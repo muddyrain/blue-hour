@@ -1,0 +1,95 @@
+; Blue Hour M0. Engine changes are an explicit project decision.
+config_version=5
+
+[application]
+config/name="Blue Hour | 蓝时归航"
+run/main_scene="res://src/app/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/description="Blue Hour first sortie candidate, based on locally observed behavior."
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+
+[input]
+practice_far_target={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":85)]
+}
+practice_long_rifle={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":50)]
+}
+practice_cross={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":72)]
+}
+practice_north={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":73)]
+}
+practice_south={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":75)]
+}
+practice_west={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":74)]
+}
+practice_east={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":76)]
+}
+practice_carbine={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":49)]
+}
+camera_left={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":65)]
+}
+camera_right={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":68)]
+}
+camera_up={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":87)]
+}
+camera_down={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":83)]
+}
+camera_zoom_in={
+"deadzone": 0.5,
+"events": [Object(InputEventMouseButton,"button_index":4)]
+}
+camera_zoom_out={
+"deadzone": 0.5,
+"events": [Object(InputEventMouseButton,"button_index":5)]
+}
+pause_sortie={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":32)]
+}
+squad_command={
+"deadzone": 0.5,
+"events": [Object(InputEventMouseButton,"button_index":1)]
+}
+return_to_title={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":4194305)]
+}
+place_probe={
+"deadzone": 0.5,
+"events": [Object(InputEventMouseButton,"button_index":1)]
+}
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+environment/defaults/default_clear_color=Color(0.035, 0.065, 0.105, 1)

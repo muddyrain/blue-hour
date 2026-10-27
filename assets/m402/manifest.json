@@ -1,0 +1,319 @@
+[
+  {
+    "file": "assets/m402/amber_full.png",
+    "canvas": [
+      1024,
+      1024
+    ],
+    "sha256": "286be6c2b7c6502736b1ab4a5725639ab2260d213f085cf5d42a0fe98c9cd544",
+    "source_sha256": "efab7ab98da37161477559340e6e45e92ec3916f6a645fd8f16f8a1e2bf420f2",
+    "source_output_id": "exec-05a53ba4-8bf6-4c33-9278-25128df528bb.png",
+    "source_tool": "built-in image_gen",
+    "rights": "Original Blue Hour artwork. Only original project references; no Deadly Days imagery.",
+    "grid": [
+      4,
+      4
+    ],
+    "frame_size": [
+      256,
+      256
+    ],
+    "anchor": [
+      128,
+      224
+    ],
+    "source_cells": [
+      [
+        0,
+        0,
+        314,
+        314
+      ],
+      [
+        314,
+        0,
+        627,
+        314
+      ],
+      [
+        627,
+        0,
+        940,
+        314
+      ],
+      [
+        940,
+        0,
+        1254,
+        314
+      ],
+      [
+        0,
+        314,
+        314,
+        627
+      ],
+      [
+        314,
+        314,
+        627,
+        627
+      ],
+      [
+        627,
+        314,
+        940,
+        627
+      ],
+      [
+        940,
+        314,
+        1254,
+        627
+      ],
+      [
+        0,
+        627,
+        314,
+        940
+      ],
+      [
+        314,
+        627,
+        627,
+        940
+      ],
+      [
+        627,
+        627,
+        940,
+        940
+      ],
+      [
+        940,
+        627,
+        1254,
+        940
+      ],
+      [
+        0,
+        940,
+        314,
+        1254
+      ],
+      [
+        314,
+        940,
+        627,
+        1254
+      ],
+      [
+        627,
+        940,
+        940,
+        1254
+      ],
+      [
+        940,
+        940,
+        1254,
+        1254
+      ]
+    ],
+    "shared_scale": 0.7384615384615385,
+    "normalization": "Common scale for all16 poses, foot anchor128,224; pose12 kneeling remains shorter."
+  },
+  {
+    "file": "assets/m402/amber_legs.png",
+    "canvas": [
+      1024,
+      1024
+    ],
+    "sha256": "bdf061489b7ed4d976e22a86b9fa5fc17e3d2fa7f6d7cb26421bb453c8b61b08",
+    "source_sha256": "efab7ab98da37161477559340e6e45e92ec3916f6a645fd8f16f8a1e2bf420f2",
+    "source_output_id": "exec-05a53ba4-8bf6-4c33-9278-25128df528bb.png",
+    "source_tool": "built-in image_gen",
+    "rights": "Original Blue Hour artwork. Only original project references; no Deadly Days imagery.",
+    "grid": [
+      4,
+      4
+    ],
+    "frame_size": [
+      256,
+      256
+    ],
+    "anchor": [
+      128,
+      224
+    ],
+    "normalization": "Derived full atlas, pixels y>=170 only. No repainting."
+  },
+  {
+    "file": "assets/m402/amber_upper.png",
+    "canvas": [
+      768,
+      256
+    ],
+    "sha256": "fb491ac4e2e638aef6f15606bd68513e9a8f8ba9c8d82b0da3c60e483f1e4548",
+    "source_sha256": "760bb5bf35d8a1c7c18bf316550c013289e64ae8e358f70dd74c746474c4338a",
+    "source_output_id": "exec-18f8c2a6-669c-4c6f-9783-69f6e7934b47.png",
+    "source_tool": "built-in image_gen",
+    "rights": "Original Blue Hour artwork. Only original project references; no Deadly Days imagery.",
+    "grid": [
+      3,
+      1
+    ],
+    "frame_size": [
+      256,
+      256
+    ],
+    "anchor": [
+      128,
+      224
+    ],
+    "waist_anchor": [
+      128,
+      174
+    ],
+    "cells": [
+      {
+        "crop": [
+          87,
+          73,
+          716,
+          659
+        ],
+        "left": 76,
+        "top": 36,
+        "scale": 0.2356902356902357
+      },
+      {
+        "crop": [
+          132,
+          72,
+          682,
+          663
+        ],
+        "left": 67,
+        "top": 35,
+        "scale": 0.2356902356902357
+      },
+      {
+        "crop": [
+          134,
+          66,
+          629,
+          660
+        ],
+        "left": 68,
+        "top": 34,
+        "scale": 0.2356902356902357
+      }
+    ],
+    "normalization": "One common scale, waist174. Side/back/front upper part; grip points calibrated separately."
+  },
+  {
+    "file": "assets/m402/rowhouse.png",
+    "canvas": [
+      512,
+      448
+    ],
+    "sha256": "9c57901ac0b9e0277111291594633b9b7c2acf1f214ae50986988110ed9b220a",
+    "source_sha256": "4bf309a321d814fcca0d1f1df3f87ad748c2f3fbfa0f5be069f9b799ba768639",
+    "source_output_id": "exec-2cb7ce14-001c-460c-8c00-da0c564a6b79.png",
+    "source_tool": "built-in image_gen",
+    "rights": "Original Blue Hour artwork. Only original project references; no Deadly Days imagery.",
+    "anchor": [
+      256,
+      416
+    ],
+    "source_crop": [
+      107,
+      129,
+      1235,
+      1090
+    ],
+    "normalization_scale": 0.3971631205673759,
+    "normalization": "Visible width448; front ground256,416; roof/front split atsourceY320."
+  },
+  {
+    "file": "assets/m402/asphalt.png",
+    "canvas": [
+      256,
+      256
+    ],
+    "sha256": "a8a9d3a25805e5ef4bb23b17db9396e22ccd8828927bc39036aa0dab74ab6951",
+    "source_sha256": "b4362af686de3c69af434c381a140f0a6c5e3bb2e0eb9fa73f4ef6caaf440a44",
+    "source_output_id": "exec-b3711acb-28b4-4674-af55-d486828aa426.png",
+    "source_tool": "built-in image_gen",
+    "rights": "Original Blue Hour artwork. Only original project references; no Deadly Days imagery.",
+    "alpha_mode": "opaque",
+    "source_crop": [
+      0,
+      0,
+      627,
+      627
+    ],
+    "normalization": "Quarter atlas crop; resize256x256; low contrast runtime blend. Painted ground only."
+  },
+  {
+    "file": "assets/m402/paving.png",
+    "canvas": [
+      256,
+      256
+    ],
+    "sha256": "47de290b3c1871d4beceffa86d6a6aff46864625d9d03f3d1f171259fda0e343",
+    "source_sha256": "b4362af686de3c69af434c381a140f0a6c5e3bb2e0eb9fa73f4ef6caaf440a44",
+    "source_output_id": "exec-b3711acb-28b4-4674-af55-d486828aa426.png",
+    "source_tool": "built-in image_gen",
+    "rights": "Original Blue Hour artwork. Only original project references; no Deadly Days imagery.",
+    "alpha_mode": "opaque",
+    "source_crop": [
+      627,
+      0,
+      1254,
+      627
+    ],
+    "normalization": "Quarter atlas crop; resize256x256; low contrast runtime blend. Painted ground only."
+  },
+  {
+    "file": "assets/m402/grass.png",
+    "canvas": [
+      256,
+      256
+    ],
+    "sha256": "b841484eebee5474104c3652fe7f741fd0f7d9d9eb7f6ae811e823a4f1a3951e",
+    "source_sha256": "b4362af686de3c69af434c381a140f0a6c5e3bb2e0eb9fa73f4ef6caaf440a44",
+    "source_output_id": "exec-b3711acb-28b4-4674-af55-d486828aa426.png",
+    "source_tool": "built-in image_gen",
+    "rights": "Original Blue Hour artwork. Only original project references; no Deadly Days imagery.",
+    "alpha_mode": "opaque",
+    "source_crop": [
+      0,
+      627,
+      627,
+      1254
+    ],
+    "normalization": "Quarter atlas crop; resize256x256; low contrast runtime blend. Painted ground only."
+  },
+  {
+    "file": "assets/m402/concrete.png",
+    "canvas": [
+      256,
+      256
+    ],
+    "sha256": "476570d9c8a4358aaa171d0fdab20ed42502cfbbb8bbca5b605ceed5592aef4c",
+    "source_sha256": "b4362af686de3c69af434c381a140f0a6c5e3bb2e0eb9fa73f4ef6caaf440a44",
+    "source_output_id": "exec-b3711acb-28b4-4674-af55-d486828aa426.png",
+    "source_tool": "built-in image_gen",
+    "rights": "Original Blue Hour artwork. Only original project references; no Deadly Days imagery.",
+    "alpha_mode": "opaque",
+    "source_crop": [
+      627,
+      627,
+      1254,
+      1254
+    ],
+    "normalization": "Quarter atlas crop; resize256x256; low contrast runtime blend. Painted ground only."
+  }
+]

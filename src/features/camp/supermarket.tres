@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MissionSupply" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/features/camp/mission_supply.gd" id="1"]
+[ext_resource type="Resource" path="res://src/features/expedition/market_loop.tres" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"supermarket"
+display_name = "超市"
+description = "从南侧进入市场环路，前往东北超市和西巷货运站。"
+layout = ExtResource("2")
+cash_reward = 4
+food_reward = 3

@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="CampRules" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/features/camp/camp_rules.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+initial_food = 2
+v1_migration_food = 2
+ration_per_member = 1

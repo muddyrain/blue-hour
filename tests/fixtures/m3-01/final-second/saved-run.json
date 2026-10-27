@@ -1,0 +1,18 @@
+{
+	"cash": 61,
+	"crew": [
+		{
+			"health": 200.0,
+			"id": 1
+		},
+		{
+			"health": 192.0,
+			"id": 2
+		}
+	],
+	"day": 4,
+	"last_settlement_id": "aef30b5fe984ded7befd21225cdfa7d5:2",
+	"profile_id": "aef30b5fe984ded7befd21225cdfa7d5",
+	"schema_version": 1,
+	"settled_sorties": 2
+}

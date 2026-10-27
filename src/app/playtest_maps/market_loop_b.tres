@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="StreetLayout" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/features/expedition/street_layout.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"market_loop"
+display_name = "青禾市场环路"
+bus_block = Rect2(808, 1168, 240, 80)
+bus_door = Vector2(1104, 1272)
+cash_block = Rect2(224, 680, 336, 216)
+cash_door = Vector2(488, 928)
+cash_title = "西巷货运站"
+food_block = Rect2(1168, 288, 448, 264)
+food_door = Vector2(1516, 584)
+food_title = "青禾超市"
+residences = Array[Rect2]([Rect2(960, 816, 320, 200), Rect2(160, 144, 320, 200), Rect2(1504, 912, 288, 184)])
+fences = Array[Rect2]([Rect2(1280, 816, 224, 20), Rect2(848, 368, 208, 20)])
+roads = Array[Rect2]([Rect2(0, 1120, 1920, 192), Rect2(640, 0, 176, 1440), Rect2(640, 584, 1088, 176)])
+yards = Array[Rect2]([Rect2(160, 896, 480, 176), Rect2(1056, 552, 640, 216), Rect2(816, 1016, 464, 104)])
+arrivals = Array[Vector2]([Vector2(752, 1168), Vector2(752, 1264)])
+enemy_points = Array[Vector2]([Vector2(1808, 704), Vector2(80, 960), Vector2(912, 80)])
+camera_start = Vector2(1008, 1040)
+route_hint = "沿市场环路绕过住宅：东北超市搜集食物，西巷货运站搜集货币与武器。"

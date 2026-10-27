@@ -1,0 +1,92 @@
+{
+	"camp_spending": 10,
+	"cash": 47,
+	"crew": [
+		{
+			"call_sign": "顾予安",
+			"condition": "active",
+			"definition_id": "crew_1",
+			"health": 200.0,
+			"id": 1,
+			"service": {
+				"damage_received": 0.0,
+				"kills": 0,
+				"last_settlement_id": "7979746132723caee71a1a5b1e898df5:1",
+				"sorties": 1
+			}
+		},
+		{
+			"call_sign": "夏之遥",
+			"condition": "active",
+			"definition_id": "crew_2",
+			"health": 200.0,
+			"id": 2,
+			"service": {
+				"damage_received": 0.0,
+				"kills": 3,
+				"last_settlement_id": "7979746132723caee71a1a5b1e898df5:1",
+				"sorties": 1
+			}
+		}
+	],
+	"day": 3,
+	"food": 0,
+	"last_day": {
+		"cash_after": 57,
+		"cash_before": 53,
+		"cash_gained": 4,
+		"day": 2,
+		"evacuated": true,
+		"food_after": 0,
+		"food_before": 2,
+		"food_consumed": 2,
+		"food_found": 0,
+		"food_overflow": 0,
+		"food_required": 2,
+		"food_shortage": 0,
+		"food_stored": 0,
+		"ration_member_ids": [
+			1,
+			2
+		],
+		"ration_per_member": 1,
+		"settlement_id": "7979746132723caee71a1a5b1e898df5:1"
+	},
+	"last_settlement_id": "7979746132723caee71a1a5b1e898df5:1",
+	"loadout": [
+		{
+			"instance_id": "7979746132723caee71a1a5b1e898df5:1:weapon:north-cache",
+			"member_id": 1
+		},
+		{
+			"instance_id": "7979746132723caee71a1a5b1e898df5:starter:1",
+			"member_id": 2
+		}
+	],
+	"profile_id": "7979746132723caee71a1a5b1e898df5",
+	"schema_version": 4,
+	"settled_sorties": 1,
+	"weapons": [
+		{
+			"acquired_sortie": "",
+			"condition": "ready",
+			"instance_id": "7979746132723caee71a1a5b1e898df5:starter:1",
+			"origin": "initial",
+			"weapon_id": "carbine"
+		},
+		{
+			"acquired_sortie": "",
+			"condition": "ready",
+			"instance_id": "7979746132723caee71a1a5b1e898df5:starter:2",
+			"origin": "initial",
+			"weapon_id": "long_rifle"
+		},
+		{
+			"acquired_sortie": "7979746132723caee71a1a5b1e898df5:1",
+			"condition": "ready",
+			"instance_id": "7979746132723caee71a1a5b1e898df5:1:weapon:north-cache",
+			"origin": "north-cache",
+			"weapon_id": "long_rifle"
+		}
+	]
+}

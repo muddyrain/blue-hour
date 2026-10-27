@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="SurvivorDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://src/features/survivors/survivor_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/p03/survivor_03.png" id="2"]
+
+[sub_resource type="AtlasTexture" id="portrait"]
+atlas = ExtResource("2")
+region = Rect2(0, 0, 256, 256)
+
+[resource]
+script = ExtResource("1")
+id = &"crew_1"
+member_id = 1
+default_display_name = "顾予安"
+gender = &"male"
+colour = Color(0.502, 0.867, 0.847, 1)
+portrait = SubResource("portrait")

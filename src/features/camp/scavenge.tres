@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MissionSupply" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/features/camp/mission_supply.gd" id="1"]
+[ext_resource type="Resource" path="res://src/features/expedition/repair_lane.tres" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"scavenge"
+display_name = "搜集"
+description = "穿过修理巷围栏缺口，搜集北侧补给间的货币与武器。"
+layout = ExtResource("2")
+cash_reward = 4
+food_reward = 0

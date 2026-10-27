@@ -1,0 +1,565 @@
+[
+  {
+    "id": "survivor_01",
+    "file": "assets/candidates/survivor_01.png",
+    "canvas": [
+      256,
+      256
+    ],
+    "anchor": [
+      128,
+      224
+    ],
+    "crop": [
+      397,
+      37,
+      948,
+      1179
+    ],
+    "source_sha256": "0bf20288a9370c1a4b2086b670af74b9c206fedd30903bb5ad8a949153aa12ec",
+    "sha256": "6bd78600489fab35bc13d782799456ea1596d84ca4c583c6d8443ae66825d63e",
+    "status": "static candidate; not final animation"
+  },
+  {
+    "id": "infected_01",
+    "file": "assets/candidates/infected_01.png",
+    "canvas": [
+      256,
+      256
+    ],
+    "anchor": [
+      128,
+      224
+    ],
+    "crop": [
+      309,
+      11,
+      1056,
+      1272
+    ],
+    "source_sha256": "b0a8685d4b6ae032e1e40514f9f13382ac25a7cc9e6e683cf4bde7e4c03e453b",
+    "sha256": "d5d7b983e4c4c3f27f7ddfcf8d2b0949490042c94cae6fb51eafc330fe7f6201",
+    "status": "static candidate; not final animation"
+  },
+  {
+    "id": "carbine_01",
+    "file": "assets/candidates/carbine_01.png",
+    "canvas": [
+      256,
+      128
+    ],
+    "anchor": [
+      128,
+      112
+    ],
+    "crop": [
+      139,
+      235,
+      1660,
+      705
+    ],
+    "source_sha256": "35612809d137283b68db9dd4be37c5c25b78cb23a9eb46632206eb4bafe7404d",
+    "sha256": "8ac2092da961123dac2cdda4250d9bb9db7c132df5fee927e2667b3f00306db1",
+    "status": "static candidate; not final animation"
+  },
+  {
+    "id": "bus_01",
+    "file": "assets/candidates/bus_01.png",
+    "canvas": [
+      512,
+      256
+    ],
+    "anchor": [
+      256,
+      232
+    ],
+    "crop": [
+      28,
+      52,
+      1753,
+      860
+    ],
+    "source_sha256": "20f8b49e56f0b320bb0dabd04f599beae05fe68280162eaff692c3f5b94ccad9",
+    "sha256": "f43ddaec8cb844468ee3d2976f906b0aeb39477e40a9ea3a51c0039c13bceac0",
+    "status": "static candidate; not final animation"
+  },
+  {
+    "id": "shop_02",
+    "file": "assets/candidates/shop_02.png",
+    "canvas": [
+      512,
+      448
+    ],
+    "anchor": [
+      256,
+      416
+    ],
+    "crop": [
+      113,
+      113,
+      1303,
+      998
+    ],
+    "source_sha256": "f5c2d1d692c0c0325da0645144fbcf890f51c78f08633615a51876edd98e23e5",
+    "sha256": "ef8f97d1eb0b3e4ba1097487942c699af88cbf0b3c01f1f9b9c2cfc8f89ecd73",
+    "status": "high oblique static candidate; native engine integration required"
+  },
+  {
+    "id": "bus_02",
+    "file": "assets/candidates/bus_02.png",
+    "canvas": [
+      512,
+      320
+    ],
+    "anchor": [
+      256,
+      288
+    ],
+    "crop": [
+      110,
+      91,
+      1686,
+      809
+    ],
+    "source_sha256": "f8ea39a67dca3ade1f49b5707507748cf94b198286e90a5069917e0ae5b106ba",
+    "sha256": "d54e3808ad73b15ae11ab0541d65a1c6e4c3d7f72532bb75b6b92bb1e5ecce32",
+    "status": "high oblique static candidate; native engine integration required"
+  },
+  {
+    "id": "survivor_03",
+    "file": "assets/p03/survivor_03.png",
+    "canvas": [
+      1024,
+      1024
+    ],
+    "grid": [
+      4,
+      4
+    ],
+    "frame_size": [
+      256,
+      256
+    ],
+    "anchor": [
+      128,
+      224
+    ],
+    "source_sha256": "a9c21e66b8da14cc5a20ef5ae260839ed0a87cd069179a9781449c9f1af7d541",
+    "sha256": "ade0d5ea99bcaadf6e6fa57d1b6fe1c33c164f2f9b315f1cf77fc34d1e1917e1",
+    "source_cells": [
+      [
+        0,
+        0,
+        314,
+        318
+      ],
+      [
+        314,
+        0,
+        627,
+        318
+      ],
+      [
+        627,
+        0,
+        940,
+        318
+      ],
+      [
+        940,
+        0,
+        1254,
+        318
+      ],
+      [
+        0,
+        318,
+        314,
+        628
+      ],
+      [
+        314,
+        318,
+        627,
+        628
+      ],
+      [
+        627,
+        318,
+        940,
+        628
+      ],
+      [
+        940,
+        318,
+        1254,
+        628
+      ],
+      [
+        0,
+        628,
+        314,
+        941
+      ],
+      [
+        314,
+        628,
+        627,
+        941
+      ],
+      [
+        627,
+        628,
+        940,
+        941
+      ],
+      [
+        940,
+        628,
+        1254,
+        941
+      ],
+      [
+        0,
+        941,
+        314,
+        1254
+      ],
+      [
+        314,
+        941,
+        627,
+        1254
+      ],
+      [
+        627,
+        941,
+        940,
+        1254
+      ],
+      [
+        940,
+        941,
+        1254,
+        1254
+      ]
+    ],
+    "shared_scale": 0.6357615894039735,
+    "status": "P03 candidate; source native motion inspected; not final art"
+  },
+  {
+    "id": "infected_03",
+    "file": "assets/p03/infected_03.png",
+    "canvas": [
+      1536,
+      1024
+    ],
+    "grid": [
+      4,
+      4
+    ],
+    "frame_size": [
+      384,
+      256
+    ],
+    "anchor": [
+      192,
+      224
+    ],
+    "source_sha256": "9bb2288d07c56ec343d4cac4a017e37d4b17ce639aaf352621afa941809fe213",
+    "sha256": "364e23819bce33da0d7ddd7c250173d025534eae3131a67d3489167f96d317d9",
+    "source_cells": [
+      [
+        0,
+        0,
+        314,
+        335
+      ],
+      [
+        314,
+        0,
+        627,
+        335
+      ],
+      [
+        627,
+        0,
+        940,
+        335
+      ],
+      [
+        940,
+        0,
+        1254,
+        335
+      ],
+      [
+        0,
+        335,
+        314,
+        627
+      ],
+      [
+        314,
+        335,
+        627,
+        627
+      ],
+      [
+        627,
+        335,
+        940,
+        627
+      ],
+      [
+        940,
+        335,
+        1254,
+        627
+      ],
+      [
+        0,
+        627,
+        314,
+        947
+      ],
+      [
+        314,
+        627,
+        627,
+        947
+      ],
+      [
+        627,
+        627,
+        940,
+        947
+      ],
+      [
+        940,
+        627,
+        1254,
+        947
+      ],
+      [
+        0,
+        947,
+        314,
+        1254
+      ],
+      [
+        314,
+        947,
+        662,
+        1254
+      ],
+      [
+        662,
+        947,
+        900,
+        1254
+      ],
+      [
+        900,
+        947,
+        1254,
+        1254
+      ]
+    ],
+    "shared_scale": 0.6357615894039735,
+    "status": "P03 candidate; source native motion inspected; not final art"
+  },
+  {
+    "id": "asphalt_03",
+    "file": "assets/p03/asphalt_03.png",
+    "canvas": [
+      256,
+      256
+    ],
+    "alpha_mode": "opaque",
+    "source_sha256": "7d9871f22421a33d6344bbee746125bdce9b8fb1a9cba4c7fa3d4a59c13b02c4",
+    "sha256": "89109e811fd77086b3d7f20cc453446ba6d60f824938b9ae49509fdc7ac20e6d",
+    "crop": [
+      0,
+      0,
+      627,
+      627
+    ],
+    "collision": "ground surface only; never adds blockers",
+    "status": "P03 painted material candidate"
+  },
+  {
+    "id": "paving_03",
+    "file": "assets/p03/paving_03.png",
+    "canvas": [
+      256,
+      256
+    ],
+    "alpha_mode": "opaque",
+    "source_sha256": "7d9871f22421a33d6344bbee746125bdce9b8fb1a9cba4c7fa3d4a59c13b02c4",
+    "sha256": "25f396bcbb814d0a2e55d81a25cad0646b5acfc87a4af15feec09ab28687c58c",
+    "crop": [
+      627,
+      0,
+      1254,
+      627
+    ],
+    "collision": "ground surface only; never adds blockers",
+    "status": "P03 painted material candidate"
+  },
+  {
+    "id": "grass_03",
+    "file": "assets/p03/grass_03.png",
+    "canvas": [
+      256,
+      256
+    ],
+    "alpha_mode": "opaque",
+    "source_sha256": "7d9871f22421a33d6344bbee746125bdce9b8fb1a9cba4c7fa3d4a59c13b02c4",
+    "sha256": "ddc506929d198a66911505670f3af23c957d730ceea74cfc703131a778928927",
+    "crop": [
+      0,
+      627,
+      627,
+      1254
+    ],
+    "collision": "ground surface only; never adds blockers",
+    "status": "P03 painted material candidate"
+  },
+  {
+    "id": "forecourt_03",
+    "file": "assets/p03/forecourt_03.png",
+    "canvas": [
+      256,
+      256
+    ],
+    "alpha_mode": "opaque",
+    "source_sha256": "7d9871f22421a33d6344bbee746125bdce9b8fb1a9cba4c7fa3d4a59c13b02c4",
+    "sha256": "7d9e31b893e2070d1c8de31dcf6b6d76d7988d4363b2b348592c19e721de56c9",
+    "crop": [
+      627,
+      627,
+      1254,
+      1254
+    ],
+    "collision": "ground surface only; never adds blockers",
+    "status": "P03 painted material candidate"
+  },
+  {
+    "id": "survivor_upper_032",
+    "file": "assets/p032/survivor_upper_032.png",
+    "canvas": [
+      768,
+      256
+    ],
+    "grid": [
+      3,
+      1
+    ],
+    "frame_size": [
+      256,
+      256
+    ],
+    "anchor": [
+      128,
+      224
+    ],
+    "waist_anchor": [
+      128,
+      174
+    ],
+    "source_sha256": "4329273a77b1497f7e1710e0c30f2562976ddcc44d83501cc4e3a3c2c5a09282",
+    "sha256": "e2c5353be65348a636be2469d07a536f2e9c15064c2e9b70eb2e6558a5a56d31",
+    "cells": [
+      {
+        "source_box": [
+          107,
+          42,
+          685,
+          662
+        ],
+        "waist_center": 330.0,
+        "scale": 0.2229299363057325,
+        "left": 78,
+        "top": 36
+      },
+      {
+        "source_box": [
+          876,
+          41,
+          1354,
+          665
+        ],
+        "waist_center": 361.0,
+        "scale": 0.2229299363057325,
+        "left": 81,
+        "top": 35
+      },
+      {
+        "source_box": [
+          1591,
+          41,
+          2047,
+          669
+        ],
+        "waist_center": 367.5,
+        "scale": 0.2229299363057325,
+        "left": 78,
+        "top": 34
+      }
+    ],
+    "status": "P03-2 upper-body grip candidate; current rifle validation first"
+  },
+  {
+    "id": "survivor_legs_032",
+    "file": "assets/p032/survivor_legs_032.png",
+    "canvas": [
+      1024,
+      1024
+    ],
+    "grid": [
+      4,
+      4
+    ],
+    "frame_size": [
+      256,
+      256
+    ],
+    "anchor": [
+      128,
+      224
+    ],
+    "source_sha256": "ade0d5ea99bcaadf6e6fa57d1b6fe1c33c164f2f9b315f1cf77fc34d1e1917e1",
+    "sha256": "e047d77e917eb3d524e593cdae2a2cfc6625fa98f7949d6975254d2e5d1f3902",
+    "normalization": "Original P03 frame pixels retained at y>=170; transparent above belt",
+    "status": "P03-2 reused walking part"
+  },
+  {
+    "id": "rifle_long_032",
+    "file": "assets/p032/rifle_long_032.png",
+    "canvas": [
+      384,
+      128
+    ],
+    "anchor": [
+      192,
+      112
+    ],
+    "source_sha256": "e6b14491da4cb7f0b4de8973841fa8138fb3f1673c2beb77f2a4bfb6034ebcda",
+    "sha256": "b2fc0edd40f21ae53047f8bb82547d9c517b1e0f3113f049f7cf32ad1434c9a3",
+    "source_box": [
+      21,
+      216,
+      2153,
+      614
+    ],
+    "scale": 0.1575984990619137,
+    "status": "P03-2 longer weapon presentation candidate; same combat rules"
+  },
+  {
+    "kind": "audio_manifest",
+    "file": "assets/audio/b1/manifest.json",
+    "sha256": "9a0b484ff20dd9f646e132d1a1aad61d756254de6507e7ed0839bd4658879f16",
+    "source": "Original mathematical synthesis; reproducible generator and six cue identities in local manifest."
+  }
+]

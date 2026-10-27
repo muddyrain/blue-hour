@@ -1,0 +1,253 @@
+[
+  {
+    "file": "assets/m403/xia_full.png",
+    "canvas": [
+      1024,
+      1024
+    ],
+    "sha256": "1b15c16ede85b9c1c391e3e66ae2510af73969875fe46d9f4cf4bc185d6bb167",
+    "source_sha256": "9264e7f0b7aefc02cc2863b68f394569935b1111d16c2a74ace6a61f6fb07bb6",
+    "source_output_id": "exec-59f2310a-3d89-4c12-9046-8682e189e28a.png",
+    "source_tool": "built-in image_gen",
+    "rights": "Original Blue Hour characters and setting only. No Deadly Days imagery.",
+    "grid": [
+      4,
+      4
+    ],
+    "frame_size": [
+      256,
+      256
+    ],
+    "anchor": [
+      128,
+      224
+    ],
+    "source_cells": [
+      [
+        0,
+        0,
+        314,
+        336
+      ],
+      [
+        314,
+        0,
+        627,
+        336
+      ],
+      [
+        627,
+        0,
+        940,
+        336
+      ],
+      [
+        940,
+        0,
+        1254,
+        336
+      ],
+      [
+        0,
+        336,
+        314,
+        640
+      ],
+      [
+        314,
+        336,
+        627,
+        640
+      ],
+      [
+        627,
+        336,
+        940,
+        640
+      ],
+      [
+        940,
+        336,
+        1254,
+        640
+      ],
+      [
+        0,
+        640,
+        314,
+        951
+      ],
+      [
+        314,
+        640,
+        627,
+        951
+      ],
+      [
+        627,
+        640,
+        940,
+        951
+      ],
+      [
+        940,
+        640,
+        1254,
+        951
+      ],
+      [
+        0,
+        951,
+        314,
+        1254
+      ],
+      [
+        314,
+        951,
+        627,
+        1254
+      ],
+      [
+        627,
+        951,
+        940,
+        1254
+      ],
+      [
+        940,
+        951,
+        1254,
+        1254
+      ]
+    ],
+    "shared_scale": 0.6233766233766234,
+    "design_source_sha256": "c2dd2103b2d8c507e458532e620d032983e2dd290ea5be96ffa6660a28469c42",
+    "normalization": "One common scale; foot128,224; no painting or pose stretching."
+  },
+  {
+    "file": "assets/m403/xia_lower.png",
+    "canvas": [
+      1024,
+      1024
+    ],
+    "sha256": "16755c8c888082a183674052d1ed65445704ea4cc5b358d135d76c946944cf77",
+    "source_sha256": "9264e7f0b7aefc02cc2863b68f394569935b1111d16c2a74ace6a61f6fb07bb6",
+    "source_output_id": "exec-59f2310a-3d89-4c12-9046-8682e189e28a.png",
+    "source_tool": "built-in image_gen",
+    "rights": "Original Blue Hour characters and setting only. No Deadly Days imagery.",
+    "grid": [
+      4,
+      4
+    ],
+    "frame_size": [
+      256,
+      256
+    ],
+    "anchor": [
+      128,
+      224
+    ],
+    "waist_cut": 140,
+    "normalization": "Derived full atlas y>=140; complete flared skirt and boots; no repainting."
+  },
+  {
+    "file": "assets/m403/xia_upper.png",
+    "canvas": [
+      768,
+      256
+    ],
+    "sha256": "0353f7eef48d3029f4d8526c4d89ba151800e8445d40aaff33e824c00ce777af",
+    "source_sha256": "c35895cf3343d4ea46eee9ae7f6d63a69e10d0a10296a564160935be2413995a",
+    "source_output_id": "exec-641f5685-fb7a-44bd-8899-8088b1f3cfb2.png",
+    "source_tool": "built-in image_gen",
+    "rights": "Original Blue Hour characters and setting only. No Deadly Days imagery.",
+    "grid": [
+      3,
+      1
+    ],
+    "frame_size": [
+      256,
+      256
+    ],
+    "anchor": [
+      128,
+      224
+    ],
+    "waist_anchor": [
+      128,
+      150
+    ],
+    "cells": [
+      {
+        "crop": [
+          97,
+          64,
+          740,
+          619
+        ],
+        "left": 77,
+        "top": 33,
+        "scale": 0.21052631578947367
+      },
+      {
+        "crop": [
+          95,
+          65,
+          623,
+          627
+        ],
+        "left": 73,
+        "top": 32,
+        "scale": 0.21052631578947367
+      },
+      {
+        "crop": [
+          132,
+          64,
+          614,
+          634
+        ],
+        "left": 76,
+        "top": 30,
+        "scale": 0.21052631578947367
+      }
+    ],
+    "normalization": "Common120 height/waist150; matches elevated dress waist, ten pixel overlap. Grip positions in CrewAppearance."
+  },
+  {
+    "file": "assets/m403/camp_blue_hour.png",
+    "canvas": [
+      1280,
+      720
+    ],
+    "sha256": "00496c4cb188bee8fc3f2097b0c4087e5c497cc00eeaa7523fe386bd2f474bd5",
+    "source_sha256": "3f42ab5da1fcd33ddebe73735263afd1c65d71094be1ff57d2ce71b73266087c",
+    "source_output_id": "exec-37c9c1cb-bafe-4389-8c1b-9e1e3bf81a5a.png",
+    "source_tool": "built-in image_gen",
+    "rights": "Original Blue Hour characters and setting only. No Deadly Days imagery.",
+    "alpha_mode": "opaque",
+    "normalization": "Whole16:9 composition resized1280x720; identity/outfit edit of original project camp image."
+  },
+  {
+    "file": "assets/m403/gender_male.svg",
+    "kind": "vector_icon",
+    "canvas": [
+      32,
+      32
+    ],
+    "sha256": "008452107bdc244b83f2990e91525b193b055caaec29488073dc5251f9d527a9",
+    "source_tool": "Original SVG paths authored for Blue Hour",
+    "rights": "Original project vector icon."
+  },
+  {
+    "file": "assets/m403/gender_female.svg",
+    "kind": "vector_icon",
+    "canvas": [
+      32,
+      32
+    ],
+    "sha256": "5b5a94f185baaaaabd3b4961c5843314bb7c288a1aae84f26e3f06a1498d02f2",
+    "source_tool": "Original SVG paths authored for Blue Hour",
+    "rights": "Original project vector icon."
+  }
+]

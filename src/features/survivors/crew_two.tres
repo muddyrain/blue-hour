@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="SurvivorDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://src/features/survivors/survivor_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/m403/xia_full.png" id="2"]
+
+[sub_resource type="AtlasTexture" id="portrait"]
+atlas = ExtResource("2")
+region = Rect2(0, 512, 256, 256)
+
+[resource]
+script = ExtResource("1")
+id = &"crew_2"
+member_id = 2
+default_display_name = "夏之遥"
+gender = &"female"
+colour = Color(0.949, 0.765, 0.498, 1)
+portrait = SubResource("portrait")

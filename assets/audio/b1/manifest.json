@@ -1,0 +1,65 @@
+{
+  "source": "Original mathematical synthesis; no recordings, external audio or Deadly Days assets.",
+  "generator": "src/features/audio_settings/generate_cues.py",
+  "generator_sha256": "159e533e74a6c53b8cac574a2780f93c3f10b8b3107c2360650062b36a7b76fd",
+  "format": "mono PCM signed 16-bit little-endian WAV, 44100 Hz, no loops",
+  "seed": 20261024,
+  "processing": "mean removed, 4 ms attack / 20 ms release sine-squared envelope, peak normalized to 0.55",
+  "status": "candidates; listening pending",
+  "assets": [
+    {
+      "cue": "ui_confirm",
+      "file": "assets/audio/b1/ui_confirm.wav",
+      "duration_s": 0.18,
+      "method": "two soft sine notes: 660 / 880 Hz, onset 0 / 0.065 s",
+      "peak": 0.54998779296875,
+      "rms": 0.1581926645131802,
+      "sha256": "fb6f48b63c2adcc54464bc61b3af982270ab57acd50e4cae361f9e72e49d214d"
+    },
+    {
+      "cue": "ui_back",
+      "file": "assets/audio/b1/ui_back.wav",
+      "duration_s": 0.17,
+      "method": "two soft sine notes: 660 / 440 Hz, onset 0 / 0.065 s",
+      "peak": 0.54998779296875,
+      "rms": 0.16276942863717261,
+      "sha256": "44c44c1f0378a78357cdb5e8a4370b5b43a747382b3214c4de09635dc323711b"
+    },
+    {
+      "cue": "fire",
+      "file": "assets/audio/b1/fire.wav",
+      "duration_s": 0.16,
+      "method": "low-pass noise (alpha .32), decay 38/s + 150 Hz body decay 30/s",
+      "peak": 0.54998779296875,
+      "rms": 0.07597623552746877,
+      "sha256": "2c7bf3923520177826dc10d72db412748e82c68b896b60f518082b365199007d"
+    },
+    {
+      "cue": "hit",
+      "file": "assets/audio/b1/hit.wav",
+      "duration_s": 0.12,
+      "method": "low-pass noise (alpha .32), decay 52/s + 310 Hz body decay 45/s",
+      "peak": 0.54998779296875,
+      "rms": 0.08382291485127062,
+      "sha256": "9dff622c2a6020457b1f9a6e972895c554dc939dc9ffee1fd21b731e3180e62c"
+    },
+    {
+      "cue": "collect_complete",
+      "file": "assets/audio/b1/collect_complete.wav",
+      "duration_s": 0.48,
+      "method": "sine triad 523.25 / 659.25 / 783.99 Hz, onset 0 / .09 / .18 s",
+      "peak": 0.54998779296875,
+      "rms": 0.15113631971420066,
+      "sha256": "14c7d3fad4fbc03460573ae2d1ba0aeae3bfa1cbd5eaaa73e008bc2b7411522c"
+    },
+    {
+      "cue": "bus_start",
+      "file": "assets/audio/b1/bus_start.wav",
+      "duration_s": 1.15,
+      "method": "rising motor 48 to 103.2 Hz + harmonics 2/3 + filtered noise; 12 Hz modulation",
+      "peak": 0.54998779296875,
+      "rms": 0.22120540583673745,
+      "sha256": "0171ead05c755e110850b1d13d3d4bf0994fa1b94f0685b04ddea7cb6adf42d8"
+    }
+  ]
+}

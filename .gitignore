@@ -1,0 +1,22 @@
+# Generated caches, local data and build outputs.
+.godot/
+/.local/
+/builds/
+/tmp/
+/output/
+.DS_Store
+Thumbs.db
+*.log
+__pycache__/
+
+# Private research and validation archives never enter the public projection.
+/docs/evidence/
+/docs/reference/
+/docs/screenshots/*.import
+*.bundle
+*.reg
+ddsave*
+*.sav
+*.avi
+*.mp4
+*.zip

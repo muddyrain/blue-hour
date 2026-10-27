@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="WeaponPresentation" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/features/expedition/weapon_presentation.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/p032/rifle_long_032.png" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"long_rifle"
+display_name = "长管步枪"
+texture = ExtResource("2")
+grip_pixel = Vector2(105, 89)
+muzzle_pixel = Vector2(359, 72)
+display_scale = 0.17
+direction_layers = PackedInt32Array(2, 2, 2)

@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="StreetLayout" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/features/expedition/street_layout.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"repair_lane"
+display_name = "旧街修理巷"
+bus_block = Rect2(112, 1008, 240, 80)
+bus_door = Vector2(408, 1112)
+cash_block = Rect2(464, 384, 368, 216)
+cash_door = Vector2(748, 632)
+cash_title = "修理巷补给间"
+food_block = Rect2(1184, 224, 320, 200)
+food_door = Vector2(1400, 456)
+food_title = "柳巷住宅"
+residences = Array[Rect2]([Rect2(1184, 704, 320, 200), Rect2(152, 192, 240, 180)])
+fences = Array[Rect2]([Rect2(384, 816, 272, 20), Rect2(752, 816, 240, 20), Rect2(864, 544, 256, 20)])
+roads = Array[Rect2]([Rect2(64, 976, 1568, 192), Rect2(640, 632, 160, 536), Rect2(832, 480, 864, 144)])
+yards = Array[Rect2]([Rect2(416, 600, 608, 192), Rect2(1088, 424, 512, 200)])
+arrivals = Array[Vector2]([Vector2(480, 1040), Vector2(480, 1136)])
+enemy_points = Array[Vector2]([Vector2(1808, 1056), Vector2(1056, 160), Vector2(1360, 1328)])
+camera_start = Vector2(744, 864)
+route_hint = "穿过围栏缺口，前往北侧补给间；搜集货币与武器后回到西南巴士。"

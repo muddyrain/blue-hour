@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="WeaponDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/features/loadout/weapon_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://assets/p032/long_rifle_view.tres" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"long_rifle"
+display_name = "长管步枪"
+presentation = ExtResource("2")

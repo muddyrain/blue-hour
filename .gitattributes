@@ -1,0 +1,25 @@
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.webp binary
+*.mp4 binary
+*.ttf binary
+*.woff2 binary
+*.exe binary
+*.pck binary
+# Preserve captured bytes; their checksums include native line endings/spacing.
+docs/evidence/m3-01/** -text -whitespace
+docs/evidence/m3-02/** -text -whitespace
+docs/evidence/m3-02-reference/** -text -whitespace
+docs/evidence/worktree-return/** -text -whitespace
+docs/evidence/m3-03/** -text -whitespace
+docs/evidence/m3-03-reference/** -text -whitespace
+docs/evidence/m3-04/** -text -whitespace
+docs/evidence/m3-04-reference/** -text -whitespace
+docs/evidence/m4-01/** -text -whitespace
+docs/evidence/m4-02/** -text -whitespace
+docs/evidence/m4-03/** -text -whitespace
+docs/evidence/m5-01/** -text -whitespace
+docs/evidence/m5-02/** -text -whitespace
+docs/evidence/m5-03/** -text -whitespace
+docs/evidence/m5-03-review/** -text -whitespace

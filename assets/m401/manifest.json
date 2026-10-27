@@ -1,0 +1,43 @@
+[
+  {
+    "alpha_mode": "opaque",
+    "canvas": [
+      1280,
+      720
+    ],
+    "source_role": "original title/camp illustration",
+    "normalization": "center crop to16:9 and resize1280x720",
+    "file": "assets/m401/camp_blue_hour.png",
+    "sha256": "51da379581d50e286e0e95c2d01594d98aaf5672204a41a10e15664a65405f50",
+    "source_sha256": "ff53de23c5ba08fb0040e1c7313ccdb8020745403ce871d2d4957d2608764b23",
+    "source_tool": "built-in image_gen",
+    "source_output_id": "exec-a49022ff-dec0-4044-a347-386cde4cdc08.png",
+    "rights": "Original generated for Blue Hour. References only existing original Blue Hour assets; no Deadly Days imagery.",
+    "status": "candidate; native acceptance evidence is recorded in docs/plan.md"
+  },
+  {
+    "canvas": [
+      512,
+      448
+    ],
+    "anchor": [
+      256,
+      416
+    ],
+    "source_crop": [
+      75,
+      143,
+      1301,
+      1050
+    ],
+    "normalization_scale": 0.36541598694942906,
+    "source_role": "distinct flat-roof supermarket sprite",
+    "file": "assets/m401/market.png",
+    "sha256": "143eac13476303b39e7532905222b2f079c4b3df2293bbf72343f1beb907e57d",
+    "source_sha256": "e552c2e3be631d3b546b7cf679efd04aac8de233afe32f9d460bed1e2316d8ec",
+    "source_tool": "built-in image_gen",
+    "source_output_id": "exec-00810043-474d-4359-8db6-66947a79fd4e.png",
+    "rights": "Original generated for Blue Hour. References only existing original Blue Hour assets; no Deadly Days imagery.",
+    "status": "candidate; native acceptance evidence is recorded in docs/plan.md"
+  }
+]

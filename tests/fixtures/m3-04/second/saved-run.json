@@ -1,0 +1,99 @@
+{
+	"camp_spending": 0,
+	"cash": 51,
+	"crew": [
+		{
+			"call_sign": "Azure",
+			"condition": "active",
+			"definition_id": "crew_1",
+			"health": 196.0,
+			"id": 1,
+			"service": {
+				"damage_received": 4.0,
+				"kills": 5,
+				"last_settlement_id": "8b6849a6db82b607accf9e90c73af2af:2",
+				"sorties": 2
+			}
+		},
+		{
+			"call_sign": "Amber",
+			"condition": "active",
+			"definition_id": "crew_2",
+			"health": 192.0,
+			"id": 2,
+			"service": {
+				"damage_received": 8.0,
+				"kills": 11,
+				"last_settlement_id": "8b6849a6db82b607accf9e90c73af2af:2",
+				"sorties": 2
+			}
+		}
+	],
+	"day": 4,
+	"food": 4,
+	"last_day": {
+		"cash_after": 51,
+		"cash_before": 47,
+		"cash_gained": 4,
+		"day": 3,
+		"evacuated": true,
+		"food_after": 4,
+		"food_before": 3,
+		"food_consumed": 2,
+		"food_found": 3,
+		"food_overflow": 0,
+		"food_required": 2,
+		"food_shortage": 0,
+		"food_stored": 3,
+		"ration_member_ids": [
+			1,
+			2
+		],
+		"ration_per_member": 1,
+		"settlement_id": "8b6849a6db82b607accf9e90c73af2af:2"
+	},
+	"last_settlement_id": "8b6849a6db82b607accf9e90c73af2af:2",
+	"loadout": [
+		{
+			"instance_id": "8b6849a6db82b607accf9e90c73af2af:1:weapon:north-cache",
+			"member_id": 1
+		},
+		{
+			"instance_id": "8b6849a6db82b607accf9e90c73af2af:starter:1",
+			"member_id": 2
+		}
+	],
+	"profile_id": "8b6849a6db82b607accf9e90c73af2af",
+	"schema_version": 4,
+	"settled_sorties": 2,
+	"weapons": [
+		{
+			"acquired_sortie": "",
+			"condition": "ready",
+			"instance_id": "8b6849a6db82b607accf9e90c73af2af:starter:1",
+			"origin": "initial",
+			"weapon_id": "carbine"
+		},
+		{
+			"acquired_sortie": "",
+			"condition": "ready",
+			"instance_id": "8b6849a6db82b607accf9e90c73af2af:starter:2",
+			"origin": "initial",
+			"weapon_id": "long_rifle"
+		},
+		{
+			"acquired_sortie": "8b6849a6db82b607accf9e90c73af2af:1",
+			"condition": "ready",
+			"instance_id": "8b6849a6db82b607accf9e90c73af2af:1:weapon:north-cache",
+			"origin": "north-cache",
+			"weapon_id": "long_rifle"
+		},
+		{
+			"acquired_sortie": "8b6849a6db82b607accf9e90c73af2af:2",
+			"condition": "damaged",
+			"instance_id": "8b6849a6db82b607accf9e90c73af2af:2:weapon:north-cache",
+			"origin": "north-cache",
+			"weapon_id": "long_rifle"
+		}
+	]
+}

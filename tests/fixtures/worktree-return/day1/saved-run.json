@@ -1,0 +1,40 @@
+{
+	"cash": 57,
+	"crew": [
+		{
+			"health": 200.0,
+			"id": 1
+		},
+		{
+			"health": 200.0,
+			"id": 2
+		}
+	],
+	"day": 3,
+	"food": 3,
+	"last_day": {
+		"cash_after": 57,
+		"cash_before": 53,
+		"cash_gained": 4,
+		"day": 2,
+		"evacuated": true,
+		"food_after": 3,
+		"food_before": 2,
+		"food_consumed": 2,
+		"food_found": 3,
+		"food_overflow": 0,
+		"food_required": 2,
+		"food_shortage": 0,
+		"food_stored": 3,
+		"ration_member_ids": [
+			1,
+			2
+		],
+		"ration_per_member": 1,
+		"settlement_id": "df9ddfa7e5c846f8f365b1c14589a816:1"
+	},
+	"last_settlement_id": "df9ddfa7e5c846f8f365b1c14589a816:1",
+	"profile_id": "df9ddfa7e5c846f8f365b1c14589a816",
+	"schema_version": 2,
+	"settled_sorties": 1
+}

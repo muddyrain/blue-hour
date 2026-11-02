@@ -2,8 +2,10 @@ class_name SurvivorRoster
 extends RefCounted
 ## Persistent identity and observed service records, never a substitute XP system.
 
+const MAX_MEMBER_ID: int = 2_147_483_645
+
 const Definitions: Array[SurvivorDefinition] = [preload("res://src/features/survivors/crew_one.tres"),
-	preload("res://src/features/survivors/crew_two.tres")]
+	preload("res://src/features/survivors/crew_two.tres"), preload("res://src/features/survivors/crew_three.tres"), preload("res://src/features/survivors/crew_4.tres"), preload("res://src/features/survivors/crew_5.tres")]
 
 
 static func definition(member_id: int) -> SurvivorDefinition:
@@ -11,6 +13,17 @@ static func definition(member_id: int) -> SurvivorDefinition:
 		if item.member_id == member_id:
 			return item
 	return null
+
+
+static func definition_by_id(identity: String) -> SurvivorDefinition:
+	for item: SurvivorDefinition in Definitions:
+		if String(item.id) == identity:
+			return item
+	return null
+
+
+static func definition_for(entry: Dictionary) -> SurvivorDefinition:
+	return definition_by_id(String(entry.get("definition_id", "")))
 
 
 static func member(crew: Array, member_id: int) -> Dictionary:
@@ -26,14 +39,31 @@ static func new_crew() -> Array[Dictionary]:
 	return crew
 
 
-static func initialize(crew: Array) -> void:
-	for entry: Dictionary in crew:
-		var base: SurvivorDefinition = definition(int(entry.id))
+static func initialize(crew: Array) -> String:
+	if crew.is_empty():
+		return "初始名册不能为空"
+	var templates: Array[SurvivorDefinition] = []
+	var ids: Array[int] = []
+	for value: Variant in crew:
+		if not value is Dictionary or not RunSave._integer(value.get("id"),1,MAX_MEMBER_ID) or int(value.id) in ids:
+			return "初始成员身份无效或重复"
+		if not RunSave._number(value.get("health")) or float(value.health) < 0.0 or float(value.health) > 200.0:
+			return "初始成员生命无效"
+		var base: SurvivorDefinition = definition_by_id(String(value.definition_id)) if value.has("definition_id") else definition(int(value.id))
+		if base == null:
+			return "初始成员模板未知"
+		ids.append(int(value.id))
+		templates.append(base)
+	# Validate every seed before initializing; a bad later seed must not reset earlier history.
+	for index: int in range(crew.size()):
+		var entry: Dictionary = crew[index]
+		var base: SurvivorDefinition = templates[index]
 		entry.definition_id = String(base.id)
 		entry.call_sign = base.default_display_name
 		entry.condition = "active" if float(entry.health) > 0.0 else "down"
 		entry.service = {"sorties":0,"kills":0,"damage_received":0.0,"last_settlement_id":""}
 	SurvivorGrowth.initialize(crew)
+	return ""
 
 
 static func name_problem(value: Variant) -> String:
@@ -45,9 +75,9 @@ static func name_problem(value: Variant) -> String:
 	return ""
 
 
-static func validate(entry: Dictionary, data: Dictionary) -> String:
-	var base: SurvivorDefinition = definition(int(entry.id))
-	if entry.size() != (7 if int(data.schema_version) >= 5 else 6) or entry.get("definition_id") != String(base.id):
+static func validate(entry: Dictionary, data: Dictionary, dynamic_identity: bool = false) -> String:
+	var base: SurvivorDefinition = definition_by_id(String(entry.get("definition_id", ""))) if dynamic_identity else definition(int(entry.id))
+	if base == null or entry.size() != (7 if int(data.schema_version) >= 5 else 6) or entry.get("definition_id") != String(base.id):
 		return "队员档案字段或基础定义无效"
 	if not name_problem(entry.get("call_sign")).is_empty():
 		return name_problem(entry.get("call_sign"))
@@ -59,7 +89,7 @@ static func validate(entry: Dictionary, data: Dictionary) -> String:
 		return "队员战绩字段无效"
 	if not RunSave._integer(service.get("sorties"), 0, int(data.settled_sorties)) or not RunSave._integer(service.get("kills"), 0, RunSave.MAX_COUNTER):
 		return "队员战绩次数无效"
-	if not RunSave._number(service.get("damage_received")) or float(service.damage_received) < 0.0 or float(service.damage_received) > float(service.sorties) * 200.0 + 0.000001:
+	if not RunSave._number(service.get("damage_received")) or float(service.damage_received) < 0.0 or float(service.damage_received) > float(service.sorties) * SurvivorGrowth.maximum(data,entry) + 0.000001:
 		return "队员累计受伤无效"
 	if not service.get("last_settlement_id") is String:
 		return "队员战绩结算身份无效"
@@ -79,12 +109,13 @@ static func record(after: Dictionary, before: Dictionary, report: Dictionary, id
 	# Legacy callers/fixtures have no per-actor record. Do not invent their history.
 	if not report.has("member_records"):
 		return ""
-	if not report.member_records is Array or report.member_records.size() != 2:
+	var expected_count: int = report.participants.size() if report.has("participants") else 2
+	if not report.member_records is Array or report.member_records.size() != expected_count:
 		return "出击成员记录不完整"
 	var ids: Array[int] = []
 	var kill_total: int = 0
 	for value: Variant in report.member_records:
-		if not value is Dictionary or value.size() != 3 or not RunSave._integer(value.get("id"),1,2):
+		if not value is Dictionary or value.size() != 3 or not RunSave._integer(value.get("id"),1,MAX_MEMBER_ID if report.has("participants") else 2):
 			return "出击成员记录字段无效"
 		var member_id: int = int(value.id)
 		if member_id in ids or not RunSave._integer(value.get("kills"),0,RunSave.MAX_COUNTER) or not RunSave._number(value.get("damage_received")):
@@ -92,6 +123,8 @@ static func record(after: Dictionary, before: Dictionary, report: Dictionary, id
 		ids.append(member_id)
 		var previous: Dictionary = member(before.crew, member_id)
 		var current: Dictionary = member(after.crew, member_id)
+		if previous.is_empty() or current.is_empty():
+			return "出击成员不在名册中"
 		if float(value.damage_received) < 0.0 or not is_equal_approx(float(previous.health) - float(current.health), float(value.damage_received)):
 			return "受伤记录与实际生命变化不符"
 		if float(previous.health) <= 0.0:

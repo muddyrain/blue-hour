@@ -6,6 +6,7 @@ signal closed
 
 var selected_member_id: int = 1
 var member_buttons: Array[Button] = []
+var buttons_by_id: Dictionary[int,Button] = {}
 var training_button: Button
 var back_button: Button
 var status: Label
@@ -18,6 +19,8 @@ var _identity: Label
 var _gender: GenderBadge
 var _alias: Label
 var _life: Label
+var _subtitle: Label
+var _members_list: VBoxContainer
 
 
 func _ready() -> void:
@@ -32,25 +35,20 @@ func _ready() -> void:
 	column.add_theme_constant_override("separation",10)
 	add_child(column)
 	_label(column,"成长与特性 / 行动记录",30)
-	_label(column,"成长规则待校准；本页记录真实出击事实，不折算经验。",16)
+	_subtitle = _label(column,"成长规则待校准；本页记录真实出击事实，不折算经验。",16)
 	var body: HBoxContainer = HBoxContainer.new()
 	body.add_theme_constant_override("separation",24)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(body)
 	var members: VBoxContainer = VBoxContainer.new()
 	members.custom_minimum_size.x = 248
-	body.add_child(members)
-	for id: int in [1,2]:
-		var button: Button = Button.new()
-		button.text = SurvivorRoster.definition(id).default_display_name
-		button.custom_minimum_size.y = 42
-		button.add_theme_font_size_override("font_size",20)
-		button.add_theme_color_override("font_color",SurvivorRoster.definition(id).colour)
-		button.pressed.connect(func() -> void:
-			selected_member_id = id
-			refresh(_data))
-		members.add_child(button)
-		member_buttons.append(button)
+	var member_scroll: ScrollContainer = ScrollContainer.new()
+	member_scroll.custom_minimum_size.x = 310
+	member_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	member_scroll.follow_focus = true
+	body.add_child(member_scroll)
+	member_scroll.add_child(members)
+	_members_list = members
 	var identity_row: HBoxContainer = HBoxContainer.new()
 	members.add_child(identity_row)
 	_identity = _label(identity_row,"",24)
@@ -93,6 +91,9 @@ func _ready() -> void:
 
 func refresh(data: Dictionary) -> void:
 	_data = data.duplicate(true)
+	_sync_members()
+	for id: int in buttons_by_id:
+		buttons_by_id[id].visible = not SurvivorRoster.member(_data.crew,id).is_empty()
 	var member: Dictionary = SurvivorRoster.member(_data.crew,selected_member_id)
 	var definition: SurvivorDefinition = SurvivorRoster.definition(selected_member_id)
 	_identity.text = definition.default_display_name
@@ -100,8 +101,19 @@ func refresh(data: Dictionary) -> void:
 	_gender.set_definition(definition)
 	_portrait.texture = definition.portrait
 	_alias.text = "呼号：" + String(member.call_sign)
-	_life.text = "生命 %.0f / 200 · 已有战绩保留" % float(member.health)
+	_life.text = "生命 %.0f / %.0f · 已有战绩保留" % [float(member.health),SurvivorGrowth.maximum(_data,member)]
 	status.text = "人物等级：尚未开放　/　经验：未换算\n个人特性：未确定　/　特性进度：尚未开放"
+	_subtitle.text = "成长规则待校准；本页记录真实出击事实，不折算经验。"
+	if GrowthState.is_family(_data):
+		_subtitle.text = "个人经验与等级试运行 · PROJECT_TEMP · 归航且存活才生效"
+		status.text = "人物等级 Lv%d · 累计 %d XP · 下一级 %d XP\n个人特性和食物训练尚未开放。" % [int(member.growth.level),int(member.growth.xp_total),GrowthRules.threshold(int(member.growth.level)+1)]
+	if TraitState.is_family(_data):
+		_subtitle.text = "普通经验与个人特性独立 · PROJECT_TEMP · 归航且存活才结算"
+		status.text = "普通 Lv%d · 累计 %d XP · 下一级 %d XP\n%s" % [int(member.growth.level),int(member.growth.xp_total),GrowthRules.threshold(int(member.growth.level)+1),TraitRules.description(member)]
+	if TrainingState.is_family(_data):
+		_subtitle.text = "普通经验与Trait独立 · 出击成长归航结算；食物训练营地确认 · PROJECT_TEMP"
+	training_button.tooltip_text = "在营地篝火预览1粮换本人Trait进度1；训练不增加普通XP、生命或日期。" if TrainingState.is_family(_data) else "本角色训练费用与效果尚未校准；不会扣粮、升级或回血。"
+	training_button.text = "食物训练 · 请返回营地篝火" if TrainingState.is_family(_data) else "食物训练 · 尚未开放"
 	for child: Node in records.get_children():
 		records.remove_child(child)
 		child.queue_free()
@@ -109,13 +121,13 @@ func refresh(data: Dictionary) -> void:
 	var action: Dictionary = member.growth.last_action
 	if action.is_empty():
 		action_summary.text = "尚无本版本行动明细"
-		_label(records,"旧战绩完整保留；从本版本的实际出击开始记录。\n没有回填历史经验或升级。",18)
+		_label(records,"每次真实个人击退+10 XP，归航且存活才生效；没有分享以前的经验。" if GrowthState.is_family(_data) else "旧战绩完整保留；从本版本的实际出击开始记录。\n没有回填历史经验或升级。",18)
 		return
 	var map_name: String = "旧街修理巷" if action.map_id == "repair_lane" else "青禾市场环路"
 	action_summary.text = "最近行动 · %s · %s\n确认击退 %d · 显示最近 %d 条" % [map_name,
 		"已撤离" if action.evacuated else "行动结束",int(action.total),action.recent.size()]
 	if action.recent.is_empty():
-		_label(records,"此次没有个人确认击退记录；本版本不将战绩换算为经验。",18)
+		_label(records,"此次没有个人确认击退；本次经验+0。" if GrowthState.is_family(_data) else "此次没有个人确认击退记录；本版本不将战绩换算为经验。",18)
 	for receipt: Dictionary in action.recent:
 		var seconds: int = int(receipt.at_ms) / 1000
 		_label(records,"%02d:%02d　%s · 确认击退" % [seconds / 60,seconds % 60,
@@ -130,3 +142,21 @@ func _label(parent: Node, text: String, font_size: int) -> Label:
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	parent.add_child(label)
 	return label
+
+
+func _sync_members() -> void:
+	for member: Dictionary in _data.crew:
+		var id: int = int(member.id)
+		if buttons_by_id.has(id): continue
+		var button: Button = Button.new()
+		button.text = SurvivorRoster.definition(id).default_display_name
+		button.custom_minimum_size.y = 42
+		button.add_theme_font_size_override("font_size",20)
+		button.add_theme_color_override("font_color",SurvivorRoster.definition(id).colour)
+		button.pressed.connect(func() -> void:
+			selected_member_id = id
+			refresh(_data))
+		_members_list.add_child(button)
+		_members_list.move_child(button,member_buttons.size())
+		member_buttons.append(button)
+		buttons_by_id[id] = button

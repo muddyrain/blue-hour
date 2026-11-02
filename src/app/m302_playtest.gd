@@ -236,6 +236,10 @@ func _finish_proof() -> void:
 		await _click_control("Interface/Screen/Title/Quit")
 	else:
 		app._quit()
+	# Quit now requests confirmation; exercise that UI instead of leaving the
+	# old controller waiting forever for the previous immediate-quit behavior.
+	await _wait(0.1)
+	await _click_screen(app.pause_menu.buttons[1].get_global_rect().get_center())
 
 
 func _write_json(name: String, data: Dictionary) -> void:

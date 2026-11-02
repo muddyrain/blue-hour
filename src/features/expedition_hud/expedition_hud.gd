@@ -30,6 +30,8 @@ var _bus_button: Button
 var _help_button: Button
 var _help: PanelContainer
 var _members: Array[Dictionary] = []
+var _members_parent: HBoxContainer
+var _members_grid: GridContainer
 
 
 func _ready() -> void:
@@ -92,14 +94,30 @@ func refresh(state: Dictionary) -> void:
 	_bus_button.disabled = state.get("bus_action_enabled", false) != true
 	_hint.text = _text(state, "status_hint")
 	_hint.visible = not _hint.text.is_empty()
-	var members: Variant = state.get("survivors", [])
-	for index: int in range(2):
+	var supplied: Variant = state.get("survivors", [])
+	var members: Array[Dictionary] = []
+	if supplied is Array:
+		for value: Variant in supplied:
+			if value is Dictionary:
+				members.append(value)
+	members.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("id",0)) < int(b.get("id",0)))
+	var count: int = members.size() if not members.is_empty() else 2
+	var container: Control = _members_grid if count > 2 else _members_parent
+	while _members.size() < count:
+		_build_member(container, _members.size())
+	_members_grid.visible = count > 2
+	for index: int in range(_members.size()):
+		var box: Control = _members[index].box
+		if box.get_parent() != container:
+			box.get_parent().remove_child(box)
+			container.add_child(box)
+		if container == _members_grid:
+			container.move_child(box,index)
+		box.visible = index < count
+	for index: int in range(count):
 		var member: Dictionary = {}
-		if members is Array:
-			for value: Variant in members:
-				if value is Dictionary and value.get("id", 0) == index + 1:
-					member = value
-					break
+		if index < members.size():
+			member = members[index]
 		_refresh_member(index, member)
 	# Disabled native buttons can still receive explicit focus neighbors.
 	# Release existing focus and remove this action from keyboard navigation.
@@ -137,6 +155,12 @@ func _build_top() -> void:
 	_time_hint = _label(_time_box, "TimeHint", 15)
 	for label: Label in [_time_label, _time_text, _time_hint]:
 		_wrap(label)
+	_members_parent = row
+	_members_grid = GridContainer.new()
+	_members_grid.columns = 2
+	_passive(_members_grid)
+	row.add_child(_members_grid)
+	_members_grid.hide()
 	for index: int in range(2):
 		_build_member(row, index)
 
@@ -145,9 +169,12 @@ func _build_member(parent: Control, index: int) -> void:
 	var box: VBoxContainer = _column(parent)
 	box.name = "Member%d" % (index + 1)
 	box.custom_minimum_size.x = 176
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var title: Label = _label(box, "Identity", 18)
-	title.add_theme_color_override("font_color", IDENTITY_COLORS[index])
-	_wrap(title)
+	title.mouse_filter = Control.MOUSE_FILTER_PASS
+	title.add_theme_color_override("font_color", IDENTITY_COLORS[index % 2])
+	title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	var health: Label = _label(box, "Health", 16)
 	_wrap(health)
 	var bar: ProgressBar = ProgressBar.new()
@@ -158,10 +185,10 @@ func _build_member(parent: Control, index: int) -> void:
 	bar.step = 0.0
 	_passive(bar)
 	var fill: StyleBoxFlat = StyleBoxFlat.new()
-	fill.bg_color = IDENTITY_COLORS[index]
+	fill.bg_color = IDENTITY_COLORS[index % 2]
 	bar.add_theme_stylebox_override("fill", fill)
 	box.add_child(bar)
-	_members.append({"title": title, "health": health, "bar": bar})
+	_members.append({"box":box,"title": title, "health": health, "bar": bar})
 
 
 func _build_actions() -> void:
@@ -217,7 +244,14 @@ func _refresh_member(index: int, state: Dictionary) -> void:
 	var title: Label = _members[index]["title"]
 	var health: Label = _members[index]["health"]
 	var bar: ProgressBar = _members[index]["bar"]
-	title.text = "%02d  %s" % [index + 1, _text(state, "label", "队员 %d" % (index + 1))]
+	var member_id: int = int(state.get("id", index + 1))
+	var full_name: String = _text(state,"label","队员 %d" % member_id)
+	title.tooltip_text = full_name
+	var call_sign: String = _text(state,"call_sign",full_name)
+	title.text = "%02d  %s" % [member_id,(call_sign.left(5)+"…" if call_sign.length()>6 else call_sign) if _members_grid.visible else full_name]
+	var colour: Color = state.get("colour", IDENTITY_COLORS[index % 2])
+	title.add_theme_color_override("font_color", colour)
+	(bar.get_theme_stylebox("fill") as StyleBoxFlat).bg_color = colour
 	var hp: Variant = state.get("hp")
 	var maximum: Variant = state.get("max_hp")
 	if not _finite_number(hp) or not _finite_number(maximum) or float(maximum) <= 0.0:
@@ -226,7 +260,11 @@ func _refresh_member(index: int, state: Dictionary) -> void:
 		bar.modulate.a = 0.35
 		return
 	var safe_hp: float = clampf(float(hp), 0.0, float(maximum))
-	health.text = "生命 %s / %s" % [str(ceili(safe_hp)), str(ceili(float(maximum)))]
+	health.text = ("HP %s/%s" if _members_grid.visible else "生命 %s / %s") % [str(ceili(safe_hp)), str(ceili(float(maximum)))]
+	if _finite_number(state.get("level")) and int(state.level) > 0:
+		health.text += " · Lv%d" % int(state.level)
+	if _members_grid.visible and not _text(state,"status").is_empty():
+		health.text += " · " + _text(state,"status")
 	bar.value = safe_hp / float(maximum)
 	bar.modulate.a = 1.0
 

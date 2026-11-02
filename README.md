@@ -1,67 +1,53 @@
 # 蓝时归航 · Blue Hour
 
-一款独立制作的 Godot 2D 生存 Roguelite。带领顾予安与夏之遥穿过街区，在搜集物资、守住队友和及时归航之间作出选择。
+Godot 2D 单机 Windows 生存原型。带领幸存者穿过街区，搜集物资、守住队友，再集合至巴士归航。
 
-![蓝时归航首页](docs/screenshots/home.png)
+**开发源码快照，截至 M5-ANIM-01 动画原型。不是正式发行版。** 动画阶段为 GO-ANIM-PILOT；正式生存发布门禁为 **BLOCKED / NO-GO-PRODUCTION**。已稳定复现 `RECORD_READBACK:RECORD_HASH` 暂存写入拒绝，尚未修复；不要用本原型承载唯一的重要进度。
 
-首页图来自 M4-03 的首次进入状态，保留原始画面。全部选图的版本与场景见[截图说明](docs/screenshots/README.md)。
+![八方向动作展示](docs/screenshots/eight-directions.png)
 
-## 当前能玩什么
+这是受控方向展示，使用真实角色路径，并非自然刷怪。图片场景和条件见[截图说明](docs/screenshots/README.md)。
 
-从营地选择修理巷或青禾市场，指派一人搜集，让另一人警戒或移动交火；带上钱粮和损坏武器，发动巴士，再明确下令集合。回到营地后结算一次，维修、配装、查看行动记录，并保存到下一次启动。
+## 当前能做什么
 
-- 实际敌人 AI、寻路、攻击与受击；建筑挡住枪线，绕角后恢复合法开火。
-- 青禾市场货运站附近有短视距侧路。继续驻守可能遭到近战；及时取消搜集并移动、集合或撤离可以避险。
-- 逗留越久，普通敌人的增援间隔越短。暂停冻结世界，但仍可安排下一步行动。
-- 发动巴士不会自动召回人员；集合人数来自实际位置，集合命令不会打断正在搜集的工人。
-- 武器按实例保存；呼号、伤情、战绩和真实行动记录可跨进程恢复。
+普通默认入口仍保留双人旧旅程。下面的成长、生存和多人成果属于显式开启的**隔离111试运行**，不自动迁移旧档。
 
-![青禾市场正常搜集](docs/screenshots/market-scavenging.png)
+- 双街区真实寻路、墙体LOS、自动战斗、搜集与巴士全员集合。
+- 单图一个救援目标，多个原创候选；确认后当场入队、交战和归航。
+- 最多四名存活者，历史名册可保留五人；真实阵亡后可救援剩余候选补位，死者历史不复活。
+- 本人普通XP、Trait与食物训练，营地档案、维修、配装和跨进程营地保存。
+- 卡宾与长管的基础差异，独立武器实例、品质、武器等级和首批有效词条。
+- 普通、疾奔、重压三类敌人及四阶段夜间混合增援；重压攻击有可规避的真实前摇。
+- 五种幸存者的八方向移动/瞄准，以及持枪、移动射击、受击、倒地；敌人独立姿态与部分明确镜像。
 
-这是内容基线 `edf9bd9` 的公开候选快照，不包含之后的 P0 公共基础开发。当前只有两张固定原创地图、两名正式角色和两种武器。经验升级、特性效果、食物训练与正式永久死亡尚未开放，也没有完整随机城镇或整局进程恢复。
+以上人数、数值和素材均为 **PROJECT_TEMP**。夜间自然压力仍待平衡，动画仍有共帧、离散转向和贴身遮挡。查看[已知限制](docs/KNOWN_LIMITATIONS.md)及[功能与入口](docs/features/README.md)。
 
-## 开始运行
+![自然夜间混合敌种](docs/screenshots/night-enemies.png)
 
-当前验证目标是 Windows x86_64，使用 Godot **4.7.2.stable.official.ed1daf0bf** 与 Compatibility 渲染器；完整版本锁见 [.godot-version](.godot-version)。其他操作系统和跨机器兼容性没有在此候选中验收。
+## 运行与可复测检查
 
-开发工具需要 Python 3.10+；图像校验额外需要 Pillow，游戏运行本身不依赖 Python。将固定版本引擎加入 PATH（命令名 `godot` 或 `godot4`），或把 `GODOT_BIN` 设置为本机引擎可执行文件。所有 Godot 入口也接受 `--godot` 参数。
-
-在项目根目录执行：
+固定 Godot **4.7.2.stable.official.ed1daf0bf**，Compatibility 渲染器；Python 3.10+，资源检查另需 Pillow。当前验收目标为 Windows x86_64，其他平台未验。把引擎加入PATH，或使用 `--godot` / `GODOT_BIN` 指定本机引擎。
 
 ```powershell
 python -m pip install Pillow==12.3.0
-python tools/godot.py check
-python tools/godot.py run
+python tools/godot.py check --godot <引擎可执行文件>
+python tools/godot.py run --godot <引擎可执行文件>
 ```
 
-先执行 `check` 完成导入和回归检查。也可用固定版本 Godot 项目管理器导入 [project.godot](project.godot)。运行时有已有进度先选择“继续游戏”；新游戏遇旧档会要求确认。
+公开 `check` 是不依赖私有原件的复测子集：导入、默认及111主场景启动、战斗/导航/动作组件和资源检查。已知哈希缺陷以单float重现器单列为 EXPECTED_KNOWN_FAILURE；检查退出0不代表修复或通过发布门禁。完整内部恢复/强杀/历史档矩阵未随源码发布，不能把既有内部验收算成本公共克隆通过。详见[验证边界](docs/VALIDATION.md)。
 
-若要自行构建 Windows 程序，先安装匹配的 Windows x86_64 debug/release 导出模板，再执行：
+显式111原型请在独立本地目录运行：
 
 ```powershell
-python tools/godot.py export
+python tools/godot.py run --enemy-trial --profile .local/demo --godot <引擎可执行文件>
 ```
 
-产物写到本地 `builds/windows`；启动 EXE 时保留相邻 PCK。本仓库当前没有已发布的 Windows 安装包、Release 或下载链接，构建产物不进入源码树。
+后续使用同一目录并在游戏内选择继续。测试和上述启动器把进度、声音及用户缓存隔离在项目本地；不要复制自己的正式存档来试。旧途中暂存跨版本不能无条件读取。源码不含游戏安装包、Release或可下载EXE；可用已安装匹配导出模板的Godot编辑器自行导出。
 
-## 基本操作
+## 操作与资料
 
-| 操作 | 输入 |
-| --- | --- |
-| 移动编队 | 左键可通行地面 |
-| 指派 / 取消搜集 | 左键可搜集建筑，再点同一建筑取消 |
-| 暂停 / 继续 | 空格；暂停时仍可下令 |
-| 移动镜头 | W/A/S/D |
-| 缩放镜头 | 鼠标滚轮 |
-| 界面焦点与确认 | Tab，Space / Enter |
-| 发动、等待、集合 | 按巴士当前状态使用右下按钮 |
+左键地面移动、点建筑派工/取消；WASD移动镜头，滚轮缩放，空格暂停，Esc打开暂停菜单。发动巴士后仍需明确集合，全部实际存活者到达才归航。营地设施管理成员、物资、武器和训练。
 
-不透明 HUD 和展开的帮助面板会拦截其覆盖区域的点击与滚轮。搜集员保持当前工作；地面移动与集合指令安排的是其他可行动成员及工人完成后的归队目标。
+[文档导航](docs/README.md) · [公开状态](docs/plan.md) · [架构](docs/architecture.md) · [素材来源](docs/ASSET_PROVENANCE.md)
 
-## 文档与来源边界
-
-从[文档导航](docs/README.md)进入功能说明、[公开状态](docs/plan.md)与[架构](docs/architecture.md)。保存边界、失败重试及旧档兼容见[保存与恢复](docs/features/save-and-recovery.md)。
-
-Blue Hour 的代码、美术和音效独立制作，机制研究参考经典《Deadly Days》。此公开视图不包含原作媒体或研究原件，也不宣称一比一还原。文档区分旧本机观察 `LOCAL_VERIFIED`、官方历史资料 `OFFICIAL_HISTORICAL`、项目暂行选择 `PROJECT_TEMP` 与未确认内容 `UNKNOWN`；当前可操作的功能以 Blue Hour 自身实现为准。
-
-公开提交身份与项目许可证尚待负责人确定；本候选没有新增 LICENSE。后续公开版本从上一公开提交演进，只投影经审核的内部变化，不能把内部历史直接合并或整体推送到公开分支。
+代码、美术、声音独立制作；部分原创图像使用AI辅助生成，音效由数学合成。机制研究参考经典 Deadly Days，但不包含其素材、研究原件或私人证据，不声称精确复刻。当前没有 LICENSE，公开可见不等于授予外部复制、分发或商业复用许可。

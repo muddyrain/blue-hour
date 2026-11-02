@@ -1,0 +1,395 @@
+{
+  "status": "PROJECT_TEMP",
+  "files": [
+    {
+      "path": "assets/audio/b1/bus_start.wav",
+      "sha256": "0171ead05c755e110850b1d13d3d4bf0994fa1b94f0685b04ddea7cb6adf42d8",
+      "origin": "original mathematical synthesis",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/audio/b1/collect_complete.wav",
+      "sha256": "14c7d3fad4fbc03460573ae2d1ba0aeae3bfa1cbd5eaaa73e008bc2b7411522c",
+      "origin": "original mathematical synthesis",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/audio/b1/fire.wav",
+      "sha256": "2c7bf3923520177826dc10d72db412748e82c68b896b60f518082b365199007d",
+      "origin": "original mathematical synthesis",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/audio/b1/hit.wav",
+      "sha256": "9dff622c2a6020457b1f9a6e972895c554dc939dc9ffee1fd21b731e3180e62c",
+      "origin": "original mathematical synthesis",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/audio/b1/ui_back.wav",
+      "sha256": "44c44c1f0378a78357cdb5e8a4370b5b43a747382b3214c4de09635dc323711b",
+      "origin": "original mathematical synthesis",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/audio/b1/ui_confirm.wav",
+      "sha256": "fb6f48b63c2adcc54464bc61b3af982270ab57acd50e4cae361f9e72e49d214d",
+      "origin": "original mathematical synthesis",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/candidates/bus_01.png",
+      "sha256": "f43ddaec8cb844468ee3d2976f906b0aeb39477e40a9ea3a51c0039c13bceac0",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/candidates/bus_02.png",
+      "sha256": "d54e3808ad73b15ae11ab0541d65a1c6e4c3d7f72532bb75b6b92bb1e5ecce32",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/candidates/carbine_01.png",
+      "sha256": "8ac2092da961123dac2cdda4250d9bb9db7c132df5fee927e2667b3f00306db1",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/candidates/infected_01.png",
+      "sha256": "d5d7b983e4c4c3f27f7ddfcf8d2b0949490042c94cae6fb51eafc330fe7f6201",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/candidates/shop_02.png",
+      "sha256": "ef8f97d1eb0b3e4ba1097487942c699af88cbf0b3c01f1f9b9c2cfc8f89ecd73",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/candidates/survivor_01.png",
+      "sha256": "6bd78600489fab35bc13d782799456ea1596d84ca4c583c6d8443ae66825d63e",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m401/camp_blue_hour.png",
+      "sha256": "51da379581d50e286e0e95c2d01594d98aaf5672204a41a10e15664a65405f50",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m401/crew_amber.gdshader",
+      "sha256": "27bbd07bade9a792655a50d62efbbd585132be314c783e0cbe650fca1c85e53c",
+      "origin": "original project vector/resource",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m401/crew_amber.gdshader.uid",
+      "sha256": "fa0d7b82a3638687d767eba2f58e9b21ce4fdee3996264d06a34bc886ddadaa3",
+      "origin": "original project vector/resource",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m401/market.png",
+      "sha256": "143eac13476303b39e7532905222b2f079c4b3df2293bbf72343f1beb907e57d",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m402/amber_full.png",
+      "sha256": "286be6c2b7c6502736b1ab4a5725639ab2260d213f085cf5d42a0fe98c9cd544",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m402/amber_legs.png",
+      "sha256": "bdf061489b7ed4d976e22a86b9fa5fc17e3d2fa7f6d7cb26421bb453c8b61b08",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m402/amber_upper.png",
+      "sha256": "fb491ac4e2e638aef6f15606bd68513e9a8f8ba9c8d82b0da3c60e483f1e4548",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m402/asphalt.png",
+      "sha256": "a8a9d3a25805e5ef4bb23b17db9396e22ccd8828927bc39036aa0dab74ab6951",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m402/concrete.png",
+      "sha256": "476570d9c8a4358aaa171d0fdab20ed42502cfbbb8bbca5b605ceed5592aef4c",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m402/grass.png",
+      "sha256": "b841484eebee5474104c3652fe7f741fd0f7d9d9eb7f6ae811e823a4f1a3951e",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m402/paving.png",
+      "sha256": "47de290b3c1871d4beceffa86d6a6aff46864625d9d03f3d1f171259fda0e343",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m402/rowhouse.png",
+      "sha256": "9c57901ac0b9e0277111291594633b9b7c2acf1f214ae50986988110ed9b220a",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m403/camp_blue_hour.png",
+      "sha256": "00496c4cb188bee8fc3f2097b0c4087e5c497cc00eeaa7523fe386bd2f474bd5",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m403/gender_female.svg",
+      "sha256": "5b5a94f185baaaaabd3b4961c5843314bb7c288a1aae84f26e3f06a1498d02f2",
+      "origin": "original project vector/resource",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m403/gender_male.svg",
+      "sha256": "008452107bdc244b83f2990e91525b193b055caaec29488073dc5251f9d527a9",
+      "origin": "original project vector/resource",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m403/xia_full.png",
+      "sha256": "1b15c16ede85b9c1c391e3e66ae2510af73969875fe46d9f4cf4bc185d6bb167",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m403/xia_lower.png",
+      "sha256": "16755c8c888082a183674052d1ed65445704ea4cc5b358d135d76c946944cf77",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m403/xia_upper.png",
+      "sha256": "0353f7eef48d3029f4d8526c4d89ba151800e8445d40aaff33e824c00ce777af",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_anim_01/gu_full.png",
+      "sha256": "c3eef53a7f373526a7cbf2cdc51bebb6fe5c9f2d9b7ec0e3b2bf5debac7a4fb4",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_anim_01/gu_left_full.png",
+      "sha256": "fedc53d3022fb9457736600b9585c8b04cbcd647bc1962a5b89e81c9454200c7",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_anim_01/heavy_full.png",
+      "sha256": "f7a349409e0af6f7df3b9424db36b2c6b09f4d92154ecc15a332f7a0cdc75a0d",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_anim_01/lin_full.png",
+      "sha256": "0b00b89d509a149c3ca4b843b776da24b2d9bee0f9657f7273579bd118c1cd09",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_anim_01/lin_left_full.png",
+      "sha256": "ee3ef72b0ff47561e93417bfe25d11e1664e5a480e25816f7069c6f5d7c8e7b0",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_anim_01/lu_full.png",
+      "sha256": "2660d609a632b698e671835c1ae27758bd85b2b5ce67c367a09cca3806681c72",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_anim_01/lu_left_full.png",
+      "sha256": "e784a914e2772fd8787d7d7b3c7f062e175fffbb214ab885440175cf4de43047",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_anim_01/normal_full.png",
+      "sha256": "d56eeec786ee18094b475ccc32cb68f1e895e684faee30454934a78675642d10",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_anim_01/rush_full.png",
+      "sha256": "fb8f4a131b42ad8dd45065b1b9e944158d68e1420a279b7745adc82682700489",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_anim_01/shen_full.png",
+      "sha256": "fb8028bf7d259c4807afcde355dffcf174d37aacc8b372a3517101c044f4c585",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_anim_01/shen_left_full.png",
+      "sha256": "0ce9c12867d9808e9ebcd8009d0ed8ccd41d04256f6796508ff61cc0d159dbd8",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_anim_01/xia_full.png",
+      "sha256": "179d659911d1bfb28b603ce675e44f6c58fd54c64e2b9a59462090c9da633de4",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_anim_01/xia_left_full.png",
+      "sha256": "9e38b9bf485dabfc130d17ad59322e8bd0e18eebfe282d6b3442da41f5e6962b",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_rescue/lin_full.png",
+      "sha256": "388aab7d2233e780bb4326123ac85cb2929a9f10249732896aee6ab0e3783af1",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_rescue/lin_lower.png",
+      "sha256": "4c3a1d7d41cf055a317f16b9e3ef1fa119c8dd02a72f217837f266baf3af7012",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_rescue/lin_upper.png",
+      "sha256": "565a0ef0c39868df7eb4a829be1135f36f41d114464ea392c461c732b1bdf7b0",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_rescue_pool/lu_full.png",
+      "sha256": "8331ec1562d0b92de7b7bf71d019d20df3706f14007f27b5392232f4fe92e2bc",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_rescue_pool/lu_lower.png",
+      "sha256": "ecebebedc70f394981020d8c4d5330e0726a5b904e5d8084968566efbb304767",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_rescue_pool/lu_upper.png",
+      "sha256": "2608e872aea6e67a9f2a202f99ee5ccf0f6097e7e92fcba75b90c741908d202c",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_rescue_pool/shen_full.png",
+      "sha256": "cee2fc09e857b9b7388d8e29e25cdc333fd0daffddea52bc46b745aa59955ee1",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_rescue_pool/shen_lower.png",
+      "sha256": "890a188c0cf90c8ab67d4d4c9da7a4a3f1841d60c0984d60cd8cc774f79e8c81",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/m5_rescue_pool/shen_upper.png",
+      "sha256": "c5daf0245595c887486e8a65cd8a0f21541929f9cf738e37d3ccd8bc9d75da6d",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/p03/asphalt_03.png",
+      "sha256": "89109e811fd77086b3d7f20cc453446ba6d60f824938b9ae49509fdc7ac20e6d",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/p03/forecourt_03.png",
+      "sha256": "7d9e31b893e2070d1c8de31dcf6b6d76d7988d4363b2b348592c19e721de56c9",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/p03/grass_03.png",
+      "sha256": "ddc506929d198a66911505670f3af23c957d730ceea74cfc703131a778928927",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/p03/infected_03.png",
+      "sha256": "364e23819bce33da0d7ddd7c250173d025534eae3131a67d3489167f96d317d9",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/p03/paving_03.png",
+      "sha256": "25f396bcbb814d0a2e55d81a25cad0646b5acfc87a4af15feec09ab28687c58c",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/p03/survivor_03.png",
+      "sha256": "ade0d5ea99bcaadf6e6fa57d1b6fe1c33c164f2f9b315f1cf77fc34d1e1917e1",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/p032/carbine_view.tres",
+      "sha256": "8902789093fbe1e3ec26aaa4780ba322cd3d12c3b695e28eeffe996c04f7f1e9",
+      "origin": "original project vector/resource",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/p032/long_rifle_view.tres",
+      "sha256": "58d5e5de43ea9e07a251dcbae2d8e6ecaeca608a20072d78891ccf08cc057855",
+      "origin": "original project vector/resource",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/p032/rifle_long_032.png",
+      "sha256": "b2fc0edd40f21ae53047f8bb82547d9c517b1e0f3113f049f7cf32ad1434c9a3",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/p032/survivor_legs_032.png",
+      "sha256": "e047d77e917eb3d524e593cdae2a2cfc6625fa98f7949d6975254d2e5d1f3902",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/p032/survivor_upper_032.png",
+      "sha256": "e2c5353be65348a636be2469d07a536f2e9c15064c2e9b70eb2e6558a5a56d31",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/probes/bag.png",
+      "sha256": "cc6b1bd869556701921005c5c6fc101356d8abbd55847a5961849ab995ac6c0a",
+      "origin": "AI-assisted original project art",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/ui/c1/hud_theme.tres",
+      "sha256": "f3e5fc33d60853f06d2341b5143fd79d8a02de514a9beb70730454df5d971dbc",
+      "origin": "original project vector/resource",
+      "license": "No additional license granted"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MissionSupply" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/features/camp/mission_supply.gd" id="1"]
+[ext_resource type="Resource" path="res://src/features/expedition/market_loop.tres" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"rescue"
+display_name = "街角求援"
+description = "援救林知秋并护送到巴士；归航后加入，下一次三人需3份粮。她携带唯一自有卡宾枪。"
+layout = ExtResource("2")
+cash_reward = 4
+food_reward = 3

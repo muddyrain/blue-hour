@@ -109,7 +109,7 @@ func _physics_process(delta: float) -> void:
 	var visual: ActorVisual = actor.visual
 	var pose: Dictionary = visual.presentation_state()
 	_grip_error = maxf(_grip_error, pose.grip.distance_to(pose.hand))
-	if visual._body.texture != CrewAppearance.AMBER_LEGS or visual._upper.texture != CrewAppearance.AMBER_UPPER:
+	if visual._body.texture not in [MotionAtlas.RIGHT[1], MotionAtlas.LEFT[1]] or visual._upper.texture not in [MotionAtlas.RIGHT[1], MotionAtlas.LEFT[1]]:
 		_bad_costume += 1
 	var key: String = "%s/%s/%s/%s/%s/%s" % [pose.state,pose.frame,pose.row,visual._body.flip_h,actor.visible,actor.activity]
 	if key != _art_key:

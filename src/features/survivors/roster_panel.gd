@@ -8,6 +8,8 @@ signal growth_requested(member_id: int)
 signal closed
 
 var member_buttons: Array[Button] = []
+var buttons_by_id: Dictionary[int,Button] = {}
+var death_equipment: Dictionary = {}
 var name_edit: LineEdit
 var save_button: Button
 var equipment_button: Button
@@ -26,6 +28,8 @@ var _health: ProgressBar
 var _equipment: Label
 var _service: Label
 var growth_button: Button
+var _members_list: VBoxContainer
+var _heading: Label
 
 
 func _ready() -> void:
@@ -49,6 +53,7 @@ func _ready() -> void:
 	heading.text = "幸存者 / 同行者档案"
 	heading.add_theme_font_size_override("font_size", 32)
 	column.add_child(heading)
+	_heading = heading
 	var row: HBoxContainer = HBoxContainer.new()
 	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	row.add_theme_constant_override("separation", 32)
@@ -56,39 +61,26 @@ func _ready() -> void:
 	var members: VBoxContainer = VBoxContainer.new()
 	members.custom_minimum_size.x = 290
 	members.add_theme_constant_override("separation", 12)
-	row.add_child(members)
-	for member_id: int in [1, 2]:
-		var button: Button = Button.new()
-		button.icon = SurvivorRoster.definition(member_id).portrait
-		button.add_theme_constant_override("icon_max_width", 72)
-		button.expand_icon = true
-		button.custom_minimum_size = Vector2(290, 108)
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.add_theme_font_size_override("font_size", 18)
-		button.pressed.connect(func() -> void:
-			selected_member_id = member_id
-			refresh(_data)
-		)
-		members.add_child(button)
-		var badge: GenderBadge = GenderBadge.new()
-		badge.definition = SurvivorRoster.definition(member_id)
-		button.add_child(badge)
-		badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-		badge.offset_left = -59
-		badge.offset_right = -9
-		badge.offset_top = 10
-		badge.offset_bottom = 36
-		_member_genders.append(badge)
-		member_buttons.append(button)
+	var member_scroll: ScrollContainer = ScrollContainer.new()
+	member_scroll.custom_minimum_size.x = 310
+	member_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	member_scroll.follow_focus = true
+	row.add_child(member_scroll)
+	member_scroll.add_child(members)
+	_members_list = members
 	growth_button = Button.new()
 	growth_button.text = "成长与特性 / 行动记录 →"
 	growth_button.custom_minimum_size.y = 44
 	growth_button.pressed.connect(func() -> void: growth_requested.emit(selected_member_id))
-	members.add_child(growth_button)
+	column.add_child(growth_button)
 	var detail: VBoxContainer = VBoxContainer.new()
 	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	detail.add_theme_constant_override("separation", 10)
-	row.add_child(detail)
+	var detail_scroll: ScrollContainer = ScrollContainer.new()
+	detail_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	row.add_child(detail_scroll)
+	detail_scroll.add_child(detail)
 	var identity_row: HBoxContainer = HBoxContainer.new()
 	detail.add_child(identity_row)
 	_portrait = TextureRect.new()
@@ -162,31 +154,87 @@ func _ready() -> void:
 
 func refresh(data: Dictionary, feedback: String = "") -> void:
 	_data = data.duplicate(true)
-	for member_id: int in [1, 2]:
+	_sync_members()
+	if SurvivorRoster.member(_data.crew,selected_member_id).is_empty():
+		selected_member_id = int(_data.crew[0].id)
+	_heading.text = "幸存者名册 · 存活%d / 历史%d" % [_data.crew.filter(func(m: Dictionary) -> bool: return m.health>0).size(),_data.crew.size()]
+	for member_id: int in buttons_by_id:
 		var entry: Dictionary = SurvivorRoster.member(_data.crew, member_id)
-		var button: Button = member_buttons[member_id - 1]
+		var button: Button = buttons_by_id[member_id]
+		button.visible = not entry.is_empty()
+		if entry.is_empty(): continue
 		var list_name: String = entry.call_sign if entry.call_sign.length() <= 5 else entry.call_sign.left(4) + "…"
 		var definition: SurvivorDefinition = SurvivorRoster.definition(member_id)
 		button.tooltip_text = "%s · %s\n呼号：%s" % [definition.default_display_name, definition.gender_text(), entry.call_sign]
-		button.text = "%02d  %s\n%s · %.0f / 200" % [member_id, list_name,
-			"存活" if entry.condition == "active" else "倒地", float(entry.health)]
+		button.text = "%02d  %s\n%s · %.0f / %.0f" % [member_id, list_name,
+			"存活" if entry.condition == "active" else ("已阵亡" if entry.condition == "dead" else "倒地"), float(entry.health),SurvivorGrowth.maximum(_data,entry)]
 		button.add_theme_color_override("font_color", SurvivorRoster.definition(member_id).colour)
 	var member: Dictionary = SurvivorRoster.member(_data.crew, selected_member_id)
 	var base: SurvivorDefinition = SurvivorRoster.definition(selected_member_id)
 	_portrait.texture = base.portrait
 	_identity.text = base.default_display_name
 	_call_sign.text = "呼号：%s" % member.call_sign
-	_condition.text = "同行者 %02d · 生命 %.0f / 200 · %s" % [selected_member_id, float(member.health),
-		"存活" if member.condition == "active" else "倒地（非永久离队）"]
+	_condition.text = "同行者 %02d · 生命 %.0f / %.0f · %s" % [selected_member_id, float(member.health),SurvivorGrowth.maximum(_data,member),
+		"存活" if member.condition == "active" else ("已阵亡 · 只读历史" if member.condition == "dead" else "倒地（非永久离队）")]
 	_gender_title.set_definition(base)
 	_gender_detail.set_definition(base)
 	_identity.add_theme_color_override("font_color", base.colour)
+	_health.max_value = SurvivorGrowth.maximum(_data,member)
 	_health.value = float(member.health)
 	_health.add_theme_stylebox_override("fill", CampStyle.box(base.colour, base.colour, 0))
 	var item: Dictionary = WeaponInventory.for_member(_data, selected_member_id)
 	_equipment.text = "当前装备：无，原装备已回库存" if item.is_empty() else "当前装备  /  %s" % WeaponInventory.definition(item.weapon_id).display_name
 	_equipment.tooltip_text = item.get("instance_id", "")
 	_service.text = "归航战绩\n出击 %d 次   /   击退 %d   /   累计受伤 %.0f\n等级与特性成长尚未启用。" % [int(member.service.sorties), int(member.service.kills), float(member.service.damage_received)]
+	if GrowthState.is_family(_data):
+		_service.text = "等级 Lv%d · 累计 %d XP · 下一级 %d XP\n出击 %d 次 / 击退 %d / 受伤 %.0f\n特性和食物训练尚未开放。" % [int(member.growth.level),int(member.growth.xp_total),GrowthRules.threshold(int(member.growth.level)+1),int(member.service.sorties),int(member.service.kills),float(member.service.damage_received)]
+	if TraitState.is_family(_data):
+		_service.text = "普通 Lv%d · %d XP · 下一级 %d XP\n%s\n出击%d / 击退%d · %s" % [int(member.growth.level),int(member.growth.xp_total),GrowthRules.threshold(int(member.growth.level)+1),TraitRules.description(member),int(member.service.sorties),int(member.service.kills),("阵亡历史只读，不能训练" if member.health<=0 else "可在篝火查看训练资格") if TrainingState.is_family(_data) else "食物训练未开放"]
+	if member.condition=="dead":
+		for death: Dictionary in _data.journey.deaths:
+			if int(death.member_id)==selected_member_id:
+				_service.text += "\n死亡：%s · 事务%s" % [death.cause,death.transaction_id]
+		var previous: Dictionary = member.growth.last_action
+		if not previous.get("recent",[]).is_empty():
+			_equipment.text += "\n最近使用：%s" % WeaponInventory.definition(previous.recent[-1].weapon_id).display_name
+			_equipment.tooltip_text += "\n历史实例："+String(previous.recent[-1].instance_id)
+		var archived: Dictionary = death_equipment.get(selected_member_id,{})
+		if not archived.is_empty():
+			_equipment.text += "\n阵亡时装备：%s（原事务记录）" % WeaponInventory.definition(archived.weapon_id).display_name
+			_equipment.tooltip_text = "历史实例：%s\n死亡事务：%s；当前归属以库存为准" % [archived.instance_id,archived.transaction_id]
+			if WeaponState.is_family(_data):
+				_equipment.text += "\n"+WeaponModifiers.description(WeaponInventory.find(_data,archived.instance_id))
 	name_edit.text = member.call_sign
+	name_edit.editable = member.condition != "dead"
+	save_button.disabled = member.condition == "dead"
 	equipment_button.disabled = member.condition != "active"
 	message.text = feedback if not feedback.is_empty() else "正式姓名固定；呼号随队伍出击，战绩在正式归航后更新。"
+
+
+func _sync_members() -> void:
+	for entry: Dictionary in _data.crew:
+		var member_id: int = int(entry.id)
+		if buttons_by_id.has(member_id): continue
+		var button: Button = Button.new()
+		button.icon = SurvivorRoster.definition(member_id).portrait
+		button.add_theme_constant_override("icon_max_width", 72)
+		button.expand_icon = true
+		button.custom_minimum_size = Vector2(290, 86)
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.add_theme_font_size_override("font_size", 18)
+		button.pressed.connect(func() -> void:
+			selected_member_id = member_id
+			refresh(_data)
+		)
+		_members_list.add_child(button)
+		var badge: GenderBadge = GenderBadge.new()
+		badge.definition = SurvivorRoster.definition(member_id)
+		button.add_child(badge)
+		badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+		badge.offset_left = -59
+		badge.offset_right = -9
+		badge.offset_top = 10
+		badge.offset_bottom = 36
+		_member_genders.append(badge)
+		member_buttons.append(button)
+		buttons_by_id[member_id] = button

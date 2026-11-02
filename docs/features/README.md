@@ -22,3 +22,27 @@
 搜集员仍按原规则进入建筑隐藏；救援原10秒进度有短反馈，不声称有不可见室内动画。归航仍需实际全员到巴士，结果确认才结算；不是退出到首页即回营。
 
 详见[限制](../KNOWN_LIMITATIONS.md)及[架构](../architecture.md)。
+
+## 五篇独立功能说明
+
+| 文档 | 玩家流程与当前边界 |
+| --- | --- |
+| [出击、搜集与救援](sortie-and-scavenging.md) | 双地图派工、取消、单目标候选救援及当场入队 |
+| [战斗、视线与夜间](combat-and-night-pressure.md) | 三敌种、两枪比较、真实LOS与八方向原型 |
+| [巴士发动与撤离](bus-evacuation.md) | 显式集合、实际全员到齐、结果预览和提交 |
+| [营地、名册与配装](camp-and-loadouts.md) | 四活五历史、普通成长/Trait/训练、武器实例与有效值 |
+| [保存与恢复](save-and-recovery.md) | 新旧档保护、一次暂存、未修复RECORD_READBACK/RECORD_HASH |
+
+## 项目要求与经典版证据
+
+本页及五篇文档按当前Blue Hour已实现行为编写，不把旧版本“尚未开放”的描述套到111，也不把111能力静默应用到普通默认。
+
+| 来源等级 | 本公开文档的含义 |
+| --- | --- |
+| PROJECT_TEMP | Blue Hour原创角色、参数、人数、成长/装备/救援和生存政策；实际游戏验证也不升级为原作证据。 |
+| LOCAL_VERIFIED | 只用于经典Deadly Days特定本机版本与条件的实际观察。本次文档同步没有操作原作，不新增该等级事实。 |
+| OFFICIAL_HISTORICAL | 经典版官方历史消息，只支持当时描述，不能推导V1.7.0F2精确参数。 |
+| COMMUNITY_CLAIM | 社区经验不当作本机验证。本文不据其补造公式或权重。 |
+| UNKNOWN | 原作精确概率、公式、人数及其他未证实机制继续未知。 |
+
+旧截图按各自版本标注，不能证明当前数值、动画或可靠性。完整索引见[真实截图及版本](../screenshots/README.md)。**RECORD_READBACK:RECORD_HASH未修，正式生存NO-GO/BLOCKED。**

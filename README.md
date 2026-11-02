@@ -44,6 +44,29 @@ python tools/godot.py run --enemy-trial --profile .local/demo --godot <引擎可
 
 后续使用同一目录并在游戏内选择继续。测试和上述启动器把进度、声音及用户缓存隔离在项目本地；不要复制自己的正式存档来试。旧途中暂存跨版本不能无条件读取。源码不含游戏安装包、Release或可下载EXE；可用已安装匹配导出模板的Godot编辑器自行导出。
 
+
+## 五篇独立功能说明
+
+| 文档 | 玩家流程与当前边界 |
+| --- | --- |
+| [出击、搜集与救援](docs/features/sortie-and-scavenging.md) | 双地图派工、取消、单目标候选救援及当场入队 |
+| [战斗、视线与夜间](docs/features/combat-and-night-pressure.md) | 三敌种、两枪比较、真实LOS与八方向原型 |
+| [巴士发动与撤离](docs/features/bus-evacuation.md) | 显式集合、实际全员到齐、结果预览和提交 |
+| [营地、名册与配装](docs/features/camp-and-loadouts.md) | 四活五历史、普通成长/Trait/训练、武器实例与有效值 |
+| [保存与恢复](docs/features/save-and-recovery.md) | 新旧档保护、一次暂存、未修复RECORD_READBACK/RECORD_HASH |
+
+## 玩法展示与历史版本
+
+![历史搜集与警戒](docs/screenshots/market-scavenging.png)
+
+**M5-COMBAT-03（edf9bd9）历史游戏截图**：正常市场搜集，不代表当前动画、成长或枪械值。
+
+![历史救援后当场入队](docs/screenshots/rescue-join.png)
+
+**M5-RESCUE-02历史游戏截图**：沈听澜当场加入四人行动，旧动作/HUD；呼号为人工压力测试，不是当前M5-ANIM-01截图。
+
+营地、配装、巴士与结算等全部版本/来源和SHA见[截图索引](docs/screenshots/README.md)。仓库既有四张M5-ANIM-01图保持原字节，当前原型说明以功能文档为准。
+
 ## 操作与资料
 
 左键地面移动、点建筑派工/取消；WASD移动镜头，滚轮缩放，空格暂停，Esc打开暂停菜单。发动巴士后仍需明确集合，全部实际存活者到达才归航。营地设施管理成员、物资、武器和训练。

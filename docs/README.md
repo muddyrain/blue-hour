@@ -20,3 +20,10 @@
 | [营地、名册与配装](features/camp-and-loadouts.md) | 四活五历史、普通成长/Trait/训练、武器实例与有效值 |
 | [保存与恢复](features/save-and-recovery.md) | 新旧档保护、一次暂存、未修复RECORD_READBACK/RECORD_HASH |
 
+
+## 开发工具与协作
+
+- [分级执行、冻结复用与计时](development/codex-execution-efficiency.md)
+- [新公开任务模板](development/codex-task-template.md)
+
+计时工具及其19项标准库隔离测试可直接运行；真实计时记录和私有资料仍只在忽略目录。开发流程工具不解除保存发布门禁。

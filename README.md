@@ -67,6 +67,19 @@ python tools/godot.py run --enemy-trial --profile .local/demo --godot <引擎可
 
 营地、配装、巴士与结算等全部版本/来源和SHA见[截图索引](docs/screenshots/README.md)。仓库既有四张M5-ANIM-01图保持原字节，当前原型说明以功能文档为准。
 
+## 开发效率工具
+
+DEV-PERF-02提供标准库阶段计时器、19项隔离单测，以及LOW/MEDIUM/HIGH分级、驱动预检、冻结和结果复用规范。
+
+```powershell
+python -m unittest discover -s tests/tools -p test_task_timing.py -v
+python tools/task_timing.py --help
+```
+
+[执行规范](docs/development/codex-execution-efficiency.md) · [任务模板](docs/development/codex-task-template.md)
+
+工具只记录显式可见区间，隐藏推理/完整对话耗时保持UNKNOWN；实际计时文件不随源码公开。不修改游戏或存档协议，RECORD_READBACK:RECORD_HASH仍未修，正式生存NO-GO/BLOCKED。
+
 ## 操作与资料
 
 左键地面移动、点建筑派工/取消；WASD移动镜头，滚轮缩放，空格暂停，Esc打开暂停菜单。发动巴士后仍需明确集合，全部实际存活者到达才归航。营地设施管理成员、物资、武器和训练。

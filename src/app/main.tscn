@@ -192,22 +192,37 @@ mouse_filter = 2
 color = Color(0.025, 0.065, 0.09, 0.94)
 
 [node name="Heading" type="Label" parent="Interface/Screen/Result"]
-offset_left = 160.0
-offset_top = 146.0
-offset_right = 1140.0
-offset_bottom = 210.0
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 72.0
+offset_top = 118.0
+offset_right = -72.0
+offset_bottom = 178.0
 theme_override_font_sizes/font_size = 42
 
-[node name="Body" type="Label" parent="Interface/Screen/Result"]
-offset_left = 164.0
-offset_top = 234.0
-offset_right = 1140.0
-offset_bottom = 504.0
+[node name="Scroll" type="ScrollContainer" parent="Interface/Screen/Result"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 72.0
+offset_top = 190.0
+offset_right = -72.0
+offset_bottom = -106.0
+horizontal_scroll_mode = 0
+follow_focus = true
+
+[node name="Body" type="Label" parent="Interface/Screen/Result/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+autowrap_mode = 3
 theme_override_font_sizes/font_size = 21
 
 [node name="Continue" type="Button" parent="Interface/Screen/Result"]
-offset_left = 164.0
-offset_top = 538.0
-offset_right = 444.0
-offset_bottom = 594.0
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 72.0
+offset_top = -84.0
+offset_right = 352.0
+offset_bottom = -28.0
 text = "返回营地 →"

@@ -26,9 +26,10 @@ static func initialize(data: Dictionary, origin: String) -> void:
 				data.loadout.append({"member_id":index + 1, "instance_id":identity})
 
 
-static func reward(sortie_id: String) -> Dictionary:
-	return {"instance_id":sortie_id + ":weapon:north-cache", "weapon_id":"long_rifle",
+static func reward(sortie_id: String, quality: bool = false) -> Dictionary:
+	var value: Dictionary = {"instance_id":sortie_id + ":weapon:north-cache", "weapon_id":"long_rifle",
 		"condition":"damaged", "origin":"north-cache", "acquired_sortie":sortie_id}
+	return WeaponModifiers.reward(value) if quality else value
 
 
 static func find(data: Dictionary, identity: String) -> Dictionary:
@@ -61,7 +62,34 @@ static func snapshot(data: Dictionary) -> Array[Dictionary]:
 	return result
 
 
-static func validate(data: Dictionary) -> String:
+static func snapshot_problem(crew: Array, equipment: Array, require_all: bool = true, quality: bool = false) -> String:
+	var members: Array[int] = []
+	var instances: Array[String] = []
+	for value: Variant in equipment:
+		if not value is Dictionary or not RunSave._integer(value.get("member_id"),1,SurvivorRoster.MAX_MEMBER_ID) or not value.get("instance") is Dictionary:
+			return "出击配装字段无效"
+		var member: Dictionary = SurvivorRoster.member(crew, int(value.member_id))
+		var item: Dictionary = value.instance
+		if quality and not WeaponModifiers.problem(item).is_empty():
+			return "出击实例属性无效"
+		if member.is_empty() or float(member.health) <= 0.0 or int(value.member_id) in members:
+			return "出击配装成员未知、重复或无法行动"
+		if not item.get("instance_id") is String or item.instance_id.is_empty() or item.instance_id in instances or not item.get("weapon_id") is String or definition(item.weapon_id) == null or item.get("condition") != "ready":
+			return "出击武器实例无效或重复"
+		members.append(int(value.member_id))
+		instances.append(item.instance_id)
+	if require_all:
+		for member: Dictionary in crew:
+			if float(member.health) > 0.0 and int(member.id) not in members:
+				return "出击成员缺少装备"
+	return ""
+
+
+static func validate(data: Dictionary, dynamic_identity: bool = false) -> String:
+	if EnemyState.is_state(data):
+		return EnemyState.problem(data)
+	if WeaponState.is_state(data):
+		return WeaponState.problem(data)
 	if not data.get("weapons") is Array or not data.get("loadout") is Array:
 		return "武器库存或配装格式无效"
 	if not RunSave._integer(data.get("camp_spending"), 0, RunSave.MAX_COUNTER):
@@ -89,12 +117,18 @@ static func validate(data: Dictionary) -> String:
 			var count: int = int(pieces[1])
 			if count < 1 or count > int(data.settled_sorties) or pieces[1] != str(count) or value != _with_condition(reward(value.acquired_sortie), value.condition):
 				return "战利品实例与来源不一致"
+		elif value.origin == "rescue-first-contact":
+			if RescuePoolState.is_family(data):
+				if not data.get("recruits",[]).any(func(row: Dictionary) -> bool: return TransactionReceipt.same(value,RescuePoolState.weapon(data.profile_id,int(row.member_id)))):
+					return "POOL_EQUIPMENT_SOURCE"
+			elif not RescueState.is_family(data) or data.get("recruits",[]).size() != 1 or not TransactionReceipt.same(value,RescueState.weapon(data.profile_id)):
+				return "救援自有武器来源无效"
 		else:
 			return "未知武器来源"
 	var equipped_ids: Array[String] = []
 	var members: Array[int] = []
 	for value: Variant in data.loadout:
-		if not value is Dictionary or value.size() != 2 or not RunSave._integer(value.get("member_id"), 1, 2) or not value.get("instance_id") is String:
+		if not value is Dictionary or value.size() != 2 or not RunSave._integer(value.get("member_id"), 1, SurvivorRoster.MAX_MEMBER_ID if dynamic_identity else 2) or not value.get("instance_id") is String:
 			return "配装字段无效"
 		var member_id: int = int(value.member_id)
 		if member_id in members or value.instance_id in equipped_ids:
@@ -149,8 +183,12 @@ static func repair(data: Dictionary, identity: String) -> Dictionary:
 
 static func bank(after: Dictionary, rewards: Array, identity: String) -> String:
 	var seen: Array[String] = []
+	var quality: bool = WeaponState.is_family(after)
+	var expected: Dictionary = reward(identity,quality)
 	for value: Variant in rewards:
-		if not value is Dictionary or value != reward(identity):
+		# JSON restores numeric levels as floats; use the existing canonical contract
+		# for110+ while retaining the exact legacy comparison for older schemas.
+		if not value is Dictionary or (not TransactionReceipt.same(value,expected) if quality else value != expected):
 			return "战利品账本与本次搜集来源不符"
 		if value.instance_id in seen or not find(after, value.instance_id).is_empty():
 			return "同一搜集来源不能重复入库"

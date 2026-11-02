@@ -1,0 +1,388 @@
+class_name SortieSnapshot
+extends RefCounted
+## Whitelisted simulation values. No resource paths or object deserialization.
+
+const VERSION: int = 1
+const ENEMY_VERSION: int = 2
+const ENEMY_BUILD: String = "M5-ENEMY-02-1"
+const BUILD: String = "P0-FINAL-SAFETY-01-1"
+const GROWTH_BUILD: String = "M5-GROWTH-01-1"
+const FIELD_BUILD: String = "M5-RESCUE-01B-1"
+const TRAIT_BUILD: String = "M5-TRAIT-01-1"
+const QUALITY_BUILD: String = "M5-WEAPON-03A-1"
+const ROSTER_BUILD: String = "M5-ROSTER-UX-01-1"
+const POOL_BUILD: String = "M5-RESCUE-02-1"
+const TRAINING_BUILD: String = "M5-TRAINING-01-1"
+const Supplies: Array[MissionSupply] = [preload("res://src/features/camp/scavenge.tres"), preload("res://src/features/camp/supermarket.tres"), preload("res://src/features/camp/rescue.tres")]
+const SIM: Dictionary = {"phase":TYPE_INT,"elapsed":TYPE_FLOAT,"loot":TYPE_INT,"food_loot":TYPE_INT,"kills":TYPE_INT,"goal":TYPE_VECTOR2,"_spawn_clock":TYPE_FLOAT,"_ai_clock":TYPE_FLOAT,"_engine_clock":TYPE_FLOAT,"_spawn_count":TYPE_INT,"_spawn_attempts":TYPE_INT}
+const ACTOR: Dictionary = {"actor_id":TYPE_INT,"member_id":TYPE_INT,"definition_id":TYPE_STRING_NAME,"is_enemy":TYPE_BOOL,"health":TYPE_FLOAT,"max_health":TYPE_FLOAT,"speed":TYPE_FLOAT,"cooldown":TYPE_FLOAT,"weapon_instance_id":TYPE_STRING,"call_sign":TYPE_STRING,"confirmed_kills":TYPE_INT,"damage_received":TYPE_FLOAT,"permanent_death":TYPE_BOOL,"permanent_death_enabled":TYPE_BOOL,"activity":TYPE_INT,"position":TYPE_VECTOR2,"path":TYPE_PACKED_VECTOR2_ARRAY,"aim":TYPE_VECTOR2,"_path_index":TYPE_INT,"visible":TYPE_BOOL}
+const VISUAL: Dictionary = {"_clock":TYPE_FLOAT,"_walk_clock":TYPE_FLOAT,"_hit_clock":TYPE_FLOAT,"_fire_clock":TYPE_FLOAT,"_attack_clock":TYPE_FLOAT,"_defeat_clock":TYPE_FLOAT,"_is_defeated":TYPE_BOOL,"_facing":TYPE_VECTOR2,"_movement":TYPE_VECTOR2,"_aim":TYPE_VECTOR2,"_hit_direction":TYPE_VECTOR2,"_attack_direction":TYPE_VECTOR2,"position":TYPE_VECTOR2}
+const KEYS: Array[String] = ["version","build","compatibility","map","sim","sites","worker","active_site","survivors","enemies","weapons","threat","growth","camera","viewport","hunger","drill"]
+
+
+static func duration_matches(elapsed: float, duration_ms: Variant) -> bool:
+	if not SurvivalContracts.integer(duration_ms,0,SurvivalContracts.MAX_ID):
+		return false
+	# JSON may cross an exact millisecond boundary by a few double ULPs.
+	# Preserve the captured integer, accepting only its original floor interval.
+	var milliseconds: float = elapsed * 1000.0
+	return milliseconds >= float(duration_ms) - 0.000001 and milliseconds < float(duration_ms) + 1.000001
+
+
+static func supply_for(identity: String) -> MissionSupply:
+	for item: MissionSupply in Supplies:
+		if String(item.layout.id) == identity:
+			return item
+	return null
+
+
+static func supply_for_world(value: Dictionary) -> MissionSupply:
+	if value.get("rescue_mission") == "rescue": return Supplies[2]
+	return supply_for(value.map)
+
+
+static func capture(world: Expedition) -> Dictionary:
+	if not world.field_join_error.is_empty() or not world.is_paused or not world.battle_survival or world.is_practice or world.los_setup != null or world.threat_rehearsal or world._practice_manual_waves or world.phase == Expedition.Phase.FINISHED:
+		return {}
+	var rows: Array = []
+	var foes: Array = []
+	for actor: FieldActor in world.survivors:
+		rows.append(_actor(actor))
+	for actor: FieldActor in world.enemies:
+		foes.append(_actor(actor))
+	var captured: Dictionary = {"version":ENEMY_VERSION if world.enemy_mode else VERSION,"build":ENEMY_BUILD if world.enemy_mode else QUALITY_BUILD if WeaponState.is_state(world.field_departure) else ROSTER_BUILD if RosterState.is_family(world.field_departure) else POOL_BUILD if world.pool_mode else TRAINING_BUILD if world.training_mode else TRAIT_BUILD if world.trait_mode else FIELD_BUILD if world.field_join_mode else (GROWTH_BUILD if world.growth_mode else BUILD),"compatibility":compatibility(world),"map":String(world.layout.id),
+		"sim":_fields(world,SIM),"sites":{"cash":{"searched":world.searched,"progress":world.search_progress},"food":{"searched":world._food_site.searched,"progress":world._food_site.progress}},
+		"worker":world.search_actor.member_id if world.search_actor != null else 0,"active_site":String(world._active_site.kind) if world._active_site != null else "",
+		"survivors":rows,"enemies":foes,"weapons":world.weapon_loot.duplicate(true),
+		"threat":_fields(world.threat,{"stage":TYPE_INT,"interval":TYPE_FLOAT,"transitions":TYPE_INT}),
+		"growth":world.growth_inputs.snapshot(world.sortie_id,world.layout.id,world.elapsed),
+		"camera":_fields(world.camera,{"position":TYPE_VECTOR2,"zoom":TYPE_VECTOR2}),"viewport":_encode(world.get_viewport_rect().size),"hunger":world.hunger_trial,
+		"drill":{"enabled":world.battle_drill,"deployed":world.drill_panel._deployed.duplicate()}}
+	if world.rescue_mode:
+		captured.rescue_mission = String(world.supply.id)
+		captured.rescue = world.rescue_target.snapshot() if world.rescue_target != null else {}
+	if world.growth_mode:
+		captured.xp_inputs = world.xp_inputs.snapshot(world)
+	if world.trait_mode:
+		captured.trait_inputs = world.trait_inputs.snapshot(world)
+	if world.field_join_mode:
+		captured.field_joins = world.field_joins.duplicate(true)
+	return captured
+
+
+static func problem(value: Variant, receipt: Dictionary) -> String:
+	var enemy_mode: bool = EnemyState.is_state(receipt.base)
+	if not value is Dictionary or value.size() != KEYS.size() + (2 if RescueState.is_family(receipt.base) else 0) + (1 if GrowthState.is_family(receipt.base) else 0) + int(FieldJoinState.is_family(receipt.base)) + int(TraitState.is_family(receipt.base)) or not value.has_all(KEYS) or not SurvivalContracts.json_value(value):
+		return "WORLD_FIELDS"
+	if value.version != (ENEMY_VERSION if enemy_mode else VERSION) or value.build != (ENEMY_BUILD if enemy_mode else QUALITY_BUILD if WeaponState.is_state(receipt.base) else ROSTER_BUILD if RosterState.is_family(receipt.base) else POOL_BUILD if RescuePoolState.is_family(receipt.base) else TRAINING_BUILD if TrainingState.is_state(receipt.base) else TRAIT_BUILD if TraitState.is_family(receipt.base) else FIELD_BUILD if FieldJoinState.is_family(receipt.base) else (GROWTH_BUILD if GrowthState.is_family(receipt.base) else BUILD)) or not value.map is String or supply_for(value.map) == null or not value.hunger is bool:
+		return "WORLD_VERSION_OR_MAP"
+	if not value.compatibility is String or value.compatibility.length() != 64 or not value.compatibility.is_valid_hex_number(false):
+		return "WORLD_COMPATIBILITY"
+	if not value.drill is Dictionary or value.drill.size() != 2 or not value.drill.has_all(["enabled","deployed"]) or not value.drill.enabled is bool or not value.drill.deployed is Array or value.drill.deployed.size() > FieldJoinRules.participants(receipt).size():
+		return "WORLD_DRILL_FIELDS"
+	var deployed: Array[int] = []
+	for id: Variant in value.drill.deployed:
+		if not SurvivalContracts.integer(id,1,SurvivalContracts.MAX_ID) or int(id) in deployed or SurvivorRoster.member(FieldJoinRules.participants(receipt),int(id)).is_empty() or not value.drill.enabled:
+			return "WORLD_DRILL_SOURCE"
+		deployed.append(int(id))
+	if not _shape(value.sim,SIM) or not _shape(value.camera,{"position":TYPE_VECTOR2,"zoom":TYPE_VECTOR2}) or not _vector(value.viewport):
+		return "WORLD_SIM_FIELDS"
+	var sim: Dictionary = value.sim
+	if int(sim.phase) not in [0,1,2] or sim.elapsed < 0 or sim.loot < 0 or sim.food_loot < 0 or sim.kills < 0 or sim._spawn_count < 0:
+		return "WORLD_SIM_RANGE"
+	if (sim.phase == 1 and (sim.elapsed + 0.0001 < 20 or sim._engine_clock <= 0 or sim._engine_clock > 3)) or (sim.phase == 2 and (sim.elapsed + 0.0001 < 23 or sim._engine_clock > 0)):
+		return "WORLD_BUS_CLOCK"
+	if not value.sites is Dictionary or value.sites.size() != 2 or not value.sites.has_all(["cash","food"]):
+		return "WORLD_SITES"
+	var supply: MissionSupply = supply_for_world(value)
+	for kind: String in ["cash","food"]:
+		var site: Variant = value.sites[kind]
+		if not _shape(site,{"searched":TYPE_BOOL,"progress":TYPE_FLOAT}) or site.progress < 0 or site.progress > 31 or (not supply.supports(StringName(kind)) and (site.searched or site.progress != 0)):
+			return "WORLD_SITE_PROGRESS"
+		if site.searched != (site.progress >= 30):
+			return "WORLD_SITE_COMPLETION"
+	if sim.loot != (supply.cash_reward if value.sites.cash.searched else 0) or sim.food_loot != (supply.food_reward if value.sites.food.searched else 0):
+		return "WORLD_CARRY_SOURCE"
+	var expected_weapons: Array = [WeaponInventory.reward(receipt.transaction_id,WeaponState.is_family(receipt.base))] if value.sites.cash.searched and supply.has_weapon_sample else []
+	if not value.weapons is Array or not _same({"v":value.weapons},{"v":expected_weapons}):
+		return "WORLD_WEAPON_SOURCE"
+	if not value.survivors is Array or value.survivors.size() != FieldJoinRules.participants(receipt).size() or not value.enemies is Array or value.enemies.size() > ThreatRules.ENEMY_CAP:
+		return "WORLD_ACTOR_COUNTS"
+	var ids: Array[int] = []
+	var workers: int = 0
+	for row: Variant in value.survivors:
+		if not _actor_shape(row) or row.state.is_enemy:
+			return "WORLD_SURVIVOR_FIELDS"
+		var state: Dictionary = row.state
+		var id: int = int(state.member_id)
+		var participant: Dictionary = SurvivorRoster.member(FieldJoinRules.participants(receipt),id)
+		var checkpoint: Dictionary = SurvivorRoster.member(receipt.health,id)
+		var member: Dictionary = SurvivorRoster.member(FieldJoinRules.context(receipt).crew,id)
+		if participant.is_empty() or id in ids or checkpoint.is_empty() or member.is_empty():
+			return "WORLD_MEMBER_ID"
+		ids.append(id)
+		if state.definition_id != member.definition_id or state.call_sign != member.call_sign or state.health != checkpoint.health or state.weapon_instance_id != participant.weapon_instance_id or state.max_health != SurvivorGrowth.maximum(receipt.base,member) or not state.permanent_death_enabled or state.speed != 125.0 * (TraitRules.factor(member,"move") if TraitState.is_family(receipt.base) else 1.0):
+			return "WORLD_MEMBER_CHECKPOINT"
+		if (state.health == 0) != state.permanent_death or (state.health == 0) != (state.activity == FieldActor.Activity.DOWN) or state.health + state.damage_received != participant.health_before:
+			return "WORLD_DEATH_OR_DAMAGE"
+		if state.activity == FieldActor.Activity.SEARCHING:
+			workers += 1
+			if id != value.worker or state.visible:
+				return "WORLD_WORKER_ID"
+	if not SurvivalContracts.integer(value.worker,0,SurvivalContracts.MAX_ID) or not value.active_site is String or value.active_site not in ["","cash","food"] or workers > 1:
+		return "WORLD_WORKER_FIELDS"
+	var participant_order: Array = []
+	for row: Dictionary in FieldJoinRules.participants(receipt):
+		participant_order.append(int(row.id))
+	if not _same({"v":ids},{"v":participant_order}):
+		return "WORLD_EXECUTION_ORDER"
+	if (value.worker == 0) != value.active_site.is_empty() or (value.worker != 0 and (int(value.worker) not in ids or value.sites[value.active_site].searched)):
+		return "WORLD_WORKER_SOURCE"
+	if value.worker != 0 and int(_member(value.survivors,int(value.worker)).state.activity) not in [1,2]:
+		return "WORLD_WORKER_ACTIVITY"
+	var enemy_ids: Array[int] = []
+	for row: Variant in value.enemies:
+		if not _actor_shape(row,enemy_mode) or not row.state.is_enemy or row.state.health <= 0 or int(row.state.activity) not in [0,1] or row.state.member_id != 0 or (row.state.actor_id >= sim._spawn_count and int(row.state.actor_id)-10000 not in deployed) or int(row.state.actor_id) in enemy_ids or (not enemy_mode and (row.state.max_health != 54 or row.state.speed != 34)):
+			return "WORLD_ENEMY_ID_OR_STATE"
+		enemy_ids.append(int(row.state.actor_id))
+	if not _shape(value.threat,{"stage":TYPE_INT,"interval":TYPE_FLOAT,"transitions":TYPE_INT}) or int(value.threat.stage) not in [0,1,2,3] or value.threat.transitions < 0 or value.threat.transitions > 3:
+		return "WORLD_THREAT"
+	var director: ThreatDirector = ThreatDirector.new()
+	director.update(float(sim.elapsed),105,7)
+	if value.threat.stage != director.stage or value.threat.interval != director.interval:
+		return "WORLD_THREAT_CLOCK"
+	if enemy_mode:
+		for row: Dictionary in value.enemies:
+			var issue: String = EnemyRules.snapshot_problem(row,value,receipt)
+			if not issue.is_empty():
+				return issue
+	if not value.growth is Dictionary or not value.growth.get("members") is Array or value.growth.members.size() != ids.size() or value.growth.get("sortie_id") != receipt.transaction_id or value.growth.get("map_id") != value.map or not duration_matches(sim.elapsed,value.growth.get("duration_ms")):
+		return "WORLD_GROWTH"
+	var total: int = 0
+	if RescueState.is_family(receipt.base):
+		if not value.get("rescue") is Dictionary or value.get("rescue_mission") not in ["rescue","scavenge","supermarket"] or value.rescue_mission != receipt.rules.mission.mission_id or supply.layout.id != StringName(value.map):
+			return "RESCUE_WORLD_REQUIRED"
+		var expected_target: bool = supply.id == &"rescue" and (not RescuePoolState.available(receipt.base).is_empty() if RescuePoolState.is_family(receipt.base) else receipt.base.recruits.is_empty())
+		if expected_target:
+			var rescue_issue: String = RescueTarget.snapshot_problem(value.rescue,ids,FieldJoinState.is_family(receipt.base),RescuePoolState.choice(receipt.base,receipt.transaction_id) if RescuePoolState.is_family(receipt.base) else 3,5 if RescuePoolState.is_family(receipt.base) else 3)
+			if not rescue_issue.is_empty(): return rescue_issue
+		elif not value.rescue.is_empty(): return "RESCUE_WORLD_UNEXPECTED"
+	if FieldJoinState.is_family(receipt.base):
+		if not value.get("field_joins") is Array or not TransactionReceipt.same({"v":value.field_joins},{"v":receipt.joins}):
+			return "FIELD_JOIN_WORLD_FACT"
+		if not receipt.joins.is_empty():
+			if value.rescue.get("status") != "IN_FIELD_JOINED" or sim.elapsed*1000.0+0.000001 < receipt.joins[0].at_ms:
+				return "FIELD_JOIN_WORLD_TARGET"
+		elif value.rescue.get("status") == "IN_FIELD_JOINED":
+			return "FIELD_JOIN_NOT_DURABLE"
+	if GrowthState.is_family(receipt.base):
+		var xp_issue: String = GrowthRules.inputs_problem(value.get("xp_inputs"),RunTransaction.token_for(receipt),value.growth,FieldJoinRules.participants(receipt),FieldJoinRules.context(receipt))
+		if not xp_issue.is_empty():
+			return xp_issue
+		if value.xp_inputs.spawn_count != sim._spawn_count or value.xp_inputs.diagnostic != value.drill.enabled:
+			return "XP_WORLD_SOURCE"
+		for event: Dictionary in value.xp_inputs.events:
+			if FieldJoinState.is_family(receipt.base) and not receipt.joins.is_empty() and event.member_id == receipt.joins[0].member_id and event.at_ms < receipt.joins[0].at_ms:
+				return "FIELD_JOIN_EARLY_XP"
+			if int(event.enemy_id) in enemy_ids:
+				return "XP_ENEMY_STILL_ACTIVE"
+	if TraitState.is_family(receipt.base):
+		var report: Dictionary = {"participants":FieldJoinRules.participants(receipt),"growth_inputs":value.growth,"xp_inputs":value.xp_inputs,"field_joins":receipt.joins,"searched":value.sites.cash.searched,"food_searched":value.sites.food.searched}
+		var trait_issue: String = TraitRules.inputs_problem(value.get("trait_inputs"),RunTransaction.token_for(receipt),report,FieldJoinRules.context(receipt))
+		if not trait_issue.is_empty():
+			return trait_issue
+	var growth_ids: Array[int] = []
+	var defeated_ids: Array[int] = []
+	for row: Variant in value.growth.members:
+		if not row is Dictionary or row.size() != 3 or not row.has_all(["member_id","total","recent"]) or int(row.member_id) not in ids or int(row.member_id) in growth_ids or not SurvivalContracts.integer(row.total,0,SurvivalContracts.MAX_ID) or not row.recent is Array or row.recent.size() > SurvivorGrowth.RECENT_LIMIT or row.recent.size() > row.total:
+			return "WORLD_GROWTH_MEMBER"
+		growth_ids.append(int(row.member_id))
+		var actor_row: Dictionary = _member(value.survivors,int(row.member_id))
+		if row.total != actor_row.state.confirmed_kills:
+			return "WORLD_GROWTH_COUNT"
+		var previous_at: int = -1
+		var item: Dictionary = WeaponInventory.for_member(FieldJoinRules.context(receipt),int(row.member_id))
+		for event: Variant in row.recent:
+			if not event is Dictionary or event.size() != 5 or not event.has_all(["kind","enemy_id","at_ms","weapon_id","instance_id"]):
+				return "WORLD_GROWTH_EVENT_FIELDS"
+			if event.kind != "defeat" or not SurvivalContracts.integer(event.enemy_id,0,SurvivalContracts.MAX_ID) or int(event.enemy_id) in defeated_ids or int(event.enemy_id) in enemy_ids or (event.enemy_id >= sim._spawn_count and int(event.enemy_id)-10000 not in deployed):
+				return "WORLD_GROWTH_DEFEAT"
+			if not SurvivalContracts.integer(event.at_ms,0,int(value.growth.duration_ms)) or event.at_ms < previous_at or event.instance_id != item.instance_id or event.weapon_id != item.weapon_id:
+				return "WORLD_GROWTH_EVENT_SOURCE"
+			previous_at = int(event.at_ms)
+			defeated_ids.append(int(event.enemy_id))
+		total += int(row.total)
+	if total != sim.kills or sim.kills + value.enemies.size() != sim._spawn_count + deployed.size():
+		return "WORLD_ENEMY_ACCOUNTING"
+	if value.camera.zoom[0] != value.camera.zoom[1] or value.camera.zoom[0] < 0.7 or value.camera.zoom[0] > 1.25 or value.viewport[0] <= 0 or value.viewport[1] <= 0:
+		return "WORLD_CAMERA"
+	return ""
+
+
+static func apply(world: Expedition, value: Dictionary) -> String:
+	if not world.setup_problem.is_empty() or world.survivors.size() != value.survivors.size() or not world.enemies.is_empty():
+		return "WORLD_RECONSTRUCTION_SETUP"
+	if compatibility(world) != value.compatibility or _encode(world.get_viewport_rect().size) != value.viewport or world.hunger_trial != value.hunger or world.battle_drill != value.drill.enabled:
+		return "WORLD_BUILD_DATA_VIEWPORT_MISMATCH"
+	_restore(world,value.sim,SIM)
+	world.drill_panel._deployed.assign(value.drill.deployed)
+	world.weapon_loot.assign(value.weapons.duplicate(true))
+	for kind: String in ["cash","food"]:
+		var site: Expedition.SearchSite = world._cash_site if kind == "cash" else world._food_site
+		site.progress = value.sites[kind].progress
+		site.searched = value.sites[kind].searched
+	for actor: FieldActor in world.survivors:
+		var row: Dictionary = _member(value.survivors,actor.member_id)
+		_restore(actor,row.state,ACTOR)
+		_restore(actor.visual,row.visual,VISUAL)
+		actor.visual._apply_pose()
+		if actor.member_id == int(value.worker):
+			world.search_actor = actor
+	world._active_site = (world._cash_site if value.active_site == "cash" else world._food_site) if not value.active_site.is_empty() else null
+	for row: Dictionary in value.enemies:
+		var actor: FieldActor = world._make_actor(true,int(row.state.actor_id),_vec(row.state.position),{},String(row.behavior.kind) if world.enemy_mode else "")
+		_restore(actor,row.state,ACTOR)
+		_restore(actor.visual,row.visual,VISUAL)
+		if world.enemy_mode:
+			actor.enemy_behavior.restore(row.behavior)
+			actor.sync_enemy_visual()
+		actor.visual._apply_pose()
+		world.enemies.append(actor)
+	_restore(world.threat,value.threat,{"stage":TYPE_INT,"interval":TYPE_FLOAT,"transitions":TYPE_INT})
+	if world.rescue_mode and world.rescue_target != null:
+		world.rescue_target.restore(value.rescue)
+	if world.growth_mode:
+		world.xp_inputs.restore(value.xp_inputs)
+	if world.trait_mode:
+		world.trait_inputs.restore(value.trait_inputs)
+	world.growth_inputs._counts.clear()
+	world.growth_inputs._recent.clear()
+	for row: Dictionary in value.growth.members:
+		world.growth_inputs._counts[int(row.member_id)] = int(row.total)
+		world.growth_inputs._recent[int(row.member_id)] = row.recent.duplicate(true)
+	_restore(world.camera,value.camera,{"position":TYPE_VECTOR2,"zoom":TYPE_VECTOR2})
+	world.camera.force_update_scroll()
+	world.is_paused = true
+	world._update_ui()
+	world.queue_redraw()
+	return ""
+
+
+static func compatibility(world: Expedition) -> String:
+	var weapons: Array = []
+	for definition: WeaponDefinition in WeaponInventory.Definitions:
+		weapons.append(_resource(definition))
+	var data: Dictionary = {"build":ENEMY_BUILD if world.enemy_mode else QUALITY_BUILD if WeaponState.is_state(world.field_departure) else ROSTER_BUILD if RosterState.is_family(world.field_departure) else POOL_BUILD if world.pool_mode else TRAINING_BUILD if world.training_mode else TRAIT_BUILD if world.trait_mode else FIELD_BUILD if world.field_join_mode else (GROWTH_BUILD if world.growth_mode else BUILD),"tuning":_resource(world.tuning),"threat":_resource(world.threat.rules),"supply":_resource(world.supply),"weapons":weapons}
+	if world.enemy_mode:
+		data.enemy_rules = EnemyRules.POLICY
+	return SurvivalContracts.fingerprint(data)
+
+
+static func _resource(resource: Resource) -> Dictionary:
+	var result: Dictionary = {}
+	for prop: Dictionary in resource.get_property_list():
+		if int(prop.usage) & PROPERTY_USAGE_EDITOR and int(prop.usage) & PROPERTY_USAGE_STORAGE and prop.name != "script":
+			result[String(prop.name)] = _encode(resource.get(prop.name))
+	return result
+
+
+static func _actor(actor: FieldActor) -> Dictionary:
+	var value: Dictionary = {"state":_fields(actor,ACTOR),"visual":_fields(actor.visual,VISUAL)}
+	if actor.is_enemy and actor.enemy_behavior!=null:
+		value.behavior = actor.enemy_behavior.snapshot()
+	return value
+
+
+static func _fields(object: Object, spec: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	for key: String in spec:
+		result[key] = _encode(object.get(key))
+	return result
+
+
+static func _encode(value: Variant) -> Variant:
+	if value is Vector2:
+		return [value.x,value.y]
+	if value is Rect2:
+		return [value.position.x,value.position.y,value.size.x,value.size.y]
+	if value is Resource:
+		return _resource(value)
+	if value is StringName:
+		return String(value)
+	if value is Array or value is PackedVector2Array or value is PackedFloat32Array or value is PackedInt32Array:
+		var result: Array = []
+		for item: Variant in value:
+			result.append(_encode(item))
+		return result
+	if value is Color:
+		return value.to_html()
+	return value
+
+
+static func _restore(object: Object, values: Dictionary, spec: Dictionary) -> void:
+	for key: String in spec:
+		var value: Variant = values[key]
+		match spec[key]:
+			TYPE_VECTOR2: value = _vec(value)
+			TYPE_PACKED_VECTOR2_ARRAY:
+				var points: PackedVector2Array = PackedVector2Array()
+				for point: Array in value:
+					points.append(_vec(point))
+				value = points
+			TYPE_INT: value = int(value)
+			TYPE_FLOAT: value = float(value)
+			TYPE_STRING_NAME: value = StringName(value)
+		object.set(key,value)
+
+
+static func _shape(value: Variant, spec: Dictionary) -> bool:
+	if not value is Dictionary or value.size() != spec.size() or not value.has_all(spec.keys()):
+		return false
+	for key: String in spec:
+		var item: Variant = value[key]
+		match spec[key]:
+			TYPE_VECTOR2:
+				if not _vector(item): return false
+			TYPE_PACKED_VECTOR2_ARRAY:
+				if not item is Array or item.size() > 512: return false
+				for point: Variant in item:
+					if not _vector(point): return false
+			TYPE_FLOAT:
+				if not _number(item): return false
+			TYPE_INT:
+				if not SurvivalContracts.integer(item,0,SurvivalContracts.MAX_ID): return false
+			TYPE_STRING_NAME,TYPE_STRING:
+				if not item is String or item.length() > 128: return false
+			_:
+				if typeof(item) != spec[key]: return false
+	return true
+
+
+static func _actor_shape(row: Variant, enemy_mode: bool = false) -> bool:
+	if not row is Dictionary or row.size() != (3 if enemy_mode else 2) or (enemy_mode and not row.has("behavior")) or not _shape(row.get("state"),ACTOR) or not _shape(row.get("visual"),VISUAL):
+		return false
+	var state: Dictionary = row.state
+	return int(state.activity) in [0,1,2,3] and state.health >= 0 and state.health <= state.max_health and state.cooldown >= 0 and state.damage_received >= 0 and (state._path_index <= state.path.size() or state.activity == 3) and row.visual._is_defeated == (state.activity == 3)
+
+
+static func _vector(value: Variant) -> bool:
+	return value is Array and value.size() == 2 and _number(value[0]) and _number(value[1])
+
+
+static func _number(value: Variant) -> bool:
+	return SurvivalContracts.number(value) and absf(float(value)) <= 100000000.0
+
+
+static func _vec(value: Array) -> Vector2:
+	return Vector2(float(value[0]),float(value[1]))
+
+
+static func _member(rows: Array, id: int) -> Dictionary:
+	for row: Dictionary in rows:
+		if int(row.state.member_id) == id:
+			return row
+	return {}
+
+
+static func _same(a: Dictionary, b: Dictionary) -> bool:
+	return SurvivalContracts.fingerprint(a) == SurvivalContracts.fingerprint(b)

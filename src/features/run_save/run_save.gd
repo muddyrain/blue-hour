@@ -11,10 +11,32 @@ var path: String
 var diagnostic: String = ""
 var snapshot: Dictionary = {}
 var migrated_from: int = 0
+var _battle_format: bool = false
+var _survival_format: bool = false
+var _rescue_format: bool = false
+var _growth_format: bool = false
+var _field_format: bool = false
+var _trait_format: bool = false
+var _training_format: bool = false
+var _pool_format: bool = false
+var _roster_format: bool = false
+var _enemy_format: bool = false
+var _quality_format: bool = false
 
 
-func _init(save_path: String) -> void:
+func _init(save_path: String, battle_format: bool = false, survival_format: bool = false, rescue_format: bool = false, growth_format: bool = false, field_format: bool = false, trait_format: bool = false, training_format: bool = false, pool_format: bool = false, roster_format: bool = false, quality_format: bool = false, enemy_format: bool = false) -> void:
 	path = ProjectSettings.globalize_path(save_path)
+	_battle_format = battle_format
+	_survival_format = survival_format
+	_rescue_format = rescue_format
+	_growth_format = growth_format
+	_field_format = field_format
+	_trait_format = trait_format
+	_training_format = training_format
+	_pool_format = pool_format
+	_roster_format = roster_format
+	_quality_format = quality_format
+	_enemy_format = enemy_format
 
 
 static func new_profile_id() -> String:
@@ -79,7 +101,7 @@ static func validate(data: Variant) -> String:
 	return ""
 
 
-static func _validate_day(data: Dictionary) -> String:
+static func _validate_day(data: Dictionary, maximum_member_id: int = 2) -> String:
 	if not data.last_day is Dictionary:
 		return "每日结算记录无效"
 	var entry: Dictionary = data.last_day
@@ -98,7 +120,7 @@ static func _validate_day(data: Dictionary) -> String:
 		return "每日结算身份或口粮名单无效"
 	var ids: Array[int] = []
 	for member_id: Variant in entry.ration_member_ids:
-		if not _integer(member_id, 1, 2) or int(member_id) in ids:
+		if not _integer(member_id, 1, maximum_member_id) or int(member_id) in ids:
 			return "口粮成员身份重复或未知"
 		ids.append(int(member_id))
 	if entry.ration_per_member < 1 or entry.food_required != ids.size() * entry.ration_per_member:
@@ -128,6 +150,9 @@ static func _integer(value: Variant, minimum: int, maximum: int) -> bool:
 
 
 func load_save(backup: bool = false) -> Error:
+	if transaction_namespace(path) or DirAccess.dir_exists_absolute(path + ".txn") or FileAccess.file_exists(path + ".txn"):
+		snapshot = {}
+		return _fail(ERR_UNAVAILABLE, "此营地要求事务协调；请使用已登记旅程入口，原件保留")
 	var source: String = path + ".bak" if backup else path
 	var result: Dictionary = _read(source)
 	diagnostic = result.message
@@ -140,11 +165,46 @@ func has_files() -> bool:
 	return FileAccess.file_exists(path) or FileAccess.file_exists(path + ".bak")
 
 
-func save(data: Dictionary, allow_invalid_replacement: bool = false) -> Error:
-	diagnostic = validate(data)
+func read_v5_exact() -> Dictionary:
+	if _battle_format or _survival_format or _rescue_format or _growth_format or _field_format or _trait_format or _training_format or _pool_format or _roster_format or _quality_format or _enemy_format:
+		return {"error":ERR_INVALID_DATA,"message":"隔离生存格式不是v5","data":{}}
+	return read_transaction_exact()
+
+
+func read_transaction_exact() -> Dictionary:
+	var result: Dictionary = _read(path)
+	if result.error == OK and int(result.get("migration", 0)) != 0:
+		return {"error":ERR_INVALID_DATA, "message":"事务适配器只接受现有v5；旧档须单独审核", "data":{}}
+	return result
+
+
+func save(data: Dictionary, allow_invalid_replacement: bool = false, writer: ProgressWriter = null, transition_hook: Callable = Callable()) -> Error:
+	var owner: ProgressWriter = writer if writer != null else ProgressWriter.new(path)
+	var error: Error = OK if writer != null and writer.owns(path) else (ERR_UNAUTHORIZED if writer != null else owner.acquire())
+	if error != OK:
+		return _fail(error, "进度写入正被占用或无法确认写者；原档保留，可重试。" + owner.reason)
+	if transition_hook.is_valid() and writer == null:
+		owner.release()
+		return _fail(ERR_UNAUTHORIZED, "事务写入钩子要求已持有写者能力")
+	if writer == null and (transaction_namespace(path) or DirAccess.dir_exists_absolute(path + ".txn") or FileAccess.file_exists(path + ".txn")):
+		error = _fail(ERR_UNAVAILABLE, "此营地只能通过绑定事务协调器写入")
+	else:
+		error = _save_owned(data, allow_invalid_replacement, transition_hook)
+	if writer == null:
+		owner.release()
+	return error
+
+
+static func transaction_namespace(save_path: String) -> bool:
+	var file_name: String = save_path.replace("\\", "/").get_file().to_lower()
+	return file_name == "run.enemy-v1.json" or file_name.begins_with("run.enemy-v1.json.") or file_name == "run.weapon-quality-v1.json" or file_name.begins_with("run.weapon-quality-v1.json.") or file_name == "run.roster-v1.json" or file_name.begins_with("run.roster-v1.json.") or file_name == "run.rescue-pool-v1.json" or file_name.begins_with("run.rescue-pool-v1.json.") or file_name == "run.training-v1.json" or file_name.begins_with("run.training-v1.json.") or file_name == "run.trait-v1.json" or file_name.begins_with("run.trait-v1.json.") or file_name == "run.field-join-v1.json" or file_name.begins_with("run.field-join-v1.json.") or file_name == "run.growth-v1.json" or file_name.begins_with("run.growth-v1.json.") or file_name == "run.rescue-v1.json" or file_name.begins_with("run.rescue-v1.json.") or file_name == "run.txn-v1.json" or file_name.begins_with("run.txn-v1.json.") or file_name == "run.battle-v1.json" or file_name.begins_with("run.battle-v1.json.") or file_name == "run.survival-v1.json" or file_name.begins_with("run.survival-v1.json.")
+
+
+func _save_owned(data: Dictionary, allow_invalid_replacement: bool = false, transition_hook: Callable = Callable()) -> Error:
+	diagnostic = _format_problem(data)
 	if not diagnostic.is_empty():
 		return ERR_INVALID_DATA
-	if data.schema_version != SCHEMA_VERSION:
+	if not _battle_format and not _survival_format and not _rescue_format and not _growth_format and not _field_format and not _trait_format and not _training_format and not _pool_format and not _roster_format and not _quality_format and not _enemy_format and data.schema_version != SCHEMA_VERSION:
 		return _fail(ERR_INVALID_DATA, "写入只支持v5；旧版请先读取迁移")
 	var serialized: String = JSON.stringify(data, "\t", true, true) + "\n"
 	if serialized.to_utf8_buffer().size() > MAX_BYTES:
@@ -197,6 +257,8 @@ func save(data: Dictionary, allow_invalid_replacement: bool = false) -> Error:
 			return _fail(ERR_FILE_CORRUPT, "旧档异常，需先明确选择备份或新游戏；原字节已保留")
 		rollback = path + ".rejected-" + new_profile_id()
 		error = DirAccess.rename_absolute(path, rollback)
+	if error == OK and transition_hook.is_valid():
+		error = int(transition_hook.call("after_base_to_backup")) as Error
 	if error == OK:
 		error = DirAccess.rename_absolute(temporary, path)
 	if error != OK:
@@ -233,9 +295,11 @@ func _read(source: String) -> Dictionary:
 	var parser: JSON = JSON.new()
 	if parser.parse(content) != OK:
 		return {"error": ERR_PARSE_ERROR, "message": "JSON 无效（第 %d 行）" % parser.get_error_line(), "data": {}}
-	var problem: String = validate(parser.data)
+	var problem: String = _format_problem(parser.data)
 	if not problem.is_empty():
 		return {"error": ERR_INVALID_DATA, "message": problem, "data": {}}
+	if _battle_format or _survival_format or _rescue_format or _growth_format or _field_format or _trait_format or _training_format or _pool_format or _roster_format or _quality_format or _enemy_format:
+		return {"error":OK,"message":"隔离生存格式校验通过，无旧档迁移","data":parser.data,"migration":0}
 	# Godot JSON numbers are floats; normalize only after strict range/integer checks.
 	var data: Dictionary = parser.data
 	var migration: int = int(data.schema_version) if int(data.schema_version) < SCHEMA_VERSION else 0
@@ -281,6 +345,64 @@ func _read(source: String) -> Dictionary:
 		if migration == 1:
 			message += "食物初始化为%d（迁移默认值，非历史库存）。" % DefaultRules.v1_migration_food
 	return {"error": OK, "message": message, "data": data, "migration":migration}
+
+
+func _format_problem(data: Variant) -> String:
+	if _enemy_format:
+		var name: String = path.replace("\\","/").get_file().to_lower()
+		if name!="run.enemy-v1.json" and not name.begins_with("run.enemy-v1.json."):
+			return "ENEMY_NAMESPACE_REQUIRED"
+		return EnemyState.problem(data) if data is Dictionary else "ENEMY_FORMAT"
+	if _quality_format:
+		var name: String = path.replace("\\","/").get_file().to_lower()
+		if name!="run.weapon-quality-v1.json" and not name.begins_with("run.weapon-quality-v1.json."):
+			return "WEAPON_QUALITY_NAMESPACE_REQUIRED"
+		return WeaponState.problem(data) if data is Dictionary else "WEAPON_QUALITY_FORMAT"
+	if _roster_format:
+		var name: String = path.replace("\\","/").get_file().to_lower()
+		if name!="run.roster-v1.json" and not name.begins_with("run.roster-v1.json."):
+			return "ROSTER_NAMESPACE_REQUIRED"
+		return RosterState.problem(data) if data is Dictionary else "ROSTER_FORMAT"
+	if _pool_format:
+		var name: String = path.replace("\\","/").get_file().to_lower()
+		if name!="run.rescue-pool-v1.json" and not name.begins_with("run.rescue-pool-v1.json."):
+			return "POOL_NAMESPACE_REQUIRED"
+		return TrainingState.family_problem(data,true) if data is Dictionary else "POOL_FORMAT"
+	if _training_format:
+		var name: String = path.replace("\\","/").get_file().to_lower()
+		if name != "run.training-v1.json" and not name.begins_with("run.training-v1.json."):
+			return "TRAINING_NAMESPACE_REQUIRED"
+		return TrainingState.problem(data) if data is Dictionary else "TRAINING_FORMAT"
+	if _trait_format:
+		var name: String = path.replace("\\","/").get_file().to_lower()
+		if name != "run.trait-v1.json" and not name.begins_with("run.trait-v1.json."):
+			return "TRAIT_NAMESPACE_REQUIRED"
+		return TraitState.problem(data) if data is Dictionary else "TRAIT_FORMAT"
+	if _field_format:
+		var name: String = path.replace("\\","/").get_file().to_lower()
+		if name != "run.field-join-v1.json" and not name.begins_with("run.field-join-v1.json."):
+			return "FIELD_JOIN_NAMESPACE_REQUIRED"
+		return FieldJoinState.problem(data) if data is Dictionary else "FIELD_JOIN_FORMAT"
+	if _growth_format:
+		var name: String = path.replace("\\","/").get_file().to_lower()
+		if name != "run.growth-v1.json" and not name.begins_with("run.growth-v1.json."):
+			return "GROWTH_NAMESPACE_REQUIRED"
+		return GrowthState.problem(data) if data is Dictionary else "GROWTH_FORMAT"
+	if _rescue_format:
+		var name: String = path.replace("\\","/").get_file().to_lower()
+		if name != "run.rescue-v1.json" and not name.begins_with("run.rescue-v1.json."):
+			return "RESCUE_NAMESPACE_REQUIRED"
+		return RescueState.problem(data) if data is Dictionary else "RESCUE_FORMAT"
+	if _survival_format:
+		var file_name: String = path.replace("\\", "/").get_file().to_lower()
+		if file_name != "run.survival-v1.json" and not file_name.begins_with("run.survival-v1.json."):
+			return "SURVIVAL_NAMESPACE_REQUIRED"
+		return SurvivalState.problem(data) if data is Dictionary else "SURVIVAL_FORMAT"
+	if not _battle_format:
+		return validate(data)
+	if path.replace("\\","/").get_file().to_lower() != "run.battle-v1.json" and not path.replace("\\","/").get_file().to_lower().begins_with("run.battle-v1.json."):
+		return "BATTLE_NAMESPACE_REQUIRED"
+	return BattleState.problem(data) if data is Dictionary else "BATTLE_FORMAT"
 
 
 func _retain_legacy(source: String, version: int) -> Error:

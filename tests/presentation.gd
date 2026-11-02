@@ -49,7 +49,7 @@ func _check_weapon(view: WeaponPresentation) -> void:
 		actor.visual.advance(0.25, Vector2.ZERO, direction)
 		_expect(actor.visual.direction_row == expected_row, "unit aim and distance-scaled aim map to the same facing")
 		if direction == Vector2.UP:
-			_expect(actor.visual._head.z_index > actor.visual._weapon.z_index and actor.visual._weapon.z_index > actor.visual._upper.z_index,
+			_expect(actor.visual._head.get_index() > actor.visual._weapon.get_index() and actor.visual._weapon.get_index() > actor.visual._upper.get_index() and actor.visual._head.z_index == 0 and actor.visual._weapon.z_index == 0,
 					"north weapon is in front of jacket and behind head/hair")
 	actor.aim = Vector2.UP * 100.0
 	actor.command_path(PackedVector2Array([Vector2(100, 0)]))

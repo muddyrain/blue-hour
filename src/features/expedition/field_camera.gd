@@ -14,6 +14,7 @@ var max_zoom: float = 1.25
 var zoom_step: float = 1.10
 var _last_pan: Vector2 = Vector2.ZERO
 var _tap_pan: Vector2 = Vector2.ZERO
+var menu_blocked: bool = false
 
 
 func _ready() -> void:
@@ -24,6 +25,9 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if menu_blocked:
+		_tap_pan = Vector2.ZERO
+		return
 	var direction: Vector2 = Input.get_vector("camera_left", "camera_right", "camera_up", "camera_down")
 	# A complete press/release between frames must still move for one frame.
 	if direction == Vector2.ZERO:
@@ -37,6 +41,8 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if menu_blocked:
+		return
 	for action: StringName in PAN_DIRECTIONS:
 		if event.is_action_pressed(action):
 			_tap_pan += PAN_DIRECTIONS[action]

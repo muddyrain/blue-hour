@@ -1,37 +1,22 @@
-# Blue Hour 文档
+# 公开文档导航
 
-文档按玩家实际遇到的功能组织。当前内容基线是 `edf9bd9`；[公开状态](plan.md)描述这一快照，后续内部 P0 开发没有自动包含在内。
+- [公开状态](plan.md)：最新原型能力与发布门禁。
+- [功能及隔离入口](features/README.md)：普通默认与111试运行的边界。
+- [已知限制](KNOWN_LIMITATIONS.md)：哈希拒绝、恢复、人数、输入及平衡限制。
+- [架构](architecture.md)：现有模块与唯一保存所有权。
+- [可复测验证](VALIDATION.md)：公共克隆可运行的子集及未包含的内部证据。
+- [素材来源](ASSET_PROVENANCE.md)和[运行资源清单](../assets/PROVENANCE.json)。
+- [真实截图](screenshots/README.md)：受控展示与自然任务分别标明。
 
-## Feature
+本公开视图不维护或包含内部工作账本、原始研究/测试档案及开发历史。
 
-| 功能 | 已经可以操作 | 说明 |
-| --- | --- | --- |
-| [出击与搜集](features/sortie-and-scavenging.md) | 双地图、暂停下令、派工与携带物资 | 固定地图与暂行奖励 |
-| [战斗与夜间](features/combat-and-night-pressure.md) | 实际寻路/攻击、LOS、墙角风险与增援 | 伤害与时间曲线仍是项目候选 |
-| [巴士撤离](features/bus-evacuation.md) | 发动、明确集合、真实到场人数 | 发动不自动召回，集合不打断搜集 |
-| [营地与配装](features/camp-and-loadouts.md) | 呼号、维修、武器归属、食物与行动记录 | 行动记录不折算经验 |
-| [保存与恢复](features/save-and-recovery.md) | v5 营地保存、旧档迁移、备份选择与重试 | 不保存局内进程，不承诺断电绝对安全 |
+## 五篇独立功能说明
 
-## 开发与画面
+| 文档 | 玩家流程与当前边界 |
+| --- | --- |
+| [出击、搜集与救援](features/sortie-and-scavenging.md) | 双地图派工、取消、单目标候选救援及当场入队 |
+| [战斗、视线与夜间](features/combat-and-night-pressure.md) | 三敌种、两枪比较、真实LOS与八方向原型 |
+| [巴士发动与撤离](features/bus-evacuation.md) | 显式集合、实际全员到齐、结果预览和提交 |
+| [营地、名册与配装](features/camp-and-loadouts.md) | 四活五历史、普通成长/Trait/训练、武器实例与有效值 |
+| [保存与恢复](features/save-and-recovery.md) | 新旧档保护、一次暂存、未修复RECORD_READBACK/RECORD_HASH |
 
-- [根 README](../README.md)：运行、工具链与基本操作。
-- [架构](architecture.md)：模块所有权、状态与保存边界。
-- [协作约定](../AGENTS.md)：数据保护、检查和公开维护规范。
-- [截图目录](screenshots/README.md)：九张原始 PNG、版本、普通任务与隔离演练说明。
-
-## 已完成与未开放
-
-此快照具备“营地选择 → 搜集交火 → 发动集合 → 归航结算 → 维修配装 → 保存重开”的可玩循环。当前正式旅程使用既有双人身份和 v5 数据；不是全员可变人数的完整生存系统。
-
-经验升级、特性效果、食物训练、正式永久死亡、医疗、整局随机生成及局内崩溃恢复尚未开放。当前街区、武器/敌人参数、固定奖励与威胁阶段含 `PROJECT_TEMP` 选择，不能称为原作最终数值。
-
-## 依据的四种等级
-
-| 等级 | 可以支持什么 | 不能扩大的结论 |
-| --- | --- | --- |
-| LOCAL_VERIFIED | 旧原作本机观察的特定条件 | 不等于本公开候选重新实测原作或掌握精确公式 |
-| OFFICIAL_HISTORICAL | 对应版本的官方历史说明 | 不能直接套到本机版本和当前 Blue Hour 参数 |
-| PROJECT_TEMP | 本项目要求或可替换实现选择 | 不是原作事实，也不是已定版的整体平衡 |
-| UNKNOWN | 尚缺可靠证据的机制或数值 | 不以界面占位或经验推断补齐 |
-
-这些页面首先描述 Blue Hour 本身的行为。原作图片不会换成 Blue Hour 图片后继续作为原作论据。完整原始研究和验收档案不随公开源码分发。

@@ -81,9 +81,12 @@ func refresh(state: Dictionary) -> void:
 	view._time_box.tooltip_text = "Blue Hour候选：随时间增加普通敌人增援；精确原作阈值/倍率未校准。暂停冻结，无自动失败。"
 	var help: Label = view._help.get_node("HelpText") as Label
 	help.text = _base_help
+	if state.get("enemy_mode",false):
+		help.text += "\n敌种候选：疾奔者近处加速；重压者预警0.5秒后重击，移出脚底圆环可避。"
 	if not practice:
 		help.text += "\n" + String(state.get("route_hint", ""))
 		help.text += "\n先发动，等待时点「集合至巴士」；搜集完成后归队。"
+		help.text += "\nEsc：暂停菜单、定位巴士与退出风险提示。"
 		help.text += "\n威胁随时间上升；归零仍可撤离，原作夜间参数待校准。"
 	if practice:
 		help.text += "\n练习：1/2 换枪；I/J/K/L 来袭；H 交错；U 远距靶"

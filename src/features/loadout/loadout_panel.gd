@@ -8,12 +8,15 @@ signal closed
 
 var items: ItemList
 var equip_buttons: Array[Button] = []
+var equip_by_id: Dictionary[int,Button] = {}
 var repair_button: Button
 var back_button: Button
 var confirmation: ConfirmationDialog
 var message: Label
 var _crew: Label
-var _member_equipment: Array[Label] = []
+var _member_equipment: Dictionary[int,Label] = {}
+var _crew_grid: GridContainer
+var _actions: HBoxContainer
 var _detail: Label
 var _preview: TextureRect
 var _data: Dictionary = {}
@@ -51,24 +54,10 @@ func _ready() -> void:
 	_crew.custom_minimum_size = Vector2(140, 56)
 	_crew.add_theme_color_override("font_color", Color("a5dfce"))
 	crew_row.add_child(_crew)
-	for member_id: int in [1, 2]:
-		var member_row: HBoxContainer = HBoxContainer.new()
-		member_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		member_row.add_theme_constant_override("separation", 10)
-		crew_row.add_child(member_row)
-		var portrait: TextureRect = TextureRect.new()
-		portrait.texture = SurvivorRoster.definition(member_id).portrait
-		portrait.custom_minimum_size = Vector2(52, 56)
-		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		member_row.add_child(portrait)
-		var equipment: Label = Label.new()
-		equipment.add_theme_font_size_override("font_size", 16)
-		equipment.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		equipment.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		member_row.add_child(equipment)
-		_member_equipment.append(equipment)
+	_crew_grid = GridContainer.new()
+	_crew_grid.columns = 2
+	_crew_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	crew_row.add_child(_crew_grid)
 	var row: HBoxContainer = HBoxContainer.new()
 	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	row.add_theme_constant_override("separation", 28)
@@ -89,22 +78,19 @@ func _ready() -> void:
 	_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	detail_column.add_child(_preview)
+	var detail_scroll: ScrollContainer = ScrollContainer.new()
+	detail_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	detail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	detail_column.add_child(detail_scroll)
 	_detail = Label.new()
 	_detail.add_theme_font_size_override("font_size", 18)
 	_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	detail_column.add_child(_detail)
+	_detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail_scroll.add_child(_detail)
 	var actions: HBoxContainer = HBoxContainer.new()
 	actions.add_theme_constant_override("separation", 16)
 	column.add_child(actions)
-	for member_id: int in [1, 2]:
-		var button: Button = Button.new()
-		button.text = "配给队员 %d / 交换" % member_id
-		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.custom_minimum_size.y = 48
-		button.pressed.connect(func() -> void: equip_requested.emit(member_id, _selected_id))
-		actions.add_child(button)
-		equip_buttons.append(button)
+	_actions = actions
 	repair_button = Button.new()
 	repair_button.text = "维修…"
 	repair_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -135,6 +121,11 @@ func _ready() -> void:
 
 func refresh(data: Dictionary, feedback: String = "") -> void:
 	_data = data.duplicate(true)
+	items.max_text_lines = 3 if WeaponState.is_family(_data) else 1
+	_sync_members()
+	for id: int in _member_equipment:
+		var entry: Dictionary = SurvivorRoster.member(_data.crew,id)
+		_member_equipment[id].get_parent().visible = not entry.is_empty() and entry.health>0
 	items.clear()
 	for item: Dictionary in _data.weapons:
 		var weapon: WeaponDefinition = WeaponInventory.definition(item.weapon_id)
@@ -143,8 +134,12 @@ func refresh(data: Dictionary, feedback: String = "") -> void:
 		var list_owner: String = ownership if ownership.length() <= 6 else ownership.left(6) + "…"
 		var index: int = items.add_item("%02d  %s  /  %s  /  %s" % [items.item_count + 1, weapon.display_name,
 			"待维修" if item.condition == "damaged" else "可装备", list_owner], weapon.presentation.texture)
+		if WeaponState.is_family(_data):
+			items.set_item_text(index,items.get_item_text(index)+"\n"+WeaponModifiers.description(item))
 		items.set_item_metadata(index, item.instance_id)
 		items.set_item_tooltip(index, "归属 " + ownership + "\n实例 " + item.instance_id)
+		if WeaponState.is_family(_data):
+			items.set_item_tooltip(index,items.get_item_tooltip(index)+"\n"+WeaponModifiers.description(item)+"\nPROJECT_TEMP；完整比较见右侧可滚动详情")
 		items.set_item_custom_fg_color(index, CampStyle.AMBER if item.condition == "damaged" else CampStyle.TEXT)
 		if _selected_id == item.instance_id:
 			items.select(index)
@@ -154,9 +149,12 @@ func refresh(data: Dictionary, feedback: String = "") -> void:
 		_select(items.get_selected_items()[0])
 	for member: Dictionary in _data.crew:
 		var item: Dictionary = WeaponInventory.for_member(_data, int(member.id))
-		var label: Label = _member_equipment[int(member.id) - 1]
-		label.text = "%02d  %s\n%s" % [int(member.id), member.call_sign,
-			WeaponInventory.definition(item.weapon_id).display_name if not item.is_empty() else "倒地，装备在库"]
+		var label: Label = _member_equipment[int(member.id)]
+		label.text = "%02d  %s\n%s" % [int(member.id), (member.call_sign.left(4)+"…" if member.call_sign.length()>5 else member.call_sign),
+			WeaponInventory.definition(item.weapon_id).display_name if not item.is_empty() else ("已阵亡，原实例在库" if member.condition == "dead" else "倒地，装备在库")]
+		if not item.is_empty():
+			var weapon: WeaponDefinition = WeaponModifiers.combat_definition(item)
+			label.text += ("\n%.2f伤 · %.3fs · %.2f距" if WeaponState.is_family(_data) else "\n%.0f伤 · %.3fs · %.0f距") % [weapon.damage,weapon.shot_interval(TraitRules.factor(member,"shot")),weapon.shot_range]
 		var base: SurvivorDefinition = SurvivorRoster.definition(int(member.id))
 		label.tooltip_text = "%s · %s\n呼号：%s" % [base.default_display_name, base.gender_text(), member.call_sign]
 	_crew.text = "货币 %d\n食物 %d" % [int(_data.cash),int(_data.food)]
@@ -165,21 +163,49 @@ func refresh(data: Dictionary, feedback: String = "") -> void:
 
 func _select(index: int) -> void:
 	_selected_id = items.get_item_metadata(index)
+	_detail.get_parent().set_deferred("scroll_vertical",0)
 	var item: Dictionary = WeaponInventory.find(_data, _selected_id)
 	var weapon: WeaponDefinition = WeaponInventory.definition(item.weapon_id)
 	_preview.texture = weapon.presentation.texture
 	var owner_id: int = WeaponInventory.owner(_data, _selected_id)
 	var ownership: String = SurvivorRoster.member(_data.crew, owner_id).call_sign if owner_id > 0 else "装备仓"
-	_detail.text = "%s\n%s\n\n当前归属  /  %s\n来源  /  %s\n维修报价  /  %d 货币\n\n伤害 %.0f   ·   间隔 %.2f秒   ·   射程 %.0f\n战斗参数待校准" % [weapon.display_name,
-		"损坏 · 须维修后装备" if item.condition == "damaged" else "状态良好 · 可装备", ownership,
-		"街区补给点搜集" if item.origin == "north-cache" else "初始装备",weapon.repair_cost,weapon.damage,weapon.interval,weapon.shot_range]
+	_detail.text = "%s · PROJECT_TEMP\n%s · %s\n\n基础伤害 %.0f · 间隔 %.3f秒 · 射程 %.0f" % [weapon.display_name,
+		"损坏 · 须维修" if item.condition == "damaged" else "状态良好", ownership,
+		weapon.damage,weapon.interval,weapon.shot_range]
+	if owner_id > 0:
+		var member: Dictionary = SurvivorRoster.member(_data.crew,owner_id)
+		var factor: float = TraitRules.factor(member,"shot")
+		_detail.text += "\n本人实际：%.0f伤 · %.3f秒 · %.0f距\n射击Trait倍率 ×%.3f；普通等级不加武器伤害" % [weapon.damage,weapon.shot_interval(factor),weapon.shot_range,factor]
+	else:
+		_detail.text += "\n未配装；配装后按持有者本人的射击Trait生效。"
+	_detail.text += "\n\n理论持续 %.2f伤/秒（未计接敌与过量伤害）\n来源  /  %s\n维修报价  /  %d 货币" % [weapon.damage/weapon.interval,
+		("救援同伴当场加入时自带" if item.origin == "rescue-first-contact" else ("街区补给点搜集" if item.origin == "north-cache" else "初始装备")),weapon.repair_cost]
+	if WeaponState.is_family(_data):
+		_detail.text = "%s · PROJECT_TEMP\n%s\n%s · %s\n\n枪型基础：%.0f伤 · %.3f秒 · %.0f距" % [weapon.display_name,WeaponModifiers.description(item),"损坏 · 须维修" if item.condition=="damaged" else "状态良好",ownership,weapon.damage,weapon.interval,weapon.shot_range]
+		var stats: Dictionary = WeaponModifiers.effective(item,TraitRules.factor(SurvivorRoster.member(_data.crew,owner_id),"shot") if owner_id>0 else 1.0)
+		_detail.text += "\n实例等级伤害：×%.2f\n%s：%.2f伤 · %.3f秒 · %.2f距\n维修10币，只改状态，不重抽词条。" % [1.10 if item.weapon_level==2 else 1.0,"本人有效" if owner_id>0 else "未配装实例",stats.damage,stats.interval,stats.range]
+		_detail.text += "\n\n与实际成员当前武器比较（同一本人Trait）："
+		for member: Dictionary in _data.crew:
+			if member.health<=0: continue
+			var current: Dictionary = WeaponInventory.for_member(_data,int(member.id))
+			var factor: float = TraitRules.factor(member,"shot")
+			var before: Dictionary = WeaponModifiers.effective(current,factor)
+			var proposed: Dictionary = WeaponModifiers.effective(item,factor)
+			_detail.text += "\n%02d %s · 当前→所选\n伤%.2f→%.2f / 秒%.3f→%.3f / 距%.2f→%.2f" % [int(member.id),member.call_sign.left(5),before.damage,proposed.damage,before.interval,proposed.interval,before.range,proposed.range]
 	_detail.tooltip_text = "实例 " + item.instance_id + "\n现有样板固定维修报价，尚无随机词条。"
-	for member_id: int in [1,2]:
-		equip_buttons[member_id-1].text = "配给 %s / 交换" % SurvivorRoster.member(_data.crew,member_id).call_sign
+	if WeaponState.is_family(_data):
+		_detail.tooltip_text = "实例 "+item.instance_id+"\n属性生成即冻结，维修只改状态；全部PROJECT_TEMP。"
+	for member_id: int in equip_by_id:
+		equip_by_id[member_id].visible = WeaponInventory._living(_data,member_id)
+		var name: String = SurvivorRoster.member(_data.crew,member_id).get("call_sign", "")
+		equip_by_id[member_id].tooltip_text = "配给 %s / 交换" % name
+		equip_by_id[member_id].text = "配给 %s / 交换" % (name.left(4)+"…" if RescuePoolState.is_family(_data) and name.length()>5 else name)
 
-	for member_id: int in [1, 2]:
-		equip_buttons[member_id - 1].disabled = item.condition != "ready" or not WeaponInventory._living(_data, member_id)
+	for member_id: int in equip_by_id:
+		equip_by_id[member_id].disabled = item.condition != "ready" or not WeaponInventory._living(_data, member_id)
 	repair_button.disabled = item.condition != "damaged"
+	if BattleState.is_state(_data) and _data.journey.state == "FAILED":
+		repair_button.disabled = true
 	repair_button.text = "维修 %d 货币…" % weapon.repair_cost if item.condition == "damaged" else "无需维修"
 
 
@@ -189,3 +215,36 @@ func _confirm_repair() -> void:
 	var weapon: WeaponDefinition = WeaponInventory.definition(item.weapon_id)
 	confirmation.dialog_text = "维修%s，消耗%d货币？\n确认后保存营地；取消不会消耗资源。" % [weapon.display_name, weapon.repair_cost]
 	confirmation.popup_centered(Vector2i(620, 230))
+
+
+func _sync_members() -> void:
+	for member: Dictionary in _data.crew:
+		var member_id: int = int(member.id)
+		if _member_equipment.has(member_id): continue
+		var member_row: HBoxContainer = HBoxContainer.new()
+		member_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		member_row.add_theme_constant_override("separation", 10)
+		_crew_grid.add_child(member_row)
+		var portrait: TextureRect = TextureRect.new()
+		portrait.texture = SurvivorRoster.definition(member_id).portrait
+		portrait.custom_minimum_size = Vector2(52, 56)
+		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		member_row.add_child(portrait)
+		var equipment: Label = Label.new()
+		equipment.add_theme_font_size_override("font_size", 16)
+		equipment.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		equipment.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		member_row.add_child(equipment)
+		_member_equipment[member_id] = equipment
+		var button: Button = Button.new()
+		button.text = "配给队员 %d / 交换" % member_id
+		button.clip_text = true
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.custom_minimum_size.y = 48
+		button.pressed.connect(func() -> void: equip_requested.emit(member_id, _selected_id))
+		_actions.add_child(button)
+		_actions.move_child(button,equip_buttons.size())
+		equip_buttons.append(button)
+		equip_by_id[member_id] = button

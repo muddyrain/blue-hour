@@ -116,9 +116,9 @@ func _run() -> void:
 
 func _migration() -> void:
 	for version: int in [1, 2]:
-		var source: String = "res://tests/fixtures/m3-01/final-second/saved-run.json" if version == 1 else "res://tests/fixtures/worktree-return/day1/saved-run.json"
+		var source: String = "res://tests/synthetic/legacy-v1-primary.json" if version == 1 else "res://tests/synthetic/legacy-v2-primary.json"
 		var bytes: PackedByteArray = FileAccess.get_file_as_bytes(source)
-		var backup_source: String = "res://tests/fixtures/m3-01/final-first/saved-run.json" if version == 1 else "res://tests/fixtures/m3-02/day2/saved-run.json"
+		var backup_source: String = "res://tests/synthetic/legacy-v1-backup.json" if version == 1 else "res://tests/synthetic/legacy-v2-backup.json"
 		var backup_bytes: PackedByteArray = FileAccess.get_file_as_bytes(backup_source)
 		var legacy: Dictionary = JSON.parse_string(bytes.get_string_from_utf8())
 		for member: Dictionary in legacy.crew:
@@ -134,7 +134,7 @@ func _migration() -> void:
 		_write(target + ".bak", backup_bytes)
 		var legacy_backup_hash: String = FileAccess.get_sha256(target + ".bak")
 		var store: RunSave = RunSave.new(target)
-		_expect(store.load_save() == OK and store.migrated_from == version and store.snapshot.schema_version == RunSave.SCHEMA_VERSION, "actual archived v%d migrates in memory" % version)
+		_expect(store.load_save() == OK and store.migrated_from == version and store.snapshot.schema_version == RunSave.SCHEMA_VERSION, "synthetic v%d fixture migrates in memory" % version)
 		_expect(store.snapshot.weapons.size() == 2 and store.snapshot.weapons[0].origin == "migration-v%d" % version
 			and store.snapshot.profile_id == legacy.profile_id and store.snapshot.crew[0].health == legacy.crew[0].health and store.snapshot.crew[1].health == legacy.crew[1].health and store.snapshot.cash == legacy.cash,
 			"v%d migration preserves old identity, cash, health and initializes only documented starter gear" % version)
@@ -172,7 +172,7 @@ func _sortie_checks(data: Dictionary) -> void:
 	enemy.position = Vector2(840, 650)
 	sortie._update_combat()
 	_expect(enemy.health == 93.0 and shooter.cooldown == 1.7, "same combat algorithm injects per-instance definition damage and interval")
-	_expect(WeaponInventory.Definitions[0].damage == 18.0 and other.weapon_definition.damage == 18.0, "runtime fixture edits cannot mutate shared static definitions or other actors")
+	_expect(WeaponInventory.Definitions[0].damage == 18.0 and WeaponInventory.Definitions[1].damage == 32.0 and other.weapon_definition.damage == 32.0, "runtime fixture edits cannot mutate either distinct static definition or the other actor")
 	sortie.toggle_pause()
 	sortie.step(5.0)
 	_expect(shooter.cooldown == 1.7 and enemy.health == 93.0, "pause freezes weapon cooldown and attack timing")

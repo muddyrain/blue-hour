@@ -9,3 +9,7 @@ extends Resource
 @export var interval: float = 0.65
 @export var shot_range: float = 210.0
 @export var repair_cost: int = 10
+
+
+func shot_interval(personal_factor: float = 1.0) -> float:
+	return interval * personal_factor

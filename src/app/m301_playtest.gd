@@ -80,6 +80,8 @@ func _run() -> void:
 		app._quit()
 	else:
 		await _click_control("Interface/Screen/Title/Quit")
+	await _wait(0.1)
+	await _click_screen(app.pause_menu.buttons[1].get_global_rect().get_center())
 
 
 func _complete_sortie() -> void:

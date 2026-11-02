@@ -17,11 +17,29 @@ static func initialize(crew: Array) -> void:
 		member.growth = empty_state()
 
 
+static func maximum(data: Dictionary, member: Dictionary) -> float:
+	return GrowthRules.maximum(member) if GrowthState.is_family(data) else 200.0
+
+
 static func validate_member(member: Dictionary, data: Dictionary) -> String:
+	if GrowthState.is_family(data):
+		var issue: String = TraitRules.member_problem(member,TrainingState.credits(data,int(member.id)) if TrainingState.is_family(data) else 0,RescuePoolState.is_family(data)) if TraitState.is_family(data) else GrowthRules.member_problem(member)
+		if not issue.is_empty():
+			return issue
+		var legacy: Dictionary = GrowthRules.legacy_view(member)
+		if TraitState.is_family(data):
+			legacy.growth.trait = {"id":null,"level":null,"progress":null}
+			if TrainingState.is_family(data):
+				legacy.growth.training_state = "unavailable"
+		return _validate_legacy_member(legacy,data)
+	return _validate_legacy_member(member,data)
+
+
+static func _validate_legacy_member(member: Dictionary, data: Dictionary) -> String:
 	var value: Variant = member.get("growth")
 	if not value is Dictionary or value.size() != 5 or not value.has_all(["level","experience","trait","training_state","last_action"]):
 		return "成长档案字段无效"
-	if value.level != null or value.experience != null or value.training_state != "unavailable":
+	if value.level != null or value.experience != null or not value.training_state is String or value.training_state != "unavailable":
 		return "正式经验、等级或训练规则尚未开放"
 	if not value.trait is Dictionary or value.trait.size() != 3 or not value.trait.has_all(["id","level","progress"]):
 		return "特性档案字段无效"
@@ -87,11 +105,12 @@ static func bank(after: Dictionary, before: Dictionary, report: Dictionary, iden
 		return "成长输入包无效"
 	if bundle.sortie_id != identity or not report.has("elapsed") or bundle.duration_ms != floori(float(report.elapsed) * 1000.0):
 		return "成长输入来自另一出击或时间不符"
-	if not bundle.members is Array or bundle.members.size() != 2 or not report.get("member_records") is Array:
+	var expected_count: int = report.participants.size() if report.has("participants") else 2
+	if not bundle.members is Array or bundle.members.size() != expected_count or not report.get("member_records") is Array:
 		return "成长输入成员不完整"
 	var ids: Array[int] = []
 	for row: Variant in bundle.members:
-		if not row is Dictionary or row.size() != 3 or not row.has_all(["member_id","total","recent"]) or not RunSave._integer(row.member_id,1,2):
+		if not row is Dictionary or row.size() != 3 or not row.has_all(["member_id","total","recent"]) or not RunSave._integer(row.member_id,1,SurvivorRoster.MAX_MEMBER_ID if report.has("participants") else 2):
 			return "成长输入成员字段无效"
 		var id: int = int(row.member_id)
 		if not RunSave._integer(row.total,0,RunSave.MAX_COUNTER) or not row.recent is Array:
@@ -103,6 +122,8 @@ static func bank(after: Dictionary, before: Dictionary, report: Dictionary, iden
 		if actual.is_empty() or row.total != actual.kills:
 			return "成长输入与真实个人击退不一致"
 		var old: Dictionary = SurvivorRoster.member(before.crew,id)
+		if old.is_empty():
+			return "成长输入成员不在名册中"
 		if float(old.health) <= 0.0:
 			if row.total != 0 or not row.recent.is_empty():
 				return "未出场成员不能生成成长输入"
@@ -113,6 +134,7 @@ static func bank(after: Dictionary, before: Dictionary, report: Dictionary, iden
 		var problem: String = validate_member(current,after)
 		if not problem.is_empty():
 			return problem
+		normalize(current.growth)
 	return validate_crew(after.crew)
 
 

@@ -208,7 +208,7 @@ func _binding_check() -> Dictionary:
 	var text: String = bytes.get_string_from_utf8()
 	var parser: JSON = JSON.new()
 	var value: Variant = parser.data if text.to_utf8_buffer() == bytes and parser.parse(text) == OK else null
-	if not value is Dictionary or value.size() != 2 or not value.get("payload") is Dictionary or not value.get("sha256") is String or TransactionReceipt.fingerprint(value.payload) != value.sha256:
+	if not value is Dictionary or value.size() != 2 or not value.get("payload") is Dictionary or not value.get("sha256") is String or TransactionReceipt.legacy_fingerprint(value.payload) != value.sha256:
 		return _error(ERR_FILE_CORRUPT, "BINDING_HASH")
 	var binding: Dictionary = value.payload
 	if binding.size() != 7 or binding.get("binding_version") != 1 or binding.get("run_id") != _run_id or binding.get("root_id") != _root_id or binding.get("journal") != _journal.directory or not SurvivalContracts.integer(binding.get("revision"), 1, 4096):
@@ -227,7 +227,7 @@ func _remember(loaded: Dictionary) -> Dictionary:
 	var payload: Dictionary = {"binding_version":1, "run_id":_run_id, "root_id":_root_id,
 		"journal":_journal.directory, "revision":receipt.revision,
 		"root_hash":loaded.hashes[1], "head_hash":loaded.hash}
-	var serialized: String = JSON.stringify({"payload":payload, "sha256":TransactionReceipt.fingerprint(payload)}, "", true, true) + "\n"
+	var serialized: String = JSON.stringify({"payload":payload, "sha256":TransactionReceipt.legacy_fingerprint(payload)}, "", true, true) + "\n"
 	if FileAccess.file_exists(_binding_path) and FileAccess.get_file_as_string(_binding_path) == serialized:
 		return {"error":OK}
 	if _inject("before_binding_write") != OK:
@@ -372,7 +372,7 @@ func _suspend(world: Dictionary, publish: bool = true) -> Dictionary:
 	next.revision += 1
 	var issue: String = TransactionReceipt.transition(loaded.receipt,next)
 	if issue.is_empty():
-		var serialized: String = JSON.stringify({"payload":next,"sha256":TransactionReceipt.fingerprint(next)},"",true,true)+"\n"
+		var serialized: String = RecordEncoding.stringify(next)
 		issue = ReceiptJournal.capacity_problem(int(next.revision),next.phase,serialized.to_utf8_buffer().size(),int(loaded.bytes),loaded.unpublished.size())
 	if not issue.is_empty():
 		return _error(ERR_INVALID_DATA,issue)

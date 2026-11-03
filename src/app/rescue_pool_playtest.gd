@@ -147,7 +147,7 @@ func _restore_pool() -> void:
 	_expect(TransactionReceipt.same(expected,captured),"all frozen actors identities weapons Trait progress clocks and candidate restore exactly")
 	_write(output_dir.path_join("restored.json"),captured)
 	for folder: String in DirAccess.get_directories_at(app.progress_path+".txn/journal"):
-		var row: Dictionary = JSON.parse_string(FileAccess.get_file_as_string((app.progress_path+".txn/journal").path_join(folder).path_join("record.json"))).payload
+		var row: Dictionary = app.progress_session._transaction._journal._read_record((app.progress_path+".txn/journal").path_join(folder).path_join("record.json")).receipt
 		if row.phase=="SUSPEND_READY":
 			replay_tokens.append({"token":RunTransaction.token_for(row),"hash":row.envelope.world_hash,"generation":row.envelope.previous_head})
 	_reject_replays("RESUME_CLAIMED")

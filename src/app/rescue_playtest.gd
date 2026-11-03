@@ -236,7 +236,7 @@ func _recovery_case() -> void:
 	for record: String in DirAccess.get_directories_at(app.progress_path+".txn/journal"):
 		var path: String = (app.progress_path+".txn/journal").path_join(record).path_join("record.json")
 		if FileAccess.file_exists(path):
-			var payload: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path)).payload
+			var payload: Dictionary = app.progress_session._transaction._journal._read_record(path).receipt
 			if payload.phase == "SUSPEND_READY": replay_tokens.append({"token":RunTransaction.token_for(payload),"hash":payload.envelope.world_hash,"generation":payload.envelope.previous_head})
 	_reject_replays("claimed-world")
 	await _capture("restored-paused.png")

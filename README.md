@@ -2,7 +2,7 @@
 
 Godot 2D 单机 Windows 生存原型。带领幸存者穿过街区，搜集物资、守住队友，再集合至巴士归航。
 
-**开发源码快照，截至 M5-ANIM-01 动画原型。不是正式发行版。** 动画阶段为 GO-ANIM-PILOT；正式生存发布门禁为 **BLOCKED / NO-GO-PRODUCTION**。已稳定复现 `RECORD_READBACK:RECORD_HASH` 暂存写入拒绝，尚未修复；不要用本原型承载唯一的重要进度。
+**开发源码快照，含 M5-ANIM-01 动画原型及 P0-RECORD-HASH-01 修复候选。不是正式发行版。** 新收据采用有版本的精确数值编码，macOS 已复现旧故障并验证新格式回读和跨进程恢复；Windows 与完整历史安全矩阵仍未完成。正式生存发布门禁保持 **BLOCKED / NO-GO-PRODUCTION**，不要用本原型承载唯一的重要进度。[兼容合同](docs/design/p0-record-hash-01.md)
 
 ![八方向动作展示](docs/screenshots/eight-directions.png)
 
@@ -34,7 +34,7 @@ python tools/godot.py check --godot <引擎可执行文件>
 python tools/godot.py run --godot <引擎可执行文件>
 ```
 
-公开 `check` 是不依赖私有原件的复测子集：导入、默认及111主场景启动、战斗/导航/动作组件和资源检查。已知哈希缺陷以单float重现器单列为 EXPECTED_KNOWN_FAILURE；检查退出0不代表修复或通过发布门禁。完整内部恢复/强杀/历史档矩阵未随源码发布，不能把既有内部验收算成本公共克隆通过。详见[验证边界](docs/VALIDATION.md)。
+公开 `check` 是不依赖私有原件的复测子集：导入、默认及111主场景启动、战斗/导航/动作组件、资源及收据编码检查。单float案例保留旧算法二周期对照，同时要求新编码十次往返稳定；真实日志测试另验新旧混合链与严格负例。检查退出0不代表通过完整发布门禁。内部恢复/强杀/历史档矩阵未随源码发布，不能沿用内部验收结果。详见[验证边界](docs/VALIDATION.md)。
 
 显式111原型请在独立本地目录运行：
 
@@ -53,7 +53,7 @@ python tools/godot.py run --enemy-trial --profile .local/demo --godot <引擎可
 | [战斗、视线与夜间](docs/features/combat-and-night-pressure.md) | 三敌种、两枪比较、真实LOS与八方向原型 |
 | [巴士发动与撤离](docs/features/bus-evacuation.md) | 显式集合、实际全员到齐、结果预览和提交 |
 | [营地、名册与配装](docs/features/camp-and-loadouts.md) | 四活五历史、普通成长/Trait/训练、武器实例与有效值 |
-| [保存与恢复](docs/features/save-and-recovery.md) | 新旧档保护、一次暂存、未修复RECORD_READBACK/RECORD_HASH |
+| [保存与恢复](docs/features/save-and-recovery.md) | 新旧档保护、一次暂存、精确收据传输候选及未关闭门禁 |
 
 ## 玩法展示与历史版本
 
@@ -78,7 +78,7 @@ python tools/task_timing.py --help
 
 [执行规范](docs/development/codex-execution-efficiency.md) · [任务模板](docs/development/codex-task-template.md)
 
-工具只记录显式可见区间，隐藏推理/完整对话耗时保持UNKNOWN；实际计时文件不随源码公开。不修改游戏或存档协议，RECORD_READBACK:RECORD_HASH仍未修，正式生存NO-GO/BLOCKED。
+工具只记录显式可见区间，隐藏推理/完整对话耗时保持UNKNOWN；实际计时文件不随源码公开。DEV-PERF-02工具本身不修改游戏或存档协议；本分支另含HIGH风险的收据传输候选，正式生存仍NO-GO/BLOCKED。
 
 ## 操作与资料
 

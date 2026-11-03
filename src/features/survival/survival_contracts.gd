@@ -191,6 +191,8 @@ static func transaction_problem(before: Dictionary, envelope: Dictionary) -> Str
 
 
 static func fingerprint(value: Dictionary) -> String:
+	# Historical business hashes (world/token/migration/training) are a persisted contract.
+	# Keep this algorithm; new journal transport preserves the exact input binary64 values.
 	if not json_value(value):
 		return ""
 	# JSON readers normalize integers to floats; normalize before hashing on either side.

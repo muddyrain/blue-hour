@@ -261,21 +261,30 @@ func _apply_pose() -> void:
 		motion_state = &"windup"
 		action = 4
 		_body.position -= _facing * 3.0
-	MotionAtlas.pose(_body, is_enemy, enemy_kind, variant, legs, action)
+	_pose_body(legs, action)
 	_body.scale = Vector2.ONE * BODY_SCALE
 	if is_enemy:
 		_body.scale *= Vector2(1.25, 1.18) if enemy_kind == EnemyRules.HEAVY else Vector2(0.90, 1.03) if enemy_kind == EnemyRules.RUSH else Vector2.ONE
+		if _normal_enemy() and NormalInfectedV1.enabled():
+			_body.scale = Vector2.ONE * NormalInfectedV1.DISPLAY_SCALE
 		# Presentation spacing only. Logical feet, navigation, LOS and melee range stay put.
 		_body.position += _contact_offset()
 	_body.self_modulate = tint
 	if _is_defeated:
 		motion_state = &"defeated"
-		MotionAtlas.pose(_body, is_enemy, enemy_kind, variant, _facing, 7 if is_enemy else 6)
+		_pose_body(_facing, 7 if is_enemy else 6)
 		_body.material = null
 		_body.position = _contact_offset() if is_enemy else Vector2.ZERO
 		_body.self_modulate = Color(0.70, 0.77, 0.78, clampf(1.0 - (_defeat_clock - 0.50) / 0.45, 0.0, 1.0))
 	_update_hold(tint, moving, upper_action)
 	queue_redraw()
+
+
+func _pose_body(direction: Vector2, action: int) -> void:
+	if _normal_enemy() and NormalInfectedV1.enabled():
+		NormalInfectedV1.pose(_body, direction, motion_state, _walk_clock, _attack_clock, _hit_clock, _defeat_clock)
+	else:
+		MotionAtlas.pose(_body, is_enemy, enemy_kind, variant, direction, action)
 
 
 func _contact_offset() -> Vector2:

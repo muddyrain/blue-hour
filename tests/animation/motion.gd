@@ -19,11 +19,16 @@ func _run() -> void:
 			actor.enemy_behavior.kind = [EnemyRules.NORMAL, EnemyRules.RUSH, EnemyRules.HEAVY][family - 5]
 		root.add_child(actor)
 		var visual: ActorVisual = actor.visual
+		var ordinary_v1: bool = family == 5 and NormalInfectedV1.enabled()
 		for oct: int in range(8):
 			var direction: Vector2 = Vector2.RIGHT.rotated(oct * PI / 4.0)
 			visual.advance(0.4, direction * (34.0 if actor.is_enemy else 125.0), direction)
 			_expect(visual.presentation_state().aim_octant == oct, "all eight actual aim selections")
-			_expect(visual._body.frame % visual._body.hframes == (MotionAtlas.LEFT_COLUMNS[oct] if family < 5 and MotionAtlas.LEFT_COLUMNS.has(oct) else MotionAtlas.COLUMNS[oct]), "actual drawn directional frame")
+			if ordinary_v1:
+				var source_name: String = ["e", "se", "s", "se", "e", "ne", "n", "ne"][oct]
+				_expect(visual._body.texture.resource_path.ends_with("/" + source_name + ".png"), "actual V1 directional source sheet")
+			else:
+				_expect(visual._body.frame % visual._body.hframes == (MotionAtlas.LEFT_COLUMNS[oct] if family < 5 and MotionAtlas.LEFT_COLUMNS.has(oct) else MotionAtlas.COLUMNS[oct]), "actual drawn directional frame")
 			_expect(visual._body.flip_h == (family >= 5 and oct in [3, 4, 5]), "only disclosed enemy mirror")
 			if not actor.is_enemy:
 				visual.show_fire(direction)
@@ -34,11 +39,11 @@ func _run() -> void:
 				_expect(prediction.distance_to(visual.muzzle_offset()) < 0.001, "eight-direction prediction equals rendered muzzle")
 			else:
 				visual.show_attack(direction)
-				_expect(visual._body.frame / 5 == 5, "front back diagonal contact at authority event")
+				_expect(visual._body.frame == 7 if ordinary_v1 else visual._body.frame / 5 == 5, "front back diagonal contact at authority event")
 				visual.advance(0.2, Vector2.ZERO, direction)
-				_expect(visual._body.frame / 5 == 4, "contact transitions to recovery")
+				_expect(visual._body.frame == 9 if ordinary_v1 else visual._body.frame / 5 == 4, "contact transitions to recovery")
 			actor.take_damage(1.0, direction)
-			_expect(visual.motion_state == &"hit" and (visual._body.frame / 5 == 6 if actor.is_enemy else visual._upper.frame / visual._upper.hframes == 5), "actual damage chooses dedicated hit pose")
+			_expect(visual.motion_state == &"hit" and (visual._body.frame == 10 if ordinary_v1 else visual._body.frame / 5 == 6 if actor.is_enemy else visual._upper.frame / visual._upper.hframes == 5), "actual damage chooses dedicated hit pose")
 			visual.advance(0.4, Vector2.ZERO, direction)
 			_expect(visual.motion_state == &"idle", "events expire without stale pose")
 		if actor.is_enemy:

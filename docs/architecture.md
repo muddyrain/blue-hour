@@ -6,6 +6,8 @@ FieldActor持有身份、生命、路径及意图；EnemyBehavior只实现类型
 
 [M5-ANIM-02](design/m5-anim-02.md)仅在ActorVisual的普通僵尸分支保留短停步态、方向滞回和渐变接触显示偏移。缓存不进入快照；幸存者枪口链与所有逻辑位置/战斗owner不变。
 
+[普通感染者V1](design/m5-art-infected-01.md)由NormalInfectedV1预载五张独立图集，按原ActorVisual时钟选帧。它只配置普通敌人的Sprite，不创建第二套Actor、计时器或保存器；其余角色继续原MotionAtlas路径。
+
 RunSave、ProductionProgress、RunTransaction、ReceiptJournal和SortieSnapshot是原数据/事务边界；没有第二套动画保存器。冻结结果、死亡、READY、单次领取与暂存代次均由原owner提交。旧格式与111分开，未知/不兼容记录严格拒绝。
 
 P0-RECORD-HASH-01候选为新日志增加RecordEncoding精确数值传输；ReceiptJournal按明确外层版本验证，新旧链均运行原业务/顺序检查。旧收据只验历史算法，binding、世界、训练和迁移中的既存业务哈希不重算。算法及旧包边界见[设计合同](design/p0-record-hash-01.md)。macOS验证不关闭Windows和完整历史安全门禁。

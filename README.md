@@ -6,6 +6,8 @@ Godot 2D 单机 Windows 生存原型。带领幸存者穿过街区，搜集物�
 
 本分支另含[M5-ANIM-02普通僵尸视觉稳定性候选](docs/design/m5-anim-02.md)：Mac原生受控场景的同条件前后连续录像已完成，Windows-NOT-VERIFIED，待独立审阅。仅处理显示偏移、转向及短停步态，未修改玩法数值或保存协议。
 
+[普通感染者V1美术样例](docs/design/m5-art-infected-01.md)已接入当前开发候选：灰白肤色与便装，五源方向及明确镜像覆盖八向，六姿态行走并衔接原攻击/受击/倒地事件。Mac画面等待主线与用户独立审阅；角色同点穿叠仍开放，未实施导航或碰撞方案。
+
 ![八方向动作展示](docs/screenshots/eight-directions.png)
 
 这是受控方向展示，使用真实角色路径，并非自然刷怪。图片场景和条件见[截图说明](docs/screenshots/README.md)。

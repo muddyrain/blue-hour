@@ -12,6 +12,8 @@ const WALK_FRAMES: Array[int] = [1, 2, 3, 2]
 const HAND_PIXELS: Array[Vector2] = [Vector2(156, 140), Vector2(181, 110), Vector2(131, 143)]
 const BODY_SCALE: float = 0.36
 const COLOURS: Array[Color] = [Color("80ddd8"), Color("f2c37f"), Color("e88266")]
+const NORMAL_DIRECTION_MARGIN: float = PI / 36.0
+const NORMAL_CONTACT_RESPONSE: float = 96.0
 
 var is_enemy: bool = false
 var enemy_kind: String = EnemyRules.NORMAL
@@ -42,6 +44,10 @@ var _hit_direction: Vector2 = Vector2.LEFT
 var _attack_direction: Vector2 = Vector2.RIGHT
 var _hand_pixels: Array[Vector2] = HAND_PIXELS
 var contact_vector: Vector2 = Vector2.INF
+# Transient presentation caches; no new snapshot fields or gameplay inputs.
+var _walk_rest: float = 0.0
+var _contact_display: Vector2 = Vector2.ZERO
+var _contact_initialized: bool = false
 
 
 func _ready() -> void:
@@ -92,7 +98,15 @@ func advance(delta: float, movement: Vector2, aim: Vector2) -> void:
 	_aim = aim
 	# Preserve the ordinary9fps cadence; variants cover the same distance per gait cycle.
 	var stride: float = movement.length()/34.0 if is_enemy and enemy_kind!=EnemyRules.NORMAL else 1.0
-	_walk_clock = _walk_clock + delta*stride if movement.length_squared() > 1.0 else 0.0
+	if movement.length_squared() > 1.0:
+		_walk_clock += delta * stride
+		_walk_rest = 0.0
+	elif _normal_enemy():
+		_walk_rest += delta
+		if _walk_rest >= 1.0 / 9.0:
+			_walk_clock = 0.0
+	else:
+		_walk_clock = 0.0
 	_hit_clock = maxf(0.0, _hit_clock - delta)
 	_fire_clock = maxf(0.0, _fire_clock - delta)
 	_attack_clock = maxf(0.0, _attack_clock - delta)
@@ -101,10 +115,28 @@ func advance(delta: float, movement: Vector2, aim: Vector2) -> void:
 	elif is_enemy and _attack_clock > 0.0:
 		_facing = _attack_direction
 	elif aim.length_squared() > 0.0001:
-		_facing = aim.normalized()
+		_face(aim)
 	elif movement.length_squared() > 1.0:
-		_facing = movement.normalized()
+		_face(movement)
+	if _normal_enemy() and not _is_defeated and (contact_vector.is_finite() or _contact_initialized):
+		var desired: Vector2 = _contact_target_offset()
+		_contact_display = _contact_display.move_toward(desired, NORMAL_CONTACT_RESPONSE * delta) if _contact_initialized else desired
+		_contact_initialized = true
 	_apply_pose()
+
+
+func _normal_enemy() -> bool:
+	return is_enemy and enemy_kind == EnemyRules.NORMAL
+
+
+func _face(direction: Vector2) -> void:
+	if not _normal_enemy():
+		_facing = direction.normalized()
+		return
+	var angle: float = MotionAtlas.octant(_facing) * PI / 4.0
+	if absf(angle_difference(angle, direction.angle())) > PI / 8.0 + NORMAL_DIRECTION_MARGIN:
+		angle = MotionAtlas.octant(direction) * PI / 4.0
+	_facing = Vector2.RIGHT.rotated(angle)
 
 
 func show_hit(direction: Vector2 = Vector2.LEFT) -> void:
@@ -197,7 +229,7 @@ func _apply_pose() -> void:
 	if _body == null:
 		return
 	direction_row = _row(_facing)
-	var moving: bool = _movement.length_squared() > 1.0
+	var moving: bool = _movement.length_squared() > 1.0 or (_normal_enemy() and _walk_clock > 0.0 and _walk_rest < 1.0 / 9.0)
 	var legs: Vector2 = _movement if moving and not is_enemy else _facing
 	# Existing clocks remain unchanged because gun bob participates in LOS. The visual
 	# cadence scales by real survivor speed; enemy clock already scales by speed/34.
@@ -229,16 +261,18 @@ func _apply_pose() -> void:
 		motion_state = &"windup"
 		action = 4
 		_body.position -= _facing * 3.0
-	MotionAtlas.pose(_body, is_enemy, enemy_kind, variant, legs, action)
+	_pose_body(legs, action)
 	_body.scale = Vector2.ONE * BODY_SCALE
 	if is_enemy:
 		_body.scale *= Vector2(1.25, 1.18) if enemy_kind == EnemyRules.HEAVY else Vector2(0.90, 1.03) if enemy_kind == EnemyRules.RUSH else Vector2.ONE
+		if _normal_enemy() and NormalInfectedV1.enabled():
+			_body.scale = Vector2.ONE * NormalInfectedV1.DISPLAY_SCALE
 		# Presentation spacing only. Logical feet, navigation, LOS and melee range stay put.
 		_body.position += _contact_offset()
 	_body.self_modulate = tint
 	if _is_defeated:
 		motion_state = &"defeated"
-		MotionAtlas.pose(_body, is_enemy, enemy_kind, variant, _facing, 7 if is_enemy else 6)
+		_pose_body(_facing, 7 if is_enemy else 6)
 		_body.material = null
 		_body.position = _contact_offset() if is_enemy else Vector2.ZERO
 		_body.self_modulate = Color(0.70, 0.77, 0.78, clampf(1.0 - (_defeat_clock - 0.50) / 0.45, 0.0, 1.0))
@@ -246,7 +280,18 @@ func _apply_pose() -> void:
 	queue_redraw()
 
 
+func _pose_body(direction: Vector2, action: int) -> void:
+	if _normal_enemy() and NormalInfectedV1.enabled():
+		NormalInfectedV1.pose(_body, direction, motion_state, _walk_clock, _attack_clock, _hit_clock, _defeat_clock)
+	else:
+		MotionAtlas.pose(_body, is_enemy, enemy_kind, variant, direction, action)
+
+
 func _contact_offset() -> Vector2:
+	return _contact_display if _normal_enemy() and _contact_initialized else _contact_target_offset()
+
+
+func _contact_target_offset() -> Vector2:
 	if not contact_vector.is_finite():
 		return Vector2.ZERO
 	var direction: Vector2 = contact_vector.normalized() if contact_vector.length_squared() > 0.0001 else _facing

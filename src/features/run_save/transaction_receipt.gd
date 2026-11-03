@@ -9,11 +9,16 @@ const KEYS: Array[String] = ["receipt_version", "revision", "previous_hash", "ph
 
 
 static func same(left: Dictionary, right: Dictionary) -> bool:
-	var digest: String = fingerprint(left)
-	return not digest.is_empty() and digest == fingerprint(right)
+	# Preserve historical business equality; journal integrity uses the exact codec.
+	var digest: String = legacy_fingerprint(left)
+	return not digest.is_empty() and digest == legacy_fingerprint(right)
 
 
 static func fingerprint(value: Dictionary) -> String:
+	return RecordEncoding.fingerprint(value)
+
+
+static func legacy_fingerprint(value: Dictionary) -> String:
 	# The receipt/envelope add two levels; the public result itself still has its full 64.
 	if not SurvivalContracts.json_value(value, -2):
 		return ""

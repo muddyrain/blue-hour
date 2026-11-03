@@ -59,6 +59,6 @@ python -m unittest discover -s tests/tools -p test_task_timing.py -v
 
 测试/导出/媒体前后只读盘点.local容量、增量和最大任务目录，先定预算。新任务分scratch/report/evidence/deliverables/protected-profile；失败原件、唯一可用包、历史媒体、存档/备份均保留，不按年龄删除或覆盖。普通回归不录制，只保留明确最终媒体与包；同盘副本不称异盘灾备。
 
-WATCH_OPEN、OS-NOT-VERIFIED和NO-GO-PRODUCTION不因优化关闭。RECORD_READBACK:RECORD_HASH未修，正式生存BLOCKED，旧档不放宽校验，默认入口不切换。所有项目暂行参数仍PROJECT_TEMP，不冒充经典Deadly Days实测。
+WATCH_OPEN、OS-NOT-VERIFIED和NO-GO-PRODUCTION不因优化关闭。精确收据传输候选仍待审，正式生存BLOCKED，旧档不放宽校验，默认入口不切换。所有项目暂行参数仍PROJECT_TEMP，不冒充经典Deadly Days实测。
 
 公开交接提交脱敏文档和工具，原始profile/日志/计时样本及研究不进Git。若当次任务另要求私有ChatGPT审阅包，使用该环境已有打包流程，核CRC/SHA和独立解压；纯工具无媒体标NOT_APPLICABLE，不伪造。本公共快照不提供内部打包器、研究或私有验证器，不引用不存在的内部文件。模型级别对照和其它玩法/协议变更须独立范围，不更改Codex设置。

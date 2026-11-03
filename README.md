@@ -4,6 +4,8 @@ Godot 2D 单机 Windows 生存原型。带领幸存者穿过街区，搜集物�
 
 **开发源码快照，含 M5-ANIM-01 动画原型及 P0-RECORD-HASH-01 修复候选。不是正式发行版。** 新收据采用有版本的精确数值编码，macOS 已复现旧故障并验证新格式回读和跨进程恢复；Windows 与完整历史安全矩阵仍未完成。正式生存发布门禁保持 **BLOCKED / NO-GO-PRODUCTION**，不要用本原型承载唯一的重要进度。[兼容合同](docs/design/p0-record-hash-01.md)
 
+本分支另含[M5-ANIM-02普通僵尸视觉稳定性候选](docs/design/m5-anim-02.md)：Mac原生受控场景的同条件前后连续录像已完成，Windows-NOT-VERIFIED，待独立审阅。仅处理显示偏移、转向及短停步态，未修改玩法数值或保存协议。
+
 ![八方向动作展示](docs/screenshots/eight-directions.png)
 
 这是受控方向展示，使用真实角色路径，并非自然刷怪。图片场景和条件见[截图说明](docs/screenshots/README.md)。
@@ -26,7 +28,7 @@ Godot 2D 单机 Windows 生存原型。带领幸存者穿过街区，搜集物�
 
 ## 运行与可复测检查
 
-固定 Godot **4.7.2.stable.official.ed1daf0bf**，Compatibility 渲染器；Python 3.10+，资源检查另需 Pillow。当前验收目标为 Windows x86_64，其他平台未验。把引擎加入PATH，或使用 `--godot` / `GODOT_BIN` 指定本机引擎。
+固定 Godot **4.7.2.stable.official.ed1daf0bf**，Compatibility 渲染器；Python 3.10+，资源检查另需 Pillow。发布验收目标为 Windows x86_64；本轮Mac受控验证范围见上述候选说明，不等于完整平台验收。把引擎加入PATH，或使用 `--godot` / `GODOT_BIN` 指定本机引擎。
 
 ```powershell
 python -m pip install Pillow==12.3.0

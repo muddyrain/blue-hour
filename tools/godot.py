@@ -32,7 +32,7 @@ def main():
  execute('import',['--editor','--import'])
  execute('startup-default',['--quit-after','3'])
  execute('startup-111',['--quit-after','3'],['--bh-enemy-trial','--bh-safe-suspend','--bh-camp-prototype'])
- for name in ['smoke','presentation','weapon_inventory','combat_los','navigation_nearest','night_pressure','contact_damage','animation/motion']:
+ for name in ['smoke','presentation','weapon_inventory','combat_los','navigation_nearest','night_pressure','contact_damage','animation/motion','animation/normal_stability']:
   execute(name.replace('/','-'),['--script','res://tests/'+name+'.gd'])
  execute('known-hash-cycle',['--script','res://tests/known_hash_cycle.gd'])
  execute('record_hash',['--script','res://tests/record_hash.gd'])

@@ -2,7 +2,7 @@
 
 全部为真实Blue Hour viewport原PNG，不是生成的游戏展示图，不含Deadly Days画面、原作素材或研究截图。本轮仅恢复/补充既有原件，未新录、未改画、未抹除水印或私人元数据。四张M5-ANIM-01图片保持原字节。
 
-历史图用于展示玩法和项目演进；其旧HUD、动作、武器值、人数与未开放说明**不代表当前原型**。当前功能以[五篇独立Feature](../features/README.md)为准。RECORD_READBACK:RECORD_HASH未修，正式生存NO-GO/BLOCKED。
+历史图用于展示玩法和项目演进；其旧HUD、动作、武器值、人数与未开放说明**不代表当前原型**。当前功能以[五篇独立Feature](../features/README.md)为准。精确收据传输候选待审，正式生存NO-GO/BLOCKED。
 
 | 图片 | 捕获版本 | 实际条件与限制 |
 | --- | --- | --- |

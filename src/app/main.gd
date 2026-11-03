@@ -225,6 +225,17 @@ func _ready() -> void:
 			proof.output_dir = argument.trim_prefix("--verify-rescue-pool=")
 			get_tree().root.add_child.call_deferred(proof)
 			return
+		if argument.begins_with("--verify-record-hash="):
+			var proof: RecordHashPlaytest = RecordHashPlaytest.new()
+			proof.app = self
+			proof.output_dir = argument.trim_prefix("--verify-record-hash=")
+			get_tree().root.add_child.call_deferred(proof)
+			return
+		if argument == "--verify-record-process":
+			var proof: RecordHashProcess = RecordHashProcess.new()
+			proof.app = self
+			get_tree().root.add_child.call_deferred(proof)
+			return
 		if argument.begins_with("--verify-anim="):
 			var proof: AnimPlaytest = AnimPlaytest.new()
 			proof.app = self
@@ -1792,6 +1803,8 @@ func _setup_presentation() -> void:
 		if argument.begins_with("--verify-anim=") or argument.begins_with("--verify-enemy=") or argument.begins_with("--verify-quality=") or argument.begins_with("--verify-roster="):
 			continue
 		if argument.begins_with("--verify-rescue-pool="):
+			continue
+		if argument.begins_with("--verify-record-hash=") or argument == "--verify-record-process":
 			continue
 		if argument.begins_with("--verify-weapons=") or argument.begins_with("--verify-training=") or argument.begins_with("--verify-traits=") or argument.begins_with("--verify-camp=") or argument.begins_with("--verify-field-join=") or argument.begins_with("--verify-growth=") or argument.begins_with("--verify-rescue=") or argument.begins_with("--verify-pilot=") or argument.begins_with("--verify-hunger=") or argument.begins_with("--verify-exit=") or argument.begins_with("--verify-recovery="):
 			continue

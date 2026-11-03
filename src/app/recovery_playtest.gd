@@ -6,6 +6,38 @@ var checkpoint: String = "search"
 var expected_path: String = ""
 var captured: Dictionary = {}
 var replay_tokens: Array[Dictionary] = []
+var _expected_exact: bool = false
+
+
+func _tap(button: BaseButton) -> void:
+	# MovieWriter/layout may settle after the inherited two-frame mouse probe.
+	# Dispatch once to the actual focused control and observe its real signal.
+	for frame: int in range(30):
+		if button.is_visible_in_tree() and not button.disabled:
+			break
+		await get_tree().process_frame
+	_expect(button.is_visible_in_tree() and not button.disabled,"focused viewport control available: "+String(button.name))
+	if not button.is_visible_in_tree() or button.disabled:
+		return
+	var pressed: Array[bool] = [false]
+	var observe: Callable = func() -> void: pressed[0] = true
+	button.pressed.connect(observe,CONNECT_ONE_SHOT)
+	button.grab_focus()
+	for frame: int in range(4): await get_tree().process_frame
+	for down: bool in [true,false]:
+		var event: InputEventKey = InputEventKey.new()
+		event.keycode = KEY_ENTER
+		event.physical_keycode = KEY_ENTER
+		event.pressed = down
+		button.get_viewport().push_input(event,true)
+		await get_tree().process_frame
+	for frame: int in range(8):
+		if pressed[0]: break
+		await get_tree().process_frame
+	_expect(pressed[0],"focused viewport control emitted pressed before inspecting result")
+	if is_instance_valid(button) and button.pressed.is_connected(observe):
+		button.pressed.disconnect(observe)
+	for frame: int in range(4): await get_tree().process_frame
 
 
 func _run() -> void:
@@ -41,7 +73,7 @@ func _run() -> void:
 		for record: String in DirAccess.get_directories_at(app.progress_path+".txn/journal"):
 			var path: String = (app.progress_path+".txn/journal").path_join(record).path_join("record.json")
 			if not FileAccess.file_exists(path): continue
-			var payload: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path)).payload
+			var payload: Dictionary = app.progress_session._transaction._journal._read_record(path).receipt
 			if payload.phase == "SUSPEND_READY":
 				_expect(app.progress_session._transaction.claim_suspend(RunTransaction.token_for(payload),payload.envelope.world_hash,payload.envelope.previous_head).error != OK,"committed camp rejects old snapshot generation "+record)
 		_expect(bytes == _digest(),"old snapshot attempts leave committed camp and head byte stable")
@@ -100,6 +132,13 @@ func _run() -> void:
 					if world.phase == Expedition.Phase.BOARDING: break
 					await _step(world)
 				world.request_bus_gather()
+		if checkpoint == "hash-cycle":
+			for frame: int in range(32):
+				if world._ai_clock > 0.0 and world._ai_clock < 0.000000000000001:
+					break
+				await _step(world)
+			_expect(world._ai_clock > 0.0 and world._ai_clock < 0.000000000000001,"natural AI stepping reaches original tiny-float S1 condition")
+			_expect(RecordEncoding._number_hex(world._ai_clock) == "0000000000009c3c","natural AI reaches the original counterexample binary64 without injecting a clock")
 		await _key_battle(KEY_ESCAPE)
 		_expect(world.is_paused and app.pause_menu.buttons[4].visible,"Esc freezes real scene and exposes explicit safe suspend")
 		await _layout("suspend")
@@ -108,6 +147,7 @@ func _run() -> void:
 		_expect(get_viewport().gui_get_focus_owner() == app.pause_menu.buttons[4],"Tab reaches prioritized safe suspend action without leaking to HUD")
 		captured = SortieSnapshot.capture(world)
 		_write(output_dir.path_join("snapshot.json"),captured)
+		_write_exact_world(captured)
 		var original: String = FileAccess.get_sha256(app.progress_path)
 		await _capture("before-suspend.png")
 		if mode == "fault": _fault_point = requested_fault
@@ -146,15 +186,18 @@ func _run() -> void:
 		if app.expedition != null:
 			var world: Expedition = app.expedition
 			world.set_physics_process(false)
-			var expected: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(expected_path))
+			var expected: Dictionary = _read_expected_world()
 			captured = SortieSnapshot.capture(world)
 			_write(output_dir.path_join("restored.json"),captured)
 			_expect(TransactionReceipt.same(captured,expected),"all captured actual actors/timers/search/queue/director/camera/growth equal across PIDs")
+			if _expected_exact:
+				_expect(RecordEncoding.fingerprint(captured) == RecordEncoding.fingerprint(expected),"every nonzero binary64 world value restores exactly across PID")
+			_write_exact_world(captured)
 			var log: Dictionary = ReceiptJournal.new(app.progress_path+".txn/journal").read_all()
 			for record: String in DirAccess.get_directories_at(app.progress_path+".txn/journal"):
 				var path: String = (app.progress_path+".txn/journal").path_join(record).path_join("record.json")
 				if not FileAccess.file_exists(path): continue
-				var payload: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path)).payload
+				var payload: Dictionary = app.progress_session._transaction._journal._read_record(path).receipt
 				if payload.phase == "SUSPEND_READY": replay_tokens.append({"token":RunTransaction.token_for(payload),"hash":payload.envelope.world_hash,"generation":payload.envelope.previous_head})
 			_expect(log.error == OK and log.receipt.phase == "RESUME_CLAIMED","consumption durably precedes first resumed step")
 			var repeated: Dictionary = app.progress_session.claim_world(log.receipt.envelope.world_hash)
@@ -163,7 +206,10 @@ func _run() -> void:
 			if mode == "death-resume":
 				_expect(world.survivors[0].permanent_death and world.survivors[0].health == 0 and world.survivors[1].member_id == 2,"fresh process cannot revive ID1 or renumber sole ID2")
 			await _tap(app.pause_menu.buttons[0])
-			if world.is_paused: await _key_battle(KEY_SPACE)
+			if world.is_paused:
+				world._hud.view._pause_button.grab_focus()
+				await _key_battle(KEY_ENTER)
+			_expect(not world.is_paused and not app.pause_menu.root.visible,"explicit HUD Continue releases restored pause before simulation")
 			world.finished.connect(func(report: Dictionary) -> void: _reports.append(report.duplicate(true)))
 			if mode in ["resuspend","death-resuspend","safe-quit"]:
 				await _resuspend(world)
@@ -181,6 +227,8 @@ func _run() -> void:
 				await _settle()
 				get_tree().quit(0 if _failures == 0 else 1)
 				return
+			_barrier = requested_barrier
+			_handshake = not _barrier.is_empty()
 			for frame: int in range(3600):
 				if world.searched: break
 				await _step(world)
@@ -226,7 +274,7 @@ func _reject_persisted_suspends(stage: String) -> void:
 	for folder: String in DirAccess.get_directories_at(app.progress_path+".txn/journal"):
 		var file: String = (app.progress_path+".txn/journal").path_join(folder).path_join("record.json")
 		if not FileAccess.file_exists(file): continue
-		var receipt: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(file)).payload
+		var receipt: Dictionary = app.progress_session._transaction._journal._read_record(file).receipt
 		if receipt.phase == "SUSPEND_READY":
 			replay_tokens.append({"token":RunTransaction.token_for(receipt),"hash":receipt.envelope.world_hash,"generation":receipt.envelope.previous_head})
 	_reject_replays(stage)
@@ -263,7 +311,8 @@ func _resuspend(world: Expedition) -> void:
 	_expect(app.pause_menu.buttons[4].get_global_rect().position.y < app.pause_menu.buttons[2].get_global_rect().position.y,"safe suspend precedes dangerous exit visually")
 	captured = SortieSnapshot.capture(world)
 	_write(output_dir.path_join("snapshot.json"),captured)
-	var old: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(expected_path))
+	_write_exact_world(captured)
+	var old: Dictionary = _read_expected_world()
 	_expect(SurvivalContracts.fingerprint(old) != SurvivalContracts.fingerprint(captured) and captured.sim.elapsed > old.sim.elapsed,"new S2 differs from S1 with latest time and world facts")
 	await _capture("S2-menu.png")
 	app.request_exit("quit" if mode == "safe-quit" else "home")
@@ -284,3 +333,37 @@ func _resuspend(world: Expedition) -> void:
 	app.audio.shutdown()
 	await _settle()
 	get_tree().quit(0 if _failures == 0 else 1)
+
+
+func _write_exact_world(world: Dictionary) -> void:
+	var file: FileAccess = FileAccess.open(output_dir.path_join("snapshot.exact.json"),FileAccess.WRITE)
+	file.store_string(RecordEncoding.stringify(world))
+	file.close()
+
+
+func _write(path: String, value: Dictionary) -> void:
+	if path.get_file() == "barrier.json":
+		value = value.duplicate(true)
+		value.failures = _failures
+	super._write(path,value)
+
+
+func _fault(point: String) -> Error:
+	if not _barrier.is_empty() and not app.progress_session.packet.is_empty():
+		var packet: Dictionary = app.progress_session.packet
+		var expected: String = output_dir.path_join("camp.expected.exact.json")
+		if packet.get("envelope",{}).get("result",{}).get("camp") is Dictionary and not FileAccess.file_exists(expected):
+			var file: FileAccess = FileAccess.open(expected,FileAccess.WRITE)
+			file.store_string(RecordEncoding.stringify(packet.envelope.result.camp))
+			file.close()
+	return super._fault(point)
+
+
+func _read_expected_world() -> Dictionary:
+	var value: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(expected_path))
+	if value.has("record_encoding"):
+		_expected_exact = true
+		var decoded: Dictionary = RecordEncoding.unpack(value)
+		_expect(decoded.error == OK,"expected world fixture authenticates before comparison")
+		return decoded.get("payload",{})
+	return value

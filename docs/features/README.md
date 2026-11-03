@@ -45,4 +45,4 @@
 | COMMUNITY_CLAIM | 社区经验不当作本机验证。本文不据其补造公式或权重。 |
 | UNKNOWN | 原作精确概率、公式、人数及其他未证实机制继续未知。 |
 
-旧截图按各自版本标注，不能证明当前数值、动画或可靠性。完整索引见[真实截图及版本](../screenshots/README.md)。**RECORD_READBACK:RECORD_HASH未修，正式生存NO-GO/BLOCKED。**
+旧截图按各自版本标注，不能证明当前数值、动画或可靠性。完整索引见[真实截图及版本](../screenshots/README.md)。**精确收据传输候选待审，正式生存NO-GO/BLOCKED。**

@@ -128,7 +128,7 @@ func append(next: Dictionary, expected_hash: String) -> Dictionary:
 	if not issue.is_empty():
 		return _error(ERR_INVALID_DATA, issue)
 	var digest: String = TransactionReceipt.fingerprint(receipt)
-	var serialized: String = JSON.stringify({"payload":receipt, "sha256":digest}, "", true, true) + "\n"
+	var serialized: String = RecordEncoding.stringify(receipt)
 	var capacity: String = capacity_problem(int(receipt.revision), receipt.phase, serialized.to_utf8_buffer().size(), int(prior.bytes), prior.unpublished.size())
 	if not capacity.is_empty():
 		return _error(ERR_OUT_OF_MEMORY, capacity)
@@ -210,15 +210,28 @@ func _read_record(source: String) -> Dictionary:
 	if content.to_utf8_buffer() != bytes:
 		return _error(ERR_FILE_CORRUPT, "RECORD_UTF8")
 	var parser: JSON = JSON.new()
-	if parser.parse(content) != OK or not parser.data is Dictionary or parser.data.size() != 2 or not parser.data.has("payload") or not parser.data.get("sha256") is String or not parser.data.payload is Dictionary:
+	if parser.parse(content) != OK or not parser.data is Dictionary:
 		return _error(ERR_FILE_CORRUPT, "RECORD_JSON")
-	var digest: String = TransactionReceipt.fingerprint(parser.data.payload)
-	if digest.is_empty() or digest != parser.data.sha256:
-		return _error(ERR_FILE_CORRUPT, "RECORD_HASH")
-	var issue: String = TransactionReceipt.problem(parser.data.payload)
+	var record: Dictionary = parser.data
+	var payload: Dictionary
+	var digest: String
+	if record.has("record_encoding"):
+		var decoded: Dictionary = RecordEncoding.unpack(record)
+		if decoded.error != OK:
+			return _error(ERR_FILE_CORRUPT, decoded.reason)
+		payload = decoded.payload
+		digest = decoded.hash
+	else:
+		if record.size() != 2 or not record.get("payload") is Dictionary or not record.get("sha256") is String:
+			return _error(ERR_FILE_CORRUPT, "RECORD_JSON")
+		payload = record.payload
+		digest = TransactionReceipt.legacy_fingerprint(payload)
+		if digest.is_empty() or digest != record.sha256:
+			return _error(ERR_FILE_CORRUPT, "RECORD_HASH")
+	var issue: String = TransactionReceipt.problem(payload)
 	if not issue.is_empty():
 		return _error(ERR_FILE_CORRUPT, issue)
-	return {"error":OK, "receipt":parser.data.payload, "hash":digest, "bytes":length}
+	return {"error":OK, "receipt":payload, "hash":digest, "bytes":length}
 
 
 static func capacity_problem(revision: int, phase: String, record_bytes: int, used_bytes: int, stages: int) -> String:

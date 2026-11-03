@@ -2,7 +2,7 @@
 
 Godot 2D 单机 Windows 生存原型。带领幸存者穿过街区，搜集物资、守住队友，再集合至巴士归航。
 
-**开发源码快照，含 ANIM-02 稳定性改善与普通感染者 V1 美术样例。不是正式发行版。** 动画阶段为 GO-ANIM-PILOT；正式生存发布门禁为 **BLOCKED / NO-GO-PRODUCTION**。已稳定复现 `RECORD_READBACK:RECORD_HASH` 暂存写入拒绝，尚未修复；不要用本原型承载唯一的重要进度。
+**开发源码快照，含 ANIM-02 稳定性改善与普通感染者 V1 美术样例。不是正式发行版。** 动画阶段为 GO-ANIM-PILOT；正式生存发布门禁为 **BLOCKED / NO-GO-PRODUCTION**。精确收据传输候选修复已知极小浮点写盘回读的因果，仍待完整审阅；不要用本原型承载唯一的重要进度。
 
 [ANIM-02](docs/design/m5-anim-02.md)保留普通感染者转向、短停步态和贴身偏移的连续性；[普通感染者V1](docs/design/m5-art-infected-01.md)使用五个独立源方向、三向镜像和六姿态步行。Mac研发样例已审，Windows公开检查、原生EXE及受控视觉已复验；物理输入与显示流畅性仍待验。角色同点穿叠仍开放，未修改导航、碰撞、战斗或保存。
 
@@ -36,7 +36,7 @@ python tools/godot.py check --godot <引擎可执行文件>
 python tools/godot.py run --godot <引擎可执行文件>
 ```
 
-公开 `check` 是不依赖私有原件的复测子集：导入、默认及111主场景启动、战斗/导航/动作组件、普通感染者稳定性与V1资源检查。已知哈希缺陷以单float重现器单列为 EXPECTED_KNOWN_FAILURE；检查退出0不代表修复或通过发布门禁。完整内部恢复/强杀/历史档矩阵未随源码发布，不能把既有内部验收算成本公共克隆通过。详见[验证边界](docs/VALIDATION.md)。
+公开 `check` 是不依赖私有原件的复测子集：导入、默认及111主场景启动、战斗/导航/动作组件、普通感染者稳定性与V1资源检查。单float诊断保留原引擎 JSON 二周期，同时要求新编码十次真实磁盘往返稳定；另有 80 项精确编码和混合链回归。Windows 合成安全矩阵驱动随源码提供，结果及未验项按本轮证据报告；检查退出0不代表通过生产发布门禁，完整内部历史档不作为公共克隆已测。详见[验证边界](docs/VALIDATION.md)。
 
 显式111原型请在独立本地目录运行：
 
@@ -80,7 +80,7 @@ python tools/task_timing.py --help
 
 [执行规范](docs/development/codex-execution-efficiency.md) · [任务模板](docs/development/codex-task-template.md)
 
-工具只记录显式可见区间，隐藏推理/完整对话耗时保持UNKNOWN；实际计时文件不随源码公开。不修改游戏或存档协议，RECORD_READBACK:RECORD_HASH仍未修，正式生存NO-GO/BLOCKED。
+工具只记录显式可见区间，隐藏推理/完整对话耗时保持UNKNOWN；实际计时文件不随源码公开。计时工具不修改游戏或存档协议；精确收据传输另见[保存边界](docs/features/save-and-recovery.md)，正式生存NO-GO/BLOCKED。
 
 ## 操作与资料
 

@@ -238,7 +238,7 @@ func _restore_field() -> void:
 	_write(output_dir.path_join("restored.json"),captured)
 	_expect(TransactionReceipt.same(expected,captured),"independent PID restores every actor/XP/health/weapon/join/clock/path value")
 	for folder: String in DirAccess.get_directories_at(app.progress_path+".txn/journal"):
-		var record: Dictionary = JSON.parse_string(FileAccess.get_file_as_string((app.progress_path+".txn/journal").path_join(folder).path_join("record.json"))).payload
+		var record: Dictionary = app.progress_session._transaction._journal._read_record((app.progress_path+".txn/journal").path_join(folder).path_join("record.json")).receipt
 		if record.phase == "SUSPEND_READY":
 			replay_tokens.append({"token":RunTransaction.token_for(record),"hash":record.envelope.world_hash,"generation":record.envelope.previous_head})
 	_reject_replays("RESUME_CLAIMED")

@@ -20,4 +20,4 @@ Git授权：本地提交、公开push、PR、merge、Release分别记录当次�
 
 顺序固定驱动预检→实施与定向→最终输入冻结→风险所需验收→文档/提交/交接。LOW验工具/链接/来源/差异；MEDIUM加相关完整检查和冻结后的Windows包/原生视觉；涉及游戏协议、死亡/冻结结果/战斗存档因果自动HIGH，严格执行旧格式/负例/往返/跨PID/唯一结算/READY-ACK/死亡营地优先/锁多写者/强杀/主备保护及最终包。缺所需矩阵就保留门禁，不把公开check子集当完整发布验证。
 
-失败不覆盖，WATCH/OS-NOT-VERIFIED/NO-GO-PRODUCTION不随效率优化关闭；未知不推算思考时间，不宣称未经对照的提速，不改模型设置。RECORD_READBACK:RECORD_HASH仍未修，相关修复另立HIGH任务。
+失败不覆盖，WATCH/OS-NOT-VERIFIED/NO-GO-PRODUCTION不随效率优化关闭；未知不推算思考时间，不宣称未经对照的提速，不改模型设置。精确收据传输候选仍待审，相关持久化修改按HIGH执行。

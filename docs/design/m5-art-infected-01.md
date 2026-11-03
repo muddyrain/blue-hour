@@ -26,6 +26,6 @@ NormalInfectedV1预载五源图，仅普通感染者走新姿态映射；其他�
 
 已审Mac美术对照覆盖同条件四主方向/转向、接近/攻击/受击/倒地、移动射击及多人拥挤；另有八方向完整姿态预览。核心源/素材相同的既有画面可作视觉参考，公共候选的启动、完整check和短时原生窗口须另验，不能把私有候选的保存结论搬入。MovieWriter固定步进不等于真实显示刷新。
 
-Windows需从实际公共PR候选核引擎、导入、313.5格UV采样、透明边缘、缩放与原生动作；物理输入单列。Mac样例通过不等于Windows已验，当前PR保持Draft。
+[WIN-PUBLIC-SYNC-04](../VALIDATION.md#windows复验win-public-sync-04)已从实际公共PR候选复核固定引擎、重新导入、313.5格UV采样、透明边缘、两尺寸及原生EXE动作。受控画面未见明显邻格渗色、alpha裁切或脚点重置；不把同点穿叠说成解决。物理输入和显示流畅性仍未签核，当前PR保持Draft。
 
 **ANIM03_CONTACT_OVERLAP_OPEN。** 新轮廓不解决逻辑角色同点或穿越。本轮没有选择或实施导航/动态接触方案，也没有修复RECORD_READBACK:RECORD_HASH；[原拒绝与生产限制](../KNOWN_LIMITATIONS.md)继续保留。

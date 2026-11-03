@@ -2,11 +2,13 @@
 
 Godot 2D 单机 Windows 生存原型。带领幸存者穿过街区，搜集物资、守住队友，再集合至巴士归航。
 
-**开发源码快照，截至 M5-ANIM-01 动画原型。不是正式发行版。** 动画阶段为 GO-ANIM-PILOT；正式生存发布门禁为 **BLOCKED / NO-GO-PRODUCTION**。已稳定复现 `RECORD_READBACK:RECORD_HASH` 暂存写入拒绝，尚未修复；不要用本原型承载唯一的重要进度。
+**开发源码快照，含 ANIM-02 稳定性改善与普通感染者 V1 美术样例。不是正式发行版。** 动画阶段为 GO-ANIM-PILOT；正式生存发布门禁为 **BLOCKED / NO-GO-PRODUCTION**。已稳定复现 `RECORD_READBACK:RECORD_HASH` 暂存写入拒绝，尚未修复；不要用本原型承载唯一的重要进度。
+
+[ANIM-02](docs/design/m5-anim-02.md)保留普通感染者转向、短停步态和贴身偏移的连续性；[普通感染者V1](docs/design/m5-art-infected-01.md)使用五个独立源方向、三向镜像和六姿态步行。Mac研发样例已审，Windows公开检查、原生EXE及受控视觉已复验；物理输入与显示流畅性仍待验。角色同点穿叠仍开放，未修改导航、碰撞、战斗或保存。
 
 ![八方向动作展示](docs/screenshots/eight-directions.png)
 
-这是受控方向展示，使用真实角色路径，并非自然刷怪。图片场景和条件见[截图说明](docs/screenshots/README.md)。
+这是M5-ANIM-01历史受控方向展示，使用真实角色路径，并非当前V1或自然刷怪。图片场景和条件见[截图说明](docs/screenshots/README.md)。
 
 ## 当前能做什么
 
@@ -26,7 +28,7 @@ Godot 2D 单机 Windows 生存原型。带领幸存者穿过街区，搜集物�
 
 ## 运行与可复测检查
 
-固定 Godot **4.7.2.stable.official.ed1daf0bf**，Compatibility 渲染器；Python 3.10+，资源检查另需 Pillow。当前验收目标为 Windows x86_64，其他平台未验。把引擎加入PATH，或使用 `--godot` / `GODOT_BIN` 指定本机引擎。
+固定 Godot **4.7.2.stable.official.ed1daf0bf**，Compatibility 渲染器；Python 3.10+，资源检查另需 Pillow。发布验收目标为 Windows x86_64；当前候选已有Mac与Windows受控验证，物理键鼠仍未签核，详见[Windows验证层级](docs/VALIDATION.md#windows复验win-public-sync-04)。把引擎加入PATH，或使用 `--godot` / `GODOT_BIN` 指定本机引擎。
 
 ```powershell
 python -m pip install Pillow==12.3.0
@@ -34,7 +36,7 @@ python tools/godot.py check --godot <引擎可执行文件>
 python tools/godot.py run --godot <引擎可执行文件>
 ```
 
-公开 `check` 是不依赖私有原件的复测子集：导入、默认及111主场景启动、战斗/导航/动作组件和资源检查。已知哈希缺陷以单float重现器单列为 EXPECTED_KNOWN_FAILURE；检查退出0不代表修复或通过发布门禁。完整内部恢复/强杀/历史档矩阵未随源码发布，不能把既有内部验收算成本公共克隆通过。详见[验证边界](docs/VALIDATION.md)。
+公开 `check` 是不依赖私有原件的复测子集：导入、默认及111主场景启动、战斗/导航/动作组件、普通感染者稳定性与V1资源检查。已知哈希缺陷以单float重现器单列为 EXPECTED_KNOWN_FAILURE；检查退出0不代表修复或通过发布门禁。完整内部恢复/强杀/历史档矩阵未随源码发布，不能把既有内部验收算成本公共克隆通过。详见[验证边界](docs/VALIDATION.md)。
 
 显式111原型请在独立本地目录运行：
 

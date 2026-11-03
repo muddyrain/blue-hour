@@ -30,7 +30,7 @@ def main():
  execute('import',['--editor','--import'])
  execute('startup-default',['--quit-after','3'])
  execute('startup-111',['--quit-after','3'],['--bh-enemy-trial','--bh-safe-suspend','--bh-camp-prototype'])
- for name in ['smoke','presentation','weapon_inventory','combat_los','navigation_nearest','night_pressure','contact_damage','animation/motion']:
+ for name in ['smoke','presentation','weapon_inventory','combat_los','navigation_nearest','night_pressure','contact_damage','animation/motion','animation/normal_stability','animation/infected_v1']:
   execute(name.replace('/','-'),['--script','res://tests/'+name+'.gd'])
  execute('known-hash-cycle',['--script','res://tests/known_hash_cycle.gd'],expected=1)
  z=subprocess.run([sys.executable,'tools/validate_assets.py'],cwd=ROOT,capture_output=True);(job/'assets.txt').write_bytes(z.stdout+z.stderr);assert z.returncode==0,z.stderr

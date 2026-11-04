@@ -6,6 +6,8 @@ signal equip_requested(member_id: int, instance_id: String)
 signal repair_requested(instance_id: String)
 signal closed
 
+var player_mode: bool = false
+
 var items: ItemList
 var equip_buttons: Array[Button] = []
 var equip_by_id: Dictionary[int,Button] = {}
@@ -137,9 +139,9 @@ func refresh(data: Dictionary, feedback: String = "") -> void:
 		if WeaponState.is_family(_data):
 			items.set_item_text(index,items.get_item_text(index)+"\n"+WeaponModifiers.description(item))
 		items.set_item_metadata(index, item.instance_id)
-		items.set_item_tooltip(index, "归属 " + ownership + "\n实例 " + item.instance_id)
+		items.set_item_tooltip(index, "归属 " + ownership + ("" if player_mode else "\n实例 " + item.instance_id))
 		if WeaponState.is_family(_data):
-			items.set_item_tooltip(index,items.get_item_tooltip(index)+"\n"+WeaponModifiers.description(item)+"\nPROJECT_TEMP；完整比较见右侧可滚动详情")
+			items.set_item_tooltip(index,items.get_item_tooltip(index)+"\n"+WeaponModifiers.description(item)+("\n完整比较见右侧详情" if player_mode else "\nPROJECT_TEMP；完整比较见右侧可滚动详情"))
 		items.set_item_custom_fg_color(index, CampStyle.AMBER if item.condition == "damaged" else CampStyle.TEXT)
 		if _selected_id == item.instance_id:
 			items.select(index)
@@ -207,6 +209,10 @@ func _select(index: int) -> void:
 	if BattleState.is_state(_data) and _data.journey.state == "FAILED":
 		repair_button.disabled = true
 	repair_button.text = "维修 %d 货币…" % weapon.repair_cost if item.condition == "damaged" else "无需维修"
+
+	if player_mode:
+		_detail.text = _detail.text.replace(" · PROJECT_TEMP", "")
+		_detail.tooltip_text = "属性以右侧实际数值和当前持有者为准；维修不会重抽词条。"
 
 
 func _confirm_repair() -> void:

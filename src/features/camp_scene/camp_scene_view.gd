@@ -13,6 +13,7 @@ const CAPTIONS: Dictionary[StringName, String] = {
 }
 
 var input_allowed: Callable
+var player_mode: bool = false
 var world: CampSceneWorld
 var hotspots: Dictionary[StringName, Button] = {}
 var member_buttons: Dictionary[int, Button] = {}
@@ -47,7 +48,7 @@ func _ready() -> void:
 	title.custom_minimum_size.x = 344
 	row.add_child(title)
 	title.add_child(CampStyle.label("蓝时驿站 / 河岸停靠院", 24))
-	title.add_child(CampStyle.label("营地场景原型 · PROJECT_TEMP", 16, CampStyle.TEAL))
+	title.add_child(CampStyle.label("开发试玩版" if player_mode else "营地场景原型 · PROJECT_TEMP", 16, CampStyle.TEAL))
 	var state: VBoxContainer = VBoxContainer.new()
 	state.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(state)
@@ -75,6 +76,7 @@ func _ready() -> void:
 	notice.clip_text = true
 	actions.add_child(notice)
 	for action: StringName in [&"sound", &"legacy", &"home", &"quit"]:
+		if player_mode and action==&"legacy": continue
 		var button: Button = Button.new()
 		button.name = String(action)
 		button.text = {&"sound":"声音", &"legacy":"原营地入口", &"home":"返回首页", &"quit":"退出游戏"}[action]
@@ -107,12 +109,13 @@ func _gui_input(event: InputEvent) -> void:
 		accept_event()
 
 
-func refresh(data: Dictionary, daily: Dictionary, can_depart: bool, reason: String) -> void:
+func refresh(data: Dictionary, daily: Dictionary, can_depart: bool, reason: String, feedback: String = "") -> void:
 	_data = data.duplicate(true)
 	_daily = daily.duplicate(true)
 	world.refresh(data.crew)
 	resource_text.text = "第%d天   货币%d   食物%d   在营%d人" % [data.day, data.cash, data.food, world.visible_member_ids.size()]
 	eligibility_text.text = "%s · 今日需%d粮%s" % [reason, daily.required, " / 缺口%d" % int(daily.shortage) if daily.shortage > 0 else " / 库存足够"]
+	notice.text = feedback if not feedback.is_empty() else "Tab选设施 · Enter/Space确认 · Esc关闭当前页"
 	hotspots[&"bus"].disabled = not can_depart
 	hotspots[&"bus"].tooltip_text = "选择出击目标" if can_depart else reason
 	hotspots[&"crew"].set_meta("member_id", world.visible_member_ids[0] if not world.visible_member_ids.is_empty() else 0)

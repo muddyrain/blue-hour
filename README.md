@@ -1,8 +1,8 @@
 # 蓝时归航 · Blue Hour
 
-Godot 2D 单机 Windows 生存原型。带领幸存者穿过街区，搜集物资、守住队友，再集合至巴士归航。
+Godot 2D 单机生存开发试玩。带领幸存者穿过街区，搜集物资、守住队友，再集合至巴士归航。
 
-**开发源码快照，含 ANIM-02 稳定性改善与普通感染者 V1 美术样例。不是正式发行版。** 动画阶段为 GO-ANIM-PILOT；正式生存发布门禁为 **BLOCKED / NO-GO-PRODUCTION**。精确收据传输候选修复已知极小浮点写盘回读的因果，仍待完整审阅；不要用本原型承载唯一的重要进度。
+**M6-PLAYABLE-01：正常启动即可连续试玩，保留 ANIM-02、感染者V1与接触修复。不是正式发行版。** 动画阶段为 GO-ANIM-PILOT；正式生存发布门禁为 **BLOCKED / NO-GO-PRODUCTION**。精确收据传输候选修复已知极小浮点写盘回读的因果，仍待完整审阅；不要用本原型承载唯一的重要进度。
 
 [ANIM-02](docs/design/m5-anim-02.md)保留普通感染者转向、短停步态和贴身偏移的连续性；[普通感染者V1](docs/design/m5-art-infected-01.md)使用五个独立源方向、三向镜像和六姿态步行。[M5-CONTACT-01](docs/design/m5-contact-01.md)新增逻辑脚点分离、追击留距和队友让位。本轮先交Mac证据，Windows-NOT-VERIFIED；此前Windows结果仅属于各自历史版本。物理输入与显示流畅性仍待验，2.5D身体遮挡仍允许。
 
@@ -12,7 +12,9 @@ Godot 2D 单机 Windows 生存原型。带领幸存者穿过街区，搜集物�
 
 ## 当前能做什么
 
-普通默认入口仍保留双人旧旅程。下面的成长、生存和多人成果属于显式开启的**隔离111试运行**，不自动迁移旧档。
+正常启动选择「开始试玩」，进入营地、训练或配装，再从巴士选择任务；搜刮/救援后发动巴士并集合存活者，预览并确认结算，回营再次出击。下一次启动选择「继续试玩」。三次出击是验收样例，不是通关规则。
+
+默认使用固定的 `user://playable-v1/run.enemy-v1.json` 独立进度。Mac位于 `~/Library/Application Support/Godot/app_userdata/Blue Hour - 蓝时归航/playable-v1/`。不会自动读取、迁移、覆盖或回退旧进度。以下既有系统通过统一入口接入，没有另一套玩法实现。
 
 - 双街区真实寻路、墙体LOS、自动战斗、搜集与巴士全员集合。
 - 单图一个救援目标，多个原创候选；确认后当场入队、交战和归航。
@@ -28,7 +30,7 @@ Godot 2D 单机 Windows 生存原型。带领幸存者穿过街区，搜集物�
 
 ## 运行与可复测检查
 
-固定 Godot **4.7.2.stable.official.ed1daf0bf**，Compatibility 渲染器；Python 3.10+，资源检查另需 Pillow。发布验收目标为 Windows x86_64；当前接触候选仅在Mac验证，物理键鼠仍未签核，详见[验证层级](docs/VALIDATION.md)。把引擎加入PATH，或使用 `--godot` / `GODOT_BIN` 指定本机引擎。
+固定 Godot **4.7.2.stable.official.ed1daf0bf**，Compatibility 渲染器；Python 3.10+，资源检查另需 Pillow。发布前另覆盖计划发布平台；M6按当前Mac范围验收，物理键鼠和人工观感仍未签核，详见[验证层级](docs/VALIDATION.md)。把引擎加入PATH，或使用 `--godot` / `GODOT_BIN` 指定本机引擎。
 
 ```powershell
 python -m pip install Pillow==12.3.0
@@ -38,13 +40,13 @@ python tools/godot.py run --godot <引擎可执行文件>
 
 公开 `check` 是不依赖私有原件的复测子集：导入、默认及111主场景启动、战斗/导航/动作组件、普通感染者稳定性与V1资源检查。单float诊断保留原引擎 JSON 二周期，同时要求新编码十次真实磁盘往返稳定；另有 80 项精确编码和混合链回归。Windows 合成安全矩阵驱动随源码提供，结果及未验项按本轮证据报告；检查退出0不代表通过生产发布门禁，完整内部历史档不作为公共克隆已测。详见[验证边界](docs/VALIDATION.md)。
 
-显式111原型请在独立本地目录运行：
+默认运行无需玩法参数，进度保存在上面的固定用户目录。开发检查仍可显式使用隔离111入口：
 
 ```powershell
 python tools/godot.py run --enemy-trial --profile .local/demo --godot <引擎可执行文件>
 ```
 
-后续使用同一目录并在游戏内选择继续。测试和上述启动器把进度、声音及用户缓存隔离在项目本地；不要复制自己的正式存档来试。旧途中暂存跨版本不能无条件读取。源码不含游戏安装包、Release或可下载EXE；可用已安装匹配导出模板的Godot编辑器自行导出。
+后续使用同一目录并在游戏内选择继续。`check` 和显式 `--profile` 使用项目本地隔离目录，默认 `run` 使用固定试玩目录。旧双人开发入口为 `run --legacy-entry`；不要复制自己的真实进度做测试。旧途中暂存跨版本不能无条件读取。源码不含游戏安装包、Release或可下载EXE；可用已安装匹配导出模板的Godot编辑器自行导出。
 
 
 ## 五篇独立功能说明
@@ -71,7 +73,7 @@ python tools/godot.py run --enemy-trial --profile .local/demo --godot <引擎可
 
 ## 开发效率工具
 
-DEV-PERF-02提供标准库阶段计时器、19项隔离单测，以及LOW/MEDIUM/HIGH分级、驱动预检、冻结和结果复用规范。
+按实际改动与受影响合同选择当前系统检查，不因普通玩法涉及战斗自动运行完整存档矩阵。阶段计时工具仍可用，仅在工具改动时验其自身。
 
 ```powershell
 python -m unittest discover -s tests/tools -p test_task_timing.py -v

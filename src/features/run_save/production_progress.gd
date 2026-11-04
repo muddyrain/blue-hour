@@ -34,7 +34,7 @@ var _pending_edit_request: Dictionary = {}
 var _suspend_generation: String = ""
 
 
-func _init(save_path: String, battle: bool = false, survival: bool = false, hunger: bool = false, rescue: bool = false, growth: bool = false, field: bool = false, traits: bool = false, training: bool = false, pool: bool = false, roster: bool = false, quality: bool = false, enemy: bool = false) -> void:
+func _init(save_path: String, battle: bool = false, survival: bool = false, hunger: bool = false, rescue: bool = false, growth: bool = false, field: bool = false, traits: bool = false, training: bool = false, pool: bool = false, roster: bool = false, quality: bool = false, enemy: bool = false, playable: bool = false) -> void:
 	enemy_mode = enemy
 	quality_mode = quality or enemy
 	roster_mode = roster or quality_mode
@@ -70,7 +70,9 @@ func _init(save_path: String, battle: bool = false, survival: bool = false, hung
 		required = "run.trait-v1.json"
 	if training_mode:
 		required = "run.enemy-v1.json" if enemy_mode else "run.weapon-quality-v1.json" if quality_mode else "run.roster-v1.json" if roster_mode else "run.rescue-pool-v1.json" if pool_mode else "run.training-v1.json"
-	if not save_path.is_absolute_path() or _path.get_file().to_lower() != required or "/.local/" not in _path.to_lower() or "/.local/" not in user_path or user_path.get_slice("/.local/",0) != _path.to_lower().get_slice("/.local/",0):
+	var dedicated_playable: bool = playable and enemy_mode and survival_mode and hunger_trial and PlayableEntry.owns_path(_path)
+	var isolated_test: bool = save_path.is_absolute_path() and _path.get_file().to_lower()==required and "/.local/" in _path.to_lower() and "/.local/" in user_path and user_path.get_slice("/.local/",0)==_path.to_lower().get_slice("/.local/",0)
+	if not dedicated_playable and not isolated_test:
 		_problem = "EXPLICIT_ISOLATED_TRANSACTION_PATH_REQUIRED"
 		return
 	_writer = ProgressWriter.new(_path)

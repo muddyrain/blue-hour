@@ -830,6 +830,10 @@ func _on_expedition_finished(report: Dictionary, sortie_id: String) -> void:
 			_show_battle_result(frozen,_pending_settlement.is_empty())
 		else:
 			_show_battle_result(_pending_settlement,false)
+			if report.evacuated and expedition.bus_view != null:
+				_screen.hide()
+				expedition.bus_view.departed.connect(func() -> void: _screen.show(),CONNECT_ONE_SHOT)
+				expedition.bus_view.departure()
 		return
 	if _pending_settlement.is_empty():
 		_status.text = "结算数据无效，营地与旧档未改变。"

@@ -1,3 +1,5 @@
+WorldActions/WorldLayout/WorldSites提供V2有限街区、站点预算与事实校验；DailyActions按版本保留V1解释。BuildingLibrary拥有素材和门锚点，BusJourney只读已登记行动/冻结结果并推进表现。原数据owner继续唯一保存；详见[街区合同](design/m6-world-01.md)。
+
 # 架构与所有权
 
 RogueActions只拥有每日V1配置与确定性描述，RogueLayout只拼装/校验值布局并构造StreetLayout；现有Main/ProductionProgress/FrozenSettlement/Snapshot继续拥有选择、写入、结果和恢复。data_version2与世界version3显式绑定完整generated；旧规则与旧历史认证独立保留，普通入口在消费前拒绝旧途中。空间描述统一驱动原绘制、寻路、遮挡和交互，详情见[生成合同](design/m6-rogue-01.md)。

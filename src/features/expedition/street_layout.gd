@@ -2,6 +2,9 @@ class_name StreetLayout
 extends Resource
 ## Authored spatial data. Rewards and battle rules remain with their existing owners.
 
+var world_bounds: Rect2 = Rect2(0,0,1920,1440)
+var world_data: Dictionary = {}
+
 @export var id: StringName
 @export var display_name: String
 var rescue_point: Vector2 = Vector2(1344,1120)
@@ -24,6 +27,10 @@ var rescue_point: Vector2 = Vector2(1344,1120)
 
 
 func blockers() -> Array[Rect2]:
+	if not world_data.is_empty():
+		var blocks: Array[Rect2] = [bus_block]
+		blocks.append_array(residences)
+		return blocks
 	var values: Array[Rect2] = [bus_block,cash_block,food_block]
 	values.append_array(residences)
 	values.append_array(fences)
@@ -31,12 +38,18 @@ func blockers() -> Array[Rect2]:
 
 
 func buildings() -> Array[Rect2]:
+	if not world_data.is_empty(): return residences.duplicate()
 	var values: Array[Rect2] = [cash_block,food_block]
 	values.append_array(residences)
 	return values
 
 
 func shot_obstacles() -> Array[ShotObstacle]:
+	if not world_data.is_empty():
+		var walls: Array[ShotObstacle] = []
+		for row: Dictionary in world_data.entities: walls.append(ShotObstacle.new(StringName(row.id),Rect2(row.rect[0],row.rect[1],row.rect[2],row.rect[3]),true))
+		walls.append(ShotObstacle.new(&"bus",bus_block,false))
+		return walls
 	# TMP-123: only authored building bodies stop ordinary shots; category parity is unknown.
 	var values: Array[ShotObstacle] = [
 		ShotObstacle.new(&"cash_wall", cash_block, true),

@@ -6,15 +6,17 @@ const CELL: float = 16.0
 const BOUNDS: Rect2 = StreetBlock.BOUNDS
 const FOOT_RADIUS: float = 10.0
 
+var bounds: Rect2 = BOUNDS
 var obstacles: Array[Rect2] = []
 var _grid: AStarGrid2D = AStarGrid2D.new()
 
 
-func configure(blockers: Array[Rect2]) -> void:
+func configure(blockers: Array[Rect2], world_bounds: Rect2 = BOUNDS) -> void:
+	bounds = world_bounds
 	obstacles = blockers.duplicate()
-	_grid.region = Rect2i(0, 0, int(BOUNDS.size.x / CELL), int(BOUNDS.size.y / CELL))
+	_grid.region = Rect2i(0, 0, int(bounds.size.x / CELL), int(bounds.size.y / CELL))
 	_grid.cell_size = Vector2(CELL, CELL)
-	_grid.offset = BOUNDS.position + Vector2.ONE * CELL * 0.5
+	_grid.offset = bounds.position + Vector2.ONE * CELL * 0.5
 	_grid.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
 	_grid.default_compute_heuristic = AStarGrid2D.HEURISTIC_OCTILE
 	_grid.default_estimate_heuristic = AStarGrid2D.HEURISTIC_OCTILE
@@ -28,7 +30,7 @@ func configure(blockers: Array[Rect2]) -> void:
 
 
 func is_clear(point: Vector2) -> bool:
-	if not BOUNDS.grow(-FOOT_RADIUS).has_point(point):
+	if not bounds.grow(-FOOT_RADIUS).has_point(point):
 		return false
 	for blocker: Rect2 in obstacles:
 		if blocker.grow(FOOT_RADIUS + CELL * 0.5).has_point(point):

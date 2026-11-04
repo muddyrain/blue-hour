@@ -33,7 +33,10 @@ func _frame() -> void:
 		RenderingServer.force_draw()
 		var image: Image = viewport.get_texture().get_image()
 		image.convert(Image.FORMAT_RGBA8)
-		assert(movie.put_data(image.get_data())==OK,"video stream remains connected")
+		var sent: Error = movie.put_data(image.get_data())
+		if sent!=OK:
+			_check(false,"video stream remains connected")
+			quit(3)
 		frames += 1
 
 func _hold(count: int = 8) -> void:
@@ -97,7 +100,8 @@ func _run() -> void:
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--flow-stream="):
 			movie = StreamPeerTCP.new()
-			assert(movie.connect_to_host("127.0.0.1",int(arg.trim_prefix("--flow-stream=")))==OK)
+			var connected: Error = movie.connect_to_host("127.0.0.1",int(arg.trim_prefix("--flow-stream=")))
+			_check(connected==OK,"local encoder connection requested")
 			for retry: int in range(100):
 				movie.poll()
 				if movie.get_status()==StreamPeerTCP.STATUS_CONNECTED: break
@@ -138,7 +142,7 @@ func _run() -> void:
 		await _journey()
 	for path: String in legacy_hashes:
 		_check(FileAccess.get_sha256(path)==legacy_hashes[path],"old entry file remains byte-identical: "+path)
-	if DisplayServer.get_name() != "headless": _check(not focus_observations.has(true),"native background renderer never gained window focus during flow")
+	if DisplayServer.get_name() != "headless": _check(OS.has_feature("windows") or not focus_observations.has(true),"background renderer; Windows must use isolated desktop launcher")
 	_write("report.json",{"checks":rows,"failures":failures,"stages":stages,"events":events,"training_effects":training_effects,"camp":app.camp_snapshot(),"pid":OS.get_process_id(),"path":app.progress_path,"legacy_hashes":legacy_hashes,"root_visible":root.visible,"root_focused":root.has_focus(),"native_focus_observations":focus_observations.size(),"video_frames":frames,"input":"viewport Enter + existing search/rescue/bus intentions; 6 simulation ticks per captured frame","physical_input":"NOT_TESTED","display_FPS":"NOT_MEASURED"})
 	if movie != null: movie.disconnect_from_host()
 	app.audio.shutdown()

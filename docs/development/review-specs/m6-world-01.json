@@ -95,9 +95,7 @@
     "release_hashes": {
       "exe_sha256": "d34d36f3be1a6c49c56525ae86469b92e4f417ddf0b43cf00dd80c385c4b0562",
       "pck_sha256": "5a9dcef5961a43adfece894d34af8aab5545cc1c7264b60cf7a76fedef9aaa57",
-      "zip_sha256": "fe45632ef2a92076fcd7f31a6a7636215a70420997b66eb1a5042cdcbc7137ec",
-      "zip_bytes": 66438890,
-      "scope": "final reviewed Windows x86_64 package"
+      "zip_sha256": "fe45632ef2a92076fcd7f31a6a7636215a70420997b66eb1a5042cdcbc7137ec"
     }
   }
 }

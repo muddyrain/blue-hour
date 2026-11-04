@@ -47,6 +47,8 @@
 
 普通感染者保留[ANIM-02](../design/m5-anim-02.md)的方向滞回、短停相位和平滑贴身偏移，使用[V1映射](../design/m5-art-infected-01.md)；幸存者与另外两敌种保持原资源和枪口几何。新轮廓不解决逻辑同点穿叠；Mac受控画面不等于Windows或物理显示验收。
 
+[M5-CONTACT-01](../design/m5-contact-01.md)在逻辑层增加20px脚点分离、追击留距及有限队友让位，保留28px近战和既有数值。移动会绕过可避开的角色占位，紧密包围或无可让位空间时允许阻塞；2.5D身体前后遮挡仍正常存在。本候选先交Mac证据，Windows和物理显示未验。
+
 ![M5-ANIM-01历史方向与姿态展示](../screenshots/eight-directions.png)
 
 **M5-ANIM-01受控方向展示**，不是自然刷怪或OS物理输入验收。全部数值、名称和素材为本项目 **PROJECT_TEMP**；历史官方消息不等于本机原作精确验证，不能标成新增LOCAL_VERIFIED。

@@ -51,7 +51,14 @@ func _run() -> void:
 		var replaced: Dictionary = app.camp_snapshot()
 		_expect(replaced.crew.size() == 5 and RosterState.living_count(replaced) == 4,"real replacement produces five history and four living")
 		_expect(RecordEncoding.fingerprint(SurvivorRoster.member(replaced.crew,_death_id)) == RecordEncoding.fingerprint(SurvivorRoster.member(dead.crew,_death_id)),"rescue never rewrites dead identity health service or growth")
-		await _train_member(candidate)
+		# Real kills can cap the new recruit's trait before camp. Select a living
+		# eligible identity through the original quote policy, never lower a level.
+		var training_id: int = 0
+		for member: Dictionary in replaced.crew:
+			if String(TrainingRules.preview(replaced,int(member.id)).get("error","unavailable")).is_empty() and (training_id==0 or int(member.id)<training_id): training_id = int(member.id)
+		_expect(training_id>0,"post-death camp has a living training owner accepted by original quote policy")
+		_write(output_dir.path_join("training-owner.json"),{"recruit_id":candidate,"training_id":training_id,"policy":"lowest eligible stable ID; no health, trait, level or food injection"})
+		if training_id>0: await _train_member(training_id)
 		var edited: Dictionary = app.progress_session.edit(app.camp_snapshot(),{"kind":"rename","member_id":1,"value":"精确回读"})
 		_expect(edited.error == OK and app._accept_transaction(edited,true),"post-death training and rename commit through original camp owner")
 		_expect(not _pre_death_anchor.is_empty(),"death priority actually exercised a consumed pre-death world")
@@ -76,8 +83,58 @@ func _field_death(world: Expedition, id: int) -> void:
 		_expect(app.progress_session.claim_world(_pre_death_anchor.hash).error == OK,"same live owner acknowledges pre-death anchor before continuing")
 	if world.is_paused:
 		await _key_battle(KEY_SPACE)
-	await super._field_death(world,id)
+	await _isolated_death_stance(world,id)
 	_reject_pre_death("confirmed death")
+
+
+func _isolated_death_stance(world: Expedition, id: int) -> void:
+	# The old fixture disabled all four guns while waiting for one AI death.
+	# Dynamic contact can hold bystanders in danger. Keep their real defence,
+	# and walk the designated subject beyond their actual weapon ranges instead.
+	if world.drill_panel != null: world.drill_panel.queue_free()
+	world.battle_drill = true
+	world.drill_panel = BattleDrillPanel.new()
+	world.drill_panel.expedition = world
+	world._hud.view.add_child(world.drill_panel)
+	await _settle()
+	var target: FieldActor = world.drill_panel._member(id)
+	_expect(target != null,"contact death fixture retains designated stable ID")
+	if target == null: return
+	var reach: float = 0.0
+	for actor: FieldActor in world.survivors:
+		if actor != target: reach = maxf(reach,actor.weapon_definition.shot_range)
+	var destination: Vector2 = Vector2.INF
+	var nearest: float = INF
+	for x: int in range(104,1800,64):
+		for y: int in range(104,1320,64):
+			var point: Vector2 = Vector2(x,y)
+			if point.distance_to(world.layout.bus_door)<reach+180.0 or not world.navigation.is_clear(point): continue
+			if not world.navigation.is_clear(point+Vector2(36,0)) or world.navigation.path_between(target.position,point).is_empty(): continue
+			if point.distance_squared_to(target.position)<nearest:
+				destination = point
+				nearest = point.distance_squared_to(target.position)
+	_expect(destination.is_finite(),"designated AI death has a reachable legal stance beyond bystander weapon range")
+	if not destination.is_finite(): return
+	world.command_move(world.layout.bus_door)
+	target.command_path(world.navigation.path_between(target.position,destination))
+	target.cooldown = 999.0
+	for actor: FieldActor in world.survivors:
+		if actor != target: actor.cooldown = 0.0
+	for frame: int in range(1200):
+		if target.permanent_death or target.position.distance_to(destination)<FieldNavigation.CELL: break
+		await _step(world)
+	_expect(target.permanent_death or target.position.distance_to(destination)<FieldNavigation.CELL,"designated subject really walks to the isolated stance without teleporting")
+	_write(output_dir.path_join("death-stance.json"),{"member_id":id,"destination":[destination.x,destination.y],"position":[target.position.x,target.position.y],"bystander_range":reach,"health":target.health,"method":"original paths; only subject fire suppressed; bystanders defend normally; no health or damage changes"})
+	if not target.permanent_death:
+		for button: Button in world.drill_panel.buttons:
+			if int(button.get_meta("member_id")) == id: await _tap(button)
+		for frame: int in range(6000):
+			if target.permanent_death: break
+			await _step(world)
+	_expect(target.permanent_death and target.health == 0,"original AI and death writer confirm designated identity, no direct health mutation")
+	_expect(world.boarding_status().required == world.living_count(),"bus immediately removes confirmed death from required occupants")
+	for actor: FieldActor in world.survivors: actor.cooldown = 0.0
+	await _capture("confirmed-death.png")
 
 
 func _reject_pre_death(stage: String) -> void:

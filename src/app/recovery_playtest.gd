@@ -97,6 +97,7 @@ func _run() -> void:
 			_expect(_initial.food == 12 and _initial.crew.all(func(row: Dictionary) -> bool: return row.health == 4),"explicit labelled4HP/12food drill only, never ordinary start")
 		else:
 			_expect(_initial.food == 2 and _initial.crew.all(func(row: Dictionary) -> bool: return row.health == 200),"ordinary200HP/2food starter, no near-enemy seed")
+		if checkpoint == "contact": app.survival_pilot = false
 		await _open_map(_map)
 		var world: Expedition = app.expedition
 		if world == null:
@@ -117,8 +118,20 @@ func _run() -> void:
 				await _step(world)
 			_expect(world.survivors[0].permanent_death and world.survivors[0].health == 0 and world.survivors[1].member_id == 2,"real enemy lethal gate confirmed ID1 death; original ID2 remains")
 			await _capture("confirmed-death.png")
-		world.request_search(&"cash")
-		if checkpoint != "start":
+		if checkpoint == "contact":
+			_expect(world.battle_drill and not world.drill_panel.buttons.is_empty(),"explicit contact checkpoint has a visible opt-in near-enemy control")
+			if world.battle_drill and not world.drill_panel.buttons.is_empty(): await _tap(world.drill_panel.buttons[0])
+			var reached: bool = false
+			for frame: int in range(240):
+				await _step(world)
+				for enemy: FieldActor in world.enemies:
+					var distance: float = enemy.position.distance_to(world.survivors[0].position)
+					if distance>=19.99 and distance<28.0 and world.survivors[0].health<200.0: reached = true
+				if reached: break
+			_expect(reached,"save checkpoint uses actual separated melee and confirmed real damage")
+		else:
+			world.request_search(&"cash")
+		if checkpoint not in ["start","contact"]:
 			for frame: int in range(3600):
 				if world.search_progress > 4 and not world.enemies.is_empty(): break
 				await _step(world)

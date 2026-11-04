@@ -17,6 +17,7 @@ const Supplies: Array[MissionSupply] = [preload("res://src/features/camp/scaveng
 const SIM: Dictionary = {"phase":TYPE_INT,"elapsed":TYPE_FLOAT,"loot":TYPE_INT,"food_loot":TYPE_INT,"kills":TYPE_INT,"goal":TYPE_VECTOR2,"_spawn_clock":TYPE_FLOAT,"_ai_clock":TYPE_FLOAT,"_engine_clock":TYPE_FLOAT,"_spawn_count":TYPE_INT,"_spawn_attempts":TYPE_INT}
 const ACTOR: Dictionary = {"actor_id":TYPE_INT,"member_id":TYPE_INT,"definition_id":TYPE_STRING_NAME,"is_enemy":TYPE_BOOL,"health":TYPE_FLOAT,"max_health":TYPE_FLOAT,"speed":TYPE_FLOAT,"cooldown":TYPE_FLOAT,"weapon_instance_id":TYPE_STRING,"call_sign":TYPE_STRING,"confirmed_kills":TYPE_INT,"damage_received":TYPE_FLOAT,"permanent_death":TYPE_BOOL,"permanent_death_enabled":TYPE_BOOL,"activity":TYPE_INT,"position":TYPE_VECTOR2,"path":TYPE_PACKED_VECTOR2_ARRAY,"aim":TYPE_VECTOR2,"_path_index":TYPE_INT,"visible":TYPE_BOOL}
 const VISUAL: Dictionary = {"_clock":TYPE_FLOAT,"_walk_clock":TYPE_FLOAT,"_hit_clock":TYPE_FLOAT,"_fire_clock":TYPE_FLOAT,"_attack_clock":TYPE_FLOAT,"_defeat_clock":TYPE_FLOAT,"_is_defeated":TYPE_BOOL,"_facing":TYPE_VECTOR2,"_movement":TYPE_VECTOR2,"_aim":TYPE_VECTOR2,"_hit_direction":TYPE_VECTOR2,"_attack_direction":TYPE_VECTOR2,"position":TYPE_VECTOR2}
+const CONTACT_VISUAL: Dictionary = {"_walk_rest":TYPE_FLOAT,"_contact_display":TYPE_VECTOR2,"_contact_initialized":TYPE_BOOL}
 const KEYS: Array[String] = ["version","build","compatibility","map","sim","sites","worker","active_site","survivors","enemies","weapons","threat","growth","camera","viewport","hunger","drill"]
 
 
@@ -67,6 +68,7 @@ static func capture(world: Expedition) -> Dictionary:
 		captured.trait_inputs = world.trait_inputs.snapshot(world)
 	if world.field_join_mode:
 		captured.field_joins = world.field_joins.duplicate(true)
+	captured.build = String(captured.build) + "+" + FieldContacts.BUILD
 	return captured
 
 
@@ -74,7 +76,11 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 	var enemy_mode: bool = EnemyState.is_state(receipt.base)
 	if not value is Dictionary or value.size() != KEYS.size() + (2 if RescueState.is_family(receipt.base) else 0) + (1 if GrowthState.is_family(receipt.base) else 0) + int(FieldJoinState.is_family(receipt.base)) + int(TraitState.is_family(receipt.base)) or not value.has_all(KEYS) or not SurvivalContracts.json_value(value):
 		return "WORLD_FIELDS"
-	if value.version != (ENEMY_VERSION if enemy_mode else VERSION) or value.build != (ENEMY_BUILD if enemy_mode else QUALITY_BUILD if WeaponState.is_state(receipt.base) else ROSTER_BUILD if RosterState.is_family(receipt.base) else POOL_BUILD if RescuePoolState.is_family(receipt.base) else TRAINING_BUILD if TrainingState.is_state(receipt.base) else TRAIT_BUILD if TraitState.is_family(receipt.base) else FIELD_BUILD if FieldJoinState.is_family(receipt.base) else (GROWTH_BUILD if GrowthState.is_family(receipt.base) else BUILD)) or not value.map is String or supply_for(value.map) == null or not value.hunger is bool:
+	var base_build: String = ENEMY_BUILD if enemy_mode else QUALITY_BUILD if WeaponState.is_state(receipt.base) else ROSTER_BUILD if RosterState.is_family(receipt.base) else POOL_BUILD if RescuePoolState.is_family(receipt.base) else TRAINING_BUILD if TrainingState.is_state(receipt.base) else TRAIT_BUILD if TraitState.is_family(receipt.base) else FIELD_BUILD if FieldJoinState.is_family(receipt.base) else (GROWTH_BUILD if GrowthState.is_family(receipt.base) else BUILD)
+	var contact_build: bool = value.build == base_build + "+" + FieldContacts.BUILD
+	# Legacy snapshots remain strictly authenticatable in completed receipt history.
+	# Resuming their different motion semantics is separately rejected by apply().
+	if value.version != (ENEMY_VERSION if enemy_mode else VERSION) or (value.build != base_build and not contact_build) or not value.map is String or supply_for(value.map) == null or not value.hunger is bool:
 		return "WORLD_VERSION_OR_MAP"
 	if not value.compatibility is String or value.compatibility.length() != 64 or not value.compatibility.is_valid_hex_number(false):
 		return "WORLD_COMPATIBILITY"
@@ -111,7 +117,7 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 	var ids: Array[int] = []
 	var workers: int = 0
 	for row: Variant in value.survivors:
-		if not _actor_shape(row) or row.state.is_enemy:
+		if not _actor_shape(row,false,contact_build) or row.state.is_enemy:
 			return "WORLD_SURVIVOR_FIELDS"
 		var state: Dictionary = row.state
 		var id: int = int(state.member_id)
@@ -142,7 +148,7 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 		return "WORLD_WORKER_ACTIVITY"
 	var enemy_ids: Array[int] = []
 	for row: Variant in value.enemies:
-		if not _actor_shape(row,enemy_mode) or not row.state.is_enemy or row.state.health <= 0 or int(row.state.activity) not in [0,1] or row.state.member_id != 0 or (row.state.actor_id >= sim._spawn_count and int(row.state.actor_id)-10000 not in deployed) or int(row.state.actor_id) in enemy_ids or (not enemy_mode and (row.state.max_health != 54 or row.state.speed != 34)):
+		if not _actor_shape(row,enemy_mode,contact_build) or not row.state.is_enemy or row.state.health <= 0 or int(row.state.activity) not in [0,1] or row.state.member_id != 0 or (row.state.actor_id >= sim._spawn_count and int(row.state.actor_id)-10000 not in deployed) or int(row.state.actor_id) in enemy_ids or (not enemy_mode and (row.state.max_health != 54 or row.state.speed != 34)):
 			return "WORLD_ENEMY_ID_OR_STATE"
 		enemy_ids.append(int(row.state.actor_id))
 	if not _shape(value.threat,{"stage":TYPE_INT,"interval":TYPE_FLOAT,"transitions":TYPE_INT}) or int(value.threat.stage) not in [0,1,2,3] or value.threat.transitions < 0 or value.threat.transitions > 3:
@@ -220,6 +226,8 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 
 
 static func apply(world: Expedition, value: Dictionary) -> String:
+	if not String(value.get("build","")).ends_with("+" + FieldContacts.BUILD):
+		return "WORLD_CONTACT_BUILD_MISMATCH"
 	if not world.setup_problem.is_empty() or world.survivors.size() != value.survivors.size() or not world.enemies.is_empty():
 		return "WORLD_RECONSTRUCTION_SETUP"
 	if compatibility(world) != value.compatibility or _encode(world.get_viewport_rect().size) != value.viewport or world.hunger_trial != value.hunger or world.battle_drill != value.drill.enabled:
@@ -234,7 +242,7 @@ static func apply(world: Expedition, value: Dictionary) -> String:
 	for actor: FieldActor in world.survivors:
 		var row: Dictionary = _member(value.survivors,actor.member_id)
 		_restore(actor,row.state,ACTOR)
-		_restore(actor.visual,row.visual,VISUAL)
+		_restore(actor.visual,row.visual,_visual_spec(true))
 		actor.visual._apply_pose()
 		if actor.member_id == int(value.worker):
 			world.search_actor = actor
@@ -242,7 +250,7 @@ static func apply(world: Expedition, value: Dictionary) -> String:
 	for row: Dictionary in value.enemies:
 		var actor: FieldActor = world._make_actor(true,int(row.state.actor_id),_vec(row.state.position),{},String(row.behavior.kind) if world.enemy_mode else "")
 		_restore(actor,row.state,ACTOR)
-		_restore(actor.visual,row.visual,VISUAL)
+		_restore(actor.visual,row.visual,_visual_spec(true))
 		if world.enemy_mode:
 			actor.enemy_behavior.restore(row.behavior)
 			actor.sync_enemy_visual()
@@ -275,6 +283,8 @@ static func compatibility(world: Expedition) -> String:
 	var data: Dictionary = {"build":ENEMY_BUILD if world.enemy_mode else QUALITY_BUILD if WeaponState.is_state(world.field_departure) else ROSTER_BUILD if RosterState.is_family(world.field_departure) else POOL_BUILD if world.pool_mode else TRAINING_BUILD if world.training_mode else TRAIT_BUILD if world.trait_mode else FIELD_BUILD if world.field_join_mode else (GROWTH_BUILD if world.growth_mode else BUILD),"tuning":_resource(world.tuning),"threat":_resource(world.threat.rules),"supply":_resource(world.supply),"weapons":weapons}
 	if world.enemy_mode:
 		data.enemy_rules = EnemyRules.POLICY
+	data.build = String(data.build) + "+" + FieldContacts.BUILD
+	data.contact = {"distance":FieldContacts.DISTANCE,"approach":FieldContacts.APPROACH,"rechase":FieldContacts.RECHASE,"step":FieldContacts.STEP_DISTANCE,"steps":FieldContacts.MAX_STEPS,"path_parts":FieldContacts.MAX_PATH_PARTS,"pass_dot":FieldContacts.PASS_DOT,"recovery_speed":FieldContacts.RECOVERY_SPEED,"recovery_cap":FieldContacts.MAX_RECOVERY,"recovery_passes":FieldContacts.RECOVERY_PASSES,"yield_speed":FieldContacts.YIELD_SPEED}
 	return SurvivalContracts.fingerprint(data)
 
 
@@ -287,7 +297,7 @@ static func _resource(resource: Resource) -> Dictionary:
 
 
 static func _actor(actor: FieldActor) -> Dictionary:
-	var value: Dictionary = {"state":_fields(actor,ACTOR),"visual":_fields(actor.visual,VISUAL)}
+	var value: Dictionary = {"state":_fields(actor,ACTOR),"visual":_fields(actor.visual,_visual_spec(true))}
 	if actor.is_enemy and actor.enemy_behavior!=null:
 		value.behavior = actor.enemy_behavior.snapshot()
 	return value
@@ -358,9 +368,14 @@ static func _shape(value: Variant, spec: Dictionary) -> bool:
 	return true
 
 
-static func _actor_shape(row: Variant, enemy_mode: bool = false) -> bool:
-	if not row is Dictionary or row.size() != (3 if enemy_mode else 2) or (enemy_mode and not row.has("behavior")) or not _shape(row.get("state"),ACTOR) or not _shape(row.get("visual"),VISUAL):
+static func _visual_spec(contact: bool) -> Dictionary:
+	return VISUAL.merged(CONTACT_VISUAL) if contact else VISUAL
+
+
+static func _actor_shape(row: Variant, enemy_mode: bool = false, contact: bool = true) -> bool:
+	if not row is Dictionary or row.size() != (3 if enemy_mode else 2) or (enemy_mode and not row.has("behavior")) or not _shape(row.get("state"),ACTOR) or not _shape(row.get("visual"),_visual_spec(contact)):
 		return false
+	if contact and row.visual._walk_rest < 0.0: return false
 	var state: Dictionary = row.state
 	return int(state.activity) in [0,1,2,3] and state.health >= 0 and state.health <= state.max_health and state.cooldown >= 0 and state.damage_received >= 0 and (state._path_index <= state.path.size() or state.activity == 3) and row.visual._is_defeated == (state.activity == 3)
 

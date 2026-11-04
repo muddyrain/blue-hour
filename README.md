@@ -1,12 +1,12 @@
 # 蓝时归航 · Blue Hour
 
-当前开发候选M6-WORLD-01：正常每日行动进入含八类建筑的12栋街区，支持多个独立搜刮点、三种模块布局和巴士驶入/下车/集合/驶离。详情见[街区合同](docs/design/m6-world-01.md)。依赖PR #7，仍为开发试玩，正式发布门禁保持。
+当前开发候选M6-WORLD-02：小/中/大地图使用同一角色与建筑尺度，商业街、住宅巷和仓储院落具有不同道路与实体院口。超市/联排门窗、连续铺装、墙脚和入口标识经过校准；部分搜刮、原暂存恢复与巴士归航链保留。见[尺度与拓扑合同](docs/design/m6-world-02.md)。依赖未合并PR #8，仍为开发试玩，正式发布门禁保持。
 
 Godot 2D 单机生存开发试玩。带领幸存者穿过街区，搜集物资、守住队友，再集合至巴士归航。
 
 **M6-ROGUE-01：正常试玩接入每日三个行动和模块街区V1，保留完整旅程、感染者V1与接触修复。不是正式发行版。** 动画阶段为 GO-ANIM-PILOT；正式生存发布门禁为 **BLOCKED / NO-GO-PRODUCTION**。精确收据传输候选修复已知极小浮点写盘回读的因果，仍待完整审阅；不要用本原型承载唯一的重要进度。
 
-[ANIM-02](docs/design/m5-anim-02.md)保留普通感染者转向、短停步态和贴身偏移的连续性；[普通感染者V1](docs/design/m5-art-infected-01.md)使用五个独立源方向、三向镜像和六姿态步行。[M5-CONTACT-01](docs/design/m5-contact-01.md)新增逻辑脚点分离、追击留距和队友让位。本轮先交Mac证据，Windows-NOT-VERIFIED；此前Windows结果仅属于各自历史版本。物理输入与显示流畅性仍待验，2.5D身体遮挡仍允许。
+[ANIM-02](docs/design/m5-anim-02.md)保留普通感染者转向、短停步态和贴身偏移的连续性；[普通感染者V1](docs/design/m5-art-infected-01.md)使用五个独立源方向、三向镜像和六姿态步行。[M5-CONTACT-01](docs/design/m5-contact-01.md)新增逻辑脚点分离、追击留距和队友让位。该M5历史阶段先交Mac证据；M6-WORLD-02的Windows结果见验证记录。物理输入与显示流畅性仍待验，2.5D身体遮挡仍允许。
 
 ![八方向动作展示](docs/screenshots/eight-directions.png)
 
@@ -14,11 +14,11 @@ Godot 2D 单机生存开发试玩。带领幸存者穿过街区，搜集物资�
 
 ## 当前能做什么
 
-正常启动选择「开始试玩」，进入营地、训练或配装，再从巴士的本日三个候选选择一项；进入本次生成的长街/三岔/环院街区，搜刮/救援后发动巴士并集合存活者，预览并确认结算，回营再次出击。下一次启动选择「继续试玩」。三次出击是验收样例，不是通关规则。
+正常启动选择「开始试玩」，进入营地、训练或配装，再从巴士的本日三个候选选择一项；进入选定规模与主题的街区，搜刮/救援后发动巴士并集合存活者，预览并确认结算，回营再次出击。下一次启动选择「继续试玩」。三次出击是验收样例，不是通关规则。
 
 默认使用固定的 `user://playable-v1/run.enemy-v1.json` 独立进度。Mac位于 `~/Library/Application Support/Godot/app_userdata/Blue Hour - 蓝时归航/playable-v1/`。不会自动读取、迁移、覆盖或回退旧进度。以下既有系统通过统一入口接入，没有另一套玩法实现。
 
-- 每日补给、装备与合资格救援；三种模块道路骨架和不同实际地块组合，共用绘制/寻路/遮挡/交互数据。固定双街区保留供开发回归。
+- 每日补给、装备与合资格救援；小中大三档、三种实体道路/院落结构和不同合法建筑组合，共用绘制/寻路/遮挡/交互数据。固定双街区保留供开发回归。
 - 单图一个救援目标，多个原创候选；确认后当场入队、交战和归航。
 - 最多四名存活者，历史名册可保留五人；真实阵亡后可救援剩余候选补位，死者历史不复活。
 - 本人普通XP、Trait与食物训练，营地档案、维修、配装和跨进程营地保存。
@@ -32,7 +32,7 @@ Godot 2D 单机生存开发试玩。带领幸存者穿过街区，搜集物资�
 
 ## 运行与可复测检查
 
-固定 Godot **4.7.2.stable.official.ed1daf0bf**，Compatibility 渲染器；Python 3.10+，资源检查另需 Pillow。发布前另覆盖计划发布平台；M6按当前Mac范围验收，物理键鼠和人工观感仍未签核，详见[验证层级](docs/VALIDATION.md)。把引擎加入PATH，或使用 `--godot` / `GODOT_BIN` 指定本机引擎。
+固定 Godot **4.7.2.stable.official.ed1daf0bf**，Compatibility 渲染器；Python 3.10+，资源检查另需 Pillow。发布前另覆盖计划发布平台；M6-WORLD-02按当前Windows范围验收，物理键鼠和人工观感仍未签核，详见[验证层级](docs/VALIDATION.md)。把引擎加入PATH，或使用 `--godot` / `GODOT_BIN` 指定本机引擎。
 
 ```powershell
 python -m pip install Pillow==12.3.0
@@ -48,7 +48,7 @@ python tools/godot.py run --godot <引擎可执行文件>
 python tools/godot.py run --enemy-trial --profile .local/demo --godot <引擎可执行文件>
 ```
 
-后续使用同一目录并在游戏内选择继续。`check` 和显式 `--profile` 使用项目本地隔离目录，默认 `run` 使用固定试玩目录。旧双人开发入口为 `run --legacy-entry`；不要复制自己的真实进度做测试。旧完成营地保留身份继续每日行动；普通试玩拒绝旧固定地图途中暂存，原件保留，须用原兼容版本继续。源码不含游戏安装包、Release或可下载EXE；可用已安装匹配导出模板的Godot编辑器自行导出。
+后续使用同一目录并在游戏内选择继续。`check` 和显式 `--profile` 使用项目本地隔离目录，默认 `run` 使用固定试玩目录。旧双人开发入口为 `run --legacy-entry`；不要复制自己的真实进度做测试。旧完成营地保留身份继续每日行动；普通试玩在claim前拒绝旧版本途中暂存，原件保留，须用原兼容版本继续。源码不含游戏安装包、Release或可下载EXE；可用已安装匹配导出模板的Godot编辑器自行导出。
 
 
 每日规则、收益范围和保存边界见[随机行动与街区V1](docs/design/m6-rogue-01.md)。后台完整验收可用 `python tools/playable_flow.py --godot <引擎> --output .local/rogue-proof`；加 `--native-movie` 在Mac后台采集，旧固定流程用 `--scenario fixed`。这些参数只供隔离验收，玩家正常启动无需玩法参数。
@@ -95,3 +95,5 @@ python tools/task_timing.py --help
 [文档导航](docs/README.md) · [公开状态](docs/plan.md) · [架构](docs/architecture.md) · [素材来源](docs/ASSET_PROVENANCE.md)
 
 代码、美术、声音独立制作；部分原创图像使用AI辅助生成，音效由数学合成。机制研究参考经典 Deadly Days，但不包含其素材、研究原件或私人证据，不声称精确复刻。当前没有 LICENSE，公开可见不等于授予外部复制、分发或商业复用许可。
+
+M6-WORLD-02后台定向复测：`python tools/world_flow.py --godot <引擎> --native --case neighborhood --output .local/world02-proof`。Windows独立桌面不切换用户输入桌面；`--pack <最终PCK>` 使用固定编辑器引擎加载包内游戏代码，release EXE默认启动另验。

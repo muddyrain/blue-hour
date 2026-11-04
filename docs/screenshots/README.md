@@ -55,3 +55,12 @@ M4-03 / 7ffb937历史图，非当前2D营地。
 - [world-01-overview.png](world-01-overview.png) · SHA256 `6120e5b9bae347b7e41964f3fc5cb6a85b29f0d94ec2c4f9ee7add1da6de9c0e`
 - [world-01-street.png](world-01-street.png) · SHA256 `b3ad2c2448ab0c7c4d14f55831d4cd7a72ebfdd2919102530b09ae1641c0986e`
 - [world-01-bus.png](world-01-bus.png) · SHA256 `41133011c0479b3e0730fe7fa4d091e5033866a6161dd7c7ba171179a84db076`
+
+
+## M6-WORLD-02 Windows
+
+以下均为最终PCK的原生Godot画面，不是概念图。local为只读V3场景、隐藏HUD、zoom0.70；street为1×实际移动/搜刮后的轮廓遮挡；overview为明确标注的只读布局预览，不能与正常相机比例混比。物理键鼠和显示FPS未验。
+
+- [world-02-local.png](world-02-local.png) · SHA256 `f3a70d553cd7e557e817f0572f9082c7b931d30846fd27bcd5149f40509db927`
+- [world-02-street.png](world-02-street.png) · SHA256 `eb643e490942c31f0e6f4564c90c46506013f28780bf528e4ed3fc5bd60c8526`
+- [world-02-overview.png](world-02-overview.png) · SHA256 `59b219cd4952cf9bfca5da33b17c96e88072bff381cb574e3d98308759f27ac7`

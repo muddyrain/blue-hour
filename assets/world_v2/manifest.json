@@ -1,0 +1,57 @@
+{
+  "version": 2,
+  "assets": [
+    {
+      "id": "supermarket",
+      "source_sha256": "25d00c8f265b956bbbbf1a23ef0269b46266fcc49ecd8df64b1a4d77650f23c3",
+      "sprite_sha256": "3d80b31b00be9e76fb2674bdee1169d2c6f329f2917a38d75cde73fe15967ec0",
+      "source_crop": [
+        35,
+        282,
+        1501,
+        878
+      ],
+      "tool": "built-in image_gen",
+      "note": "alpha output0..254; transparent corners verified; proportional normalization only",
+      "archetype_id": "supermarket",
+      "source": "source/supermarket.png",
+      "sprite": "supermarket.png",
+      "sha256": "3d80b31b00be9e76fb2674bdee1169d2c6f329f2917a38d75cde73fe15967ec0",
+      "canvas": [
+        512,
+        640
+      ],
+      "pivot": [
+        256,
+        608
+      ],
+      "normalization": "alpha>16 crop, proportional fit 448x576, baseline 608"
+    },
+    {
+      "id": "row_house",
+      "source_sha256": "43dc030bd512c32099558d4b8f6fa6a4f68d1b32e578b0a94a606a932ebf3bd3",
+      "sprite_sha256": "b0456f48497c15656af8ff84b96993c4f04030ea6fccae5ff9011ace960307a5",
+      "source_crop": [
+        43,
+        79,
+        1494,
+        948
+      ],
+      "tool": "built-in image_gen",
+      "note": "alpha output0..254; transparent corners verified; proportional normalization only",
+      "archetype_id": "row_house",
+      "source": "source/row_house.png",
+      "sprite": "row_house.png",
+      "sha256": "b0456f48497c15656af8ff84b96993c4f04030ea6fccae5ff9011ace960307a5",
+      "canvas": [
+        512,
+        640
+      ],
+      "pivot": [
+        256,
+        608
+      ],
+      "normalization": "alpha>16 crop, proportional fit 448x576, baseline 608"
+    }
+  ]
+}

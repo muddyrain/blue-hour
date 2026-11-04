@@ -9,10 +9,15 @@ const GrassTexture: Texture2D = preload("res://assets/m402/grass.png")
 const ConcreteTexture: Texture2D = preload("res://assets/m402/concrete.png")
 
 var layout: StreetLayout
+func _ready() -> void:
+	if layout.world_data.get("version")==3:
+		var surface: NeighborhoodGround=NeighborhoodGround.new();surface.layout=layout;add_child(surface)
+
 var food_source_visible: bool = true
 
 
 func _draw() -> void:
+	if layout.world_data.get("version")==3: return
 	if not layout.world_data.is_empty():
 		_draw_world()
 		return

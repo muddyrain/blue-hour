@@ -198,7 +198,7 @@ func _ready() -> void:
 		for block: Rect2 in layout.residences:
 			_make_building(block,"柳巷住宅",preload("res://assets/m402/rowhouse.png"),false,true)
 		sites.assign([_cash_site,_food_site])
-	for block: Rect2 in layout.fences:
+	for block: Rect2 in ([] if layout.world_data.get("version")==3 else layout.fences):
 		var fence: StreetFence = StreetFence.new()
 		fence.footprint = block
 		fence.position = Vector2(block.position.x,block.end.y)
@@ -1304,8 +1304,12 @@ func _clicked_site(point: Vector2) -> bool:
 	return false
 
 func _make_world_buildings() -> void:
+	if layout.world_data.get("version")==3:
+		for wall: Rect2 in layout.fences:
+			var barrier: NeighborhoodWall=NeighborhoodWall.new()
+			barrier.footprint=wall;barrier.position=wall.position+Vector2(0,wall.size.y);_sort.add_child(barrier)
 	for row: Dictionary in layout.world_data.entities:
-		for kind: String in ["lamp","planter","crate","fence"]:
+		for kind: String in (["lamp","planter"] if layout.world_data.get("version")==3 else ["lamp","planter","crate","fence"]):
 			var prop: WorldFurniture = WorldFurniture.new()
 			prop.kind=kind
 			var offset: Vector2 = {"lamp":Vector2(-24,48),"planter":Vector2(44,52),"crate":Vector2(-32,-16),"fence":Vector2(100,-30)}[kind]
@@ -1314,10 +1318,13 @@ func _make_world_buildings() -> void:
 	var props: Dictionary = {}
 	for entity: Dictionary in layout.world_data.entities:
 		var block: Rect2 = WorldLayout.rect(entity.rect)
-		var definition: Dictionary = BuildingLibrary.definition(entity.archetype)
+		var definition: Dictionary = NeighborhoodArt.definition(entity.archetype) if layout.world_data.get("version")==3 else BuildingLibrary.definition(entity.archetype)
 		var building: FieldProp = FieldProp.new()
 		building.facade = definition.texture
 		building.world_asset = true
+		if layout.world_data.get("version")==3:
+			building.calibrated=true;building.roof_cut=int(definition.roof_split);building.body_depth=block.size.y
+			building.door_offset=WorldLayout.point(entity.door).x-block.get_center().x
 		building.title = definition.title
 		building.front_width = block.size.x
 		building.position = Vector2(block.get_center().x,block.end.y)
@@ -1333,7 +1340,7 @@ func _make_world_buildings() -> void:
 		var site: SearchSite = SearchSite.new(StringName(def.kind),WorldLayout.point(entity.door))
 		site.id=StringName(def.id); site.reward=int(def.amount); site.weapon=def.weapon
 		site.prop=props[def.building]
-		site.hit=Rect2(WorldLayout.rect(entity.rect).position-Vector2(0,160),WorldLayout.rect(entity.rect).size+Vector2(0,220))
+		site.hit=Rect2(site.prop.position-Vector2(site.prop.front_width/2,280),Vector2(site.prop.front_width,340)) if layout.world_data.get("version")==3 else Rect2(WorldLayout.rect(entity.rect).position-Vector2(0,160),WorldLayout.rect(entity.rect).size+Vector2(0,220))
 		site.prop.reward_hint=("货币" if site.kind==&"cash" else "食物")+" +%d"%site.reward+(" / 武器" if site.weapon else "")
 		sites.append(site)
 		if site.id==&"cash": _cash_site=site; _shop=site.prop

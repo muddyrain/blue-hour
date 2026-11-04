@@ -30,6 +30,7 @@ func blockers() -> Array[Rect2]:
 	if not world_data.is_empty():
 		var blocks: Array[Rect2] = [bus_block]
 		blocks.append_array(residences)
+		if world_data.get("version")==3: blocks.append_array(fences)
 		return blocks
 	var values: Array[Rect2] = [bus_block,cash_block,food_block]
 	values.append_array(residences)
@@ -48,6 +49,8 @@ func shot_obstacles() -> Array[ShotObstacle]:
 	if not world_data.is_empty():
 		var walls: Array[ShotObstacle] = []
 		for row: Dictionary in world_data.entities: walls.append(ShotObstacle.new(StringName(row.id),Rect2(row.rect[0],row.rect[1],row.rect[2],row.rect[3]),true))
+		if world_data.get("version")==3:
+			for i: int in range(fences.size()): walls.append(ShotObstacle.new(StringName("yard_wall_%d"%i),fences[i],true))
 		walls.append(ShotObstacle.new(&"bus",bus_block,false))
 		return walls
 	# TMP-123: only authored building bodies stop ordinary shots; category parity is unknown.

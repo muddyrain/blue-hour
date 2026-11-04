@@ -191,6 +191,13 @@ static func transaction_problem(before: Dictionary, envelope: Dictionary) -> Str
 
 
 static func fingerprint(value: Dictionary) -> String:
+	var stamp: int = FreezeProfile.enter("business.fingerprint")
+	var result: String = _profiled_fingerprint(value)
+	FreezeProfile.leave("business.fingerprint", stamp)
+	return result
+
+
+static func _profiled_fingerprint(value: Dictionary) -> String:
 	# Historical business hashes (world/token/migration/training) are a persisted contract.
 	# Keep this algorithm; new journal transport preserves the exact input binary64 values.
 	if not json_value(value):

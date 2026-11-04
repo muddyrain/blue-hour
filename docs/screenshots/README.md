@@ -64,3 +64,11 @@ M4-03 / 7ffb937历史图，非当前2D营地。
 - [world-02-local.png](world-02-local.png) · SHA256 `f3a70d553cd7e557e817f0572f9082c7b931d30846fd27bcd5149f40509db927`
 - [world-02-street.png](world-02-street.png) · SHA256 `eb643e490942c31f0e6f4564c90c46506013f28780bf528e4ed3fc5bd60c8526`
 - [world-02-overview.png](world-02-overview.png) · SHA256 `59b219cd4952cf9bfca5da33b17c96e88072bff381cb574e3d98308759f27ac7`
+
+
+## M6-WORLD-02-R1 Windows
+
+以下两张来自R1最终PCK，停车框和逐栋灯/花槽规则已移除；local为1280×720、相机(1080,1460)/zoom0.70、隐藏HUD的实际只读局部，street为新1×实际行动。旧WORLD-02图保留为上一候选历史，不冒称修正后成果。
+
+- [world-02-r1-local.png](world-02-r1-local.png) · SHA256 `4f55a8c12664ce5b3458ba8c93451b1472167939dd8d29f72a500445e79bf84a`
+- [world-02-r1-street.png](world-02-r1-street.png) · SHA256 `e0fc9109ed0b08d78036b656d9ee5b5c70efb4afffe62f027d1c295b38ea99c9`

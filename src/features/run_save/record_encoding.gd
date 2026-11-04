@@ -6,12 +6,26 @@ const VERSION: String = "BH_EXACT_JSON_V1"
 
 
 static func fingerprint(value: Dictionary) -> String:
+	var stamp: int = FreezeProfile.enter("exact.fingerprint")
+	var result: String = _profiled_fingerprint(value)
+	FreezeProfile.leave("exact.fingerprint", stamp)
+	return result
+
+
+static func _profiled_fingerprint(value: Dictionary) -> String:
 	if not SurvivalContracts.json_value(value, -2):
 		return ""
 	return _digest(_encode(value))
 
 
 static func stringify(value: Dictionary) -> String:
+	var stamp: int = FreezeProfile.enter("exact.stringify")
+	var result: String = _profiled_stringify(value)
+	FreezeProfile.leave("exact.stringify", stamp)
+	return result
+
+
+static func _profiled_stringify(value: Dictionary) -> String:
 	if not SurvivalContracts.json_value(value, -2):
 		return ""
 	var encoded: Array = _encode(value)
@@ -19,6 +33,13 @@ static func stringify(value: Dictionary) -> String:
 
 
 static func unpack(record: Dictionary) -> Dictionary:
+	var stamp: int = FreezeProfile.enter("exact.unpack")
+	var result: Dictionary = _profiled_unpack(record)
+	FreezeProfile.leave("exact.unpack", stamp)
+	return result
+
+
+static func _profiled_unpack(record: Dictionary) -> Dictionary:
 	if record.size() != 3 or record.get("record_encoding") != VERSION or not record.get("sha256") is String:
 		return {"error":ERR_FILE_CORRUPT, "reason":"RECORD_ENCODING"}
 	var decoded: Dictionary = _decode(record.get("payload"), -2)

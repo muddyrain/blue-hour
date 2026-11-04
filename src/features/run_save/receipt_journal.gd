@@ -5,6 +5,14 @@ extends RefCounted
 const MAX_BYTES: int = 4_194_304
 const MAX_TOTAL_BYTES: int = 67_108_864
 const MAX_STAGES: int = 32
+const MAX_CACHED_RECORDS: int = 64
+const MAX_CACHED_BYTES: int = 4_194_304
+const MAX_CACHED_TRANSITIONS: int = 128
+
+## Pure proofs are shared across coordinator recreation; every caller still rereads its own files.
+static var _record_cache: Dictionary = {}
+static var _transition_cache: Dictionary = {}
+static var _cached_bytes: int = 0
 
 var directory: String
 var fault: Callable
@@ -16,6 +24,13 @@ func _init(explicit_directory: String, fault_hook: Callable = Callable()) -> voi
 
 
 func read_all() -> Dictionary:
+	var stamp: int = FreezeProfile.enter("journal.read_all")
+	var result: Dictionary = _profiled_read_all()
+	FreezeProfile.leave("journal.read_all", stamp)
+	return result
+
+
+func _profiled_read_all() -> Dictionary:
 	if not directory.is_absolute_path() or directory.begins_with("user://") or directory.begins_with("res://"):
 		return _error(ERR_INVALID_PARAMETER, "EXPLICIT_ABSOLUTE_PATH_REQUIRED")
 	if FileAccess.file_exists(directory):
@@ -57,8 +72,10 @@ func read_all() -> Dictionary:
 		return _error(ERR_FILE_CORRUPT, "JOURNAL_LIMIT")
 	if stages.size() > MAX_STAGES:
 		return _error(ERR_OUT_OF_MEMORY, "UNPUBLISHED_STAGE_LIMIT")
+	FreezeProfile.scale("journal_generations",generations.size())
 	generations.sort()
 	var previous: Dictionary = {}
+	var previous_identity: String = ""
 	var digest: String = ""
 	var hashes: Dictionary = {}
 	var identities: Array[String] = []
@@ -102,16 +119,25 @@ func read_all() -> Dictionary:
 			identities.append(receipt.transaction_id)
 		if receipt.previous_hash != digest:
 			return _error(ERR_FILE_CORRUPT, "CHAIN_HASH")
-		var issue: String = TransactionReceipt.transition(previous, receipt)
+		var issue: String = _transition(previous, receipt, previous_identity, result.raw_identity)
 		if not issue.is_empty():
 			return _error(ERR_FILE_CORRUPT, issue)
 		previous = receipt
+		previous_identity = result.raw_identity
 		digest = result.hash
 		hashes[int(receipt.revision)] = digest
+	FreezeProfile.scale("journal_total_bytes",total)
 	return {"error":OK, "receipt":previous, "hash":digest, "hashes":hashes, "identities":identities, "unpublished":stages, "bytes":total}
 
 
 func append(next: Dictionary, expected_hash: String) -> Dictionary:
+	var stamp: int = FreezeProfile.enter("journal.append")
+	var result: Dictionary = _profiled_append(next,expected_hash)
+	FreezeProfile.leave("journal.append", stamp)
+	return result
+
+
+func _profiled_append(next: Dictionary, expected_hash: String) -> Dictionary:
 	var shape_problem: String = TransactionReceipt.problem(next)
 	if not shape_problem.is_empty():
 		return _error(ERR_INVALID_DATA, shape_problem)
@@ -150,6 +176,7 @@ func append(next: Dictionary, expected_hash: String) -> Dictionary:
 	if _fault("before_record_write") != OK:
 		return _error(ERR_CANT_CREATE, "INJECTED_RECORD_WRITE")
 	var temporary: String = stage.path_join("record.json")
+	var io_stamp: int = Time.get_ticks_usec()
 	var file: FileAccess = FileAccess.open(temporary, FileAccess.WRITE)
 	if file == null:
 		return _error(FileAccess.get_open_error(), "RECORD_OPEN")
@@ -157,6 +184,7 @@ func append(next: Dictionary, expected_hash: String) -> Dictionary:
 	file.flush()
 	error = file.get_error()
 	file.close()
+	FreezeProfile.sample("file.write_flush_record",io_stamp)
 	var checked: Dictionary = _read_record(temporary)
 	if error != OK or checked.error != OK or checked.get("hash") != digest or FileAccess.get_file_as_string(temporary) != serialized:
 		return _error(ERR_FILE_CORRUPT, "RECORD_READBACK:" + String(checked.get("reason","BYTE_OR_HASH_MISMATCH")))
@@ -195,6 +223,14 @@ func registration_problem(base: Dictionary, root_id: String) -> String:
 
 
 func _read_record(source: String) -> Dictionary:
+	var stamp: int = FreezeProfile.enter("journal.read_record")
+	var result: Dictionary = _profiled_read_record(source)
+	FreezeProfile.leave("journal.read_record", stamp)
+	return result
+
+
+func _profiled_read_record(source: String) -> Dictionary:
+	var io_stamp: int = Time.get_ticks_usec()
 	var file: FileAccess = FileAccess.open(source, FileAccess.READ)
 	if file == null:
 		return _error(FileAccess.get_open_error(), "RECORD_READ")
@@ -204,11 +240,20 @@ func _read_record(source: String) -> Dictionary:
 	var bytes: PackedByteArray = file.get_buffer(length)
 	var read_error: Error = file.get_error()
 	file.close()
+	FreezeProfile.sample("file.read_record_bytes",io_stamp)
+	FreezeProfile.scale("largest_record_bytes",length)
 	if bytes.size() != length or read_error != OK:
 		return _error(ERR_FILE_CORRUPT, "RECORD_INCOMPLETE_READ")
 	var content: String = bytes.get_string_from_utf8()
 	if content.to_utf8_buffer() != bytes:
 		return _error(ERR_FILE_CORRUPT, "RECORD_UTF8")
+	# Every lookup follows a fresh file read and complete UTF-8 byte identity.
+	# Claimed record hashes, paths, timestamps and mutable object references are insufficient.
+	var identity: String = content.sha256_text()
+	if _record_cache.has(identity) and _record_cache[identity].raw == content:
+		FreezeProfile.count("record_cache_hits")
+		return _record_cache[identity].result.duplicate(true)
+	FreezeProfile.count("record_cache_misses")
 	var parser: JSON = JSON.new()
 	if parser.parse(content) != OK or not parser.data is Dictionary:
 		return _error(ERR_FILE_CORRUPT, "RECORD_JSON")
@@ -231,7 +276,30 @@ func _read_record(source: String) -> Dictionary:
 	var issue: String = TransactionReceipt.problem(payload)
 	if not issue.is_empty():
 		return _error(ERR_FILE_CORRUPT, issue)
-	return {"error":OK, "receipt":payload, "hash":digest, "bytes":length}
+	var result: Dictionary = {"error":OK, "receipt":payload, "hash":digest,
+		"bytes":length, "raw_identity":identity}
+	if length <= MAX_CACHED_BYTES:
+		if _record_cache.size() >= MAX_CACHED_RECORDS or _cached_bytes + length > MAX_CACHED_BYTES:
+			_record_cache.clear()
+			_cached_bytes = 0
+		_record_cache[identity] = {"raw":content, "result":result.duplicate(true)}
+		_cached_bytes += length
+	return result
+
+
+func _transition(previous: Dictionary, next: Dictionary, previous_identity: String, next_identity: String) -> String:
+	# A transition proof is valid only for the full adjacent raw records, not merely a head ID.
+	var identity: String = previous_identity + ":" + next_identity
+	if _transition_cache.has(identity):
+		FreezeProfile.count("transition_cache_hits")
+		return ""
+	FreezeProfile.count("transition_cache_misses")
+	var issue: String = TransactionReceipt.transition(previous, next)
+	if issue.is_empty():
+		if _transition_cache.size() >= MAX_CACHED_TRANSITIONS:
+			_transition_cache.clear()
+		_transition_cache[identity] = true
+	return issue
 
 
 static func capacity_problem(revision: int, phase: String, record_bytes: int, used_bytes: int, stages: int) -> String:

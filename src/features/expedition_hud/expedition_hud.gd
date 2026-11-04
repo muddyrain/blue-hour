@@ -121,6 +121,20 @@ func hide_screen() -> void:
 	hide()
 
 
+func place_help_above_lane() -> void:
+	_help_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	_help_button.offset_left = -144
+	_help_button.offset_right = -16
+	_help_button.offset_top = 154
+	_help_button.offset_bottom = 198
+	_help.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	_help.offset_left = -544
+	_help.offset_right = -16
+	_help.grow_vertical = Control.GROW_DIRECTION_END
+	_help.offset_top = 208
+	_help.offset_bottom = 390
+
+
 func _build_top() -> void:
 	var panel: PanelContainer = _panel(self, "MissionPanel")
 	panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)

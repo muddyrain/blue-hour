@@ -39,5 +39,3 @@ func _draw() -> void:
 		for i: int in range(7):
 			var p: Vector2=Vector2(e.rect[0]+e.rect[2]-18+i*4,e.rect[1]+e.rect[3]+6)
 			draw_line(p,p+Vector2((i%3-1)*5,-6-i%4),Color("667e59"),2)
-	var parking: Rect2=layout.bus_block.grow(12)
-	draw_rect(parking,Color("bcb797"),false,2)

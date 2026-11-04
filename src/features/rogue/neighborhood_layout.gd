@@ -108,6 +108,13 @@ static func is_map_id(v: Variant) -> bool:
 	return v is String and v.length()==41 and v.begins_with("rogue_v3_") and v.substr(9).is_valid_hex_number(false)
 
 static func validate(value: Variant, cached: bool = true) -> String:
+	var stamp: int = FreezeProfile.enter("layout.validate")
+	var result: String = _profiled_validate(value,cached)
+	FreezeProfile.leave("layout.validate", stamp)
+	return result
+
+
+static func _profiled_validate(value: Variant, cached: bool = true) -> String:
 	if not value is Dictionary or value.size()!=16 or not value.has_all(["version","seed","size","topology","attempt","fallback","bounds","entities","roads","barriers","gates","bus","arrivals","enemy_points","rescue","id"]): return "NEIGHBORHOOD_FIELDS"
 	if value.version!=3 or not value.seed is String or value.seed.length()>128 or value["size"] not in SIZES or value.topology not in TOPOLOGIES or not SurvivalContracts.integer(value.attempt,0,2) or not value.fallback is bool: return "NEIGHBORHOOD_VERSION"
 	var signature: String = SurvivalContracts.fingerprint(value)

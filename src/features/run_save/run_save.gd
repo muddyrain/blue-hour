@@ -172,6 +172,13 @@ func read_v5_exact() -> Dictionary:
 
 
 func read_transaction_exact() -> Dictionary:
+	var stamp: int = FreezeProfile.enter("camp.read_exact")
+	var result: Dictionary = _profiled_read_transaction_exact()
+	FreezeProfile.leave("camp.read_exact", stamp)
+	return result
+
+
+func _profiled_read_transaction_exact() -> Dictionary:
 	var result: Dictionary = _read(path)
 	if result.error == OK and int(result.get("migration", 0)) != 0:
 		return {"error":ERR_INVALID_DATA, "message":"事务适配器只接受现有v5；旧档须单独审核", "data":{}}

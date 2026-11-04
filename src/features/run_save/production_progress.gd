@@ -385,6 +385,13 @@ func release_frozen_world(world_hash: String) -> Dictionary:
 
 
 func finish(report: Dictionary, carried: Dictionary) -> Dictionary:
+	var stamp: int = FreezeProfile.enter("progress.finish")
+	var result: Dictionary = _profiled_finish(report,carried)
+	FreezeProfile.leave("progress.finish", stamp)
+	return result
+
+
+func _profiled_finish(report: Dictionary, carried: Dictionary) -> Dictionary:
 	if _transaction == null or token.is_empty():
 		return _blocked("NO_ACTIVE_TRANSACTION")
 	var input: Dictionary = {"before":_active_base.duplicate(true),"token":token.duplicate(true),

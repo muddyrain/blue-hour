@@ -44,6 +44,13 @@ static func _make(seed: String, day: int, slot: int, type: String, bone: String,
 	return result
 
 static func problem(value: Variant) -> String:
+	var stamp: int = FreezeProfile.enter("action.problem")
+	var result: String = _profiled_problem(value)
+	FreezeProfile.leave("action.problem", stamp)
+	return result
+
+
+static func _profiled_problem(value: Variant) -> String:
 	if not value is Dictionary or value.size()!=13 or not value.has_all(["version","id","seed","day","slot","type","cash","food","weapons","recruit","layout","route_length","sites"]):return "DAILY_FIELDS"
 	if value.version!=VERSION or not value.seed is String or value.seed.length()!=32 or not value.seed.is_valid_hex_number(false) or not SurvivalContracts.integer(value.day,2,RunSave.MAX_COUNTER) or not SurvivalContracts.integer(value.slot,0,2) or value.type not in TYPES:return "DAILY_VERSION_OR_SEED"
 	for key: String in ["cash","food","weapons","recruit","route_length"]:

@@ -14,6 +14,13 @@ const REPORT_KEYS: Array[String] = ["contract_version", "sortie_id", "participan
 
 
 static func compute(input: Dictionary) -> Dictionary:
+	var stamp: int = FreezeProfile.enter("settlement.compute")
+	var result: Dictionary = _profiled_compute(input)
+	FreezeProfile.leave("settlement.compute", stamp)
+	return result
+
+
+static func _profiled_compute(input: Dictionary) -> Dictionary:
 	var issue: String = input_problem(input)
 	if not issue.is_empty():
 		return _reject(issue)
@@ -262,6 +269,13 @@ static func common_problem(state: Dictionary, generated_maps: bool = false) -> S
 
 
 static func validate(packet: Dictionary) -> String:
+	var stamp: int = FreezeProfile.enter("settlement.validate")
+	var result: String = _profiled_validate(packet)
+	FreezeProfile.leave("settlement.validate", stamp)
+	return result
+
+
+static func _profiled_validate(packet: Dictionary) -> String:
 	if packet.size() != 2 or not packet.get("input") is Dictionary or not packet.get("envelope") is Dictionary:
 		return "PACKET_FIELDS"
 	var result: Dictionary = compute(packet.input)

@@ -1073,6 +1073,8 @@ func _update_search(delta: float) -> void:
 func _finish(evacuated: bool) -> void:
 	if phase == Phase.FINISHED:
 		return
+	FreezeProfile.start({"day":day,"size":layout.world_data.get("size","legacy"),"buildings":_buildings.size(),"sites":sites.size(),"survivors":survivors.size(),"enemies":enemies.size(),"elapsed":elapsed})
+	var profile_report: int = FreezeProfile.enter("report.build")
 	phase = Phase.FINISHED
 	for enemy: FieldActor in enemies:
 		if enemy.enemy_behavior!=null:
@@ -1112,8 +1114,10 @@ func _finish(evacuated: bool) -> void:
 		report.trait_inputs = trait_inputs.snapshot(self)
 	if field_join_mode:
 		report.field_joins = field_joins.duplicate(true)
+	FreezeProfile.leave("report.build", profile_report)
 	print("BH_RESULT %s" % JSON.stringify(report))
 	finished.emit(report)
+	FreezeProfile.finish()
 
 
 func _shot_effect(from: Vector2, to: Vector2, damage: float) -> void:
@@ -1163,6 +1167,8 @@ func _make_ui() -> void:
 	_hud.extraction_requested.connect(request_bus_action)
 	_hud.help_changed.connect(func(expanded: bool) -> void: help_changed.emit(expanded))
 	add_child(_hud)
+	if layout.world_data.get("version") == 3:
+		_hud.view.place_help_above_lane()
 	if battle_survival:
 		drill_panel = BattleDrillPanel.new()
 		drill_panel.expedition = self
@@ -1308,13 +1314,22 @@ func _make_world_buildings() -> void:
 		for wall: Rect2 in layout.fences:
 			var barrier: NeighborhoodWall=NeighborhoodWall.new()
 			barrier.footprint=wall;barrier.position=wall.position+Vector2(0,wall.size.y);_sort.add_child(barrier)
-	for row: Dictionary in layout.world_data.entities:
-		for kind: String in (["lamp","planter"] if layout.world_data.get("version")==3 else ["lamp","planter","crate","fence"]):
+	if layout.world_data.get("version") == 3:
+		for detail: Dictionary in NeighborhoodDecor.placements(layout):
 			var prop: WorldFurniture = WorldFurniture.new()
-			prop.kind=kind
-			var offset: Vector2 = {"lamp":Vector2(-24,48),"planter":Vector2(44,52),"crate":Vector2(-32,-16),"fence":Vector2(100,-30)}[kind]
-			prop.position=Vector2(row.rect[0],row.rect[1]+row.rect[3])+offset
+			prop.kind = detail.kind
+			prop.position = detail.position
+			prop.variant = int(detail.variant)
+			prop.refined = true
 			_sort.add_child(prop)
+	else:
+		for row: Dictionary in layout.world_data.entities:
+			for kind: String in ["lamp","planter","crate","fence"]:
+				var prop: WorldFurniture = WorldFurniture.new()
+				prop.kind=kind
+				var offset: Vector2 = {"lamp":Vector2(-24,48),"planter":Vector2(44,52),"crate":Vector2(-32,-16),"fence":Vector2(100,-30)}[kind]
+				prop.position=Vector2(row.rect[0],row.rect[1]+row.rect[3])+offset
+				_sort.add_child(prop)
 	var props: Dictionary = {}
 	for entity: Dictionary in layout.world_data.entities:
 		var block: Rect2 = WorldLayout.rect(entity.rect)

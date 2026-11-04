@@ -30,6 +30,12 @@ func _ready() -> void:
 	button.offset_right = 296
 	button.offset_top = -116
 	button.offset_bottom = -68
+	if world.layout.world_data.get("version") == 3:
+		button.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+		button.offset_left = 16
+		button.offset_right = 296
+		button.offset_top = 208
+		button.offset_bottom = 256
 	button.pressed.connect(request)
 	world._hud.view.add_child(button)
 	refresh()

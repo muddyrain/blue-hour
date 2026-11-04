@@ -21,7 +21,8 @@ static func maximum(data: Dictionary, member: Dictionary) -> float:
 	return GrowthRules.maximum(member) if GrowthState.is_family(data) else 200.0
 
 
-static func validate_member(member: Dictionary, data: Dictionary) -> String:
+static func validate_member(member: Dictionary, data: Dictionary, generated_maps: bool = false) -> String:
+	generated_maps = generated_maps or EnemyState.is_state(data)
 	if GrowthState.is_family(data):
 		var issue: String = TraitRules.member_problem(member,TrainingState.credits(data,int(member.id)) if TrainingState.is_family(data) else 0,RescuePoolState.is_family(data)) if TraitState.is_family(data) else GrowthRules.member_problem(member)
 		if not issue.is_empty():
@@ -31,11 +32,11 @@ static func validate_member(member: Dictionary, data: Dictionary) -> String:
 			legacy.growth.trait = {"id":null,"level":null,"progress":null}
 			if TrainingState.is_family(data):
 				legacy.growth.training_state = "unavailable"
-		return _validate_legacy_member(legacy,data)
-	return _validate_legacy_member(member,data)
+		return _validate_legacy_member(legacy,data,generated_maps)
+	return _validate_legacy_member(member,data,generated_maps)
 
 
-static func _validate_legacy_member(member: Dictionary, data: Dictionary) -> String:
+static func _validate_legacy_member(member: Dictionary, data: Dictionary, generated_maps: bool = false) -> String:
 	var value: Variant = member.get("growth")
 	if not value is Dictionary or value.size() != 5 or not value.has_all(["level","experience","trait","training_state","last_action"]):
 		return "成长档案字段无效"
@@ -52,7 +53,7 @@ static func _validate_legacy_member(member: Dictionary, data: Dictionary) -> Str
 	var action: Dictionary = value.last_action
 	if action.size() != 6 or not action.has_all(["settlement_id","map_id","duration_ms","total","recent","evacuated"]):
 		return "行动明细字段无效"
-	if not action.settlement_id is String or not action.evacuated is bool or not action.map_id in MAPS:
+	if not action.settlement_id is String or not action.evacuated is bool or (action.map_id not in MAPS and not (generated_maps and RogueLayout.is_map_id(action.map_id))):
 		return "行动明细来源无效"
 	var parts: PackedStringArray = action.settlement_id.split(":")
 	if parts.size() != 2 or parts[0] != data.profile_id or not parts[1].is_valid_int() or not RunSave._integer(int(parts[1]),1,int(data.settled_sorties)):

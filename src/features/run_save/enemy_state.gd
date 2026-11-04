@@ -28,4 +28,4 @@ static func problem(data: Dictionary) -> String:
 	var projected: Dictionary = data.duplicate(true)
 	projected.schema_version = WeaponState.SCHEMA
 	projected.journey.format = WeaponState.FORMAT
-	return WeaponState.problem(projected)
+	return WeaponState.problem(projected,true) # Validation context, never a serialized permission.

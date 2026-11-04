@@ -1,4 +1,4 @@
-"""Isolated three-sortie + new-PID acceptance; optional macOS background movie.
+"""Isolated daily journey + suspend/new-PID acceptance; optional macOS background movie.
 
 Uses real viewport controls and existing business intentions. Never OS input.
 The movie accelerates simulation, and is not a performance/physical-input test.
@@ -61,6 +61,7 @@ def main():
     parser.add_argument('--godot', required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--native-movie', action='store_true')
+    parser.add_argument('--scenario', choices=['rogue', 'fixed'], default='rogue')
     args = parser.parse_args()
     version = subprocess.check_output([args.godot, '--version'], text=True).strip()
     assert version == (ROOT / '.godot-version').read_text().strip()
@@ -79,13 +80,18 @@ def main():
         (project / 'project.godot').write_text((ROOT / 'project.godot').read_text().replace(
             '[display]', '[display]\nwindow/size/no_focus=true\nwindow/size/mode=1'), encoding='utf-8')
     reports = []
-    for phase in ['first', 'resume']:
+    phases = ['first', 'restore', 'second', 'third', 'fourth', 'final'] if args.scenario == 'rogue' else ['first', 'resume']
+    for phase in phases:
         folder = output / phase
-        flags = ['--flow-output=' + str(folder)] + (['--flow-resume'] if phase == 'resume' else [])
+        flags = ['--flow-output=' + str(folder)] + (['--flow-resume'] if phase != 'first' else [])
+        if args.scenario == 'rogue':
+            flags += ['--bh-rescue-seed=rogue-sample-008']
+        else:
+            flags += ['--flow-fixed', '--bh-enemy-trial', '--bh-safe-suspend', '--bh-camp-prototype', '--bh-progress=' + str(output / 'fixed/run.enemy-v1.json')]
         encoder = None
         encoding_log = None
         try:
-            if args.native_movie and phase == 'first':
+            if args.native_movie and phase == ('second' if args.scenario == 'rogue' else 'first'):
                 with socket.socket() as probe:
                     probe.bind(('127.0.0.1', 0))
                     port = probe.getsockname()[1]
@@ -97,7 +103,7 @@ def main():
                     '-movflags', '+faststart', str(output / 'playable-flow.mp4')], stdout=encoding_log, stderr=encoding_log)
                 time.sleep(0.3)
             command = [args.godot, '--path', str(project), '--rendering-method', 'gl_compatibility',
-                       '--audio-driver', 'Dummy', '--script', 'res://tests/playable_flow.gd', '--', *flags]
+                       '--audio-driver', 'Dummy', '--script', 'res://tests/rogue_flow.gd' if args.scenario == 'rogue' else 'res://tests/playable_flow.gd', '--', *flags]
             stdout = output / (phase + '.txt')
             stderr = output / (phase + '-error.txt')
             if args.native_movie:
@@ -127,7 +133,7 @@ def main():
         reports.append({'phase': phase, 'checks': len(result['checks']), 'pid': result['pid'], 'status': 'PASS'})
         print(phase, reports[-1], flush=True)
     (output / 'summary.json').write_text(json.dumps({'status': 'PASS', 'reports': reports,
-        'native_movie': args.native_movie, 'engine': version, 'physical_input': 'NOT_TESTED',
+        'native_movie': args.native_movie, 'scenario':args.scenario, 'engine': version, 'physical_input': 'NOT_TESTED',
         'display_FPS': 'NOT_MEASURED', 'Windows': 'NOT_RUN_CURRENT_MAC_SCOPE'}, indent=2))
 
 

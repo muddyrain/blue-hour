@@ -86,6 +86,9 @@ static func problem(value: Variant) -> String:
 	if RescuePoolState.is_family(value.base) and value.phase not in ["CAMP_REGISTERED","EDIT_READY","EDIT_COMMITTED"]:
 		if not value.rules.get("scope") is String or value.rules.scope!=RescuePoolState.SCOPE or not FrozenSettlement._rules_problem(value.rules).is_empty() or not TransactionReceipt.same(value.rules.get("candidate",{}),RescuePoolState.offer(value.base,value.transaction_id,String(value.rules.mission.mission_id))):
 			return "POOL_CANDIDATE_BINDING"
+	if value.phase not in ["CAMP_REGISTERED","EDIT_READY","EDIT_COMMITTED"] and value.rules.get("data_version")==2:
+		if not value.rules.get("mission") is Dictionary or not RogueActions.matches(value.base,value.rules.mission.get("generated")):
+			return "DAILY_RECEIPT_BINDING"
 	if field and not FieldJoinRules.problem(value.joins,value.base,value.transaction_id).is_empty():
 		return "FIELD_JOIN_RECEIPT"
 	if field and not value.joins.is_empty() and (value.rules.get("scope") != (RescuePoolState.SCOPE if RescuePoolState.is_family(value.base) else TraitState.SCOPE if TraitState.is_family(value.base) else FieldJoinState.SCOPE) or not value.rules.get("mission") is Dictionary or value.rules.mission.get("mission_id") != "rescue"):

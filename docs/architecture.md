@@ -1,5 +1,7 @@
 # 架构与所有权
 
+RogueActions只拥有每日V1配置与确定性描述，RogueLayout只拼装/校验值布局并构造StreetLayout；现有Main/ProductionProgress/FrozenSettlement/Snapshot继续拥有选择、写入、结果和恢复。data_version2与世界version3显式绑定完整generated；旧规则与旧历史认证独立保留，普通入口在消费前拒绝旧途中。空间描述统一驱动原绘制、寻路、遮挡和交互，详情见[生成合同](design/m6-rogue-01.md)。
+
 PlayableEntry只提供统一启动配置、固定独立进度路径和旧开发入口选择。Main仍组合原营地/任务/Expedition/ProductionProgress；player_mode只改变界面文案与开发控件可见性。ProductionProgress仅新增精确canonical试玩路径的许可，既有隔离路径和严格数据校验保留；不复制事务或结果计算。详见[试玩边界](design/m6-playable-01.md)。
 
 根目录为Godot2D项目，严格使用.godot-version。Main组合已有营地、任务、界面、声音与保存服务；Expedition拥有真实世界推进、导航、LOS、刷怪和攻击判定。

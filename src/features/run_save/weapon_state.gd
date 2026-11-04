@@ -36,13 +36,13 @@ static func projected(data: Dictionary) -> Dictionary:
 	return value
 
 
-static func problem(data: Dictionary) -> String:
+static func problem(data: Dictionary, generated_maps: bool = false) -> String:
 	if not is_state(data) or not data.get("journey") is Dictionary or data.journey.get("format")!=FORMAT or not data.get("weapons") is Array:
 		return "WEAPON_INSTANCE_CONTAINER"
 	for item: Variant in data.weapons:
 		if not item is Dictionary or not WeaponModifiers.problem(item).is_empty():
 			return "WEAPON_INSTANCE_ATTRIBUTES"
-	var issue: String = RosterState.problem(projected(data))
+	var issue: String = RosterState.problem(projected(data),generated_maps)
 	if not issue.is_empty():
 		return issue
 	for item: Dictionary in data.weapons:

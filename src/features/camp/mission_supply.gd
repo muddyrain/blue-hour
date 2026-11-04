@@ -9,6 +9,8 @@ extends Resource
 @export_range(0, 1000) var food_reward: int = 3
 @export var has_weapon_sample: bool = true
 @export var layout: StreetLayout
+# Versioned task data; non-exported so fixed-map legacy compatibility hashes stay unchanged.
+var generated: Dictionary = {}
 
 
 func supports(kind: StringName) -> bool:

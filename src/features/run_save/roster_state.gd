@@ -28,8 +28,8 @@ static func snapshot(camp: Dictionary, journey: Dictionary, recruits: Array, his
 	return value
 
 
-static func problem(data: Dictionary) -> String:
-	return TrainingState.family_problem(data,true,true) if is_state(data) else "ROSTER_FORMAT"
+static func problem(data: Dictionary, generated_maps: bool = false) -> String:
+	return TrainingState.family_problem(data,true,true,generated_maps) if is_state(data) else "ROSTER_FORMAT"
 
 
 static func living_count(data: Dictionary) -> int:

@@ -146,6 +146,8 @@ static func input_problem(input: Dictionary) -> String:
 	issue = _rules_problem(input.rules)
 	if not issue.is_empty():
 		return issue
+	if input.rules.get("data_version")==2 and not RogueActions.matches(input.before,input.rules.mission.generated):
+		return "DAILY_CAMP_BINDING"
 	if RescuePoolState.is_family(input.before) and not TransactionReceipt.same(input.rules.get("candidate",{}),RescuePoolState.offer(input.before,token.transaction_id,String(input.rules.mission.mission_id))):
 		return "POOL_CANDIDATE_BINDING"
 	if SurvivalState.is_extended(input.before):
@@ -233,7 +235,7 @@ static func state_problem(state: Dictionary) -> String:
 	return common_problem(state)
 
 
-static func common_problem(state: Dictionary) -> String:
+static func common_problem(state: Dictionary, generated_maps: bool = false) -> String:
 	var rescued: bool = RescueState.is_family(state)
 	if not SurvivalContracts.json_value(state) or state.size() != STATE_KEYS.size() + (3 if rescued else 0) or not state.has_all(STATE_KEYS) or (state.schema_version != 5 and not rescued):
 		return "STATE_FIELDS"
@@ -250,7 +252,7 @@ static func common_problem(state: Dictionary) -> String:
 	for member: Dictionary in state.crew:
 		issue = SurvivorRoster.validate(member, state, true)
 		if issue.is_empty():
-			issue = SurvivorGrowth.validate_member(member, state)
+			issue = SurvivorGrowth.validate_member(member, state,generated_maps)
 		if not issue.is_empty():
 			return issue
 	issue = WeaponInventory.validate(state, true)
@@ -364,9 +366,13 @@ static func survival_rules(supply: MissionSupply) -> Dictionary:
 
 
 static func foundation_rules(supply: MissionSupply) -> Dictionary:
-	return {"ruleset_id":"BH_FOUNDATION_V1","data_version":1,"scope":FOUNDATION,"ration_per_member":1,
+	var rules: Dictionary = {"ruleset_id":"BH_FOUNDATION_V1","data_version":1,"scope":FOUNDATION,"ration_per_member":1,
 		"mission":{"map_id":String(supply.layout.id),"mission_id":String(supply.id),"cash_reward":supply.cash_reward,
 			"food_reward":supply.food_reward,"has_weapon_sample":supply.has_weapon_sample},"hunger":{},"dead_equipment":{}}
+	if not supply.generated.is_empty():
+		rules.data_version = 2
+		rules.mission.generated = supply.generated.duplicate(true)
+	return rules
 
 
 static func direct_hunger_rules(supply: MissionSupply) -> Dictionary:
@@ -443,6 +449,18 @@ static func _rules_problem(rules: Dictionary) -> String:
 		projected.erase("candidate")
 		projected.scope = TraitState.SCOPE
 		return _rules_problem(projected)
+	if rules.get("data_version")==2:
+		if rules.scope!=TraitState.SCOPE or not rules.get("mission") is Dictionary:
+			return "DAILY_RULES_SCOPE"
+		var daily_issue: String = RogueActions.mission_problem(rules.mission)
+		if not daily_issue.is_empty(): return daily_issue
+		# Validate unchanged policies with the legacy shape; actual generated mission
+		# identity/rewards/geometry are separately authenticated above and below.
+		var legacy: Dictionary = rules.duplicate(true)
+		legacy.data_version = 1
+		legacy.mission.erase("generated")
+		legacy.mission.map_id = "market_loop"
+		return _rules_problem(legacy)
 	if rules.size() != (10 if rules.get("scope") == TraitState.SCOPE else (9 if rules.get("scope") == FieldJoinState.SCOPE else (8 if rules.get("scope") == GrowthState.SCOPE else 7))) or not rules.get("ruleset_id") is String or rules.ruleset_id.is_empty() or not SurvivalContracts.integer(rules.get("data_version"),1,SurvivalContracts.MAX_ID) or rules.get("scope") not in [SCOPE,FOUNDATION,BATTLE,SURVIVAL,HUNGER_PILOT,RescueState.SCOPE,GrowthState.SCOPE,FieldJoinState.SCOPE,TraitState.SCOPE] or not SurvivalContracts.integer(rules.get("ration_per_member"),1,100):
 		return "RULES_VERSION_OR_SCOPE"
 	if not rules.get("mission") is Dictionary or not rules.get("hunger") is Dictionary or not rules.get("dead_equipment") is Dictionary:

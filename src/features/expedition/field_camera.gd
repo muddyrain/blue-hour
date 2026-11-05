@@ -64,7 +64,9 @@ func pan_by(offset: Vector2) -> void:
 
 func zoom_at(screen_point: Vector2, factor: float) -> void:
 	var anchor: Vector2 = screen_to_world(screen_point)
-	zoom = Vector2.ONE * clampf(zoom.x * factor, min_zoom, max_zoom)
+	# Vector2 uses float32; its nearest 0.7 is below the strict snapshot bound.
+	var stored_min: float = maxf(min_zoom, 0.7000000476837158)
+	zoom = Vector2.ONE * clampf(zoom.x * factor, stored_min, max_zoom)
 	position = anchor - (screen_point - get_viewport_rect().size * 0.5) / zoom.x
 	_clamp_position()
 	force_update_scroll()

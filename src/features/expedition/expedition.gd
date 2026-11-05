@@ -1526,6 +1526,8 @@ func support_available() -> bool:
 func support_world() -> Dictionary:
 	var paused: bool=is_paused
 	is_paused=true
+	# Toxic/boss damage happens after the combat phase's ordinary cancellation.
+	if combat_mode(): combat.cancel_unavailable(self)
 	_reap_defeated_enemies()
 	var value: Dictionary=SortieSnapshot.capture(self)
 	is_paused=paused
@@ -1552,6 +1554,7 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 	var result: Dictionary=support_commit.call(before,request)
 	if result.get("error",ERR_UNAVAILABLE)!=OK:
 		pending_support={"before":before,"request":request}
+		print("BH_SUPPORT "+JSON.stringify({"kind":request.kind,"status":"PENDING","reason":result.get("reason",""),"sequence":before.support.sequence,"elapsed":before.sim.elapsed}))
 		is_paused=true
 		support_aiming=false
 		_show_notice("支援尚未确认，已暂停；请重试或暂存继续。"+String(result.get("reason","")))
@@ -1559,6 +1562,7 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 		return false
 	pending_support={}
 	var after: Dictionary=result.world
+	print("BH_SUPPORT "+JSON.stringify({"kind":request.kind,"status":"ACCEPTED","sequence_before":before.support.sequence,"sequence":after.support.sequence,"cooldowns":after.support.cooldowns,"kills_before":before.sim.kills,"kills":after.sim.kills,"facts":after.support.accepted.back().facts,"elapsed":after.sim.elapsed}))
 	# All fallible validation and I/O preceded this visible state replacement.
 	for enemy: FieldActor in enemies: enemy.free()
 	enemies.clear()

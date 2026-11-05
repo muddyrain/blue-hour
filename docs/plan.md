@@ -55,3 +55,5 @@ M6-WORLD-01：工程已通过本轮Windows验收，正式品质视觉仍待人�
 ## M9-COMBAT-01 当前候选
 
 #13精确已审f937652已普通合入main 6b2dfd14；新分支从最新main开发。新建旅程消防斧/霰弹/毒气V1以generated8/rules9/world11隔离，旧M8与short_v1保持原规则。两名真实子代理共用主目录按文件所有权交接，A统一Git与引擎。Windows当前系统源码/原生及导出层级验证见[验收](VALIDATION.md#m9-combat-01windows)；Draft PR待审，不自动合并/Release，生产BLOCKED。后续路线仍是战斗差异→装备型特殊能力→幸存者特长组合→较完整旅程；本轮不启动后续里程碑。
+
+M9-COMBAT-01 R1：用户空袭故障已在原 Windows EXE 复现为最小缩放的 WORLD_CAMERA 提交拒绝；修镜头生产值，并收口斧队员晚阶段死亡后的支援捕获。新 EXE/PCK 实际窗口瞄准→左键确认、可见冲击/冷却/继续通过，源码边界184项及公开检查通过。详情与限制见 [R1记录](development/m9-combat-01-r1.md)。同一 Draft #14 追加提交，仍不合并。

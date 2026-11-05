@@ -120,7 +120,8 @@ func run() -> void:
 	var handled: Dictionary = copy.snapshot()
 	expect(handled.pending.is_empty() and handled.thresholds[0].handled and handled.thresholds[1].handled and handled.last_handled==1 and BossBehavior.problem(handled,IDENTITY).is_empty(),"restored requests acknowledge each actual effect exactly once")
 	copy.restore(RecordEncoding.unpack(JSON.parse_string(RecordEncoding.stringify(handled))).payload)
-	expect(copy.step(0.1,0.29,true,far,Vector2.ZERO).is_empty() and copy.snapshot().attack_result.result.hits==[1],"handled roundtrip cannot repeat summon or slam")
+	expect(copy.step(0.1,0.29,true,far,Vector2.ZERO).is_empty(),"handled roundtrip cannot repeat summon or slam")
+	expect(same(copy.snapshot().attack_result.result.hits,[1]),"handled roundtrip preserves actual hit identities")
 	for change: String in ["identity","version","unknown","negative_timer","timer_nan","timer_infinite","cooldown","point","target","threshold_duplicate","threshold_retry","threshold_fake","result_extra","result_capacity","result_many","result_duplicate"]:
 		var bad: Dictionary = threshold_checkpoint.duplicate(true)
 		match change:

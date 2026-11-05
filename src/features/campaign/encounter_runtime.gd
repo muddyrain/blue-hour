@@ -34,6 +34,8 @@ func record_defeat(value: FieldActor, receipt: Dictionary) -> void:
 	# Called only after the same fatal shot was accepted by the existing XP ledger.
 	defeat=world.xp_inputs.events.back().duplicate(true)
 	behavior.step(0.0,0.0,false,[],value.position)
+	# Applied hits remain on members; death cancels every unapplied part.
+	handling={}
 	world._show_notice("破阵者已击败 · 返回巴士并确认归航")
 	world.combat_feedback.emit({"kind":"boss_defeated","boss_id":definition.boss_id,"elapsed":world.elapsed})
 

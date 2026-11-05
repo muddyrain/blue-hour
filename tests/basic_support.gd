@@ -184,4 +184,3 @@ func run() -> void:
 	expect(same(support.snapshot(), checkpoint), "all target planning leaves cooldown ledger immutable")
 	print(JSON.stringify({"suite":"basic_support", "checks":checks, "failures":failures, "policy_source":"PROJECT_TEMP", "scope":"PURE_COMPONENT_ONLY"}))
 	quit(0 if failures == 0 else 1)
-

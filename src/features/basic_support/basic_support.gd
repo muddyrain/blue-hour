@@ -192,4 +192,3 @@ func accept(proposal: Dictionary, facts: Dictionary) -> bool:
 	_state.sequence = int(_state.sequence) + 1
 	_state.cooldowns[proposal.kind] = POLICY[proposal.kind + "_cooldown"]
 	return true
-

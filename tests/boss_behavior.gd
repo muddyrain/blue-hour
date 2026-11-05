@@ -36,7 +36,8 @@ func run() -> void:
 		quit(2)
 		return
 	var behavior: BossBehavior = fresh()
-	expect(BossDefinition.POLICY.health==480.0 and BossDefinition.POLICY.speed==26.0,"separate V1 life and speed")
+	expect(BossDefinition.POLICY.health==960.0 and BossDefinition.POLICY.speed==26.0,"separate tuned V1 life and unchanged speed")
+	expect(BossDefinition.POLICY.melee_damage==24.0 and BossDefinition.POLICY.slam_damage==32.0,"central tuned V1 damage values")
 	expect(BossBehavior.problem(behavior.snapshot(),IDENTITY).is_empty(),"initial state authenticates")
 	expect(behavior.step(0.5,1.0,true,[],Vector2.ZERO).is_empty() and behavior.snapshot().state=="idle","no target cannot create attack")
 	var near: Array[Dictionary] = [target(2,Vector2(20,0),true),target(1,Vector2(-20,0),true)]
@@ -147,7 +148,7 @@ func run() -> void:
 	var warning: BossWarning = BossWarning.new()
 	root.add_child(warning)
 	var unchanged: Dictionary = armed.duplicate(true)
-	warning.update_state(armed,Vector2.ZERO,480.0,480.0)
+	warning.update_state(armed,Vector2.ZERO,BossDefinition.POLICY.health,BossDefinition.POLICY.health)
 	expect(same(armed,unchanged),"warning does not change its input snapshot")
 	warning.queue_free()
 	await process_frame

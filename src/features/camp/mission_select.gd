@@ -101,10 +101,10 @@ func refresh_rescue(completed: bool, reason: String = "") -> void:
 
 
 func refresh_daily(base: Dictionary) -> void:
-	daily_offers = RogueActions.offers(base)
+	daily_offers = DailyActions.offers(base)
 	_heading.text = "第%d天 · 选择一项行动" % int(base.day)
 	for index: int in range(3):
-		var supply: MissionSupply = RogueActions.supply(daily_offers[index])
+		var supply: MissionSupply = DailyActions.supply(daily_offers[index])
 		_active[index] = supply
 		_titles[index].text = "%02d / %s" % [index+1,supply.display_name]
 		_descriptions[index].text = supply.description

@@ -420,6 +420,46 @@
       "sha256": "b942f9f8d08414e2b5d0ddc6964bb6db86fcda902e63e06daf7c739c2a522db5",
       "origin": "AI-assisted original project art; M5-ART-INFECTED-01, built-in image_gen, five source views and disclosed mirroring",
       "license": "No additional license granted"
+    },
+    {
+      "path": "assets/world_v1/convenience_store.png",
+      "sha256": "5a10952618115949b88b9a36301b358fbd2cf85d9a6518ddd34591566f8fbf5f",
+      "source": "Original built-in image_gen; normalization and source hashes in assets/world_v1/manifest.json"
+    },
+    {
+      "path": "assets/world_v1/detached_home.png",
+      "sha256": "f4027955d4e1679053cbb46f5133ff89aee9aa59e7e41df8912aafe9749be1c5",
+      "source": "Original built-in image_gen; normalization and source hashes in assets/world_v1/manifest.json"
+    },
+    {
+      "path": "assets/world_v1/eatery.png",
+      "sha256": "3460f310819dd1b0a0ef0ed9e6806f5d77a3260f00f44d359c6c7192e8fbfac2",
+      "source": "Original built-in image_gen; normalization and source hashes in assets/world_v1/manifest.json"
+    },
+    {
+      "path": "assets/world_v1/garage.png",
+      "sha256": "51ef4cbde4780a38d6bff0c5b8748a3d63ea9ef037c436a8a25556326cb8a8a9",
+      "source": "Original built-in image_gen; normalization and source hashes in assets/world_v1/manifest.json"
+    },
+    {
+      "path": "assets/world_v1/row_house.png",
+      "sha256": "4d19e5ba10620926be8bf95f15469c7bc95c1fde711f6333b4b907b5002b8d72",
+      "source": "Original built-in image_gen; normalization and source hashes in assets/world_v1/manifest.json"
+    },
+    {
+      "path": "assets/world_v1/small_apartment.png",
+      "sha256": "785080ae8f69620ad345d268992a55d2cebecf5d3a36a73aeb90984a496bbece",
+      "source": "Original built-in image_gen; normalization and source hashes in assets/world_v1/manifest.json"
+    },
+    {
+      "path": "assets/world_v1/supermarket.png",
+      "sha256": "14b3f9842fb4fe612dc8b00cc3f00c25ccfb87ff3874e36e48d43eb7f44940d1",
+      "source": "Original built-in image_gen; normalization and source hashes in assets/world_v1/manifest.json"
+    },
+    {
+      "path": "assets/world_v1/warehouse.png",
+      "sha256": "215f3206b9ed718b790bf994e6a03c964bc5c3f93c6691ca987f344d12f5a8ef",
+      "source": "Original built-in image_gen; normalization and source hashes in assets/world_v1/manifest.json"
     }
   ]
 }

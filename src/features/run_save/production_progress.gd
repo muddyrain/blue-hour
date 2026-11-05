@@ -299,7 +299,7 @@ func begin(before: Dictionary, supply: MissionSupply) -> Dictionary:
 	for member: Dictionary in before.crew:
 		if member.health <= 0 and not battle_mode:
 			return _blocked("LEGACY_ZERO_HP_NOT_ENROLLED")
-	if daily_actions and (supply==null or not RogueActions.matches(before,supply.generated)):
+	if daily_actions and (supply==null or not DailyActions.matches(before,supply.generated)):
 		return _blocked("DAILY_SELECTION_NOT_CURRENT")
 	_active_base = before.duplicate(true)
 	_active_rules = FrozenSettlement.battle_rules(supply) if battle_mode else FrozenSettlement.foundation_rules(supply)
@@ -319,7 +319,7 @@ func begin(before: Dictionary, supply: MissionSupply) -> Dictionary:
 
 
 func active_supply() -> MissionSupply:
-	return RogueActions.supply(_active_rules.mission.generated) if _active_rules.get("data_version")==2 else null
+	return DailyActions.supply(_active_rules.mission.generated) if (_active_rules.get("data_version")==2 or _active_rules.get("data_version")==3) else null
 
 
 func join_field(at_ms: int) -> Dictionary:
@@ -356,7 +356,7 @@ func resume_offer() -> Dictionary:
 	if state.error != OK or state.state != "SUSPENDED":
 		return _blocked(state.get("reason","NO_SUSPEND_READY"))
 	var receipt: Dictionary = state.receipt
-	if daily_actions and receipt.rules.get("data_version")!=2:
+	if daily_actions and receipt.rules.get("data_version")!=3:
 		return _blocked("WORLD_DAILY_BUILD_MISMATCH")
 	if receipt.envelope.world.hunger != hunger_trial:
 		return _blocked("SUSPEND_HUNGER_ENTRY_MISMATCH")

@@ -3,6 +3,7 @@ extends Node2D
 ## Front edge is the sort anchor. Only the roof fades for a friend behind it.
 
 const ShopTexture: Texture2D = preload("res://assets/candidates/shop_02.png")
+var world_asset: bool = false
 var facade: Texture2D = ShopTexture
 var is_market: bool = false
 var is_residence: bool = false
@@ -20,9 +21,9 @@ var _wall: Sprite2D
 
 func _ready() -> void:
 	var factor: float = front_width / 448.0
-	_roof = _part(Rect2(0, 0, 512, 320), Vector2(-256, -416) * factor, factor)
-	_wall = _part(Rect2(0, 320, 512, 128), Vector2(-256, -96) * factor, factor)
-	if not is_market and not is_residence:
+	_roof = _part(Rect2(0,0,512,512) if world_asset else Rect2(0,0,512,320),Vector2(-256,-608 if world_asset else -416)*factor,factor)
+	_wall = _part(Rect2(0,512,512,128) if world_asset else Rect2(0,320,512,128),Vector2(-256,-96)*factor,factor)
+	if not world_asset and not is_market and not is_residence:
 		var props: ShopFurniture = ShopFurniture.new()
 		props.scale = Vector2.ONE * front_width / 368.0
 		add_child(props)
@@ -71,7 +72,7 @@ func _draw() -> void:
 
 func obscures(world_point: Vector2) -> bool:
 	var factor: float = front_width / 448.0
-	return Rect2(global_position + Vector2(-front_width / 2, -384 * factor), Vector2(front_width, 288 * factor)).has_point(world_point)
+	return Rect2(global_position + Vector2(-front_width / 2, (-576 if world_asset else -384) * factor), Vector2(front_width, (480 if world_asset else 288) * factor)).has_point(world_point)
 
 
 func show_behind_roof(friend_behind: bool) -> void:

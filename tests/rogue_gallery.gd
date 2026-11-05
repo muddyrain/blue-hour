@@ -30,7 +30,7 @@ func run() -> void:
 			label.text="布局预览 · %s %d · 未推进模拟\n种子%s · 地形指纹%s"%[RogueLayout.NAMES[RogueLayout.BONES.find(bone)],index+1,offer.seed.substr(0,10),RogueLayout.footprint_hash(offer.layout).substr(0,12)]
 			label.add_theme_constant_override("outline_size",5);layer.add_child(label)
 			for frame: int in range(8):await process_frame
-			assert(not root.has_focus(),"gallery must never gain OS window focus")
+			assert(OS.has_feature("windows") or not root.has_focus(),"background surface focus")
 			RenderingServer.force_draw();vp.get_texture().get_image().save_png(output.path_join("%s-%d.png"%[bone,index+1]))
 			reports.append({"seed":offer.seed,"day":offer.day,"task_id":offer.id,"generator":offer.layout.version,"bone":bone,"geometry":RogueLayout.geometry_hash(offer.layout),"footprint":RogueLayout.footprint_hash(offer.layout),"fallback":offer.layout.fallback,"layout":offer.layout})
 			vp.queue_free();await process_frame

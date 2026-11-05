@@ -117,6 +117,9 @@ var _practice_manual_waves: bool = false
 var _readouts: SquadReadouts
 var _cash_site: SearchSite = SearchSite.new(&"cash", Vector2.ZERO)
 var _food_site: SearchSite = SearchSite.new(&"food", Vector2.ZERO)
+var sites: Array[SearchSite] = []
+var _bus_sprite: Sprite2D
+var bus_view: BusJourney
 var _active_site: SearchSite
 
 
@@ -150,7 +153,7 @@ func _ready() -> void:
 	layout = supply.layout
 	_cash_site.door = layout.cash_door
 	_food_site.door = layout.food_door
-	navigation.configure(layout.blockers())
+	navigation.configure(layout.blockers(),layout.world_bounds)
 	shot_obstacles = layout.shot_obstacles()
 	if is_practice and los_practice:
 		los_setup = LosPracticeSetup.for_layout(layout, los_range_case)
@@ -164,6 +167,7 @@ func _ready() -> void:
 	camera.min_zoom = tuning.camera_min_zoom
 	camera.max_zoom = tuning.camera_max_zoom
 	camera.zoom_step = tuning.camera_zoom_step
+	camera.bounds = layout.world_bounds
 	add_child(camera)
 	camera.pan_by(layout.camera_start-camera.position)
 	_sort = Node2D.new()
@@ -173,22 +177,27 @@ func _ready() -> void:
 	_effects = Node2D.new()
 	add_child(_effects)
 	var bus: Sprite2D = Sprite2D.new()
+	_bus_sprite = bus
 	bus.texture = BusTexture
 	bus.offset = Vector2(0, -128)
 	bus.scale = Vector2.ONE * (240.0 / 448.0)
 	bus.position = layout.bus_foot()
 	_sort.add_child(bus)
-	_shop = _make_building(layout.cash_block,layout.cash_title,FieldProp.ShopTexture,false,false)
-	_shop.searchable = supply.supports(&"cash")
-	_shop.reward_hint = ("货币 +%d" % supply.cash_reward)+(" / 武器" if supply.has_weapon_sample else "")
-	_cash_site.prop = _shop
-	var second: FieldProp = _make_building(layout.food_block,layout.food_title,
-		preload("res://assets/m401/market.png") if supply.supports(&"food") else preload("res://assets/m402/rowhouse.png"),supply.supports(&"food"),not supply.supports(&"food"))
-	second.searchable = supply.supports(&"food")
-	second.reward_hint = "食物 +%d" % supply.food_reward
-	_food_site.prop = second
-	for block: Rect2 in layout.residences:
-		_make_building(block,"柳巷住宅",preload("res://assets/m402/rowhouse.png"),false,true)
+	if not layout.world_data.is_empty():
+		_make_world_buildings()
+	else:
+		_shop = _make_building(layout.cash_block,layout.cash_title,FieldProp.ShopTexture,false,false)
+		_shop.searchable = supply.supports(&"cash")
+		_shop.reward_hint = ("货币 +%d" % supply.cash_reward)+(" / 武器" if supply.has_weapon_sample else "")
+		_cash_site.prop = _shop
+		var second: FieldProp = _make_building(layout.food_block,layout.food_title,
+			preload("res://assets/m401/market.png") if supply.supports(&"food") else preload("res://assets/m402/rowhouse.png"),supply.supports(&"food"),not supply.supports(&"food"))
+		second.searchable = supply.supports(&"food")
+		second.reward_hint = "食物 +%d" % supply.food_reward
+		_food_site.prop = second
+		for block: Rect2 in layout.residences:
+			_make_building(block,"柳巷住宅",preload("res://assets/m402/rowhouse.png"),false,true)
+		sites.assign([_cash_site,_food_site])
 	for block: Rect2 in layout.fences:
 		var fence: StreetFence = StreetFence.new()
 		fence.footprint = block
@@ -245,7 +254,15 @@ func _ready() -> void:
 		_show_notice(layout.route_hint)
 		if threat_rehearsal:
 			_show_notice("短时压力演练 · 21秒夜间候选；正常出击105秒，规则均待校准。")
+	if not layout.world_data.is_empty():
+		bus_view = BusJourney.new()
+		bus_view.configure(self,_bus_sprite,layout.world_data.bus)
+		add_child(bus_view)
 	print("BH_SORTIE build=%s start day=%d members=%d" % [BUILD_ID, day, survivors.size()])
+
+
+func _process(delta: float) -> void:
+	if phase == Phase.FINISHED and bus_view != null and bus_view.running(): bus_view.advance(delta)
 
 
 func _physics_process(delta: float) -> void:
@@ -295,24 +312,30 @@ func _unhandled_input(event: InputEvent) -> void:
 			point = get_global_transform_with_canvas().affine_inverse() * event.position
 		if rescue_target != null and rescue_target.contains(point):
 			rescue_target.request()
-		elif supply.supports(&"cash") and layout.hit_area(&"cash").has_point(point):
+		elif not layout.world_data.is_empty() and _clicked_site(point):
+			pass
+		elif layout.world_data.is_empty() and supply.supports(&"cash") and layout.hit_area(&"cash").has_point(point):
 			if searched:
 				command_move(point)
 			else:
 				request_search()
-		elif supply.supports(&"food") and layout.hit_area(&"food").has_point(point):
+		elif layout.world_data.is_empty() and supply.supports(&"food") and layout.hit_area(&"food").has_point(point):
 			if _food_site.searched:
 				command_move(point)
 			else:
 				request_search(&"food")
 		elif layout.bus_block.grow(18.0).has_point(point):
 			request_extraction()
-		elif FieldNavigation.BOUNDS.has_point(point):
+		elif layout.world_bounds.has_point(point):
 			command_move(point)
 		get_viewport().set_input_as_handled()
 
 
 func step(delta: float) -> void:
+	if bus_view != null and bus_view.running():
+		if not is_paused: bus_view.advance(delta)
+		_update_ui()
+		return
 	if phase == Phase.FINISHED or is_paused or suspend_sealed:
 		_update_ui()
 		return
@@ -459,6 +482,7 @@ func toggle_pause() -> void:
 
 
 func command_move(point: Vector2) -> void:
+	if bus_view != null and bus_view.running(): return
 	if not field_join_error.is_empty():
 		return
 	if rescue_target != null: rescue_target.cancel()
@@ -475,11 +499,12 @@ func command_move(point: Vector2) -> void:
 
 
 func request_search(kind: StringName = &"cash") -> void:
+	if bus_view != null and bus_view.running(): return
 	if not field_join_error.is_empty():
 		return
 	if rescue_target != null: rescue_target.cancel()
 	var site: SearchSite = search_site(kind)
-	if phase == Phase.FINISHED or site == null or site.searched or not supply.supports(kind):
+	if phase == Phase.FINISHED or site == null or site.searched or not supply.supports(site.kind):
 		return
 	if search_actor != null:
 		var cancelling_same: bool = site == _active_site
@@ -505,6 +530,8 @@ func request_search(kind: StringName = &"cash") -> void:
 
 
 func search_site(kind: StringName) -> SearchSite:
+	for site: SearchSite in sites:
+		if site.id == kind: return site
 	if kind == &"cash":
 		return _cash_site
 	if kind == &"food":
@@ -513,6 +540,7 @@ func search_site(kind: StringName) -> SearchSite:
 
 
 func request_extraction() -> void:
+	if bus_view != null and bus_view.running(): return
 	if not field_join_error.is_empty():
 		return
 	if is_practice and phase != Phase.FINISHED:
@@ -755,7 +783,7 @@ func _safe_spawn_point() -> Vector2:
 	var candidates: Array[Vector2] = []
 	for index: int in range(layout.enemy_points.size()):
 		candidates.append(layout.enemy_points[(_spawn_attempts + index) % layout.enemy_points.size()])
-	var bounds: Rect2 = FieldNavigation.BOUNDS.grow(-ThreatRules.EDGE_MARGIN)
+	var bounds: Rect2 = layout.world_bounds.grow(-ThreatRules.EDGE_MARGIN)
 	for fraction: float in [0.0, 0.25, 0.5, 0.75, 1.0]:
 		candidates.append(Vector2(lerpf(bounds.position.x, bounds.end.x, fraction), bounds.position.y))
 		candidates.append(Vector2(lerpf(bounds.position.x, bounds.end.x, fraction), bounds.end.y))
@@ -1019,15 +1047,15 @@ func _update_search(delta: float) -> void:
 	_active_site.progress += delta / search_actor.trait_search_factor
 	if _active_site.progress >= tuning.search_seconds:
 		var site: SearchSite = _active_site
-		if trait_mode and not trait_inputs.accept_search(self,search_actor,site.kind):
+		if trait_mode and not trait_inputs.events.any(func(e: Dictionary) -> bool: return e.site==String(site.kind)) and not trait_inputs.accept_search(self,search_actor,site.kind):
 			_show_notice("特性搜集来源未确认，已暂停；不会重复发放收益。")
 			toggle_pause()
 			return
 		site.searched = true
-		var reward: int = supply.reward(site.kind)
+		var reward: int = site.reward if not layout.world_data.is_empty() else supply.reward(site.kind)
 		if site.kind == &"cash":
 			loot += reward
-			if not is_practice and supply.has_weapon_sample:
+			if not is_practice and (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
 				weapon_loot.append(WeaponInventory.reward(sortie_id,WeaponState.is_family(field_departure)))
 		else:
 			food_loot += reward
@@ -1035,7 +1063,7 @@ func _update_search(delta: float) -> void:
 		site.prop.searched = true
 		site.prop.queue_redraw()
 		_show_notice("搜集完成 · 携带%s +%d（撤离后带回）" % ["货币" if site.kind == &"cash" else "食物",reward])
-		if site.kind == &"cash" and not is_practice and supply.has_weapon_sample:
+		if site.kind == &"cash" and not is_practice and (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
 			_show_notice("获得损坏长管步枪 · 回营后入库维修")
 			print("BH_WEAPON_FOUND %s" % JSON.stringify(weapon_loot.back()))
 		print("BH_SEARCH completed kind=%s reward=%d cash=%d food=%d" % [site.kind,reward,loot,food_loot])
@@ -1070,9 +1098,10 @@ func _finish(evacuated: bool) -> void:
 		"participants":participants_snapshot.duplicate(true),"member_results":member_results,
 		"mission_outcome":"EXTRACTED" if evacuated else "FAILED",
 		"weapons":weapon_loot.duplicate(true) if evacuated and not is_practice else [],
-		"food":food_loot if evacuated else 0,"food_searched":_food_site.searched,
-		"sites_searched":int(searched) + int(_food_site.searched),
-		"kills": kills, "searched": searched, "health": remaining_health, "elapsed": elapsed}
+		"food":food_loot if evacuated else 0,"food_searched":_kind_searched(&"food"),
+		"sites_searched":_searched_count(),
+		"kills": kills, "searched": _kind_searched(&"cash"), "health": remaining_health, "elapsed": elapsed}
+	if not layout.world_data.is_empty(): report.site_facts = WorldSites.facts(self)
 	if not is_practice and not loadout_snapshot.is_empty():
 		report.growth_inputs = growth_inputs.snapshot(sortie_id,layout.id,elapsed)
 	if rescue_mode:
@@ -1190,8 +1219,8 @@ func _update_ui() -> void:
 		"can_gather":not is_practice and phase == Phase.BOARDING and boarding.required > 0,
 		"day": day, "seconds": timing["sortie_seconds"], "time_fraction": timing["sortie_fraction"],
 		"paused": is_paused, "cash": initial_cash, "loot": loot,
-		"food":initial_food,"food_loot":food_loot,"sites_searched":int(searched)+int(_food_site.searched),
-		"sites_total":int(supply.supports(&"cash"))+int(supply.supports(&"food")),
+		"food":initial_food,"food_loot":food_loot,"sites_searched":_searched_count(),
+		"sites_total":sites.filter(func(site: SearchSite) -> bool: return supply.supports(site.kind)).size(),
 		"has_food_source":supply.supports(&"food"),
 		"route_hint":layout.route_hint,
 		"enemy_mode":enemy_mode,
@@ -1203,7 +1232,7 @@ func _update_ui() -> void:
 	})
 	if drill_panel != null:
 		drill_panel.refresh()
-	for site: SearchSite in [_cash_site, _food_site]:
+	for site: SearchSite in sites:
 		site.prop.searched = site.searched
 		site.prop.update_work(search_actor.actor_id if search_actor != null and _active_site == site else -1,
 			site.progress / tuning.search_seconds,
@@ -1243,6 +1272,10 @@ func _make_building(block: Rect2, title: String, texture: Texture2D, market: boo
 
 class SearchSite:
 	extends RefCounted
+	var id: StringName
+	var reward: int = 0
+	var weapon: bool = false
+	var hit: Rect2
 	var kind: StringName
 	var door: Vector2
 	var progress: float = 0.0
@@ -1251,5 +1284,57 @@ class SearchSite:
 
 
 	func _init(resource_kind: StringName, entrance: Vector2) -> void:
+		id = resource_kind
 		kind = resource_kind
 		door = entrance
+
+
+func _kind_searched(kind: StringName) -> bool:
+	return sites.any(func(site: SearchSite) -> bool: return site.kind==kind and site.searched)
+
+func _searched_count() -> int:
+	return sites.filter(func(site: SearchSite) -> bool: return site.searched).size()
+
+func _clicked_site(point: Vector2) -> bool:
+	for site: SearchSite in sites:
+		if site.hit.has_point(point):
+			if not site.searched: request_search(site.id)
+			else: command_move(site.door)
+			return true
+	return false
+
+func _make_world_buildings() -> void:
+	for row: Dictionary in layout.world_data.entities:
+		for kind: String in ["lamp","planter","crate","fence"]:
+			var prop: WorldFurniture = WorldFurniture.new()
+			prop.kind=kind
+			var offset: Vector2 = {"lamp":Vector2(-24,48),"planter":Vector2(44,52),"crate":Vector2(-32,-16),"fence":Vector2(100,-30)}[kind]
+			prop.position=Vector2(row.rect[0],row.rect[1]+row.rect[3])+offset
+			_sort.add_child(prop)
+	var props: Dictionary = {}
+	for entity: Dictionary in layout.world_data.entities:
+		var block: Rect2 = WorldLayout.rect(entity.rect)
+		var definition: Dictionary = BuildingLibrary.definition(entity.archetype)
+		var building: FieldProp = FieldProp.new()
+		building.facade = definition.texture
+		building.world_asset = true
+		building.title = definition.title
+		building.front_width = block.size.x
+		building.position = Vector2(block.get_center().x,block.end.y)
+		building.ui_theme = ui_theme
+		building.searchable = supply.generated.sites.any(func(d: Dictionary) -> bool: return d.building==entity.id)
+		_sort.add_child(building)
+		_buildings.append(building)
+		props[entity.id] = building
+	for def: Dictionary in supply.generated.sites:
+		var entity: Dictionary = {}
+		for row: Dictionary in layout.world_data.entities:
+			if row.id==def.building: entity=row
+		var site: SearchSite = SearchSite.new(StringName(def.kind),WorldLayout.point(entity.door))
+		site.id=StringName(def.id); site.reward=int(def.amount); site.weapon=def.weapon
+		site.prop=props[def.building]
+		site.hit=Rect2(WorldLayout.rect(entity.rect).position-Vector2(0,160),WorldLayout.rect(entity.rect).size+Vector2(0,220))
+		site.prop.reward_hint=("货币" if site.kind==&"cash" else "食物")+" +%d"%site.reward+(" / 武器" if site.weapon else "")
+		sites.append(site)
+		if site.id==&"cash": _cash_site=site; _shop=site.prop
+		if site.id==&"food": _food_site=site

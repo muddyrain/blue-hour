@@ -61,6 +61,7 @@ func contains(point: Vector2) -> bool:
 
 
 func request() -> void:
+	if world.bus_view!=null and world.bus_view.running(): return
 	if world.field_join_mode and progress >= SECONDS and status == "IN_PROGRESS":
 		_complete_field_join()
 		return
@@ -147,7 +148,7 @@ func refresh() -> void:
 		button.text = candidate_name()+"已加入 · 全员撤离后登记营地" if npc.health > 0 else candidate_name()+"已阵亡 · 历史保留"
 	if not world.field_join_error.is_empty():
 		button.text = "重试完成援救 / 接纳"+candidate_name()
-	button.disabled = status in ["RESCUED","FAILED","IN_FIELD_JOINED"]
+	button.disabled = status in ["RESCUED","FAILED","IN_FIELD_JOINED"] or (world.bus_view!=null and world.bus_view.running())
 	queue_redraw()
 
 
@@ -183,7 +184,7 @@ static func fact_problem(value: Dictionary) -> String:
 	return "" if value.size() == 2 and value.get("rescue_id") == RescueState.TARGET and value.get("status") in ["RESCUED","FAILED","UNAVAILABLE"] else "RESCUE_FACT"
 
 
-static func snapshot_problem(value: Variant, ids: Array[int], field: bool = false, candidate: int = 3, max_id: int = 3) -> String:
+static func snapshot_problem(value: Variant, ids: Array[int], field: bool = false, candidate: int = 3, max_id: int = 3, bounds: Rect2 = FieldNavigation.BOUNDS) -> String:
 	if field and value is Dictionary and value.get("status") == "IN_FIELD_JOINED":
 		return "" if value.size() == 3 and value.get("progress") == SECONDS and value.get("worker") == 0 and candidate in ids else "FIELD_JOIN_TARGET_STATE"
 	if field and value is Dictionary and value.get("status") not in ["AVAILABLE","IN_PROGRESS"]:
@@ -195,6 +196,6 @@ static func snapshot_problem(value: Variant, ids: Array[int], field: bool = fals
 	var points: Array = value.path.duplicate()
 	points.append(value.position)
 	for point: Variant in points:
-		if not point is Array or point.size() != 2 or not SurvivalContracts.number(point[0]) or not SurvivalContracts.number(point[1]) or not FieldNavigation.BOUNDS.has_point(Vector2(point[0],point[1])):
+		if not point is Array or point.size() != 2 or not SurvivalContracts.number(point[0]) or not SurvivalContracts.number(point[1]) or not bounds.has_point(Vector2(point[0],point[1])):
 			return "RESCUE_SNAPSHOT_POINT"
 	return ""

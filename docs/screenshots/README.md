@@ -47,3 +47,11 @@
 M4-03 / 7ffb937历史图，非当前2D营地。
 
 [返回文档导航](../README.md)。
+
+## M6-WORLD-01 Windows V1
+
+原创八类建筑的真实Godot画面，Windows Compatibility。总览未推进模拟；街道/巴士图来自最终PCK的1×自动输入流程，非概念图或物理键鼠证据。
+
+- [world-01-overview.png](world-01-overview.png) · SHA256 `6120e5b9bae347b7e41964f3fc5cb6a85b29f0d94ec2c4f9ee7add1da6de9c0e`
+- [world-01-street.png](world-01-street.png) · SHA256 `b3ad2c2448ab0c7c4d14f55831d4cd7a72ebfdd2919102530b09ae1641c0986e`
+- [world-01-bus.png](world-01-bus.png) · SHA256 `41133011c0479b3e0730fe7fa4d091e5033866a6161dd7c7ba171179a84db076`

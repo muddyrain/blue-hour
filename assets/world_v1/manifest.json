@@ -1,0 +1,238 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "archetype_id": "convenience_store",
+      "version": 1,
+      "source": "source/convenience_store.png",
+      "source_sha256": "9843e9c39b0ed6705824ba39ae8c51f0a4bc6da0dae91865a06ae99d36bd10b5",
+      "sprite": "convenience_store.png",
+      "sha256": "5a10952618115949b88b9a36301b358fbd2cf85d9a6518ddd34591566f8fbf5f",
+      "source_crop": [
+        86,
+        81,
+        1586,
+        890
+      ],
+      "canvas": [
+        512,
+        640
+      ],
+      "pivot": [
+        256,
+        608
+      ],
+      "roof_split": 512,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "origin": "OpenAI built-in image_gen; original project artwork",
+      "normalization": "alpha bbox >16, proportional LANCZOS fit 448x576; paste at baseline608; no repaint"
+    },
+    {
+      "archetype_id": "supermarket",
+      "version": 1,
+      "source": "source/supermarket.png",
+      "source_sha256": "9efd363c050e38442e3022adb36ea90cfa249381f8f04c699df962f84ebec6ba",
+      "sprite": "supermarket.png",
+      "sha256": "14b3f9842fb4fe612dc8b00cc3f00c25ccfb87ff3874e36e48d43eb7f44940d1",
+      "source_crop": [
+        14,
+        66,
+        2157,
+        684
+      ],
+      "canvas": [
+        512,
+        640
+      ],
+      "pivot": [
+        256,
+        608
+      ],
+      "roof_split": 512,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "origin": "OpenAI built-in image_gen; original project artwork",
+      "normalization": "alpha bbox >16, proportional LANCZOS fit 448x576; paste at baseline608; no repaint"
+    },
+    {
+      "archetype_id": "eatery",
+      "version": 1,
+      "source": "source/eatery.png",
+      "source_sha256": "f047782af9b7f4bffc252a3e1684c83cfcb7504465c31523e921cdb56295a20e",
+      "sprite": "eatery.png",
+      "sha256": "3460f310819dd1b0a0ef0ed9e6806f5d77a3260f00f44d359c6c7192e8fbfac2",
+      "source_crop": [
+        32,
+        92,
+        1742,
+        856
+      ],
+      "canvas": [
+        512,
+        640
+      ],
+      "pivot": [
+        256,
+        608
+      ],
+      "roof_split": 512,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "origin": "OpenAI built-in image_gen; original project artwork",
+      "normalization": "alpha bbox >16, proportional LANCZOS fit 448x576; paste at baseline608; no repaint"
+    },
+    {
+      "archetype_id": "warehouse",
+      "version": 1,
+      "source": "source/warehouse.png",
+      "source_sha256": "927315ce6be92556be91635d16198d1466ffc2888f097db668c67890118dfd76",
+      "sprite": "warehouse.png",
+      "sha256": "215f3206b9ed718b790bf994e6a03c964bc5c3f93c6691ca987f344d12f5a8ef",
+      "source_crop": [
+        13,
+        116,
+        1762,
+        829
+      ],
+      "canvas": [
+        512,
+        640
+      ],
+      "pivot": [
+        256,
+        608
+      ],
+      "roof_split": 512,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "origin": "OpenAI built-in image_gen; original project artwork",
+      "normalization": "alpha bbox >16, proportional LANCZOS fit 448x576; paste at baseline608; no repaint"
+    },
+    {
+      "archetype_id": "garage",
+      "version": 1,
+      "source": "source/garage.png",
+      "source_sha256": "4a647eee613bcc32b880b3d28132eda8a7b89e838f60bf3cd9b2f5ed298689fc",
+      "sprite": "garage.png",
+      "sha256": "51ef4cbde4780a38d6bff0c5b8748a3d63ea9ef037c436a8a25556326cb8a8a9",
+      "source_crop": [
+        25,
+        57,
+        1594,
+        913
+      ],
+      "canvas": [
+        512,
+        640
+      ],
+      "pivot": [
+        256,
+        608
+      ],
+      "roof_split": 512,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "origin": "OpenAI built-in image_gen; original project artwork",
+      "normalization": "alpha bbox >16, proportional LANCZOS fit 448x576; paste at baseline608; no repaint"
+    },
+    {
+      "archetype_id": "detached_home",
+      "version": 1,
+      "source": "source/detached_home.png",
+      "source_sha256": "205c0590234ffed64b1371367d8d9ce6f74ae52bb8cd967b9282d94a65068494",
+      "sprite": "detached_home.png",
+      "sha256": "f4027955d4e1679053cbb46f5133ff89aee9aa59e7e41df8912aafe9749be1c5",
+      "source_crop": [
+        123,
+        28,
+        1185,
+        1158
+      ],
+      "canvas": [
+        512,
+        640
+      ],
+      "pivot": [
+        256,
+        608
+      ],
+      "roof_split": 512,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "origin": "OpenAI built-in image_gen; original project artwork",
+      "normalization": "alpha bbox >16, proportional LANCZOS fit 448x576; paste at baseline608; no repaint"
+    },
+    {
+      "archetype_id": "row_house",
+      "version": 1,
+      "source": "source/row_house.png",
+      "source_sha256": "c8fecf4828c769f763ac2e8c8f5a2e64ff63267403c9960660fbf67c31c35a37",
+      "sprite": "row_house.png",
+      "sha256": "4d19e5ba10620926be8bf95f15469c7bc95c1fde711f6333b4b907b5002b8d72",
+      "source_crop": [
+        53,
+        25,
+        1721,
+        858
+      ],
+      "canvas": [
+        512,
+        640
+      ],
+      "pivot": [
+        256,
+        608
+      ],
+      "roof_split": 512,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "origin": "OpenAI built-in image_gen; original project artwork",
+      "normalization": "alpha bbox >16, proportional LANCZOS fit 448x576; paste at baseline608; no repaint"
+    },
+    {
+      "archetype_id": "small_apartment",
+      "version": 1,
+      "source": "source/small_apartment.png",
+      "source_sha256": "a26289ae5609c8e7b837f142737de6705761a9adcb9ff46fdf18cde53150ea05",
+      "sprite": "small_apartment.png",
+      "sha256": "785080ae8f69620ad345d268992a55d2cebecf5d3a36a73aeb90984a496bbece",
+      "source_crop": [
+        88,
+        130,
+        1212,
+        1157
+      ],
+      "canvas": [
+        512,
+        640
+      ],
+      "pivot": [
+        256,
+        608
+      ],
+      "roof_split": 512,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "origin": "OpenAI built-in image_gen; original project artwork",
+      "normalization": "alpha bbox >16, proportional LANCZOS fit 448x576; paste at baseline608; no repaint"
+    }
+  ],
+  "license_note": "Original generated Blue Hour assets; no third-party or Deadly Days image used. Source PNG editable as raster; roof/front split in FieldProp."
+}

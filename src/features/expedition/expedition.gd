@@ -65,6 +65,7 @@ var participants_snapshot: Array[Dictionary] = []
 var setup_problem: String = ""
 var _setup_crew: Array[Dictionary] = []
 var ui_theme: Theme
+var player_mode: bool = false
 var is_practice: bool = false
 var battle_survival: bool = false
 var battle_drill: bool = false
@@ -1127,6 +1128,7 @@ func _hit_effect(to: Vector2, damage: float, survivor_hit: bool) -> void:
 
 func _make_ui() -> void:
 	_hud = ExpeditionHud.new()
+	_hud.player_mode = player_mode
 	_hud.ui_theme = ui_theme
 	_hud.pause_requested.connect(toggle_pause)
 	_hud.extraction_requested.connect(request_bus_action)
@@ -1137,6 +1139,7 @@ func _make_ui() -> void:
 		drill_panel.expedition = self
 		drill_panel.theme = ui_theme
 		_hud.view.add_child(drill_panel)
+		drill_panel.visible = not player_mode
 	_update_ui()
 
 

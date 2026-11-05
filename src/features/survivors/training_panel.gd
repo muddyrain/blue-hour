@@ -6,6 +6,8 @@ signal closed
 signal confirmed(request: Dictionary)
 signal retry_requested
 
+var player_mode: bool = false
+
 var selected_member_id: int = 0
 var member_buttons: Dictionary[int,Button] = {}
 var train_button: Button
@@ -37,7 +39,7 @@ func _ready() -> void:
 	column.add_theme_constant_override("separation",12)
 	add_child(column)
 	_label(column,"篝火训练 / 为下次出击做准备",30)
-	_label(column,"1份食物 → 本人Trait累计进度+1 · PROJECT_TEMP · 不增加普通XP、生命或日期",17)
+	_label(column,"1份食物 → 本人特质进度+1，不增加经验、生命或日期。" if player_mode else "1份食物 → 本人Trait累计进度+1 · PROJECT_TEMP · 不增加普通XP、生命或日期",17)
 	var body: HBoxContainer = HBoxContainer.new()
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation",24)
@@ -110,7 +112,7 @@ func refresh(data: Dictionary, message: String = "", pending: bool = false) -> v
 		risk_text.text = ""
 	else:
 		member_buttons[selected_member_id].button_pressed = true
-		detail.text = "%02d %s · 普通Lv%d / %d XP · 生命%.0f/%.0f\n%s" % [selected_member_id,member.call_sign,int(member.growth.level),int(member.growth.xp_total),member.health,GrowthRules.maximum(member),TraitRules.description(member)]
+		detail.text = "%02d %s · 普通Lv%d / %d XP · 生命%.0f/%.0f\n%s" % [selected_member_id,member.call_sign,int(member.growth.level),int(member.growth.xp_total),member.health,GrowthRules.maximum(member),(TraitRules.description(member).replace(" · PROJECT_TEMP", "") if player_mode else TraitRules.description(member))]
 		var quote: Dictionary = TrainingRules.preview(_data,selected_member_id) if not pending else {"error":"原训练保存尚未确认，请重试；不会再次购买。"}
 		if not quote.error.is_empty():
 			preview_text.text = quote.error
@@ -118,7 +120,7 @@ func refresh(data: Dictionary, message: String = "", pending: bool = false) -> v
 		else:
 			_quote = quote
 			var next: Dictionary = SurvivorRoster.member(quote.after.crew,selected_member_id)
-			preview_text.text = "消耗1份食物 → 本人累计进度 %d → %d\nTrait Lv%d → Lv%d%s\n训练后：%s" % [member.growth.trait.progress,next.growth.trait.progress,member.growth.trait.level,next.growth.trait.level,"（本次不升级）" if member.growth.trait.level==next.growth.trait.level else "（下次出击使用新效果）",TraitRules.description(next).get_slice("\n",1)]
+			preview_text.text = "消耗1份食物 → 本人累计进度 %d → %d\nTrait Lv%d → Lv%d%s\n训练后：%s" % [member.growth.trait.progress,next.growth.trait.progress,member.growth.trait.level,next.growth.trait.level,"（本次不升级）" if member.growth.trait.level==next.growth.trait.level else "（下次出击使用新效果）",(TraitRules.description(next).replace(" · PROJECT_TEMP", "") if player_mode else TraitRules.description(next)).get_slice("\n",1)]
 			risk_text.text = "存活%d人 · 食物%d − 训练1 = 剩余%d\n假设下次归航零补给：需%d粮，可能缺%d粮。\n静态风险预估；未执行晚餐，不预定死亡人选。" % [_data.journey.active_member_ids.size(),_data.food,quote.after.food,quote.risk.required,quote.risk.shortage]
 	train_button.disabled = _quote.is_empty() or pending
 	retry_button.visible = pending
@@ -152,7 +154,7 @@ func _confirm() -> void:
 	_busy = true
 	train_button.disabled = true
 	confirmation.hide()
-	status.text = "正在保存并确认原训练事务…"
+	status.text = "正在保存训练…" if player_mode else "正在保存并确认原训练事务…"
 	confirmed.emit(request)
 	# A held Enter must not focus the next purchase after this confirmation.
 	back_button.grab_focus.call_deferred()

@@ -10,6 +10,7 @@ const SHOP: Texture2D = preload("res://assets/candidates/shop_02.png")
 const MARKET: Texture2D = preload("res://assets/m401/market.png")
 var choices: Array[Button] = []
 var rescue_enabled: bool = false
+var player_mode: bool = false
 var field_join_mode: bool = false
 var rescue_completed: bool = false
 var cancel_button: Button
@@ -52,13 +53,15 @@ func _ready() -> void:
 		card.add_child(CampStyle.label("%02d / %s" % [index + 1, supply.display_name if index == 2 else supply.layout.display_name], 24))
 		var picture: TextureRect = TextureRect.new()
 		picture.texture = SHOP if index == 0 else MARKET
-		picture.custom_minimum_size = Vector2(240 if rescue_enabled else 400,192)
+		picture.custom_minimum_size = Vector2(240 if rescue_enabled else 400,112 if player_mode else 192)
 		picture.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(picture)
 		var description: String = "援救10秒后立即加入行动；全员撤离后登记营地。新同行本餐不参食，下次按实际存活者计粮。" if field_join_mode and index == 2 else supply.description
+		if player_mode:
+			description = ("援助一位幸存者10秒后同行参战，存活归航后正式加入。" if index==2 else supply.description) + "\n搜完货币点可带回%d币；%s。武器以实际搜获为准。\n夜间敌人增援变密；阵亡不可恢复，归航需留足口粮。" % [supply.cash_reward,"食物点%d份" % supply.food_reward if supply.food_reward>0 else "此行没有食物点"]
 		var text: Label = CampStyle.label(description, 17, CampStyle.MUTED)
 		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		text.custom_minimum_size.y = 52

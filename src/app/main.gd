@@ -13,6 +13,7 @@ enum Phase {
 const ValidationScene: PackedScene = preload("res://src/features/validation/validation.tscn")
 const ExpeditionScene: PackedScene = preload("res://src/features/expedition/expedition.tscn")
 
+var playable_entry: bool = false
 var phase: Phase = Phase.TITLE
 var _validation: Node2D
 var expedition: Expedition
@@ -123,15 +124,20 @@ var _exit_target: String = ""
 func _ready() -> void:
 	get_tree().auto_accept_quit = false
 	get_window().close_requested.connect(func() -> void: request_exit("quit"))
-	enemy_mode = "--bh-enemy-trial" in OS.get_cmdline_user_args()
-	quality_mode = enemy_mode or "--bh-weapon-quality-trial" in OS.get_cmdline_user_args()
-	roster_mode = quality_mode or "--bh-roster-trial" in OS.get_cmdline_user_args()
-	pool_mode = roster_mode or "--bh-rescue-pool-trial" in OS.get_cmdline_user_args()
-	training_mode = pool_mode or "--bh-training-trial" in OS.get_cmdline_user_args()
-	trait_mode = training_mode or "--bh-trait-trial" in OS.get_cmdline_user_args()
-	field_join_mode = trait_mode or "--bh-field-join-trial" in OS.get_cmdline_user_args()
-	growth_mode = field_join_mode or "--bh-growth-trial" in OS.get_cmdline_user_args()
-	rescue_mode = growth_mode or "--bh-rescue-trial" in OS.get_cmdline_user_args()
+	var entry: Dictionary = PlayableEntry.resolve(OS.get_cmdline_user_args())
+	playable_entry = entry.playable
+	var launch_arguments: Array[String] = entry.arguments
+	progress_path = entry.progress
+	audio_settings_path = entry.audio
+	enemy_mode = "--bh-enemy-trial" in launch_arguments
+	quality_mode = enemy_mode or "--bh-weapon-quality-trial" in launch_arguments
+	roster_mode = quality_mode or "--bh-roster-trial" in launch_arguments
+	pool_mode = roster_mode or "--bh-rescue-pool-trial" in launch_arguments
+	training_mode = pool_mode or "--bh-training-trial" in launch_arguments
+	trait_mode = training_mode or "--bh-trait-trial" in launch_arguments
+	field_join_mode = trait_mode or "--bh-field-join-trial" in launch_arguments
+	growth_mode = field_join_mode or "--bh-growth-trial" in launch_arguments
+	rescue_mode = growth_mode or "--bh-rescue-trial" in launch_arguments
 	if growth_mode:
 		GrowthRules.initialize(crew)
 	if trait_mode:
@@ -139,23 +145,23 @@ func _ready() -> void:
 	if training_mode:
 		TrainingState.initialize(crew)
 		_training = []
-	hunger_trial = rescue_mode or "--bh-hunger-trial" in OS.get_cmdline_user_args()
-	survival_pilot = hunger_trial or "--bh-survival-pilot" in OS.get_cmdline_user_args()
-	survival_mode = survival_pilot or "--bh-survival" in OS.get_cmdline_user_args()
-	safe_suspend = survival_mode and "--bh-safe-suspend" in OS.get_cmdline_user_args()
-	battle_mode = survival_mode or "--bh-battle-survival" in OS.get_cmdline_user_args()
-	transactional_mode = battle_mode or "--bh-transactional" in OS.get_cmdline_user_args()
+	hunger_trial = rescue_mode or "--bh-hunger-trial" in launch_arguments
+	survival_pilot = hunger_trial or "--bh-survival-pilot" in launch_arguments
+	survival_mode = survival_pilot or "--bh-survival" in launch_arguments
+	safe_suspend = survival_mode and "--bh-safe-suspend" in launch_arguments
+	battle_mode = survival_mode or "--bh-battle-survival" in launch_arguments
+	transactional_mode = battle_mode or "--bh-transactional" in launch_arguments
 	if battle_mode:
 		_battle_meta = _pool_initial() if pool_mode else TrainingState.initial() if training_mode else TraitState.initial() if trait_mode else FieldJoinState.initial() if field_join_mode else GrowthState.initial() if growth_mode else (RescueState.initial() if rescue_mode else (SurvivalState.initial() if survival_mode else BattleState.initial()))
-	for argument: String in OS.get_cmdline_user_args():
+	for argument: String in launch_arguments:
 		if argument.begins_with("--bh-audio-settings="):
 			audio_settings_path = argument.trim_prefix("--bh-audio-settings=")
 		if argument.begins_with("--bh-progress="):
 			progress_path = argument.trim_prefix("--bh-progress=")
 		if argument.begins_with("--bh-migrate-v5="):
 			_migration_source = argument.trim_prefix("--bh-migrate-v5=")
-	camp_prototype = "--bh-camp-prototype" in OS.get_cmdline_user_args() and CampSceneLayout.isolated(progress_path)
-	if "--bh-camp-prototype" in OS.get_cmdline_user_args() and not camp_prototype:
+	camp_prototype = playable_entry or ("--bh-camp-prototype" in launch_arguments and CampSceneLayout.isolated(progress_path))
+	if not playable_entry and "--bh-camp-prototype" in launch_arguments and not camp_prototype:
 		_camp_scene_problem = "营地场景原型需要明确的隔离目录；保留原界面。"
 	_setup_progress()
 	audio_preferences = AudioPreferences.new(audio_settings_path)
@@ -168,6 +174,7 @@ func _ready() -> void:
 	add_child(audio)
 	$Interface/Screen/Title/Start.pressed.connect(open_mission_select)
 	mission_select = MissionSelect.new()
+	mission_select.player_mode = playable_entry
 	mission_select.rescue_enabled = rescue_mode
 	mission_select.field_join_mode = field_join_mode
 	_screen.add_child(mission_select)
@@ -615,6 +622,7 @@ func _open_sortie(practice: bool, resume: Dictionary = {}) -> void:
 		return
 	expedition = ExpeditionScene.instantiate() as Expedition
 	expedition.is_practice = practice
+	expedition.player_mode = playable_entry
 	expedition.battle_survival = battle_mode
 	expedition.battle_drill = battle_mode and not survival_pilot and "--bh-battle-drill" in OS.get_cmdline_user_args()
 	expedition.hunger_trial = hunger_trial
@@ -724,6 +732,10 @@ func reset_demo() -> void:
 		if hunger_trial:
 			_new_game_confirmation.title = "Blue Hour 暂行饥饿规则 / 隔离测试"
 			_new_game_confirmation.dialog_text = _hunger_policy_text() + "\n新旅程：两人各200HP / 食物2 / 原初始装备。普通v5不自动转换。\n确认后立即保存独立基础营地；取消不写盘，旧旅程原件保留。"
+		if playable_entry:
+			_new_game_confirmation.title = "开始新的试玩旅程"
+			_new_game_confirmation.ok_button_text = "开始试玩"
+			_new_game_confirmation.dialog_text = _hunger_policy_text() + "\n初始两人各200生命、食物2、货币53及原初始装备。已有试玩进度会保留为历史，确认后开始新旅程。"
 		_new_game_confirmation.popup_centered(Vector2i(650, 240))
 		return
 	_new_game()
@@ -1115,6 +1127,7 @@ func open_roster() -> void:
 		return
 	if not is_instance_valid(roster_panel):
 		roster_panel = RosterPanel.new()
+		roster_panel.player_mode = playable_entry
 		_screen.add_child(roster_panel)
 		roster_panel.call_sign_requested.connect(rename_survivor)
 		roster_panel.equipment_requested.connect(_roster_equipment)
@@ -1148,6 +1161,7 @@ func open_growth(member_id: int, discard_pending: bool = false) -> void:
 	roster_panel.hide()
 	if not is_instance_valid(growth_panel):
 		growth_panel = GrowthPanel.new()
+		growth_panel.player_mode = playable_entry
 		_screen.add_child(growth_panel)
 		growth_panel.closed.connect(close_growth)
 	growth_panel.selected_member_id = member_id
@@ -1203,6 +1217,7 @@ func open_loadout() -> void:
 		return
 	if not is_instance_valid(loadout_panel):
 		loadout_panel = LoadoutPanel.new()
+		loadout_panel.player_mode = playable_entry
 		_screen.add_child(loadout_panel)
 		loadout_panel.equip_requested.connect(equip_weapon)
 		loadout_panel.repair_requested.connect(repair_weapon)
@@ -1480,6 +1495,7 @@ func _accept_transaction(result: Dictionary, retryable: bool = false) -> bool:
 			_progress_message = "隔离生存测试版：战斗阵亡持久化；死者装备闲置为暂行候选，缺粮仍阻塞。"
 		if hunger_trial:
 			_progress_message = "PROJECT_TEMP 隔离试运行：缺粮直接减员、冻结哈希选人；死者原武器闲置。正式默认未开放。"
+		if playable_entry: _progress_message = "旅程结束，记录已保存。" if result.state=="ENDED" else "营地已保存。可整备后再次出击。"
 		_update_camp()
 		return true
 	_progress_dirty = retryable
@@ -1491,6 +1507,11 @@ func _accept_transaction(result: Dictionary, retryable: bool = false) -> bool:
 
 
 func _transaction_message(reason: String) -> String:
+	if playable_entry:
+		if "WRITER" in reason: return "进度正被其他窗口使用或暂时无法保存。请关闭其他实例后重开；原件保留。"
+		if "UNFINISHED_ACTION" in reason: return "上次行动中断且没有完整结算，当前无法继续。请保留进度；不会回退营地或发放战利品。"
+		if "COMPAT" in reason or "BUILD" in reason: return "此版本无法安全继续该途中进度。原件保留，不自动转换或回退。"
+		return "进度保存或校验未完成，已阻止出击。可重试或退出；原件保留，不自动回退旧档。"
 	if "HUNGER_EXPLICIT_TRIAL_REQUIRED" in reason:
 		return "此旅程含暂行饥饿规则；请使用 Play-Survival -HungerTrial 并明确确认。当前入口已阻止继续，原件保留。"
 	if "UNFINISHED_ACTION" in reason:
@@ -1527,6 +1548,7 @@ func _show_battle_result(snapshot: Dictionary, durable: bool) -> void:
 		text += "\n完整结果已冻结；返回营地只提交一次，按存活者扣口粮。"
 	if hunger_trial:
 		text = _hunger_result_text(snapshot,durable)
+	if playable_entry: text = _playable_result_text(snapshot,durable)
 	$Interface/Screen/Result/Scroll/Body.text = text
 	$Interface/Screen/Result/Scroll.scroll_vertical = 0
 	$Interface/Screen/Result/Scroll/Body.add_theme_font_size_override("font_size",18 if hunger_trial else 19)
@@ -1534,9 +1556,14 @@ func _show_battle_result(snapshot: Dictionary, durable: bool) -> void:
 	_battle_new_button.visible = ended
 	_battle_new_button.disabled = not durable
 	_status.text = "隔离生存终局" if ended and durable else _progress_message
+	if playable_entry:
+		_status.text = _progress_message if _progress_blocked else ("结算已保存。" if durable else "确认结算后保存；保存失败时不会进入下一次行动。")
+		$Interface/Screen/Result/Continue.text = ("查看旅程记录 →" if durable else "重试保存终局 →") if ended else "确认结算并回营 →"
 
 
 func _hunger_policy_text() -> String:
+	if playable_entry:
+		return "开发试玩版：战斗阵亡不可恢复；归航时每名原出发存活者消耗1粮。每缺1粮会失去1名队员，最多至全灭。\n新救援同伴本餐不参食，下一次按实际存活者计粮；死者的原武器保留库存。\n搜刮后须发动巴士并集合存活者，确认结算才入账。中途请使用安全暂存；未保存的中断可能无法继续。\n试玩进度独立，旧档不会自动转换。"
 	var rescue: String = "救援试运行：援救10秒，等获救者到达巴士后正常撤离，结算确认才加入。\n林知秋自带一把卡宾枪；本次两人吃2粮，下次三人吃3粮。\n" if rescue_mode else ""
 	if field_join_mode:
 		rescue = "同场救援：援救10秒后立即参战；存活者全员撤离后登记营地。\n林知秋自有唯一卡宾枪；当餐只计算原出发存活者，下次按实际存活者计粮。\n"
@@ -1638,7 +1665,7 @@ func _setup_progress() -> void:
 	_initialize_weapons("initial")
 	var loaded: Error = ERR_UNAVAILABLE
 	if transactional_mode:
-		progress_session = ProductionProgress.new(progress_path,battle_mode,survival_mode,hunger_trial,rescue_mode,growth_mode,field_join_mode,trait_mode,training_mode,pool_mode,roster_mode,quality_mode,enemy_mode)
+		progress_session = ProductionProgress.new(progress_path,battle_mode,survival_mode,hunger_trial,rescue_mode,growth_mode,field_join_mode,trait_mode,training_mode,pool_mode,roster_mode,quality_mode,enemy_mode,playable_entry)
 		progress_session.suspend_enabled = safe_suspend
 		var state: Dictionary = progress_session.inspect()
 		if state.error == OK and state.state == "SUSPENDED":
@@ -1684,6 +1711,8 @@ func _setup_progress() -> void:
 				_backup_migration_notice = backup.diagnostic
 		else:
 			_progress_message += " 备份也不可用。"
+	if playable_entry and not _progress_blocked:
+		_progress_message = "发现已保存的试玩，可继续同一旅程。" if _requires_continue else "开始试玩会创建独立进度，旧档保持原样。"
 	_continue_button = _progress_button("继续游戏 →", 456.0, continue_game)
 	_backup_button = _progress_button("使用有效备份（上次营地）", 456.0, use_backup)
 	_retry_button = _progress_button("重试保存当前营地", 540.0, save_camp)
@@ -1701,7 +1730,7 @@ func _setup_progress() -> void:
 	_new_game_confirmation.confirmed.connect(_new_game)
 	_screen.add_child(_new_game_confirmation)
 	_hunger_confirmation = ConfirmationDialog.new()
-	_hunger_confirmation.title = "明确选择隔离饥饿试运行"
+	_hunger_confirmation.title = "继续试玩前请确认" if playable_entry else "明确选择隔离饥饿试运行"
 	_hunger_confirmation.dialog_text = _hunger_policy_text() + "\n继续当前旅程，不创建新旅程；只提交已有冻结结果，不重新选人。"
 	_hunger_confirmation.ok_button_text = "同意暂行规则并继续"
 	_hunger_confirmation.cancel_button_text = "保留原件 / 取消"
@@ -1936,6 +1965,7 @@ func _refresh_presentation() -> void:
 	if _requires_continue and not _migration_notice.is_empty():
 		camp.text = "已保存：第 %d 天 · 货币 %d · 食物 %d\n旧版营地将在继续后读取，原件保留。" % [int(_pending_save.day),int(_pending_save.cash),int(_pending_save.food)]
 
+	if playable_entry: _refresh_playable_presentation()
 	_sync_camp_scene()
 
 
@@ -1961,6 +1991,7 @@ func _setup_camp_scene() -> void:
 		_camp_scene_problem = "营地场景未通过检查；原营地功能保留。"
 		return
 	camp_scene = candidate as CampSceneView
+	camp_scene.player_mode = playable_entry and not _developer_menu
 	_title.add_child(camp_scene)
 	camp_scene.input_allowed = _camp_input_allowed
 	camp_scene.action_requested.connect(_camp_action)
@@ -1989,7 +2020,7 @@ func _sync_camp_scene() -> void:
 		camp_scene.clear()
 		return
 	var data: Dictionary = camp_snapshot()
-	camp_scene.refresh(data, CampEconomy.rations(day, crew, food, camp_rules), not $Interface/Screen/Title/Start.disabled, "可以选择出击目标" if not $Interface/Screen/Title/Start.disabled else ("旧版队伍状态不支持出击；请查看幸存者" if not battle_mode else "当前旅程不能出击"))
+	camp_scene.refresh(data, CampEconomy.rations(day, crew, food, camp_rules), not $Interface/Screen/Title/Start.disabled, "可以选择出击目标" if not $Interface/Screen/Title/Start.disabled else ("旧版队伍状态不支持出击；请查看幸存者" if not battle_mode else "当前旅程不能出击"), _progress_message if playable_entry else "")
 	for child: Node in _title.get_children():
 		if child is CanvasItem and child != camp_scene:
 			child.hide()
@@ -2078,6 +2109,7 @@ func open_training() -> void:
 		return
 	if not is_instance_valid(training_panel):
 		training_panel = TrainingPanel.new()
+		training_panel.player_mode = playable_entry
 		_screen.add_child(training_panel)
 		training_panel.closed.connect(close_training)
 		training_panel.confirmed.connect(confirm_training)
@@ -2115,3 +2147,33 @@ func retry_training() -> void:
 		return
 	var accepted: bool = _accept_transaction(progress_session.retry(),true)
 	training_panel.refresh(camp_snapshot(),"原训练已保存确认；没有再次扣粮或增加进度。" if accepted else _progress_message,not accepted)
+
+
+func _refresh_playable_presentation() -> void:
+	$Interface/Screen/Brand.text = "BLUE HOUR · 开发试玩版"
+	$Interface/Screen/Title/Eyebrow.text = "开发试玩版 · 整备队伍，再次启程。" if _camp_open else "开发试玩版 · 独立进度 · 阵亡与缺粮损失会保存"
+	_home_button.text = "进入营地 →" if run_save.has_files() else "开始试玩 →"
+	_continue_button.text = "继续试玩 →" if not _pending_save.is_empty() else "继续出击 →"
+	if _pending_save.get("journey",{}).get("state")=="FAILED": _continue_button.text = "查看旅程记录 →"
+	$Interface/Screen/Title/Reset.text = "新的试玩旅程…"
+	$Interface/Screen/Title/Sound.text = "设置"
+	if _requires_continue and not _pending_save.is_empty():
+		$Interface/Screen/Title/Camp.text = "已保存：第%d天 · 货币%d · 食物%d\n继续同一旅程，或明确开始新的试玩。" % [_pending_save.day,_pending_save.cash,_pending_save.food]
+
+
+func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
+	# Presentation reads the already-frozen result; it never recalculates rewards/deaths.
+	var state: Dictionary = progress_session.inspect()
+	var frozen: Dictionary = state.get("receipt",{}).get("envelope",{}).get("result",{})
+	var meal: Dictionary = frozen.get("food",snapshot.last_day)
+	var battle: Dictionary = frozen.get("battle",{})
+	var text: String = "结算已保存。\n" if durable else "结果预览 · 确认后保存入账。\n"
+	if not meal.is_empty():
+		text += "带回：货币%d · 食物%d（入库%d） · 武器%d件\n口粮：%d名队员需%d粮，消耗%d，缺口%d\n" % [snapshot.last_day.cash_gained,meal.get("food_found",0),meal.get("food_stored",0),battle.get("weapons",[]).size(),meal.ration_member_ids.size(),meal.food_required,meal.food_consumed,meal.food_shortage]
+	for member: Dictionary in snapshot.crew:
+		var awarded: Dictionary = GrowthRules.member_row(frozen.get("xp",{}).get("members",[]),int(member.id))
+		var fate: String = _member_fate(snapshot,int(member.id)).replace(" / STARVATION", "").replace(" / BATTLE", "")
+		text += "\n%02d %s · %s · 生命%.0f/%.0f\nLv%d · %d XP（本次+%d）\n" % [member.id,member.call_sign,fate,member.health,GrowthRules.maximum(member),member.growth.level,member.growth.xp_total,awarded.get("xp_gained",0)]
+	text += "\n营地：第%d天 · 货币%d · 食物%d · 存活%d人\n" % [snapshot.day,snapshot.cash,snapshot.food,snapshot.journey.active_member_ids.size()]
+	text += "旅程已结束，不能再次出击。" if snapshot.journey.state=="FAILED" else "确认结算后可回营整备，再次出击。"
+	return text

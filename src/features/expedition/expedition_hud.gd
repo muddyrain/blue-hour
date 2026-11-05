@@ -9,6 +9,7 @@ signal help_changed(expanded: bool)
 const HudScene: PackedScene = preload("res://src/features/expedition_hud/expedition_hud.tscn")
 
 var ui_theme: Theme
+var player_mode: bool = false
 var view: C1ExpeditionHud
 var _root: Control
 var _time_bar: ProgressBar
@@ -52,6 +53,8 @@ func refresh(state: Dictionary) -> void:
 	var threat: Dictionary = state.get("threat", {})
 	var night: bool = threat.get("enabled",false) and int(threat.get("stage",0)) >= ThreatDirector.Stage.NIGHT
 	var display_seconds: int = floori(float(threat.get("overtime",0.0))) if night else seconds
+	var time_label: String = "夜间经过" if night else "出击时间"
+	if not player_mode and threat.get("enabled",false): time_label += " · 候选"
 	var action: String = "结束交火练习" if practice else "发动巴士"
 	if not enabled:
 		action = bus_text
@@ -64,7 +67,7 @@ func refresh(state: Dictionary) -> void:
 		"defeated_text":str(state["kills"]), "currency_text":str(state["cash"]),
 		"currency_delta_text":"+%d 携带 · 食物 %d（携带+%d）· 武器+%d" % [state["loot"],state["food"],state["food_loot"],int(state.get("weapon_loot",0))], "paused":state["paused"],
 		"survivors":state["members"],
-		"time":{"label":"夜间经过 · 候选" if night else ("出击时间 · 候选" if threat.get("enabled", false) else "出击时间"),
+		"time":{"label":time_label,
 			"text":("+" if night else "") + "%02d:%02d" % [display_seconds / 60, display_seconds % 60],
 			"hint":threat.get("hint", "") if threat.get("enabled", false) else ""},
 		"bus_status_text":"交火练习" if practice else ("巴士就绪" if enabled else bus_text),
@@ -90,6 +93,9 @@ func refresh(state: Dictionary) -> void:
 		help.text += "\n威胁随时间上升；归零仍可撤离，原作夜间参数待校准。"
 	if practice:
 		help.text += "\n练习：1/2 换枪；I/J/K/L 来袭；H 交错；U 远距靶"
+	if player_mode:
+		view._time_box.tooltip_text = "威胁随时间增加；暂停会冻结计时。巴士就绪后须发动并集合队员。"
+		help.text = help.text.replace("敌种候选：", "敌种：").replace("；归零仍可撤离，原作夜间参数待校准。", "；计时归零仍可撤离。")
 
 
 func hide_screen() -> void:

@@ -104,6 +104,8 @@ def main():
                     if args.native:
                         sample_foreground()
                         assert proc.pid not in foreground['pids'], 'background renderer became foreground'
+                    if re.search(r'(?m)^(SCRIPT ERROR|ERROR):', (out / (phase + '.txt')).read_text()):
+                        raise AssertionError('Engine reported a script/runtime error; see ' + phase + '.txt')
                     time.sleep(.2)
             if encoder:
                 assert encoder.wait(timeout=30) == 0

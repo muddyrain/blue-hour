@@ -78,7 +78,7 @@ func _resume() -> void:
 			await _tap(app._new_game_confirmation.get_ok_button())
 			var fresh:Dictionary=app.camp_snapshot()
 			_check(fresh.profile_id!=old.profile_id and fresh.journey.seed!=old.journey.seed and fresh.journey.campaign.preparations==0,"new journey creates fresh identity and zero preparations")
-			_check(DirAccess.get_files_at(app.progress_path.get_base_dir()).any(func(name:String)->bool:return name.begins_with(app.progress_path.get_file()+".previous-")),"original ended journey remains archived")
+			_check(Array(DirAccess.get_files_at(app.progress_path.get_base_dir())).any(func(name:String)->bool:return name.begins_with(app.progress_path.get_file()+".previous-")),"original ended journey remains archived")
 		return
 	var source: String="fight" if phase_name in ["victory","wipe"] else "first"
 	var expected: Dictionary=JSON.parse_string(FileAccess.get_file_as_string(output.get_base_dir().path_join(source+"/checkpoint.json")))

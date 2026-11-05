@@ -104,13 +104,15 @@ func show_behind_roof(friend_behind: bool) -> void:
 	_roof.modulate.a = 0.40 if friend_behind else 1.0
 
 
-func update_work(actor_id: int, fraction: float, inside: bool, call_sign: String = "") -> void:
+func update_work(actor_id: int, fraction: float, inside: bool, call_sign: String = "", work_text: String = "") -> void:
 	if _work != null:
 		_work.visible = searchable
 		_work.text = "已搜集" if searched else reward_hint + " · 左键"
 		if calibrated: _work.text=("主目标 · " if primary_target else "")+("已搜集" if searched else title+" · "+reward_hint)
 		if actor_id >= 0:
 			_work.text = "%s · %s · 再点取消" % [call_sign if not call_sign.is_empty() else "队员%d" % (actor_id + 1), "搜集中" if inside else "前往中"]
+		if not work_text.is_empty():
+			_work.text = work_text
 		_work.add_theme_color_override("font_color", Color("a8ebd4") if searched else Color("ffe0a4"))
 	if _bar != null:
 		_bar.visible = searchable and not searched and fraction > 0.0

@@ -2,7 +2,7 @@ class_name BuildAuthority
 extends RefCounted
 ## Pure support proposals; RunTransaction alone publishes their full recoverable world.
 static func factor(world: Dictionary, key: String) -> float:
-	return BuildItems.factors(world.generated.build.slots)[key] if (world.get("version")==10 or world.get("version")==11) else 1.0
+	return BuildItems.factors(world.generated.build.slots)[key] if (world.get("version")==10 or SortieSnapshot.combat_version(world.get("version"))) else 1.0
 
 static func healed(events: Array, id: int) -> float:
 	var amount: float=0.0
@@ -98,7 +98,7 @@ static func plan_airstrike(world: Dictionary, point: Vector2, supplied_layout: S
 	return {"member_id":callers[0].id,"point":[point.x,point.y],"radius":radius,"targets":targets}
 
 static func propose(before: Dictionary, request: Dictionary) -> Dictionary:
-	if (before.get("version")!=10 and before.get("version")!=11) or request.size()!=3 or not request.has_all(["id","kind","payload"]) or not request.kind is String or request.kind not in BasicSupport.KINDS or not request.payload is Dictionary: return {}
+	if (before.get("version")!=10 and not SortieSnapshot.combat_version(before.get("version"))) or request.size()!=3 or not request.has_all(["id","kind","payload"]) or not request.kind is String or request.kind not in BasicSupport.KINDS or not request.payload is Dictionary: return {}
 	var component: BasicSupport=BasicSupport.new()
 	component.restore(before.support)
 	if not TransactionReceipt.same(request,component.request(request.kind,request.payload)): return {}
@@ -137,7 +137,7 @@ static func propose(before: Dictionary, request: Dictionary) -> Dictionary:
 				SortieSnapshot._member(after.survivors,int(request.payload.member_id)).state.confirmed_kills+=1
 				after.sim.kills+=1
 				after.enemies.erase(row)
-				if after.get("version")==11: after.combat.toxic.casters.erase(str(id))
+				if SortieSnapshot.combat_version(after.get("version")): after.combat.toxic.casters.erase(str(id))
 				if id==0 and not after.generated.encounter.is_empty():
 					after.encounter.health=0.0
 					after.encounter.defeat=event.duplicate(true)
@@ -177,7 +177,7 @@ static func transition(previous: Dictionary, next: Dictionary) -> String:
 	var proof: Variant=next.envelope.get("support_proposal")
 	if not proof is Dictionary or proof.size()!=2 or not proof.get("before") is Dictionary or not proof.get("request") is Dictionary: return "SUPPORT_PROOF_REQUIRED"
 	var before: Dictionary=proof.before
-	if (before.get("version")!=10 and before.get("version")!=11): return "SUPPORT_PROOF_VERSION"
+	if (before.get("version")!=10 and not SortieSnapshot.combat_version(before.get("version"))): return "SUPPORT_PROOF_VERSION"
 	var checkpoint: Dictionary=previous.duplicate(true)
 	for row: Dictionary in before.survivors:
 		var old: Dictionary=SurvivorRoster.member(previous.health,int(row.state.member_id))

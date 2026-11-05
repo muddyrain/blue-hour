@@ -89,6 +89,20 @@ func run() -> void:
    w.apply_build(a)
    check(a.weapon_definition.damage==base*(1.0 if gun=="fire_axe_v1" else BuildItems.factors([item,""]).damage),"passive exact dispatch "+gun+item)
  check(WeaponMagazine.problem(saved,"controlled:shotgun_v1","shotgun_v1").is_empty(),"new shotgun magazine has strict original shape")
+ # R1 representative: actual actor death plus the same support capture cleanup.
+ # This controlled component does not claim an authenticated persistent journey.
+ weapon(a,"fire_axe_v1")
+ caster.position=a.position+Vector2(30,0)
+ w.combat.attack(w,a,0.0)
+ var sequence:int=w.combat.action(a).sequence
+ var xp_count:int=w.xp_inputs.events.size()
+ check(w.combat.action(a).remaining>0 and a.take_damage(a.health),"real actor damage interrupts an unfinished axe windup")
+ w.support_world()
+ check(w.combat.action(a).remaining==0 and w.combat.action(a).sequence==sequence and w.xp_inputs.events.size()==xp_count,"support capture cancels dead axe without replay or sequence change")
+ var camera:FieldCamera=FieldCamera.new();root.add_child(camera)
+ camera.zoom_at(Vector2(640,360),0.01)
+ check(camera.zoom.x>=0.7,"R1 minimum float32 zoom remains inside strict snapshot bound")
+ camera.free()
  for member:FieldActor in w.survivors:member.free()
  for enemy:FieldActor in w.enemies:enemy.free()
  w._effects.free();w.free()

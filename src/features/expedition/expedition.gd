@@ -51,7 +51,13 @@ var search_progress: float:
 		return _cash_site.progress
 	set(value):
 		_cash_site.progress = value
-var search_actor: FieldActor
+var search_assignments: SearchAssignments = SearchAssignments.new()
+var parallel_search: bool = false
+# Legacy readers see the first stable task; runtime ownership stays in the registry.
+var search_actor: FieldActor:
+	get:
+		var jobs: Array[Dictionary] = search_assignments.ordered()
+		return search_member(int(jobs[0].member_id)) if not jobs.is_empty() else null
 var goal: Vector2 = Vector2.ZERO
 var initial_cash: int = 53
 var initial_food: int = 2
@@ -131,10 +137,13 @@ var _bus_sprite: Sprite2D
 var bus_view: BusJourney
 var restoring_world: bool=false
 var encounter: EncounterRuntime
-var _active_site: SearchSite
+var _active_site: SearchSite:
+	get:
+		return member_site(search_actor.member_id) if search_actor != null else null
 
 
 func _ready() -> void:
+	parallel_search = combat_mode()
 	_setup_crew.assign(crew_snapshot.duplicate(true) if not crew_snapshot.is_empty() else SurvivorRoster.new_crew())
 	if crew_snapshot.is_empty() or is_practice:
 		for index: int in range(_setup_crew.size()):
@@ -290,8 +299,10 @@ func _physics_process(delta: float) -> void:
 
 
 func _draw() -> void:
-	if search_actor != null and search_actor.activity == FieldActor.Activity.MOVING:
-		draw_dashed_line(search_actor.position, _active_site.door, Color("e3c879"), 1.5, 8.0)
+	for job: Dictionary in search_assignments.ordered():
+		var actor: FieldActor = search_member(int(job.member_id))
+		if actor != null and actor.activity == FieldActor.Activity.MOVING:
+			draw_dashed_line(actor.position, search_site(StringName(job.site_id)).door, Color("e3c879"), 1.5, 8.0)
 	if phase == Phase.BOARDING:
 		draw_circle(layout.bus_door, tuning.boarding_radius, Color(0.9, 0.75, 0.3, 0.2))
 		draw_arc(layout.bus_door, tuning.boarding_radius, 0.0, TAU, 48, Color("e3c879"), 2.0)
@@ -299,7 +310,7 @@ func _draw() -> void:
 		draw_arc(goal, 13.0, 0.0, TAU, 24, Color("b3e8d9"), 2.0, true)
 		draw_line(goal - Vector2(6, 0), goal + Vector2(6, 0), Color("b3e8d9"), 2.0)
 		for actor: FieldActor in survivors:
-			if actor.activity == FieldActor.Activity.MOVING and actor != search_actor:
+			if actor.activity == FieldActor.Activity.MOVING and not has_search_job(actor.member_id):
 				draw_dashed_line(actor.position, goal, Color(0.8, 0.95, 0.91, 0.4), 1.0, 8.0)
 
 
@@ -421,6 +432,9 @@ func step(delta: float) -> void:
 			_update_ui()
 			return
 	_update_search(delta)
+	if is_paused:
+		_update_ui()
+		return
 	# Neither entry into nor completion of work consumes a whole reload delta.
 	for actor: FieldActor in survivors:
 		if actor.magazine!=null and not working_before.get(actor.member_id,false) and actor.activity not in [FieldActor.Activity.DOWN,FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING]:actor.magazine.advance(delta)
@@ -538,7 +552,7 @@ func command_move(point: Vector2) -> void:
 	goal = point
 	for index: int in range(survivors.size()):
 		var actor: FieldActor = survivors[index]
-		if actor == search_actor or actor.activity == FieldActor.Activity.DOWN:
+		if has_search_job(actor.member_id) or actor.activity == FieldActor.Activity.DOWN:
 			continue
 		_move_to_group_goal(actor)
 	queue_redraw()
@@ -546,34 +560,79 @@ func command_move(point: Vector2) -> void:
 
 
 func request_search(kind: StringName = &"cash") -> void:
-	if bus_view != null and bus_view.running(): return
-	if not field_join_error.is_empty():
+	if (bus_view != null and bus_view.running()) or not field_join_error.is_empty():
 		return
-	if rescue_target != null: rescue_target.cancel()
 	var site: SearchSite = search_site(kind)
 	if phase == Phase.FINISHED or site == null or site.searched or not supply.supports(site.kind):
 		return
-	if search_actor != null:
-		var cancelling_same: bool = site == _active_site
+	var previous: int = search_assignments.member_for(String(site.id))
+	if previous > 0:
+		_release_searcher(previous)
+		_show_notice(SearchWorkView.notice("cancelled",site_label(site)))
+		_search_log("cancelled",site)
+		_update_ui()
+		return
+	if not parallel_search:
+		if rescue_target != null:
+			rescue_target.cancel()
 		_release_searcher()
-		if cancelling_same:
-			_show_notice("搜集已取消 · 队员返回当前队伍目标。")
-			print("BH_SEARCH cancelled kind=%s progress=%.2f" % [kind, site.progress])
-			return
-	var closest: float = INF
+	var candidates: Array[Dictionary] = []
+	var paths: Dictionary = {}
+	var free_count: int = 0
 	for actor: FieldActor in survivors:
-		if actor.activity == FieldActor.Activity.DOWN:
+		if actor.health <= 0 or not actor.visible or has_search_job(actor.member_id) or actor.activity not in [FieldActor.Activity.IDLE,FieldActor.Activity.MOVING]:
 			continue
-		var distance: float = actor.position.distance_squared_to(site.door)
-		if distance < closest:
-			closest = distance
-			search_actor = actor
-	if search_actor != null:
-		_active_site = site
-		search_actor.command_path(navigation.path_between(search_actor.position, site.door))
-		_show_notice("队员 %d 前往搜集，其余队员留守。" % search_actor.member_id)
-		queue_redraw()
-		print("BH_SEARCH assigned=%d kind=%s" % [search_actor.actor_id,kind])
+		if rescue_target != null and rescue_target.status == "IN_PROGRESS" and rescue_target.worker == actor.member_id:
+			continue
+		free_count += 1
+		var path: PackedVector2Array = navigation.path_between(actor.position,site.door)
+		var reachable: bool = not path.is_empty() and path[-1].distance_to(site.door) <= 14.0
+		if actor.position.distance_to(site.door) <= 14.0:
+			path = PackedVector2Array([actor.position])
+			reachable = true
+		paths[actor.member_id] = path
+		candidates.append({"member_id":actor.member_id,"distance":actor.position.distance_to(site.door),"reachable":reachable,"available":true})
+	var chosen: int = SearchAssignments.pick(candidates)
+	if chosen == 0:
+		_show_notice(SearchWorkView.notice("no_idle" if free_count == 0 else "unreachable",site_label(site)))
+		return
+	if not search_assignments.assign(chosen,String(site.id)):
+		return
+	var actor: FieldActor = search_member(chosen)
+	actor.command_path(paths[chosen])
+	_show_notice(SearchWorkView.notice("assigned",site_label(site),actor.call_sign))
+	_search_log("assigned",site)
+	_update_ui()
+	queue_redraw()
+
+
+func has_search_job(member_id: int) -> bool:
+	return not search_assignments.site_for(member_id).is_empty()
+
+
+func search_member(member_id: int) -> FieldActor:
+	for actor: FieldActor in survivors:
+		if actor.member_id == member_id:
+			return actor
+	return null
+
+
+func member_site(member_id: int) -> SearchSite:
+	var id: String = search_assignments.site_for(member_id)
+	return search_site(StringName(id)) if not id.is_empty() else null
+
+
+func site_label(site: SearchSite) -> String:
+	return SearchWorkView.short_site(site.prop.title,sites.find(site)+1)
+
+
+func _search_log(stage: String, site: SearchSite) -> void:
+	var rows: Array[Dictionary] = []
+	for job: Dictionary in search_assignments.ordered():
+		var entry: Dictionary = job.duplicate()
+		entry.progress = search_site(StringName(job.site_id)).progress
+		rows.append(entry)
+	print("BH_SEARCH "+JSON.stringify({"stage":stage,"site_id":String(site.id),"jobs":rows,"elapsed":elapsed,"loot":loot,"food":food_loot}))
 
 
 func search_site(kind: StringName) -> SearchSite:
@@ -620,7 +679,7 @@ func boarding_status() -> Dictionary:
 		if actor.activity == FieldActor.Activity.DOWN:
 			continue
 		required += 1
-		if actor == search_actor:
+		if has_search_job(actor.member_id):
 			working += 1
 		elif actor.position.distance_to(layout.bus_door) <= tuning.boarding_radius:
 			arrived += 1
@@ -638,7 +697,7 @@ func request_bus_gather() -> void:
 	for actor: FieldActor in survivors:
 		if actor.activity == FieldActor.Activity.DOWN:
 			continue
-		var start: Vector2 = _active_site.door if actor == search_actor else actor.position
+		var start: Vector2 = member_site(actor.member_id).door if has_search_job(actor.member_id) else actor.position
 		var path: PackedVector2Array = navigation.path_between(start, layout.bus_door + _group_offset(actor))
 		if path.is_empty() or path[-1].distance_to(layout.bus_door) > tuning.boarding_radius:
 			_show_notice("无法到达巴士集合区 · 请检查当前路线。")
@@ -741,13 +800,17 @@ func _arrival(index: int) -> Vector2:
 	return anchor
 
 
-func _release_searcher() -> void:
-	var released: FieldActor = search_actor
-	search_actor = null
-	_active_site = null
-	released.clear_order()
-	if goal != Vector2.ZERO:
-		_move_to_group_goal(released)
+func _release_searcher(member_id: int = 0) -> void:
+	if member_id == 0:
+		if search_actor == null:
+			return
+		member_id = search_actor.member_id
+	search_assignments.release_member(member_id)
+	var released: FieldActor = search_member(member_id)
+	if released != null:
+		released.clear_order()
+		if released.health > 0 and goal != Vector2.ZERO:
+			_move_to_group_goal(released)
 	queue_redraw()
 
 
@@ -1106,56 +1169,82 @@ func work_state_matches(actor: FieldActor, site: SearchSite) -> bool:
 
 
 func _clear_dead_worker() -> void:
-	if search_actor != null and search_actor.activity == FieldActor.Activity.DOWN:
-		# Existing death policy: unfinished progress resets; the once-only event survives.
-		_active_site.progress = 0.0
-		_release_searcher()
+	for job: Dictionary in search_assignments.ordered():
+		var actor: FieldActor = search_member(int(job.member_id))
+		if actor != null and (actor.health <= 0 or actor.activity == FieldActor.Activity.DOWN):
+			var site: SearchSite = search_site(StringName(job.site_id))
+			site.progress = 0.0
+			_release_searcher(actor.member_id)
+			_search_log("worker_dead",site)
 
 
 func _update_search(delta: float) -> void:
 	_clear_dead_worker()
-	if search_actor == null:
-		return
-	var outdoor: bool = TaskActions.outdoor_site(supply.generated,_active_site.id)
-	if search_actor.activity not in [FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING]:
-		if search_actor.position.distance_to(_active_site.door) > 14.0:
+	for job: Dictionary in search_assignments.ordered():
+		if is_paused:
 			return
-		search_actor.activity = FieldActor.Activity.RECOVERING if outdoor else FieldActor.Activity.SEARCHING
-		search_actor.visible = outdoor
-		if outdoor: _trigger_airdrop()
-		print("BH_SEARCH entered")
-	if not work_state_matches(search_actor,_active_site):
-		# Contact displacement interrupts outdoor work; cancellation retains earned progress.
-		_release_searcher()
-		return
-	_active_site.progress += delta / (search_actor.trait_search_factor * (BuildItems.factors(supply.generated.build.slots).work if build_mode() else 1.0))
-	if _active_site.progress >= _site_seconds(_active_site):
-		var site: SearchSite = _active_site
-		if trait_mode and not trait_inputs.events.any(func(e: Dictionary) -> bool: return e.site==String(site.kind)) and not trait_inputs.accept_search(self,search_actor,site.kind):
-			_show_notice("特性搜集来源未确认，已暂停；不会重复发放收益。")
-			toggle_pause()
-			return
-		site.searched = true
-		var reward: int = site.reward if not layout.world_data.is_empty() else supply.reward(site.kind)
-		if site.kind == &"cash":
-			loot += reward
-			if not is_practice and (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
-				weapon_loot.append(_site_weapon(site))
-		else:
-			food_loot += reward
-		_release_searcher()
-		site.prop.searched = true
-		site.prop.queue_redraw()
-		_show_notice("搜集完成 · 携带%s +%d（撤离后带回）" % ["货币" if site.kind == &"cash" else "食物",reward])
-		if site.kind == &"cash" and not is_practice and (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
-			_show_notice("获得损坏%s · 回营后入库维修"%WeaponInventory.definition(weapon_loot.back().weapon_id).display_name)
-			print("BH_WEAPON_FOUND %s" % JSON.stringify(weapon_loot.back()))
-		if build_mode() and site.id==&"cash" and not supply.generated.build.drops.is_empty():
-			var names: PackedStringArray=[]
-			for item: String in supply.generated.build.drops: names.append(BuildItems.definitions()[item].name)
-			_show_notice("携带道具："+"、".join(names)+" · 归航确认后入库")
-		print("BH_SEARCH completed kind=%s reward=%d cash=%d food=%d" % [site.kind,reward,loot,food_loot])
-		search_completed.emit(reward)
+		var actor: FieldActor = search_member(int(job.member_id))
+		var site: SearchSite = search_site(StringName(job.site_id))
+		var outdoor: bool = TaskActions.outdoor_site(supply.generated,site.id)
+		if job.phase == "approach":
+			if actor.position.distance_to(site.door) > 14.0:
+				if actor._path_index >= actor.path.size():
+					var route: PackedVector2Array = navigation.path_between(actor.position,site.door)
+					if route.is_empty() or route[-1].distance_to(site.door)>14.0:
+						_release_searcher(actor.member_id)
+						_show_notice(SearchWorkView.notice("unreachable",site_label(site)))
+					else:
+						actor.command_path(route)
+				continue
+			actor.clear_order()
+			actor.activity = FieldActor.Activity.RECOVERING if outdoor else FieldActor.Activity.SEARCHING
+			actor.visible = outdoor
+			search_assignments.begin(actor.member_id)
+			if combat_mode():
+				combat.cancel_unavailable(self)
+			if outdoor:
+				_trigger_airdrop()
+			_search_log("entered",site)
+		if not work_state_matches(actor,site):
+			_release_searcher(actor.member_id)
+			_search_log("interrupted",site)
+			continue
+		var prior_progress: float = site.progress
+		site.progress += delta / (actor.trait_search_factor * (BuildItems.factors(supply.generated.build.slots).work if build_mode() else 1.0))
+		if site.progress >= _site_seconds(site):
+			if not _complete_search(actor,site):
+				site.progress = prior_progress
+				return
+
+
+func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
+	if trait_mode and not trait_inputs.events.any(func(e: Dictionary) -> bool: return e.site == String(site.kind)) and not trait_inputs.accept_search(self,actor,site.kind,site.id):
+		_show_notice("特性搜集来源未确认，已暂停；不会重复发放收益。")
+		toggle_pause()
+		return false
+	site.searched = true
+	var reward: int = site.reward if not layout.world_data.is_empty() else supply.reward(site.kind)
+	if site.kind == &"cash":
+		loot += reward
+		if not is_practice and (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
+			weapon_loot.append(_site_weapon(site))
+	else:
+		food_loot += reward
+	_release_searcher(actor.member_id)
+	site.prop.searched = true
+	site.prop.queue_redraw()
+	_show_notice("搜集完成 · 携带%s +%d（撤离后带回）" % ["货币" if site.kind == &"cash" else "食物",reward])
+	if site.kind == &"cash" and not is_practice and (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
+		_show_notice("获得损坏%s · 回营后入库维修"%WeaponInventory.definition(weapon_loot.back().weapon_id).display_name)
+		print("BH_WEAPON_FOUND %s" % JSON.stringify(weapon_loot.back()))
+	if build_mode() and site.id==&"cash" and not supply.generated.build.drops.is_empty():
+		var names: PackedStringArray=[]
+		for item: String in supply.generated.build.drops: names.append(BuildItems.definitions()[item].name)
+		_show_notice("携带道具："+"、".join(names)+" · 归航确认后入库")
+	print("BH_SEARCH completed kind=%s reward=%d cash=%d food=%d" % [site.kind,reward,loot,food_loot])
+	search_completed.emit(reward)
+	_search_log("completed",site)
+	return true
 
 
 func _finish(evacuated: bool) -> void:
@@ -1306,8 +1395,12 @@ func _update_ui() -> void:
 	var members: Array[Dictionary] = []
 	var activities: Array[String] = ["警戒", "移动", "搜集中", "倒地", "回收中"]
 	for actor: FieldActor in survivors:
-		members.append({"id":actor.member_id,"label":"%s · %s" % [actor.call_sign, "阵亡" if actor.permanent_death else activities[actor.activity]],
-			"call_sign":actor.call_sign,"status":_weapon_status(actor,activities[actor.activity]),"ammo":_ammo_text(actor),
+		var assigned_site: SearchSite = member_site(actor.member_id)
+		var status: String = activities[actor.activity]
+		if assigned_site != null:
+			status = SearchWorkView.actor_status(search_assignments.phase_for(actor.member_id),site_label(assigned_site),TaskActions.outdoor_site(supply.generated,assigned_site.id))
+		members.append({"id":actor.member_id,"label":"%s · %s" % [actor.call_sign, "阵亡" if actor.permanent_death else status],
+			"call_sign":actor.call_sign,"status":_weapon_status(actor,status),"ammo":_ammo_text(actor),
 			"colour":SurvivorRoster.definition_by_id(String(actor.definition_id)).colour,
 			"hp":actor.health,"max_hp":actor.max_health})
 	if growth_mode:
@@ -1342,10 +1435,11 @@ func _update_ui() -> void:
 		drill_panel.refresh()
 	for site: SearchSite in sites:
 		site.prop.searched = site.searched
-		site.prop.update_work(search_actor.actor_id if search_actor != null and _active_site == site else -1,
-			site.progress / _site_seconds(site),
-			search_actor != null and _active_site == site and work_state_matches(search_actor,site),
-			search_actor.call_sign if search_actor != null and _active_site == site else "")
+		var worker: FieldActor = search_member(search_assignments.member_for(String(site.id)))
+		var text: String = SearchWorkView.building_text(worker.member_id,worker.call_sign,search_assignments.phase_for(worker.member_id),TaskActions.outdoor_site(supply.generated,site.id)) if worker != null else ""
+		site.prop.update_work(worker.actor_id if worker != null else -1,
+			site.progress / _site_seconds(site),worker != null and work_state_matches(worker,site),
+			worker.call_sign if worker != null else "",text)
 
 
 func _update_member_display() -> void:
@@ -1498,11 +1592,15 @@ func _site_weapon(site: SearchSite) -> Dictionary:
 func _ammo_text(actor: FieldActor) -> String:
 	if CombatEquipment.melee(String(actor.weapon_definition.id)): return "消防斧 · 近战"
 	if actor.magazine==null:return "%s · 旧规则"%actor.weapon_definition.display_name if actor.weapon_definition!=null else ""
+	# Keep the task destination readable; reload feedback uses the ammunition line.
+	if has_search_job(actor.member_id) and actor.magazine.reloading:
+		return "换弹暂停" if actor.activity in [FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING] else "换弹 %.1fs"%actor.magazine.remaining
 	return "%s %d/%d · ∞"%[actor.weapon_definition.display_name,actor.magazine.rounds,actor.magazine.capacity()]
 
 
 func _weapon_status(actor: FieldActor, action: String) -> String:
 	if actor.activity==FieldActor.Activity.DOWN:return "阵亡" if actor.permanent_death else "倒地"
+	if has_search_job(actor.member_id): return action
 	if actor.magazine!=null and actor.magazine.reloading:
 		return "%s · 换弹暂停"%action if actor.activity in [FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING] else "%s · 换弹%.1fs"%[action,actor.magazine.remaining]
 	return action
@@ -1526,6 +1624,7 @@ func support_available() -> bool:
 func support_world() -> Dictionary:
 	var paused: bool=is_paused
 	is_paused=true
+	_clear_dead_worker()
 	# Toxic/boss damage happens after the combat phase's ordinary cancellation.
 	if combat_mode(): combat.cancel_unavailable(self)
 	_reap_defeated_enemies()

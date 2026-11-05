@@ -228,6 +228,7 @@ func _ready() -> void:
 			actor.weapon_instance_id = item.instance_id
 			actor.weapon_definition = WeaponModifiers.combat_definition(item)
 		actor.visual.set_weapon(actor.weapon_definition.presentation)
+		if supply.generated.get("version")==5:actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
 		survivors.append(actor)
 	_make_ui()
 	var readout_layer: CanvasLayer = CanvasLayer.new()
@@ -363,6 +364,8 @@ func step(delta: float) -> void:
 	if _ai_clock <= 0.0:
 		_update_enemy_paths()
 		_ai_clock = 0.7
+	var working_before: Dictionary={}
+	for actor: FieldActor in survivors:working_before[actor.member_id]=actor.activity in [FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING]
 	var occupants: Array[FieldActor] = survivors + enemies
 	var previous: Dictionary = {}
 	for actor: FieldActor in occupants: previous[actor] = actor.position
@@ -390,6 +393,9 @@ func step(delta: float) -> void:
 			_update_ui()
 			return
 	_update_search(delta)
+	# Neither entry into nor completion of work consumes a whole reload delta.
+	for actor: FieldActor in survivors:
+		if actor.magazine!=null and not working_before.get(actor.member_id,false) and actor.activity not in [FieldActor.Activity.DOWN,FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING]:actor.magazine.advance(delta)
 	_update_enemy_behaviors(0.0)
 	_update_combat()
 	if is_paused:
@@ -443,6 +449,7 @@ func promote_target(event: Dictionary, restoring: bool = false) -> void:
 	actor.weapon_instance_id = gun.instance_id
 	actor.weapon_definition = WeaponModifiers.combat_definition(gun)
 	actor.visual.set_weapon(actor.weapon_definition.presentation)
+	if supply.generated.get("version")==5:actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
 	actor.clear_order()
 	if trait_mode:
 		TraitRules.apply(actor,profile,tuning.survivor_speed)
@@ -904,6 +911,7 @@ func _update_combat() -> void:
 	for actor: FieldActor in survivors:
 		if actor.activity in [FieldActor.Activity.DOWN, FieldActor.Activity.SEARCHING, FieldActor.Activity.RECOVERING]:
 			continue
+		if actor.magazine!=null and not actor.magazine.can_fire():continue
 		var weapon: WeaponDefinition = actor.weapon_definition
 		var target: FieldActor = _attack_target(actor)
 		if target != null:
@@ -915,26 +923,13 @@ func _update_combat() -> void:
 					_show_notice("成长账本达到安全容量，已暂停；不能丢弃事件或虚报保存成功。")
 					toggle_pause()
 					return
+				if target.health<=weapon.damage and growth_mode and not is_practice and (not growth_inputs.can_record(actor,target,elapsed) or not xp_inputs.can_record(self,actor,target)):
+					_show_notice("成长来源不可提交，已暂停；生命、弹量与开火均未应用。")
+					toggle_pause();return
+				var recorded: Dictionary={}
 				var cooldown_before: float = actor.cooldown
-				actor.cooldown = weapon.shot_interval(actor.trait_shot_factor)
 				var health_before: float = target.health
-				target.take_damage(weapon.damage, (target.position - actor.position).normalized())
-				actor.visual.show_fire(actor.aim)
-				var muzzle: Vector2 = actor.position + actor.visual.muzzle_offset(actor.aim)
-				_shot_effect(muzzle, target.position, weapon.damage)
-				combat_feedback.emit({"kind": "shot", "actor": actor.actor_id,
-					"target": target.actor_id, "target_health": target.health,
-					"damage": weapon.damage, "from": actor.position, "to": target.position,
-					"instance_id":actor.weapon_instance_id, "weapon_id":String(weapon.id), "interval":actor.cooldown,
-					"applied_damage": health_before - target.health,
-					"member_id":actor.member_id,"shot_from":muzzle,"hit_to":decision.hit_to,
-					"foot_distance":decision.distance,"shot_range":weapon.shot_range,
-					"blocker_id":String(decision.blocker_id),"attack_reason":String(decision.reason),
-					"predicted_muzzle_error":muzzle.distance_to(decision.shot_from),
-					"cooldown_before":cooldown_before,"cooldown_after":actor.cooldown,
-					"moving": actor.activity == FieldActor.Activity.MOVING, "elapsed": elapsed,
-					"weapon": String(actor.visual.weapon_view.id), "row": actor.visual.direction_row,
-					"facing": actor.visual.presentation_state()["facing"]})
+				if not target.take_damage(weapon.damage, (target.position - actor.position).normalized()):continue
 				if target.activity == FieldActor.Activity.DOWN:
 					kills += 1
 					actor.confirmed_kills += 1
@@ -944,7 +939,27 @@ func _update_combat() -> void:
 							if growth_mode and not xp_inputs.accept(self,actor,target,receipt):
 								_show_notice("成长来源校验失败，已暂停；本次不会伪造经验。")
 								toggle_pause()
-							growth_input_recorded.emit(receipt)
+								return
+							recorded=receipt
+				actor.cooldown = weapon.shot_interval(actor.trait_shot_factor)
+				if actor.magazine!=null:actor.magazine.commit_shot()
+				if not recorded.is_empty():growth_input_recorded.emit(recorded)
+				actor.visual.show_fire(actor.aim)
+				var muzzle: Vector2 = actor.position + actor.visual.muzzle_offset(actor.aim)
+				_shot_effect(muzzle, target.position, weapon.damage)
+				combat_feedback.emit({"kind": "shot", "actor": actor.actor_id,
+					"target": target.actor_id, "target_health": target.health,
+					"damage": weapon.damage, "from": actor.position, "to": target.position,
+					"instance_id":actor.weapon_instance_id, "weapon_id":String(weapon.id), "interval":actor.cooldown,
+					"applied_damage": health_before - target.health,
+					"magazine":actor.magazine.snapshot() if actor.magazine!=null else {},"member_id":actor.member_id,"shot_from":muzzle,"hit_to":decision.hit_to,
+					"foot_distance":decision.distance,"shot_range":weapon.shot_range,
+					"blocker_id":String(decision.blocker_id),"attack_reason":String(decision.reason),
+					"predicted_muzzle_error":muzzle.distance_to(decision.shot_from),
+					"cooldown_before":cooldown_before,"cooldown_after":actor.cooldown,
+					"moving": actor.activity == FieldActor.Activity.MOVING, "elapsed": elapsed,
+					"weapon": String(actor.visual.weapon_view.id), "row": actor.visual.direction_row,
+					"facing": actor.visual.presentation_state()["facing"]})
 		else:
 			actor.aim = Vector2.ZERO
 	for enemy: FieldActor in enemies:
@@ -1079,7 +1094,7 @@ func _update_search(delta: float) -> void:
 		if site.kind == &"cash":
 			loot += reward
 			if not is_practice and (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
-				weapon_loot.append(WeaponInventory.reward(sortie_id,WeaponState.is_family(field_departure)))
+				weapon_loot.append(_site_weapon(site))
 		else:
 			food_loot += reward
 		_release_searcher()
@@ -1087,7 +1102,7 @@ func _update_search(delta: float) -> void:
 		site.prop.queue_redraw()
 		_show_notice("搜集完成 · 携带%s +%d（撤离后带回）" % ["货币" if site.kind == &"cash" else "食物",reward])
 		if site.kind == &"cash" and not is_practice and (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
-			_show_notice("获得损坏长管步枪 · 回营后入库维修")
+			_show_notice("获得损坏%s · 回营后入库维修"%WeaponInventory.definition(weapon_loot.back().weapon_id).display_name)
 			print("BH_WEAPON_FOUND %s" % JSON.stringify(weapon_loot.back()))
 		print("BH_SEARCH completed kind=%s reward=%d cash=%d food=%d" % [site.kind,reward,loot,food_loot])
 		search_completed.emit(reward)
@@ -1127,7 +1142,7 @@ func _finish(evacuated: bool) -> void:
 		"sites_searched":_searched_count(),
 		"kills": kills, "searched": _kind_searched(&"cash"), "health": remaining_health, "elapsed": elapsed}
 	if not layout.world_data.is_empty(): report.site_facts = WorldSites.facts(self)
-	if supply.generated.get("version")==4: report.task_event=task_event.duplicate(true)
+	if supply.generated.get("version")==4 or supply.generated.get("version")==5: report.task_event=task_event.duplicate(true)
 	if not is_practice and not loadout_snapshot.is_empty():
 		report.growth_inputs = growth_inputs.snapshot(sortie_id,layout.id,elapsed)
 	if rescue_mode:
@@ -1231,7 +1246,7 @@ func _update_ui() -> void:
 	var activities: Array[String] = ["警戒", "移动", "搜集中", "倒地", "回收中"]
 	for actor: FieldActor in survivors:
 		members.append({"id":actor.member_id,"label":"%s · %s" % [actor.call_sign, "阵亡" if actor.permanent_death else activities[actor.activity]],
-			"call_sign":actor.call_sign,"status":"阵亡" if actor.permanent_death else activities[actor.activity],
+			"call_sign":actor.call_sign,"status":_weapon_status(actor,activities[actor.activity]),"ammo":_ammo_text(actor),
 			"colour":SurvivorRoster.definition_by_id(String(actor.definition_id)).colour,
 			"hp":actor.health,"max_hp":actor.max_health})
 	if growth_mode:
@@ -1242,6 +1257,7 @@ func _update_ui() -> void:
 		for actor: FieldActor in survivors:
 			pending.append("%02d +%d" % [actor.member_id,0 if battle_drill or actor.health <= 0 else xp_inputs.pending(actor.member_id)])
 	var xp_text: String = "本次经验（归航后生效）："+" / ".join(pending) if growth_mode else ""
+	if not weapon_loot.is_empty():xp_text+="\n携带："+WeaponInventory.loot_description(weapon_loot[0])
 	_hud.refresh({
 		"objective":TaskActions.hud(self),
 		"mission_title":("交火练习" if is_practice else mission_title) if los_setup == null else mission_title, "members":members,
@@ -1396,7 +1412,7 @@ func _make_world_buildings() -> void:
 
 
 func _site_seconds(site: SearchSite) -> float:
-	return site.seconds if supply.generated.get("version")==4 else tuning.search_seconds
+	return site.seconds if supply.generated.get("version")==4 or supply.generated.get("version")==5 else tuning.search_seconds
 
 
 func _trigger_airdrop() -> void:
@@ -1409,3 +1425,21 @@ func _trigger_airdrop() -> void:
 		else: task_event.resolutions.append(_spawn_enemy(EnemyRules.NORMAL,search_site(&"cash").door))
 	print("BH_TASK_EVENT "+JSON.stringify(task_event))
 	_show_notice("空投信标已启动 · 留意来袭；回收后可直接集合归航。")
+
+
+func _site_weapon(site: SearchSite) -> Dictionary:
+	for definition: Dictionary in supply.generated.get("sites",[]):
+		if definition.id==String(site.id):return WeaponInventory.site_reward(sortie_id,supply.generated,definition,WeaponState.is_family(field_departure))
+	return WeaponInventory.reward(sortie_id,WeaponState.is_family(field_departure))
+
+
+func _ammo_text(actor: FieldActor) -> String:
+	if actor.magazine==null:return "%s · 旧规则"%actor.weapon_definition.display_name if actor.weapon_definition!=null else ""
+	return "%s %d/%d · ∞"%[actor.weapon_definition.display_name,actor.magazine.rounds,actor.magazine.capacity()]
+
+
+func _weapon_status(actor: FieldActor, action: String) -> String:
+	if actor.activity==FieldActor.Activity.DOWN:return "阵亡" if actor.permanent_death else "倒地"
+	if actor.magazine!=null and actor.magazine.reloading:
+		return "%s · 换弹暂停"%action if actor.activity in [FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING] else "%s · 换弹%.1fs"%[action,actor.magazine.remaining]
+	return action

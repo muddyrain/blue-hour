@@ -21,6 +21,10 @@ func register_member(member_id: int) -> void:
 		_recent[member_id] = []
 
 
+func can_record(shooter: FieldActor, enemy: FieldActor, at: float) -> bool:
+	return not shooter.is_enemy and enemy.is_enemy and _counts.has(shooter.member_id) and shooter.health>0 and not enemy.has_meta(RECEIPT_META) and not shooter.weapon_instance_id.is_empty() and shooter.weapon_definition!=null and is_finite(at) and at>=0
+
+
 func accept_defeat(shooter: FieldActor, enemy: FieldActor, at: float) -> Dictionary:
 	if not is_instance_valid(shooter) or not is_instance_valid(enemy):
 		return {}

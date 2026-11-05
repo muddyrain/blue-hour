@@ -22,7 +22,7 @@ static func reward(item: Dictionary) -> Dictionary:
 
 
 static func problem(item: Dictionary) -> String:
-	if item.size()!=8 or not item.has_all(KEYS) or not SurvivalContracts.integer(item.weapon_level,1,2) or not item.quality is String or item.quality not in ["common","rare"] or not item.affixes is Array:
+	if item.size()!=(9 if item.has("drop") else 8) or not item.has_all(KEYS) or not SurvivalContracts.integer(item.weapon_level,1,2) or not item.quality is String or item.quality not in ["common","rare"] or not item.affixes is Array:
 		return "WEAPON_MODIFIER_FIELDS"
 	for key: String in ["instance_id","weapon_id","condition","origin","acquired_sortie"]:
 		if not item.get(key) is String:

@@ -178,6 +178,7 @@ func _build_top() -> void:
 func _build_member(parent: Control, index: int) -> void:
 	var box: VBoxContainer = _column(parent)
 	box.name = "Member%d" % (index + 1)
+	box.add_theme_constant_override("separation",2)
 	box.custom_minimum_size.x = 160
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var title: Label = _label(box, "Identity", 18)
@@ -200,7 +201,9 @@ func _build_member(parent: Control, index: int) -> void:
 	box.add_child(bar)
 	var status: Label = _label(box,"Activity",16)
 	status.autowrap_mode = TextServer.AUTOWRAP_OFF
-	_members.append({"box":box,"title": title, "health": health, "bar": bar,"status":status})
+	var ammo: Label = _label(box,"Ammo",14)
+	ammo.autowrap_mode=TextServer.AUTOWRAP_OFF
+	_members.append({"ammo":ammo,"box":box,"title": title, "health": health, "bar": bar,"status":status})
 
 
 func _build_actions() -> void:
@@ -262,6 +265,8 @@ func _refresh_member(index: int, state: Dictionary) -> void:
 	var call_sign: String = _text(state,"call_sign",full_name)
 	title.text = "%02d  %s" % [member_id,call_sign.left(5)+"…" if call_sign.length()>6 else call_sign]
 	_members[index].status.text = _text(state,"status")
+	_members[index].ammo.text = _text(state,"ammo")
+	_members[index].ammo.visible=not _members[index].ammo.text.is_empty()
 	var colour: Color = state.get("colour", IDENTITY_COLORS[index % 2])
 	title.add_theme_color_override("font_color", colour)
 	(bar.get_theme_stylebox("fill") as StyleBoxFlat).bg_color = colour

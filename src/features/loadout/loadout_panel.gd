@@ -184,6 +184,7 @@ func _select(index: int) -> void:
 		("救援同伴当场加入时自带" if item.origin == "rescue-first-contact" else ("街区补给点搜集" if item.origin == "north-cache" else "初始装备")),weapon.repair_cost]
 	if WeaponState.is_family(_data):
 		_detail.text = "%s · PROJECT_TEMP\n%s\n%s · %s\n\n枪型基础：%.0f伤 · %.3f秒 · %.0f距" % [weapon.display_name,WeaponModifiers.description(item),"损坏 · 须维修" if item.condition=="damaged" else "状态良好",ownership,weapon.damage,weapon.interval,weapon.shot_range]
+		_detail.text += "\n弹匣 %d发 · 自动换弹 %.1f秒 · 备弹∞"%[weapon.magazine_capacity(),weapon.reload_seconds()]
 		var stats: Dictionary = WeaponModifiers.effective(item,TraitRules.factor(SurvivorRoster.member(_data.crew,owner_id),"shot") if owner_id>0 else 1.0)
 		_detail.text += "\n实例等级伤害：×%.2f\n%s：%.2f伤 · %.3f秒 · %.2f距\n维修10币，只改状态，不重抽词条。" % [1.10 if item.weapon_level==2 else 1.0,"本人有效" if owner_id>0 else "未配装实例",stats.damage,stats.interval,stats.range]
 		_detail.text += "\n\n与实际成员当前武器比较（同一本人Trait）："

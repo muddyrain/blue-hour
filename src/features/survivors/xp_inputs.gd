@@ -19,6 +19,10 @@ func has_capacity() -> bool:
 	return events.size() < GrowthRules.MAX_EVENTS
 
 
+func can_record(world: Expedition, shooter: FieldActor, enemy: FieldActor) -> bool:
+	return world.growth_mode and not world.is_paused and world.phase!=Expedition.Phase.FINISHED and world.survivors.has(shooter) and world.enemies.has(enemy) and shooter.health>0 and shooter.visible and shooter.activity not in [FieldActor.Activity.DOWN,FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING] and enemy.is_enemy and has_capacity() and not _seen.has(enemy.actor_id) and world.growth_inputs._counts.get(shooter.member_id)==shooter.confirmed_kills
+
+
 func accept(world: Expedition, shooter: FieldActor, enemy: FieldActor, accepted: Dictionary) -> bool:
 	if not world.growth_mode or world.is_paused or world.phase == Expedition.Phase.FINISHED or not world.survivors.has(shooter) or not world.enemies.has(enemy):
 		return false

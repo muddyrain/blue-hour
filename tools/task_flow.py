@@ -10,8 +10,11 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--native', action='store_true')
     parser.add_argument('--movie', action='store_true')
+    parser.add_argument('--weapon', action='store_true', help='M7 magazine/drop driver')
+    parser.add_argument('--seed', default=None)
+    parser.add_argument('--legacy-world', type=Path)
     parser.add_argument('--outdoor', action='store_true', help='R1 outdoor work regression driver')
-    parser.add_argument('--case', choices=['airdrop','supply','equipment','rescue','early','rescue-death','rescue-roster4','probe','death','indoor','normal','legacy'], required=True)
+    parser.add_argument('--case', choices=['airdrop','supply','equipment','rescue','early','rescue-death','rescue-roster4','probe','death','indoor','normal','legacy','loop','combat','partial','reload','lifecycle','four','oldcamp','oldworld','gates','long-drop','post-kill'], required=True)
     args = parser.parse_args()
     assert subprocess.check_output([args.godot,'--version'], text=True).strip() == (ROOT/'.godot-version').read_text().strip()
     out = args.output.resolve()
@@ -25,13 +28,16 @@ def main():
         assert sys.platform == 'darwin'
         guard = out/'background_guard.dylib'
         subprocess.run(['clang','-dynamiclib','-framework','AppKit','-framework','Foundation','-o',str(guard),str(ROOT/'tools/macos_background.m')],check=True,capture_output=True)
-    assert not args.movie or (args.native and args.case=='airdrop'), 'movie uses one native airdrop journey'
+    assert not args.movie or (args.native and (args.case=='airdrop' or (args.weapon and args.case=='combat'))), 'movie uses one native airdrop journey'
     results = []
-    for phase in ['first','resume'] if args.case in ['airdrop','legacy'] and not args.movie else ['first']:
+    for phase in ['first','resume','camp'] if args.weapon and args.case=='oldworld' else ['first','resume'] if args.case in (['partial','reload'] if args.weapon else ['airdrop','legacy']) and not args.movie else ['first']:
         command = [args.godot,'--path',str(ROOT),'--audio-driver','Dummy','--rendering-method','gl_compatibility']
         command += ['--position','-16000,-16000'] if args.native else ['--headless']
-        command += ['--script','res://tests/'+('task_outdoor_flow' if args.outdoor else 'task_movie' if args.movie else 'task_flow')+'.gd','--','--flow-output='+str(out/phase),'--task-case='+args.case,'--bh-rescue-seed='+('task-v4-2' if args.case=='equipment' else 'task-v4-3')]
-        if args.outdoor and args.case=='airdrop': command += ['--bh-battle-drill']
+        command += ['--script','res://tests/'+('weapon_flow' if args.weapon else 'task_outdoor_flow' if args.outdoor else 'task_movie' if args.movie else 'task_flow')+'.gd','--','--flow-output='+str(out/phase),'--task-case='+args.case,'--bh-rescue-seed='+(args.seed or ('task-v4-2' if args.case=='equipment' else 'task-v4-3'))]
+        if args.weapon and args.legacy_world:
+            assert args.legacy_world.resolve().is_relative_to(ROOT/'.local')
+            command+=['--weapon-legacy='+str(args.legacy_world.resolve())]
+        if (args.outdoor and args.case=='airdrop') or (args.weapon and args.case in ['partial','reload','oldworld']): command += ['--bh-battle-drill']
         if phase != 'first': command += ['--flow-resume']
         started = time.monotonic()
         if args.native:

@@ -54,6 +54,7 @@ def main():
  execute('rogue-contracts',['--script','res://tests/rogue_contracts.gd'],[])
  execute('task-data',['--script','res://tests/task_data.gd'],[])
  execute('task-contracts',['--script','res://tests/task_contracts.gd'],[])
+ execute('weapon-magazine',['--script','res://tests/weapon_magazine.gd'],[])
  execute('known-hash-cycle',['--script','res://tests/known_hash_cycle.gd'])
  execute('record-hash',['--script','res://tests/record_hash.gd'])
  z=subprocess.run([sys.executable,'tools/validate_assets.py'],cwd=ROOT,capture_output=True);(job/'assets.txt').write_bytes(z.stdout+z.stderr);assert z.returncode==0,z.stderr

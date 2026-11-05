@@ -13,6 +13,5 @@ func _journey() -> void:
 			if actor.actor_id==resolution.enemy_id: _check(actor.enemy_behavior.kind==EnemyRules.NORMAL,"late event uses existing ordinary enemy type")
 	app.open_pause_menu(); await _hold(3)
 	var snapshot: Dictionary = SortieSnapshot.capture(world)
-	var receipt: Dictionary = app.progress_session._transaction.recover().receipt
-	_check(SortieSnapshot.problem(snapshot,receipt).is_empty(),"late forced ordinary identities authenticate without changing natural enemy selection")
+	_check(app.progress_session.preview_suspend(snapshot).error==OK,"late forced ordinary identities authenticate without changing natural enemy selection")
 	_write("late-pressure.json",{"event":world.task_event,"stage":int(world.threat.stage),"snapshot":RecordEncoding.stringify(snapshot)})

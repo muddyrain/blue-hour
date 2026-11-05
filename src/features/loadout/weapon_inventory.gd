@@ -32,6 +32,32 @@ static func reward(sortie_id: String, quality: bool = false) -> Dictionary:
 	return WeaponModifiers.reward(value) if quality else value
 
 
+# Historical reward() stays fixed. V1 drop entropy is bound to action seed and site.
+static func drop_weapon(seed: String, action: String, site: String) -> String:
+	return "carbine" if ("BH_SITE_WEAPON_DROP_V1:%s:%s:%s"%[seed,action,site]).sha256_text().substr(0,2).hex_to_int()%2==0 else "long_rifle"
+
+
+static func site_reward(sortie_id: String, generated: Dictionary, site: Dictionary, quality: bool) -> Dictionary:
+	if generated.get("version")!=5:return reward(sortie_id,quality)
+	var value: Dictionary=reward(sortie_id)
+	value.weapon_id=site.drop.weapon_id
+	value.drop={"version":1,"slot":generated.slot,"site_id":site.id}
+	return WeaponModifiers.reward(value) if quality else value
+
+
+static func instance_reward(data: Dictionary, item: Dictionary) -> Dictionary:
+	var drop: Variant=item.get("drop")
+	if not drop is Dictionary or drop.size()!=3 or not drop.has_all(["version","slot","site_id"]) or not SurvivalContracts.integer(drop.version,1,1) or not SurvivalContracts.integer(drop.slot,0,2) or drop.site_id!="cash" or item.origin!="north-cache":return {}
+	var parts: PackedStringArray=item.acquired_sortie.split(":")
+	if parts.size()!=2 or not parts[1].is_valid_int():return {}
+	# RunSave authenticates day == settled_sorties + 2; sortie N starts on day N+1.
+	var action: String=("daily-v4:%s:%d:%d"%[data.journey.seed,int(parts[1])+1,int(drop.slot)]).sha256_text()
+	var value: Dictionary=reward(item.acquired_sortie)
+	value.weapon_id=drop_weapon(data.journey.seed,action,drop.site_id)
+	value.drop=drop.duplicate(true);value.condition=item.condition
+	return WeaponModifiers.reward(value)
+
+
 static func find(data: Dictionary, identity: String) -> Dictionary:
 	for item: Dictionary in data.weapons:
 		if item.instance_id == identity:
@@ -181,10 +207,13 @@ static func repair(data: Dictionary, identity: String) -> Dictionary:
 	return {"data":after, "message":"维修完成，货币 −%d；现在可配装。" % cost}
 
 
-static func bank(after: Dictionary, rewards: Array, identity: String) -> String:
+static func bank(after: Dictionary, rewards: Array, identity: String, generated: Dictionary = {}) -> String:
 	var seen: Array[String] = []
 	var quality: bool = WeaponState.is_family(after)
 	var expected: Dictionary = reward(identity,quality)
+	if generated.get("version")==5:
+		for site: Dictionary in generated.sites:
+			if site.weapon:expected=site_reward(identity,generated,site,quality)
 	for value: Variant in rewards:
 		# JSON restores numeric levels as floats; use the existing canonical contract
 		# for110+ while retaining the exact legacy comparison for older schemas.
@@ -214,3 +243,7 @@ static func _living(data: Dictionary, member_id: int) -> bool:
 static func _with_condition(item: Dictionary, condition: String) -> Dictionary:
 	item.condition = condition
 	return item
+
+
+static func loot_description(item: Dictionary) -> String:
+	return ("损坏" if item.condition=="damaged" else "")+definition(item.weapon_id).display_name+(" · "+WeaponModifiers.description(item) if item.has("weapon_level") else "")

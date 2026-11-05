@@ -109,7 +109,7 @@ func _start(size: String) -> void:
 	await _shot("map-day-%d"%app.day)
 
 func _finish(world: Expedition, fault: bool) -> void:
-	var expected: Dictionary = WorldSites.carry(_selected.sites,WorldSites.facts(world),world.sortie_id,true)
+	var expected: Dictionary = WorldSites.carry(_selected.sites,WorldSites.facts(world),world.sortie_id,true,_selected)
 	_check(world._searched_count()>=1 and world.loot==expected.loot and world.food_loot==expected.food and world.weapon_loot.size()==expected.weapons.size(),"multiple real independent sites agree with partial task budget")
 	var carry: Dictionary = {"loot":world.loot,"food":world.food_loot,"weapons":world.weapon_loot.duplicate(true)}
 	for site: Expedition.SearchSite in world.sites:

@@ -105,7 +105,7 @@ static func _airdrop_point(layout: Dictionary) -> Array:
 	return []
 
 static func outdoor_site(value: Dictionary, id: StringName) -> bool:
-	if value.get("version")!=4 or value.get("type")!="airdrop" or id!=&"cash": return false
+	if (value.get("version")!=4 and value.get("version")!=5) or value.get("type")!="airdrop" or id!=&"cash": return false
 	for site: Dictionary in value.sites:
 		if site.id==String(id): return site.has("point") and site.building.is_empty()
 	return false
@@ -203,7 +203,7 @@ static func summary_text(value: Dictionary) -> String:
 
 static func hud(world: Expedition) -> String:
 	var value: Dictionary = world.supply.generated
-	if value.get("version")!=VERSION: return ""
+	if value.get("version")!=VERSION and value.get("version")!=5: return ""
 	if value.type=="rescue":
 		if world.rescue_target!=null and world.rescue_target.status=="IN_FIELD_JOINED": return "主目标：带%s归航"%world.rescue_target.candidate_name() if world.rescue_target.npc.health>0 else "主目标：救援对象已阵亡 · 可撤离"
 		return "主目标：援救%s"%SurvivorRoster.definition(int(value.recruit)).default_display_name

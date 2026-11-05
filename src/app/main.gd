@@ -860,7 +860,7 @@ func _on_expedition_finished(report: Dictionary, sortie_id: String) -> void:
 		$Interface/Screen/Result/Scroll/Body.text += "\n库存上限：另有 %d 食物未入库。" % ledger.food_overflow
 	var reward_items: Array = report.get("weapons", [])
 	if not reward_items.is_empty() and report.evacuated:
-		$Interface/Screen/Result/Scroll/Body.text += "\n带回武器：损坏长管步枪 · 回营后可维修整备"
+		for item: Dictionary in reward_items:$Interface/Screen/Result/Scroll/Body.text += "\n带回武器："+WeaponInventory.loot_description(item)+" · 回营后可维修整备"
 
 
 func _update_camp() -> void:
@@ -2182,6 +2182,7 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	if snapshot.last_day.has("task"): text+=TaskActions.summary_text(snapshot.last_day.task)+"\n"
 	if not meal.is_empty():
 		text += "带回：货币%d · 食物%d（入库%d） · 武器%d件\n口粮：%d名队员需%d粮，消耗%d，缺口%d\n" % [snapshot.last_day.cash_gained,meal.get("food_found",0),meal.get("food_stored",0),battle.get("weapons",[]).size(),meal.ration_member_ids.size(),meal.food_required,meal.food_consumed,meal.food_shortage]
+	for item: Dictionary in battle.get("weapons",[]):text+="带回武器："+WeaponInventory.loot_description(item)+"\n"
 	for member: Dictionary in snapshot.crew:
 		var awarded: Dictionary = GrowthRules.member_row(frozen.get("xp",{}).get("members",[]),int(member.id))
 		var fate: String = _member_fate(snapshot,int(member.id)).replace(" / STARVATION", "").replace(" / BATTLE", "")

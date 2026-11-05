@@ -2,6 +2,8 @@ class_name WeaponDefinition
 extends Resource
 ## Project sample parameters, never inferred from the reference weapon's appearance.
 
+const MAGAZINES: Dictionary = {"carbine":{"capacity":12,"seconds":1.6},"long_rifle":{"capacity":5,"seconds":2.2}} # PROJECT_TEMP V1
+
 @export var id: StringName
 @export var display_name: String
 @export var presentation: WeaponPresentation
@@ -13,3 +15,11 @@ extends Resource
 
 func shot_interval(personal_factor: float = 1.0) -> float:
 	return interval * personal_factor
+
+
+func magazine_capacity() -> int:
+	return MAGAZINES[String(id)].capacity
+
+
+func reload_seconds() -> float:
+	return MAGAZINES[String(id)].seconds

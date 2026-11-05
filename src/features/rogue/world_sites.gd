@@ -35,12 +35,12 @@ static func problem(defs: Array, facts: Variant) -> String:
 		if not state is Dictionary or state.size()!=2 or not state.get("searched") is bool or not SurvivalContracts.number(state.get("progress")) or state.progress<0 or state.progress>31 or state.searched!=(state.progress>=def.seconds): return "SITE_PROGRESS"
 	return ""
 
-static func carry(defs: Array, facts: Dictionary, transaction: String, quality: bool) -> Dictionary:
+static func carry(defs: Array, facts: Dictionary, transaction: String, quality: bool, generated: Dictionary = {}) -> Dictionary:
 	var result: Dictionary = {"loot":0,"food":0,"weapons":[]}
 	for def: Dictionary in defs:
 		if facts[def.id].searched:
 			result["loot" if def.kind=="cash" else "food"]+=int(def.amount)
-			if def.weapon: result.weapons.append(WeaponInventory.reward(transaction,quality))
+			if def.weapon: result.weapons.append(WeaponInventory.site_reward(transaction,generated,def,quality))
 	return result
 
 static func completed(defs: Array, facts: Dictionary, kind: String = "") -> int:

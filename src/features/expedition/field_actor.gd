@@ -21,6 +21,7 @@ var cooldown: float = 0.0
 var trait_shot_factor: float = 1.0
 var trait_search_factor: float = 1.0
 var weapon_instance_id: String = ""
+var magazine: WeaponMagazine
 var weapon_definition: WeaponDefinition
 var call_sign: String = ""
 var confirmed_kills: int = 0

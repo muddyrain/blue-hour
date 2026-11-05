@@ -86,7 +86,7 @@ func _journey() -> void:
 	await _tap(app.pause_menu.buttons[4])
 	_check(app.expedition==null and app._requires_continue,"original suspend ACK stores outdoor partial without banking")
 	var receipt: Dictionary=app.progress_session.inspect().receipt
-	_check(exact.version==7 and SortieSnapshot.problem(exact,receipt).is_empty(),"V7 authenticates outdoor state against published injury checkpoint")
+	_check(exact.version==(8 if exact.generated.version==5 else 7) and SortieSnapshot.problem(exact,receipt).is_empty(),"versioned outdoor state authenticates against published injury checkpoint")
 	_negatives(exact,receipt)
 
 func _resume() -> void:
@@ -159,7 +159,7 @@ func _death(world: Expedition) -> void:
 	_check(track.health==0 and world.search_actor==null and world._active_site==null and world.search_site(&"cash").progress==0,"original permanent death immediately unbinds and resets unfinished work")
 	_check(not world.searched and world.weapon_loot.is_empty() and TransactionReceipt.same(event,world.task_event),"worker death cannot complete, drop or reset event")
 	app.open_pause_menu()
-	_check(SortieSnapshot.problem(SortieSnapshot.capture(world),app.progress_session._transaction.recover().receipt).is_empty(),"immediate post-death world authenticates without stale binding")
+	_check(app.progress_session.preview_suspend(SortieSnapshot.capture(world)).error==OK,"immediate post-death world authenticates without stale binding")
 	await _tap(app.pause_menu.buttons[0]);if world.is_paused:world.toggle_pause()
 	world.request_search(&"cash")
 	await _advance(world,func() -> bool:return world.search_site(&"cash").progress>0.2)
@@ -175,12 +175,11 @@ func _indoor(world: Expedition) -> void:
 	_check(not world._combatant(actor).available and world._nearest_target(world.enemies[0],[actor],INF)==null,"indoor work remains excluded from original combat")
 	app.open_pause_menu()
 	var exact: Dictionary=SortieSnapshot.capture(world)
-	var receipt: Dictionary=app.progress_session._transaction.recover().receipt
-	_check(exact.version==6 and SortieSnapshot.problem(exact,receipt).is_empty(),"indoor work retains authenticatable V6 and old build")
+	_check(exact.version==(8 if exact.generated.version==5 else 6) and app.progress_session.preview_suspend(exact).error==OK,"indoor work retains its protected versioned state")
 	var bad: Dictionary=exact.duplicate(true);SortieSnapshot._member(bad.survivors,actor.member_id).state.activity=4
-	_check(not SortieSnapshot.problem(bad,receipt).is_empty(),"indoor snapshot rejects outdoor activity")
+	_check(app.progress_session.preview_suspend(bad).error!=OK,"indoor snapshot rejects outdoor activity")
 	bad=exact.duplicate(true);SortieSnapshot._member(bad.survivors,actor.member_id).state.visible=true
-	_check(not SortieSnapshot.problem(bad,receipt).is_empty(),"indoor snapshot rejects visible protected worker")
+	_check(app.progress_session.preview_suspend(bad).error!=OK,"indoor snapshot rejects visible protected worker")
 	await _tap(app.pause_menu.buttons[0]);if world.is_paused:world.toggle_pause()
 	await _advance(world,func() -> bool:return world.search_site(&"food").searched)
 	for id: String in _selected.objective.site_ids:
@@ -229,3 +228,21 @@ func _files() -> Dictionary:
 		if folder.begins_with(".stage"):continue
 		values[folder]=FileAccess.get_sha256(path.path_join(folder+"/record.json"))
 	return values
+
+
+func _start(type: String) -> void:
+	if scenario!="legacy":
+		await super._start(type)
+		return
+	# This case intentionally constructs the old V4/V6 contract, not a new V5 action.
+	_before=app.camp_snapshot()
+	for offer: Dictionary in TaskActions.offers(_before):
+		if offer.type==type:_selected=offer;break
+	_check(not _selected.is_empty(),"historical task offered for explicit legacy fixture")
+	app.progress_session.daily_actions=false
+	app._select_mission(TaskActions.supply(_selected))
+	var world: Expedition=app.expedition
+	_check(world!=null,"explicit old task starts through original business owner")
+	if world==null:return
+	world.set_process(false);world.set_physics_process(false);world.camera.set_process(false)
+	await _advance(world,func() -> bool:return not world.bus_view.running())

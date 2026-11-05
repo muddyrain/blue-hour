@@ -42,8 +42,12 @@ func _journey() -> void:
 		_check(TransactionReceipt.same(event,world.task_event),"cancel/retry cannot trigger another event")
 		app.open_pause_menu(); await _hold(3)
 		var exact: Dictionary = SortieSnapshot.capture(world)
-		var receipt: Dictionary = app.progress_session._transaction.recover().receipt
-		_check(SortieSnapshot.problem(exact,receipt).is_empty(),"V6 task snapshot strictly authenticates")
+		_write("world-exact.json",{"encoded":RecordEncoding.stringify(exact),"hash":SurvivalContracts.fingerprint(exact),"selected":_selected,"camp":_before,"event":event})
+		await _shot("airdrop-partial")
+		await _tap(app.pause_menu.buttons[4])
+		_check(app.expedition==null and app._requires_continue,"original suspend ACK leaves no resources banked")
+		var receipt: Dictionary = app.progress_session.inspect().receipt
+		_check(SortieSnapshot.problem(exact,receipt).is_empty(),"selected task snapshot strictly authenticates")
 		var bad: Dictionary = exact.duplicate(true); bad.task_event.extra=true
 		_check(not SortieSnapshot.problem(bad,receipt).is_empty(),"unknown event fact rejected after warm proof")
 		bad=exact.duplicate(true); bad.task_event.started=false
@@ -52,10 +56,6 @@ func _journey() -> void:
 		_check(not SortieSnapshot.problem(bad,receipt).is_empty(),"foreign target cannot use cached proof")
 		bad=exact.duplicate(true); bad.generated.cash+=1
 		_check(not SortieSnapshot.problem(bad,receipt).is_empty(),"changed budget cannot use cached proof")
-		_write("world-exact.json",{"encoded":RecordEncoding.stringify(exact),"hash":SurvivalContracts.fingerprint(exact),"selected":_selected,"camp":_before,"event":event})
-		await _shot("airdrop-partial")
-		await _tap(app.pause_menu.buttons[4])
-		_check(app.expedition==null and app._requires_continue,"original suspend ACK leaves no resources banked")
 		return
 	await _complete_task(world)
 	await _finish(world,scenario=="equipment")
@@ -108,7 +108,7 @@ func _start(type: String) -> void:
 	world.set_physics_process(false); world.set_process(false)
 	await _advance(world,func() -> bool:return not world.bus_view.running())
 	world.finished.connect(func(report: Dictionary) -> void:journey_reports.append(report.duplicate(true)))
-	_check(world.elapsed==0 and app.progress_session._transaction.recover().receipt.rules.data_version==5,"arrival preserves clock and task policy5")
+	_check(world.elapsed==0 and app.progress_session._transaction.recover().receipt.rules.data_version==(6 if world.supply.generated.version==5 else 5),"arrival preserves clock and selected task policy")
 	world.camera.set_process(false)
 	await _hud_sample(world)
 

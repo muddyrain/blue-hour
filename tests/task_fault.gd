@@ -10,7 +10,7 @@ func _journey() -> void:
 	var target: StringName = &"food" if world.supply.food_reward > 0 else &"cash"
 	world.request_search(target)
 	await _advance(world, func() -> bool: return world.search_site(target).searched)
-	var expected: Dictionary = WorldSites.carry(_selected.sites,WorldSites.facts(world),world.sortie_id,true)
+	var expected: Dictionary = WorldSites.carry(_selected.sites,WorldSites.facts(world),world.sortie_id,true,_selected)
 	app.progress_session.fault_hook = func(point: String) -> Error:
 		return ERR_CANT_CREATE if point == "after_record_flush" else OK
 	world.request_bus_action()

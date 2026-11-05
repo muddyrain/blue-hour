@@ -1,3 +1,5 @@
+当前候选 **M9-COMBAT-01**：正常新旅程接入消防斧、五弹丸霰弹和锁点毒气感染者；实际回收→归航确认→维修/配装→战斗沿原链，新动作/毒区跨进程恢复。旧M8/short_v1保留旧模式。Windows验证与限制见[本轮记录](docs/VALIDATION.md#m9-combat-01windows)。数值PROJECT_TEMP，正式生存门禁仍BLOCKED。
+
 当前开发候选M8-BUILD-01 WIN-R1：装备主回收点获得本局被动、归航确认入库、营地两个可替换槽，以及Q治疗/E瞄准空袭。正常新旅程启用，旧旅程保持原模式；[构筑合同](docs/design/m8-build-01.md)。开发验收与正式生产门禁分别报告，BLOCKED保持。
 
 # 蓝时归航 · Blue Hour

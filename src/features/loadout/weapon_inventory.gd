@@ -10,7 +10,7 @@ static func definition(id: String) -> WeaponDefinition:
 	for item: WeaponDefinition in Definitions:
 		if String(item.id) == id:
 			return item
-	return null
+	return CombatEquipment.definition(id)
 
 
 static func initialize(data: Dictionary, origin: String) -> void:
@@ -38,22 +38,22 @@ static func drop_weapon(seed: String, action: String, site: String) -> String:
 
 
 static func site_reward(sortie_id: String, generated: Dictionary, site: Dictionary, quality: bool) -> Dictionary:
-	if (generated.get("version")!=5 and (generated.get("version")!=6 and generated.get("version")!=7)):return reward(sortie_id,quality)
+	if (generated.get("version")!=5 and (generated.get("version")!=6 and (generated.get("version")!=7 and generated.get("version")!=8))):return reward(sortie_id,quality)
 	var value: Dictionary=reward(sortie_id)
 	value.weapon_id=site.drop.weapon_id
-	value.drop={"version":1,"slot":generated.slot,"site_id":site.id}
+	value.drop={"version":2 if generated.get("version")==8 else 1,"slot":generated.slot,"site_id":site.id}
 	return WeaponModifiers.reward(value) if quality else value
 
 
 static func instance_reward(data: Dictionary, item: Dictionary) -> Dictionary:
 	var drop: Variant=item.get("drop")
-	if not drop is Dictionary or drop.size()!=3 or not drop.has_all(["version","slot","site_id"]) or not SurvivalContracts.integer(drop.version,1,1) or not SurvivalContracts.integer(drop.slot,0,2) or drop.site_id!="cash" or item.origin!="north-cache":return {}
+	if not drop is Dictionary or drop.size()!=3 or not drop.has_all(["version","slot","site_id"]) or not SurvivalContracts.integer(drop.version,1,2) or not SurvivalContracts.integer(drop.slot,0,2) or drop.site_id!="cash" or item.origin!="north-cache":return {}
 	var parts: PackedStringArray=item.acquired_sortie.split(":")
 	if parts.size()!=2 or not parts[1].is_valid_int():return {}
 	# RunSave authenticates day == settled_sorties + 2; sortie N starts on day N+1.
 	var action: String=("daily-v4:%s:%d:%d"%[data.journey.seed,int(parts[1])+1,int(drop.slot)]).sha256_text()
 	var value: Dictionary=reward(item.acquired_sortie)
-	value.weapon_id=drop_weapon(data.journey.seed,action,drop.site_id)
+	value.weapon_id=CombatActions.drop(data.journey.seed,action,drop.site_id,int(parts[1])==1) if drop.version==2 else drop_weapon(data.journey.seed,action,drop.site_id)
 	value.drop=drop.duplicate(true);value.condition=item.condition
 	return WeaponModifiers.reward(value)
 
@@ -127,7 +127,7 @@ static func validate(data: Dictionary, dynamic_identity: bool = false) -> String
 		for key: String in ["instance_id", "weapon_id", "condition", "origin", "acquired_sortie"]:
 			if not value.get(key) is String:
 				return "武器实例缺少字符串字段：" + key
-		if definition(value.weapon_id) == null or value.condition not in ["ready", "damaged"]:
+		if value.weapon_id not in ["carbine","long_rifle"] or value.condition not in ["ready", "damaged"]:
 			return "未知武器定义或状态"
 		if value.instance_id in identities:
 			return "武器实例身份重复"
@@ -211,7 +211,7 @@ static func bank(after: Dictionary, rewards: Array, identity: String, generated:
 	var seen: Array[String] = []
 	var quality: bool = WeaponState.is_family(after)
 	var expected: Dictionary = reward(identity,quality)
-	if (generated.get("version")==5 or (generated.get("version")==6 or generated.get("version")==7)):
+	if (generated.get("version")==5 or (generated.get("version")==6 or (generated.get("version")==7 or generated.get("version")==8))):
 		for site: Dictionary in generated.sites:
 			if site.weapon:expected=site_reward(identity,generated,site,quality)
 	for value: Variant in rewards:

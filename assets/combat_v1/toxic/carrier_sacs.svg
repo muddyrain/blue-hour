@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="92" height="88" viewBox="0 0 92 88">
+  <!-- Original Blue Hour vector appendage, authored for M9-COMBAT-01. -->
+  <path d="M14 64 6 47 8 27 18 10 35 7 45 18 57 7 75 11 87 31 85 52 74 69 55 77 32 75Z" fill="#243b36" stroke="#182f30" stroke-width="4"/>
+  <path d="M13 42 13 27 23 14 34 14 40 29 39 49 29 61 17 56Z" fill="#7c8e59" stroke="#475d46" stroke-width="3"/>
+  <path d="M48 31 53 16 67 13 79 25 82 43 75 60 63 63 51 51Z" fill="#8d9d61" stroke="#4a624a" stroke-width="3"/>
+  <path d="M21 27 26 20 30 22M57 25 62 20 68 22M18 43 22 48M64 45 69 51" fill="none" stroke="#bec889" stroke-width="3" stroke-linecap="round"/>
+  <path d="M36 22 43 31 48 26 51 36 46 53 49 68 36 72 29 62 38 48Z" fill="#525d46" stroke="#273e37" stroke-width="3"/>
+  <path d="M15 59 25 68 33 64 39 74 55 74 64 68 76 66" fill="none" stroke="#a69a73" stroke-width="5"/>
+  <path d="M37 45 49 48 47 57 36 54Z" fill="#b4be79" stroke="#344d40" stroke-width="2"/>
+  <circle cx="24" cy="37" r="3" fill="#4b6349"/><circle cx="64" cy="34" r="4" fill="#536c4a"/>
+</svg>

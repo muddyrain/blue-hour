@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="WeaponDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/features/loadout/weapon_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://assets/combat_v1/weapons/axe_view.tres" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"fire_axe_v1"
+display_name = "消防斧"
+presentation = ExtResource("2")
+damage = 34.0
+interval = 1.0
+shot_range = 50.0
+repair_cost = 10

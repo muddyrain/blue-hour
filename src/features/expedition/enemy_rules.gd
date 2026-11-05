@@ -17,15 +17,15 @@ static func pick(identity: String, index: int, stage: int) -> String:
 
 
 static func health(kind: String, normal: float) -> float:
-	return POLICY.rush_hp if kind==RUSH else POLICY.heavy_hp if kind==HEAVY else normal
+	return 64.0 if kind==CombatEnemyRules.TOXIC else POLICY.rush_hp if kind==RUSH else POLICY.heavy_hp if kind==HEAVY else normal
 
 
 static func speed(kind: String, rushing: bool, normal: float) -> float:
-	return POLICY.heavy_speed if kind==HEAVY else POLICY.rush_speed if rushing else normal
+	return 26.0 if kind==CombatEnemyRules.TOXIC else POLICY.heavy_speed if kind==HEAVY else POLICY.rush_speed if rushing else normal
 
 
 static func name_for(kind: String) -> String:
-	return "疾奔" if kind==RUSH else "重压" if kind==HEAVY else "普通"
+	return "毒气" if kind==CombatEnemyRules.TOXIC else "疾奔" if kind==RUSH else "重压" if kind==HEAVY else "普通"
 
 
 static func snapshot_problem(row: Dictionary, world: Dictionary, receipt: Dictionary, summoned_normal: bool = false) -> String:

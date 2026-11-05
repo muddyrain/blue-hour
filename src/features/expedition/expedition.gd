@@ -93,6 +93,8 @@ var los_range_case: bool = false
 var los_setup: LosPracticeSetup
 var threat: ThreatDirector = ThreatDirector.new()
 var threat_rehearsal: bool = false
+var combat: CombatRuntime=CombatRuntime.new()
+var combat_delta: float=0.0
 var basic_support: BasicSupport = BasicSupport.new()
 var support_commit: Callable
 var support_aiming: bool = false
@@ -153,6 +155,7 @@ func _ready() -> void:
 	if growth_mode:
 		xp_inputs.configure(growth_binding)
 	if build_mode(): basic_support.configure(growth_binding)
+	if combat_mode(): combat.setup(self)
 	if trait_mode:
 		trait_inputs.configure(growth_binding)
 	if is_practice and participants_snapshot.size() != 2:
@@ -160,7 +163,7 @@ func _ready() -> void:
 		set_physics_process(false)
 		set_process_unhandled_input(false)
 		return
-	if (supply.generated.get("version")==6 or supply.generated.get("version")==7): tuning.spawn_seconds*=float(supply.generated.campaign.pressure)
+	if (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or supply.generated.get("version")==8)): tuning.spawn_seconds*=float(supply.generated.campaign.pressure)
 	layout = supply.layout
 	_cash_site.door = layout.cash_door
 	_food_site.door = layout.food_door
@@ -238,10 +241,12 @@ func _ready() -> void:
 			actor.weapon_instance_id = item.instance_id
 			actor.weapon_definition = WeaponModifiers.combat_definition(item)
 		actor.visual.set_weapon(actor.weapon_definition.presentation)
-		if (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or supply.generated.get("version")==7)):actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
+		if combat_mode() and String(actor.weapon_definition.id) in ["fire_axe_v1","shotgun_v1"]: combat.action(actor)
+		if (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or supply.generated.get("version")==8))):
+			if not CombatEquipment.melee(String(actor.weapon_definition.id)): actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
 		if build_mode(): apply_build(actor)
 		survivors.append(actor)
-	if (supply.generated.get("version")==6 or supply.generated.get("version")==7):
+	if (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or supply.generated.get("version")==8)):
 		encounter=EncounterRuntime.new();encounter.setup(self,restoring_world)
 	_make_ui()
 	var readout_layer: CanvasLayer = CanvasLayer.new()
@@ -350,6 +355,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func step(delta: float) -> void:
+	combat_delta=delta
 	if bus_view != null and bus_view.running():
 		if not is_paused: bus_view.advance(delta)
 		_update_ui()
@@ -357,6 +363,9 @@ func step(delta: float) -> void:
 	if phase == Phase.FINISHED or is_paused or suspend_sealed:
 		_update_ui()
 		return
+	if combat_mode() and not combat.toxic.pending.is_empty():
+		combat.advance_toxic(self,0.0)
+		if is_paused: return
 	var started_usec: int = Time.get_ticks_usec()
 	elapsed += delta
 	if build_mode():
@@ -417,6 +426,10 @@ func step(delta: float) -> void:
 		if actor.magazine!=null and not working_before.get(actor.member_id,false) and actor.activity not in [FieldActor.Activity.DOWN,FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING]:actor.magazine.advance(delta)
 	_update_enemy_behaviors(0.0)
 	_update_combat()
+	if combat_mode(): combat.cancel_unavailable(self)
+	if combat_mode() and not is_paused: combat.advance_toxic(self,delta)
+	if combat_mode():
+		for actor: FieldActor in survivors: combat.present(actor)
 	if encounter!=null and not is_paused: encounter.advance(delta)
 	if is_paused:
 		_update_ui()
@@ -469,7 +482,7 @@ func promote_target(event: Dictionary, restoring: bool = false) -> void:
 	actor.weapon_instance_id = gun.instance_id
 	actor.weapon_definition = WeaponModifiers.combat_definition(gun)
 	actor.visual.set_weapon(actor.weapon_definition.presentation)
-	if (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or supply.generated.get("version")==7)):actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
+	if (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or supply.generated.get("version")==8))) and not CombatEquipment.melee(String(actor.weapon_definition.id)):actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
 	actor.clear_order()
 	if trait_mode:
 		TraitRules.apply(actor,profile,tuning.survivor_speed)
@@ -497,6 +510,7 @@ func promote_target(event: Dictionary, restoring: bool = false) -> void:
 
 
 func toggle_pause() -> void:
+	if combat_mode(): combat.cancel_unavailable(self)
 	support_aiming=false
 	if not pending_support.is_empty():
 		_accept_support(pending_support.before,pending_support.request)
@@ -756,8 +770,9 @@ func _make_actor(enemy: bool, index: int, point: Vector2, profile: Dictionary = 
 	actor.health = actor.max_health
 	if enemy and enemy_mode:
 		actor.enemy_behavior = EnemyBehavior.new()
-		actor.enemy_behavior.kind = kind if not kind.is_empty() else EnemyRules.NORMAL if index>=10000 or is_practice else EnemyRules.pick(sortie_id,index,int(threat.stage))
+		actor.enemy_behavior.kind = kind if not kind.is_empty() else EnemyRules.NORMAL if index>=10000 or is_practice else combat.pick_spawn(self,index) if combat_mode() else EnemyRules.pick(sortie_id,index,int(threat.stage))
 		actor.enemy_behavior.spawn_stage = int(threat.stage)
+		if combat_mode() and actor.enemy_behavior.kind==CombatEnemyRules.TOXIC: combat.toxic.casters[str(index)]=ToxicV1._caster(index)
 		actor.enemy_theme = ui_theme
 		actor.max_health = EnemyRules.health(actor.enemy_behavior.kind,tuning.enemy_health)
 		actor.health = actor.max_health
@@ -902,7 +917,7 @@ func _spawn_practice_enemy() -> void:
 
 func _update_enemy_paths(idle_only: bool = false) -> void:
 	for enemy: FieldActor in enemies:
-		if (encounter!=null and encounter.holds(enemy)) or (enemy.enemy_behavior!=null and enemy.enemy_behavior.state=="windup"):
+		if (combat_mode() and combat.holds(enemy)) or (encounter!=null and encounter.holds(enemy)) or (enemy.enemy_behavior!=null and enemy.enemy_behavior.state=="windup"):
 			continue
 		var target: FieldActor = _nearest_target(enemy, survivors, INF)
 		if target == null or _hold_enemy_approach(enemy):
@@ -934,6 +949,10 @@ func _nearest_target(actor: FieldActor, candidates: Array[FieldActor], limit: fl
 
 func _update_combat() -> void:
 	for actor: FieldActor in survivors:
+		if combat_mode() and String(actor.weapon_definition.id) in ["fire_axe_v1","shotgun_v1"]:
+			combat.attack(self,actor,combat_delta)
+			if is_paused: return
+			continue
 		if actor.activity in [FieldActor.Activity.DOWN, FieldActor.Activity.SEARCHING, FieldActor.Activity.RECOVERING]:
 			continue
 		if actor.magazine!=null and not actor.magazine.can_fire():continue
@@ -991,6 +1010,7 @@ func _update_combat() -> void:
 	for enemy: FieldActor in enemies:
 		if enemy.activity == FieldActor.Activity.DOWN or (encounter!=null and encounter.is_boss(enemy)):
 			continue
+		if combat_mode() and combat.holds(enemy): continue
 		var target: FieldActor = _nearest_target(enemy, survivors, 28.0)
 		var damage: float = tuning.enemy_damage
 		var behavior: EnemyBehavior = enemy.enemy_behavior
@@ -1172,7 +1192,7 @@ func _finish(evacuated: bool) -> void:
 		"sites_searched":_searched_count(),
 		"kills": kills, "searched": _kind_searched(&"cash"), "health": remaining_health, "elapsed": elapsed}
 	if not layout.world_data.is_empty(): report.site_facts = WorldSites.facts(self)
-	if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or supply.generated.get("version")==7)): report.task_event=task_event.duplicate(true)
+	if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or supply.generated.get("version")==8))): report.task_event=task_event.duplicate(true)
 	if build_mode(): report.support=basic_support.snapshot()
 	if not is_practice and not loadout_snapshot.is_empty():
 		report.growth_inputs = growth_inputs.snapshot(sortie_id,layout.id,elapsed)
@@ -1454,7 +1474,7 @@ func _make_world_buildings() -> void:
 
 
 func _site_seconds(site: SearchSite) -> float:
-	return site.seconds if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or supply.generated.get("version")==7)) else tuning.search_seconds
+	return site.seconds if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or supply.generated.get("version")==8))) else tuning.search_seconds
 
 
 func _trigger_airdrop() -> void:
@@ -1476,6 +1496,7 @@ func _site_weapon(site: SearchSite) -> Dictionary:
 
 
 func _ammo_text(actor: FieldActor) -> String:
+	if CombatEquipment.melee(String(actor.weapon_definition.id)): return "消防斧 · 近战"
 	if actor.magazine==null:return "%s · 旧规则"%actor.weapon_definition.display_name if actor.weapon_definition!=null else ""
 	return "%s %d/%d · ∞"%[actor.weapon_definition.display_name,actor.magazine.rounds,actor.magazine.capacity()]
 
@@ -1486,15 +1507,18 @@ func _weapon_status(actor: FieldActor, action: String) -> String:
 		return "%s · 换弹暂停"%action if actor.activity in [FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING] else "%s · 换弹%.1fs"%[action,actor.magazine.remaining]
 	return action
 
+func combat_mode() -> bool:
+	return supply.generated.get("version")==8
+
 func build_mode() -> bool:
-	return supply.generated.get("version")==7
+	return (supply.generated.get("version")==7 or supply.generated.get("version")==8)
 
 func apply_build(actor: FieldActor) -> void:
 	var factors: Dictionary=BuildItems.factors(supply.generated.build.slots)
 	# Definitions are freshly derived from immutable inventory once per actor setup.
-	actor.weapon_definition.damage*=factors.damage
+	if not CombatEquipment.melee(String(actor.weapon_definition.id)): actor.weapon_definition.damage*=factors.damage
 	actor.speed*=factors.move
-	actor.magazine.reload_factor=factors.reload
+	if actor.magazine!=null: actor.magazine.reload_factor=factors.reload
 
 func support_available() -> bool:
 	return build_mode() and not is_paused and not suspend_sealed and phase!=Phase.FINISHED and not (bus_view!=null and bus_view.running()) and field_join_error.is_empty()
@@ -1502,6 +1526,8 @@ func support_available() -> bool:
 func support_world() -> Dictionary:
 	var paused: bool=is_paused
 	is_paused=true
+	# Toxic/boss damage happens after the combat phase's ordinary cancellation.
+	if combat_mode(): combat.cancel_unavailable(self)
 	_reap_defeated_enemies()
 	var value: Dictionary=SortieSnapshot.capture(self)
 	is_paused=paused
@@ -1528,6 +1554,7 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 	var result: Dictionary=support_commit.call(before,request)
 	if result.get("error",ERR_UNAVAILABLE)!=OK:
 		pending_support={"before":before,"request":request}
+		print("BH_SUPPORT "+JSON.stringify({"kind":request.kind,"status":"PENDING","reason":result.get("reason",""),"sequence":before.support.sequence,"elapsed":before.sim.elapsed}))
 		is_paused=true
 		support_aiming=false
 		_show_notice("支援尚未确认，已暂停；请重试或暂存继续。"+String(result.get("reason","")))
@@ -1535,6 +1562,7 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 		return false
 	pending_support={}
 	var after: Dictionary=result.world
+	print("BH_SUPPORT "+JSON.stringify({"kind":request.kind,"status":"ACCEPTED","sequence_before":before.support.sequence,"sequence":after.support.sequence,"cooldowns":after.support.cooldowns,"kills_before":before.sim.kills,"kills":after.sim.kills,"facts":after.support.accepted.back().facts,"elapsed":after.sim.elapsed}))
 	# All fallible validation and I/O preceded this visible state replacement.
 	for enemy: FieldActor in enemies: enemy.free()
 	enemies.clear()

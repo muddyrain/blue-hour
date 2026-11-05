@@ -9,3 +9,7 @@ M6-ROGUE-02的空投箱、信标和主目标入口圈由 `airdrop_prop.gd` 与 `
 [逐文件运行资源来源和SHA](../assets/PROVENANCE.json)只列输出，不含私人生成位置或原始研究。五身份左右分画，三敌种另三个左向镜像；品质/人数/显示参数均PROJECT_TEMP。AI辅助原型不意味着最终美术签核或外部权利保证。
 
 本项目当前没有新增LICENSE；公开源文件不授予额外复制、分发或商业复用许可。Godot引擎及系统字体不随本源码树重新分发。
+
+## M9-COMBAT-01
+
+assets/combat_v1/weapons/fire_axe_v1.svg、shotgun_v1.svg及toxic/carrier_sacs.svg为本项目新绘原创矢量；对应tres为原创持握/配置，CombatWeaponVisualV1与Toxic*VisualV1程序绘制挥击/预警/气体/消退。不使用外部生图服务、原作素材或新增许可。复用人物与普通感染者基底的既有来源保持。

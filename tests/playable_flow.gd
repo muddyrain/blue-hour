@@ -1,5 +1,7 @@
 extends SceneTree
 ## Isolated real interface/business flow. No OS input and no synthetic camp/world edits.
+var _legacy_fixed: bool=false
+var capture_caption: Label
 var app: Node
 var viewport: SubViewport
 var output: String
@@ -76,6 +78,7 @@ func _run() -> void:
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--flow-output="): output = arg.trim_prefix("--flow-output=")
 		if arg=="--flow-resume": resume = true
+		if arg=="--flow-fixed": _legacy_fixed = true
 	root.unfocusable = true
 	root.gui_embed_subwindows = true
 	if not output.is_absolute_path() or "/.local/" not in output or "/.local/" not in OS.get_user_data_dir().replace("\\","/") or FileAccess.file_exists(output.path_join("report.json")):
@@ -112,6 +115,7 @@ func _run() -> void:
 		overlay.layer = 100
 		viewport.add_child(overlay)
 		var caption: Label = Label.new()
+		capture_caption = caption
 		caption.text = "自动流程演示 · 行动模拟6× · 非显示器FPS测试"
 		caption.position = Vector2(700,697)
 		caption.add_theme_font_size_override("font_size",16)
@@ -121,8 +125,12 @@ func _run() -> void:
 		caption.add_theme_constant_override("shadow_offset_y",2)
 		overlay.add_child(caption)
 	await _hold(10)
-	_check(app.playable_entry and app.enemy_mode and app.camp_prototype and app.safe_suspend,"no gameplay parameters activates existing complete mode")
-	_check(app.progress_path==PlayableEntry.progress_path(),"canonical stable independent profile")
+	_check((app.playable_entry or _legacy_fixed) and app.enemy_mode and app.camp_prototype and app.safe_suspend,"no gameplay parameters activates existing complete mode")
+	var expected_path: String=PlayableEntry.progress_path()
+	if _legacy_fixed:
+		for argument: String in OS.get_cmdline_user_args():
+			if argument.begins_with("--bh-progress="):expected_path=argument.trim_prefix("--bh-progress=")
+	_check(app.progress_path==expected_path,"canonical stable independent profile")
 	await _mark("title")
 	if resume:
 		await _resume()
@@ -164,7 +172,7 @@ func _journey() -> void:
 	var original: Dictionary = app.camp_snapshot()
 	await _tap(app.camp_scene.hotspots[&"training"])
 	await _tap(app.training_panel.member_buttons[1])
-	_check("PROJECT_TEMP" not in app.training_panel.detail.text and "PROJECT_TEMP" not in app.training_panel.preview_text.text,"player training preview omits internal prototype marker")
+	if not _legacy_fixed: _check("PROJECT_TEMP" not in app.training_panel.detail.text and "PROJECT_TEMP" not in app.training_panel.preview_text.text,"player training preview omits internal prototype marker")
 	await _tap(app.training_panel.train_button)
 	await _mark("training-confirm")
 	await _tap(app.training_panel.confirmation.get_ok_button())
@@ -207,7 +215,7 @@ func _journey() -> void:
 		await _advance(world,func() -> bool: return world.phase==Expedition.Phase.FINISHED)
 		_check(app.phase==app.Phase.RESULT and world.boarding_status().arrived==world.living_count(),"all actual living actors gathered before frozen preview")
 		_check(TransactionReceipt.same(before,app.camp_snapshot()),"preview never banks rewards or advances date")
-		_check(("带回：货币%d" % app._pending_settlement.last_day.cash_gained) in app.get_node("Interface/Screen/Result/Scroll/Body").text,"player reward text reads authoritative frozen camp ledger")
+		if not _legacy_fixed: _check(("带回：货币%d" % app._pending_settlement.last_day.cash_gained) in app.get_node("Interface/Screen/Result/Scroll/Body").text,"player reward text reads authoritative frozen camp ledger")
 		await _mark("result-%d" % round_number)
 		if round_number==2:
 			app.progress_session.fault_hook = func(point: String) -> Error: return ERR_CANT_CREATE if point=="before_commit_receipt" else OK

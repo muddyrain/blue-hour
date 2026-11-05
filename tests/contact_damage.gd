@@ -39,7 +39,7 @@ func _run() -> void:
 		emitted += float(event.applied_damage)
 	_expect(_hits.size() >= 3 and emitted > 8.0,"remaining default enemy genuinely attacks again after simulation cooldown")
 	_expect(is_equal_approx(emitted,400.0-sortie.survivors[0].health-sortie.survivors[1].health) and is_equal_approx(emitted,sortie.survivors[0].damage_received+sortie.survivors[1].damage_received),"actual health loss, hit events and received-damage service inputs agree")
-	_expect(sortie._hud.view._members[0].health.text == "生命 %d / 200" % ceili(sortie.survivors[0].health),"real HUD reads the resulting health")
+	_expect(sortie._hud.view._members[0].health.text == "HP %d/200" % ceili(sortie.survivors[0].health) and is_equal_approx(sortie._hud.view._members[0].bar.value,sortie.survivors[0].health / sortie.survivors[0].max_health),"compact HUD text and bar read the resulting actual health")
 	var health: Array[float] = [sortie.survivors[0].health,sortie.survivors[1].health]
 	sortie._finish(true)
 	sortie.step(5.0)

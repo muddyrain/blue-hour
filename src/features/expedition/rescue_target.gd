@@ -15,7 +15,7 @@ var label: Label
 
 
 func _ready() -> void:
-	npc = world._make_actor(false,99,START,{"id":world.candidate_id(),"definition_id":"crew_%d" % world.candidate_id()})
+	npc = world._make_actor(false,99,world.layout.rescue_point,{"id":world.candidate_id(),"definition_id":"crew_%d" % world.candidate_id()})
 	npc.weapon_definition = WeaponInventory.definition("long_rifle" if world.pool_mode and world.candidate_id()==4 else "carbine")
 	npc.visual.set_weapon(npc.weapon_definition.presentation)
 	label = Label.new()

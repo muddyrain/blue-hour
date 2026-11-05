@@ -4,6 +4,7 @@ extends Resource
 
 @export var id: StringName
 @export var display_name: String
+var rescue_point: Vector2 = Vector2(1344,1120)
 @export var bus_block: Rect2
 @export var bus_door: Vector2
 @export var cash_block: Rect2

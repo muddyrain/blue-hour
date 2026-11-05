@@ -180,7 +180,7 @@ func _ready() -> void:
 	_sort.add_child(bus)
 	_shop = _make_building(layout.cash_block,layout.cash_title,FieldProp.ShopTexture,false,false)
 	_shop.searchable = supply.supports(&"cash")
-	_shop.reward_hint = "货币 +%d / 武器" % supply.cash_reward
+	_shop.reward_hint = ("货币 +%d" % supply.cash_reward)+(" / 武器" if supply.has_weapon_sample else "")
 	_cash_site.prop = _shop
 	var second: FieldProp = _make_building(layout.food_block,layout.food_title,
 		preload("res://assets/m401/market.png") if supply.supports(&"food") else preload("res://assets/m402/rowhouse.png"),supply.supports(&"food"),not supply.supports(&"food"))

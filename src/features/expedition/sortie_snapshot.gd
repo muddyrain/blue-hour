@@ -2,6 +2,8 @@ class_name SortieSnapshot
 extends RefCounted
 ## Whitelisted simulation values. No resource paths or object deserialization.
 
+const ROGUE_VERSION: int = 3
+const ROGUE_BUILD: String = "M6-ROGUE-01-1"
 const VERSION: int = 1
 const ENEMY_VERSION: int = 2
 const ENEMY_BUILD: String = "M5-ENEMY-02-1"
@@ -38,6 +40,8 @@ static func supply_for(identity: String) -> MissionSupply:
 
 
 static func supply_for_world(value: Dictionary) -> MissionSupply:
+	if value.get("version")==ROGUE_VERSION:
+		return RogueActions.supply(value.generated) if RogueActions.problem(value.get("generated")).is_empty() else null
 	if value.get("rescue_mission") == "rescue": return Supplies[2]
 	return supply_for(value.map)
 
@@ -69,18 +73,28 @@ static func capture(world: Expedition) -> Dictionary:
 	if world.field_join_mode:
 		captured.field_joins = world.field_joins.duplicate(true)
 	captured.build = String(captured.build) + "+" + FieldContacts.BUILD
+	if not world.supply.generated.is_empty():
+		captured.version = ROGUE_VERSION
+		captured.build += "+"+ROGUE_BUILD
+		captured.generated = world.supply.generated.duplicate(true)
 	return captured
 
 
 static func problem(value: Variant, receipt: Dictionary) -> String:
 	var enemy_mode: bool = EnemyState.is_state(receipt.base)
-	if not value is Dictionary or value.size() != KEYS.size() + (2 if RescueState.is_family(receipt.base) else 0) + (1 if GrowthState.is_family(receipt.base) else 0) + int(FieldJoinState.is_family(receipt.base)) + int(TraitState.is_family(receipt.base)) or not value.has_all(KEYS) or not SurvivalContracts.json_value(value):
+	var generated: bool = value is Dictionary and value.get("version")==ROGUE_VERSION
+	if not value is Dictionary or value.size() != KEYS.size() + (2 if RescueState.is_family(receipt.base) else 0) + (1 if GrowthState.is_family(receipt.base) else 0) + int(FieldJoinState.is_family(receipt.base)) + int(TraitState.is_family(receipt.base)) + int(generated) or not value.has_all(KEYS) or not SurvivalContracts.json_value(value):
 		return "WORLD_FIELDS"
 	var base_build: String = ENEMY_BUILD if enemy_mode else QUALITY_BUILD if WeaponState.is_state(receipt.base) else ROSTER_BUILD if RosterState.is_family(receipt.base) else POOL_BUILD if RescuePoolState.is_family(receipt.base) else TRAINING_BUILD if TrainingState.is_state(receipt.base) else TRAIT_BUILD if TraitState.is_family(receipt.base) else FIELD_BUILD if FieldJoinState.is_family(receipt.base) else (GROWTH_BUILD if GrowthState.is_family(receipt.base) else BUILD)
-	var contact_build: bool = value.build == base_build + "+" + FieldContacts.BUILD
+	if generated:
+		if not enemy_mode or receipt.rules.get("data_version")!=2 or not value.get("generated") is Dictionary or not TransactionReceipt.same(value.generated,receipt.rules.mission.generated) or not RogueActions.problem(value.generated).is_empty():
+			return "WORLD_DAILY_BINDING"
+	elif receipt.rules.get("data_version")==2:
+		return "WORLD_DAILY_VERSION"
+	var contact_build: bool = value.build == base_build + "+" + FieldContacts.BUILD + ("+"+ROGUE_BUILD if generated else "")
 	# Legacy snapshots remain strictly authenticatable in completed receipt history.
 	# Resuming their different motion semantics is separately rejected by apply().
-	if value.version != (ENEMY_VERSION if enemy_mode else VERSION) or (value.build != base_build and not contact_build) or not value.map is String or supply_for(value.map) == null or not value.hunger is bool:
+	if value.version != (ROGUE_VERSION if generated else ENEMY_VERSION if enemy_mode else VERSION) or ((generated or value.build != base_build) and not contact_build) or not value.map is String or (value.map!=value.generated.layout.id if generated else supply_for(value.map)==null) or not value.hunger is bool:
 		return "WORLD_VERSION_OR_MAP"
 	if not value.compatibility is String or value.compatibility.length() != 64 or not value.compatibility.is_valid_hex_number(false):
 		return "WORLD_COMPATIBILITY"
@@ -226,7 +240,7 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 
 
 static func apply(world: Expedition, value: Dictionary) -> String:
-	if not String(value.get("build","")).ends_with("+" + FieldContacts.BUILD):
+	if not String(value.get("build","")).ends_with("+" + FieldContacts.BUILD + ("+"+ROGUE_BUILD if value.get("version")==ROGUE_VERSION else "")):
 		return "WORLD_CONTACT_BUILD_MISMATCH"
 	if not world.setup_problem.is_empty() or world.survivors.size() != value.survivors.size() or not world.enemies.is_empty():
 		return "WORLD_RECONSTRUCTION_SETUP"
@@ -284,6 +298,9 @@ static func compatibility(world: Expedition) -> String:
 	if world.enemy_mode:
 		data.enemy_rules = EnemyRules.POLICY
 	data.build = String(data.build) + "+" + FieldContacts.BUILD
+	if not world.supply.generated.is_empty():
+		data.build += "+"+ROGUE_BUILD
+		data.generated = world.supply.generated.duplicate(true)
 	data.contact = {"distance":FieldContacts.DISTANCE,"approach":FieldContacts.APPROACH,"rechase":FieldContacts.RECHASE,"step":FieldContacts.STEP_DISTANCE,"steps":FieldContacts.MAX_STEPS,"path_parts":FieldContacts.MAX_PATH_PARTS,"pass_dot":FieldContacts.PASS_DOT,"recovery_speed":FieldContacts.RECOVERY_SPEED,"recovery_cap":FieldContacts.MAX_RECOVERY,"recovery_passes":FieldContacts.RECOVERY_PASSES,"yield_speed":FieldContacts.YIELD_SPEED}
 	return SurvivalContracts.fingerprint(data)
 

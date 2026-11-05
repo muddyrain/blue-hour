@@ -9,6 +9,12 @@ const Supplies: Array[MissionSupply] = [preload("res://src/features/camp/scaveng
 const SHOP: Texture2D = preload("res://assets/candidates/shop_02.png")
 const MARKET: Texture2D = preload("res://assets/m401/market.png")
 var choices: Array[Button] = []
+var daily_offers: Array[Dictionary] = []
+var _active: Array[MissionSupply] = []
+var _titles: Array[Label] = []
+var _descriptions: Array[Label] = []
+var _pictures: Array[TextureRect] = []
+var _heading: Label
 var rescue_enabled: bool = false
 var player_mode: bool = false
 var field_join_mode: bool = false
@@ -33,7 +39,8 @@ func _ready() -> void:
 	var column: VBoxContainer = VBoxContainer.new()
 	column.add_theme_constant_override("separation", 16)
 	margins.add_child(column)
-	column.add_child(CampStyle.label("行动地图 / 旧街", 32))
+	_heading = CampStyle.label("行动地图 / 旧街", 32)
+	column.add_child(_heading)
 	column.add_child(CampStyle.label("选择此行的补给方向，准备好后出发。", 18, CampStyle.MUTED))
 	var row: HBoxContainer = HBoxContainer.new()
 	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -41,6 +48,7 @@ func _ready() -> void:
 	column.add_child(row)
 	var available: Array[MissionSupply] = Supplies.duplicate()
 	if rescue_enabled: available.append(preload("res://src/features/camp/rescue.tres"))
+	_active.assign(available)
 	for index: int in range(available.size()):
 		var supply: MissionSupply = available[index]
 		var panel: PanelContainer = PanelContainer.new()
@@ -50,7 +58,9 @@ func _ready() -> void:
 		var card: VBoxContainer = VBoxContainer.new()
 		card.add_theme_constant_override("separation", 12)
 		panel.add_child(card)
-		card.add_child(CampStyle.label("%02d / %s" % [index + 1, supply.display_name if index == 2 else supply.layout.display_name], 24))
+		var title: Label = CampStyle.label("%02d / %s" % [index + 1, supply.display_name if index == 2 else supply.layout.display_name], 24)
+		card.add_child(title)
+		_titles.append(title)
 		var picture: TextureRect = TextureRect.new()
 		picture.texture = SHOP if index == 0 else MARKET
 		picture.custom_minimum_size = Vector2(240 if rescue_enabled else 400,112 if player_mode else 192)
@@ -59,6 +69,7 @@ func _ready() -> void:
 		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(picture)
+		_pictures.append(picture)
 		var description: String = "援救10秒后立即加入行动；全员撤离后登记营地。新同行本餐不参食，下次按实际存活者计粮。" if field_join_mode and index == 2 else supply.description
 		if player_mode:
 			description = ("援助一位幸存者10秒后同行参战，存活归航后正式加入。" if index==2 else supply.description) + "\n搜完货币点可带回%d币；%s。武器以实际搜获为准。\n夜间敌人增援变密；阵亡不可恢复，归航需留足口粮。" % [supply.cash_reward,"食物点%d份" % supply.food_reward if supply.food_reward>0 else "此行没有食物点"]
@@ -66,10 +77,11 @@ func _ready() -> void:
 		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		text.custom_minimum_size.y = 52
 		card.add_child(text)
+		_descriptions.append(text)
 		var button: Button = Button.new()
 		button.text = "前往救援 →" if index == 2 else ("出发搜集 →" if index == 0 else "前往超市 →")
 		button.custom_minimum_size.y = 52
-		button.pressed.connect(func() -> void: selected.emit(supply))
+		button.pressed.connect(func() -> void: selected.emit(_active[index]))
 		card.add_child(button)
 		choices.append(button)
 	cancel_button = Button.new()
@@ -86,3 +98,18 @@ func refresh_rescue(completed: bool, reason: String = "") -> void:
 		choices[2].text = ("救援已结束" if field_join_mode else "林知秋已加入") if completed else "前往救援 →"
 		if completed and not reason.is_empty():
 			choices[2].text = reason
+
+
+func refresh_daily(base: Dictionary) -> void:
+	daily_offers = RogueActions.offers(base)
+	_heading.text = "第%d天 · 选择一项行动" % int(base.day)
+	for index: int in range(3):
+		var supply: MissionSupply = RogueActions.supply(daily_offers[index])
+		_active[index] = supply
+		_titles[index].text = "%02d / %s" % [index+1,supply.display_name]
+		_descriptions[index].text = supply.description
+		_pictures[index].custom_minimum_size.y = 88
+		_pictures[index].texture = MARKET if supply.id==&"supermarket" else SHOP
+		choices[index].disabled = false
+		choices[index].text = "选择此行动 →"
+		choices[index].tooltip_text = "只有真实搜集并成功撤离，确认结算才入账。"

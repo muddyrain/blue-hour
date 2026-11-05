@@ -573,7 +573,8 @@ func open_mission_select() -> void:
 		_hunger_confirmation.popup_centered(Vector2i(700,260))
 		return
 	_title.hide()
-	mission_select.refresh_rescue(RescuePoolState.available(camp_snapshot()).is_empty() if pool_mode else not _recruits.is_empty(), RosterState.unavailable_reason(camp_snapshot()) if roster_mode else "四人历史编制已满" if pool_mode else "")
+	if playable_entry: mission_select.refresh_daily(camp_snapshot())
+	else: mission_select.refresh_rescue(RescuePoolState.available(camp_snapshot()).is_empty() if pool_mode else not _recruits.is_empty(), RosterState.unavailable_reason(camp_snapshot()) if roster_mode else "四人历史编制已满" if pool_mode else "")
 	mission_select.show()
 	mission_select.choices[0].grab_focus()
 	_request_audio(&"ui_confirm")
@@ -615,6 +616,7 @@ func _open_sortie(practice: bool, resume: Dictionary = {}) -> void:
 		if started.error != OK:
 			_accept_transaction(started)
 			return
+		if playable_entry: selected_supply = progress_session.active_supply()
 	elif not practice and not transactional_mode and RunSave.transaction_namespace(progress_path):
 		_progress_blocked = true
 		_progress_message = "此进度要求事务入口，不能按旧档出击。"
@@ -995,6 +997,8 @@ func suspend_sortie() -> void:
 func _suspend_problem(result: Dictionary) -> String:
 	var reason: String = result.get("reason", "UNKNOWN")
 	print("BH_SUSPEND_DETAIL build=%s reason=%s" % [SortieSnapshot.GROWTH_BUILD if growth_mode else SortieSnapshot.BUILD, reason])
+	if "WORLD_DAILY_BUILD_MISMATCH" in reason:
+		return "此途中进度属于旧固定街区版本，请用原版本继续。暂存未消费，原件保留，不回退旧营地。"
 	if "WORLD_CONTACT_BUILD_MISMATCH" in reason:
 		return "此途中暂存使用旧接触规则，请使用原兼容版本继续；本次未消费或改写暂存。"
 	if "BINDING" in reason or "ACK" in reason:
@@ -1510,7 +1514,7 @@ func _transaction_message(reason: String) -> String:
 	if playable_entry:
 		if "WRITER" in reason: return "进度正被其他窗口使用或暂时无法保存。请关闭其他实例后重开；原件保留。"
 		if "UNFINISHED_ACTION" in reason: return "上次行动中断且没有完整结算，当前无法继续。请保留进度；不会回退营地或发放战利品。"
-		if "COMPAT" in reason or "BUILD" in reason: return "此版本无法安全继续该途中进度。原件保留，不自动转换或回退。"
+		if "COMPAT" in reason or "BUILD" in reason or "DAILY" in reason or "LAYOUT" in reason: return "此版本无法安全继续该途中进度。原件保留，不自动转换或回退。"
 		return "进度保存或校验未完成，已阻止出击。可重试或退出；原件保留，不自动回退旧档。"
 	if "HUNGER_EXPLICIT_TRIAL_REQUIRED" in reason:
 		return "此旅程含暂行饥饿规则；请使用 Play-Survival -HungerTrial 并明确确认。当前入口已阻止继续，原件保留。"

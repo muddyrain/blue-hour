@@ -23,10 +23,11 @@ def main():
  rows=[]
  def execute(label,args,flags=None,expected=0):
   folder=job/label;folder.mkdir();cmd=[exe,'--headless','--path',str(ROOT),'--audio-driver','Dummy',*args]
-  flags=list(flags or ([] if label=='startup-default' else ['--bh-legacy-entry']))
-  cmd+=['--',*flags,'--bh-progress='+str(folder/('run.enemy-v1.json' if label=='startup-default' or '--bh-enemy-trial' in flags else 'run.json')),'--bh-audio-settings='+str(folder/'audio.json')]
+  flags=list(flags if flags is not None else ([] if label=='startup-default' else ['--bh-legacy-entry']))
+  cmd+=['--',*flags,'--bh-progress='+str(folder/('run.enemy-v1.json' if label in ['startup-default','rogue-contracts'] or '--bh-enemy-trial' in flags else 'run.json')),'--bh-audio-settings='+str(folder/'audio.json')]
   if label=='known-hash-cycle':cmd+=['--cycle-output='+str(folder/'cycle.json')]
   if label=='record-hash':cmd+=['--record-output='+str(folder/'data')]
+  if label=='rogue-data':cmd+=['--rogue-data-output='+str(folder/'data.json')]
   with (folder/'console.txt').open('xb') as out:z=subprocess.run(cmd,cwd=ROOT,stdout=out,stderr=out,env=env,timeout=150)
   text=(folder/'console.txt').read_text(encoding='utf-8',errors='replace');assert z.returncode==expected and not re.search(r'(?m)^(SCRIPT ERROR|ERROR):',text),(label,z.returncode,text[-2000:])
   if label=='known-hash-cycle':assert 'MINIMAL_HASH_CYCLE=true' in text and 'EXACT_RECORD_ROUNDTRIP=true' in text
@@ -38,6 +39,9 @@ def main():
  execute('startup-111',['--quit-after','3'],['--bh-enemy-trial','--bh-safe-suspend','--bh-camp-prototype'])
  for name in ['playable_entry','smoke','presentation','weapon_inventory','combat_los','navigation_nearest','night_pressure','contact_damage','contact_separation','animation/motion','animation/normal_stability','animation/infected_v1']:
   execute(name.replace('/','-'),['--script','res://tests/'+name+'.gd'])
+ for name in ['rogue_data','rogue_navigation','hud_compact','rogue_legacy_scope']:
+  execute(name.replace('_','-'),['--script','res://tests/'+name+'.gd'])
+ execute('rogue-contracts',['--script','res://tests/rogue_contracts.gd'],[])
  execute('known-hash-cycle',['--script','res://tests/known_hash_cycle.gd'])
  execute('record-hash',['--script','res://tests/record_hash.gd'])
  z=subprocess.run([sys.executable,'tools/validate_assets.py'],cwd=ROOT,capture_output=True);(job/'assets.txt').write_bytes(z.stdout+z.stderr);assert z.returncode==0,z.stderr

@@ -2,6 +2,7 @@ class_name ProductionProgress
 extends RefCounted
 ## Explicit sandbox wiring through main. The reserved path remains gated when sidecars disappear.
 
+var daily_actions: bool = false
 var fault_hook: Callable
 var token: Dictionary = {}
 var packet: Dictionary = {}
@@ -35,6 +36,7 @@ var _suspend_generation: String = ""
 
 
 func _init(save_path: String, battle: bool = false, survival: bool = false, hunger: bool = false, rescue: bool = false, growth: bool = false, field: bool = false, traits: bool = false, training: bool = false, pool: bool = false, roster: bool = false, quality: bool = false, enemy: bool = false, playable: bool = false) -> void:
+	daily_actions = playable
 	enemy_mode = enemy
 	quality_mode = quality or enemy
 	roster_mode = roster or quality_mode
@@ -297,6 +299,8 @@ func begin(before: Dictionary, supply: MissionSupply) -> Dictionary:
 	for member: Dictionary in before.crew:
 		if member.health <= 0 and not battle_mode:
 			return _blocked("LEGACY_ZERO_HP_NOT_ENROLLED")
+	if daily_actions and (supply==null or not RogueActions.matches(before,supply.generated)):
+		return _blocked("DAILY_SELECTION_NOT_CURRENT")
 	_active_base = before.duplicate(true)
 	_active_rules = FrozenSettlement.battle_rules(supply) if battle_mode else FrozenSettlement.foundation_rules(supply)
 	if survival_mode:
@@ -312,6 +316,10 @@ func begin(before: Dictionary, supply: MissionSupply) -> Dictionary:
 		token = started.token.duplicate(true)
 		packet = {}
 	return started
+
+
+func active_supply() -> MissionSupply:
+	return RogueActions.supply(_active_rules.mission.generated) if _active_rules.get("data_version")==2 else null
 
 
 func join_field(at_ms: int) -> Dictionary:
@@ -348,6 +356,8 @@ func resume_offer() -> Dictionary:
 	if state.error != OK or state.state != "SUSPENDED":
 		return _blocked(state.get("reason","NO_SUSPEND_READY"))
 	var receipt: Dictionary = state.receipt
+	if daily_actions and receipt.rules.get("data_version")!=2:
+		return _blocked("WORLD_DAILY_BUILD_MISMATCH")
 	if receipt.envelope.world.hunger != hunger_trial:
 		return _blocked("SUSPEND_HUNGER_ENTRY_MISMATCH")
 	_active_base = receipt.base.duplicate(true)

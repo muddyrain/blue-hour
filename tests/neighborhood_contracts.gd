@@ -43,6 +43,7 @@ func run() -> void:
 	var registration: Dictionary=TransactionReceipt.registration(base,base.journey.root_id)
 	var receipt: Dictionary=TransactionReceipt.initial(base,base.profile_id+":1",rules,registration)
 	# Use the real composition path: it installs PersistedDamageGate and all mode wiring.
+	main.progress_session.daily_actions=false # Explicit historical generator probe.
 	main._select_mission(supply)
 	var world: Expedition=main.expedition
 	world.set_physics_process(false);world.toggle_pause()

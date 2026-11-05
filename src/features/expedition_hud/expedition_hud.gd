@@ -16,6 +16,7 @@ const TONES: Dictionary[String, Color] = {
 
 var _paused: bool = false
 var _mission: Label
+var _objective: Label
 var _progress: Label
 var _currency: Label
 var _time_label: Label
@@ -72,6 +73,8 @@ func refresh(state: Dictionary) -> void:
 		_text(state, "day_text", "天数 —"),
 		_text(state, "search_progress_text", "—"), _text(state, "defeated_text", "—"),
 	]
+	_objective.text=_text(state,"objective")
+	_objective.visible=not _objective.text.is_empty()
 	_currency.text = "货币 %s" % _text(state, "currency_text", "—")
 	var delta: String = _text(state, "currency_delta_text")
 	if not delta.is_empty():
@@ -151,6 +154,8 @@ func _build_top() -> void:
 	_wrap(_mission)
 	_progress = _label(mission_box, "Progress", 16)
 	_wrap(_progress)
+	_objective = _label(mission_box,"Objective",16)
+	_wrap(_objective)
 	_currency = _label(mission_box, "Currency", 16)
 	_wrap(_currency)
 	_time_box = _column(row)

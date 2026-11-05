@@ -7,6 +7,7 @@ enum Activity {
 	MOVING,
 	SEARCHING,
 	DOWN,
+	RECOVERING, # Outdoor work stays visible and damageable; preserve legacy enum numbers.
 }
 
 var actor_id: int = 0
@@ -80,7 +81,7 @@ func _draw() -> void:
 
 
 func command_path(points: PackedVector2Array) -> void:
-	if activity == Activity.DOWN or points.is_empty():
+	if activity in [Activity.DOWN, Activity.RECOVERING] or points.is_empty():
 		return
 	path = points
 	_path_index = 0

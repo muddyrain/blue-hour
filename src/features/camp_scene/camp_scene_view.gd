@@ -115,6 +115,9 @@ func refresh(data: Dictionary, daily: Dictionary, can_depart: bool, reason: Stri
 	world.refresh(data.crew)
 	resource_text.text = "第%d天   货币%d   食物%d   在营%d人" % [data.day, data.cash, data.food, world.visible_member_ids.size()]
 	eligibility_text.text = "%s · 今日需%d粮%s" % [reason, daily.required, " / 缺口%d" % int(daily.shortage) if daily.shortage > 0 else " / 库存足够"]
+	if data.last_day.has("task"):
+		var found: int = data.weapons.filter(func(item: Dictionary) -> bool:return item.get("acquired_sortie")==data.last_settlement_id).size()
+		eligibility_text.text=TaskActions.summary_text(data.last_day.task)+" · 实得货币%d / 食物%d / 武器%d"%[data.last_day.cash_gained,data.last_day.food_found,found]
 	notice.text = feedback if not feedback.is_empty() else "Tab选设施 · Enter/Space确认 · Esc关闭当前页"
 	hotspots[&"bus"].disabled = not can_depart
 	hotspots[&"bus"].tooltip_text = "选择出击目标" if can_depart else reason

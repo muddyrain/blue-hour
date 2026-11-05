@@ -319,7 +319,7 @@ func begin(before: Dictionary, supply: MissionSupply) -> Dictionary:
 
 
 func active_supply() -> MissionSupply:
-	return DailyActions.supply(_active_rules.mission.generated) if (_active_rules.get("data_version")==2 or _active_rules.get("data_version")==3 or _active_rules.get("data_version")==4) else null
+	return DailyActions.supply(_active_rules.mission.generated) if (_active_rules.get("data_version")==2 or _active_rules.get("data_version")==3 or _active_rules.get("data_version")==4 or _active_rules.get("data_version")==5) else null
 
 
 func join_field(at_ms: int) -> Dictionary:
@@ -356,8 +356,10 @@ func resume_offer() -> Dictionary:
 	if state.error != OK or state.state != "SUSPENDED":
 		return _blocked(state.get("reason","NO_SUSPEND_READY"))
 	var receipt: Dictionary = state.receipt
-	if daily_actions and receipt.rules.get("data_version")!=4:
+	if daily_actions and receipt.rules.get("data_version")!=4 and receipt.rules.get("data_version")!=5:
 		return _blocked("WORLD_DAILY_BUILD_MISMATCH")
+	if SortieSnapshot.old_outdoor(receipt.envelope.world):
+		return _blocked("WORLD_OUTDOOR_BUILD_MISMATCH")
 	if receipt.envelope.world.hunger != hunger_trial:
 		return _blocked("SUSPEND_HUNGER_ENTRY_MISMATCH")
 	_active_base = receipt.base.duplicate(true)

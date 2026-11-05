@@ -13,6 +13,11 @@ var daily_offers: Array[Dictionary] = []
 var _active: Array[MissionSupply] = []
 var _titles: Array[Label] = []
 var _descriptions: Array[Label] = []
+class CrateThumbnail extends Node2D:
+	func _draw() -> void:
+		AirdropProp.draw_crate(self,false)
+
+var _crates: Array[Node2D] = []
 var _pictures: Array[TextureRect] = []
 var _heading: Label
 var rescue_enabled: bool = false
@@ -70,6 +75,11 @@ func _ready() -> void:
 		picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(picture)
 		_pictures.append(picture)
+		var crate: Node2D=CrateThumbnail.new()
+		crate.visible=false
+		picture.add_child(crate)
+		picture.resized.connect(func() -> void: crate.position=picture.size*0.5+Vector2(-12,28))
+		_crates.append(crate)
 		var description: String = "援救10秒后立即加入行动；全员撤离后登记营地。新同行本餐不参食，下次按实际存活者计粮。" if field_join_mode and index == 2 else supply.description
 		if player_mode:
 			description = ("援助一位幸存者10秒后同行参战，存活归航后正式加入。" if index==2 else supply.description) + "\n搜完货币点可带回%d币；%s。武器以实际搜获为准。\n夜间敌人增援变密；阵亡不可恢复，归航需留足口粮。" % [supply.cash_reward,"食物点%d份" % supply.food_reward if supply.food_reward>0 else "此行没有食物点"]
@@ -109,7 +119,9 @@ func refresh_daily(base: Dictionary) -> void:
 		_titles[index].text = "%02d / %s" % [index+1,supply.display_name]
 		_descriptions[index].text = supply.description
 		_pictures[index].custom_minimum_size.y = 88
-		_pictures[index].texture = MARKET if supply.id==&"supermarket" else SHOP
+		var outdoor: bool=TaskActions.outdoor_site(supply.generated,&"cash")
+		_pictures[index].texture = null if outdoor else MARKET if supply.id==&"supermarket" else SHOP
+		_crates[index].visible=outdoor
 		choices[index].disabled = false
 		choices[index].text = "选择此行动 →"
 		choices[index].tooltip_text = "只有真实搜集并成功撤离，确认结算才入账。"

@@ -12,9 +12,9 @@ func configure(token: Dictionary) -> void:
 
 
 func accept_search(world: Expedition, actor: FieldActor, site: StringName) -> bool:
-	if not world.trait_mode or world.is_paused or world.phase == Expedition.Phase.FINISHED or actor != world.search_actor or not world.survivors.has(actor) or actor.health <= 0 or actor.activity != FieldActor.Activity.SEARCHING or actor.visible:
+	if not world.trait_mode or world.is_paused or world.phase == Expedition.Phase.FINISHED or actor != world.search_actor or not world.survivors.has(actor) or actor.health <= 0 or not world.work_state_matches(actor,world._active_site):
 		return false
-	if world._active_site == null or world._active_site.kind != site or world._active_site.progress < world.tuning.search_seconds or events.any(func(row: Dictionary) -> bool: return row.site == String(site)):
+	if world._active_site == null or world._active_site.kind != site or world._active_site.progress < world._site_seconds(world._active_site) or events.any(func(row: Dictionary) -> bool: return row.site == String(site)):
 		return false
 	events.append({"member_id":actor.member_id,"kind":"search_complete","site":String(site),"at_ms":floori(world.elapsed*1000.0)})
 	return true

@@ -118,6 +118,7 @@ var _readouts: SquadReadouts
 var _cash_site: SearchSite = SearchSite.new(&"cash", Vector2.ZERO)
 var _food_site: SearchSite = SearchSite.new(&"food", Vector2.ZERO)
 var sites: Array[SearchSite] = []
+var task_event: Dictionary = TaskActions.empty_event()
 var _bus_sprite: Sprite2D
 var bus_view: BusJourney
 var _active_site: SearchSite
@@ -750,18 +751,20 @@ func _visual_contact(enemy: FieldActor) -> Vector2:
 	return nearest
 
 
-func _spawn_enemy() -> void:
+func _spawn_enemy(forced_kind: String = "", pressure_point: Vector2 = Vector2.INF) -> Dictionary:
 	if is_practice:
 		_spawn_practice_enemy()
-		return
-	var point: Vector2 = _safe_spawn_point()
+		return {"reason":"practice","enemy_id":-1}
+	var point: Vector2 = _safe_spawn_point(pressure_point)
 	if not point.is_finite():
 		_record_spawn(&"no_safe_point", point)
-		return
-	var enemy: FieldActor = _make_actor(true, _spawn_count, point)
+		return {"reason":"no_safe_point","enemy_id":-1}
+	var enemy: FieldActor = _make_actor(true, _spawn_count, point,{},forced_kind)
 	enemies.append(enemy)
 	_spawn_count += 1
 	_record_spawn(&"spawned", point, enemy.actor_id)
+
+	return {"reason":"spawned","enemy_id":enemy.actor_id}
 
 
 func visible_world_rect() -> Rect2:
@@ -779,7 +782,7 @@ func threat_status() -> Dictionary:
 	return state
 
 
-func _safe_spawn_point() -> Vector2:
+func _safe_spawn_point(pressure_point: Vector2 = Vector2.INF) -> Vector2:
 	var candidates: Array[Vector2] = []
 	for index: int in range(layout.enemy_points.size()):
 		candidates.append(layout.enemy_points[(_spawn_attempts + index) % layout.enemy_points.size()])
@@ -789,9 +792,13 @@ func _safe_spawn_point() -> Vector2:
 		candidates.append(Vector2(lerpf(bounds.position.x, bounds.end.x, fraction), bounds.end.y))
 		candidates.append(Vector2(bounds.position.x, lerpf(bounds.position.y, bounds.end.y, fraction)))
 		candidates.append(Vector2(bounds.end.x, lerpf(bounds.position.y, bounds.end.y, fraction)))
+	if pressure_point.is_finite():
+		candidates.sort_custom(func(a: Vector2,b: Vector2) -> bool:return a.distance_squared_to(pressure_point)<b.distance_squared_to(pressure_point))
 	var visible: Rect2 = visible_world_rect().grow(threat.rules.screen_margin)
 	for point: Vector2 in candidates:
 		if visible.has_point(point) or not navigation.is_clear(point):
+			continue
+		if pressure_point.is_finite() and point.distance_to(pressure_point)<threat.rules.party_distance:
 			continue
 		var nearest: FieldActor = _nearest_target_from_point(point)
 		if nearest == null or point.distance_to(nearest.position) < threat.rules.party_distance:
@@ -895,7 +902,7 @@ func _nearest_target(actor: FieldActor, candidates: Array[FieldActor], limit: fl
 
 func _update_combat() -> void:
 	for actor: FieldActor in survivors:
-		if actor.activity == FieldActor.Activity.DOWN or actor.activity == FieldActor.Activity.SEARCHING:
+		if actor.activity in [FieldActor.Activity.DOWN, FieldActor.Activity.SEARCHING, FieldActor.Activity.RECOVERING]:
 			continue
 		var weapon: WeaponDefinition = actor.weapon_definition
 		var target: FieldActor = _attack_target(actor)
@@ -972,6 +979,7 @@ func _update_combat() -> void:
 				return
 			if battle_survival and target.health == 0:
 				_show_notice("%02d %s 已阵亡 · 战斗死亡已持久确认" % [target.member_id,target.call_sign])
+			_clear_dead_worker()
 			enemy.cooldown = tuning.enemy_interval
 			if behavior!=null and behavior.kind==EnemyRules.HEAVY:
 				behavior.reset(enemy,tuning.enemy_speed)
@@ -1030,22 +1038,37 @@ func _attack_target(actor: FieldActor) -> FieldActor:
 	return result
 
 
+func work_state_matches(actor: FieldActor, site: SearchSite) -> bool:
+	if site == null: return false
+	var outdoor: bool = TaskActions.outdoor_site(supply.generated,site.id)
+	return actor.health>0 and actor.activity == (FieldActor.Activity.RECOVERING if outdoor else FieldActor.Activity.SEARCHING) and actor.visible == outdoor and (not outdoor or actor.position.distance_to(site.door)<=14.0)
+
+
+func _clear_dead_worker() -> void:
+	if search_actor != null and search_actor.activity == FieldActor.Activity.DOWN:
+		# Existing death policy: unfinished progress resets; the once-only event survives.
+		_active_site.progress = 0.0
+		_release_searcher()
+
+
 func _update_search(delta: float) -> void:
+	_clear_dead_worker()
 	if search_actor == null:
 		return
-	if search_actor.activity == FieldActor.Activity.DOWN:
-		search_actor = null
-		_active_site.progress = 0.0
-		_active_site = null
-		return
-	if search_actor.activity != FieldActor.Activity.SEARCHING:
+	var outdoor: bool = TaskActions.outdoor_site(supply.generated,_active_site.id)
+	if search_actor.activity not in [FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING]:
 		if search_actor.position.distance_to(_active_site.door) > 14.0:
 			return
-		search_actor.activity = FieldActor.Activity.SEARCHING
-		search_actor.hide()
+		search_actor.activity = FieldActor.Activity.RECOVERING if outdoor else FieldActor.Activity.SEARCHING
+		search_actor.visible = outdoor
+		if outdoor: _trigger_airdrop()
 		print("BH_SEARCH entered")
+	if not work_state_matches(search_actor,_active_site):
+		# Contact displacement interrupts outdoor work; cancellation retains earned progress.
+		_release_searcher()
+		return
 	_active_site.progress += delta / search_actor.trait_search_factor
-	if _active_site.progress >= tuning.search_seconds:
+	if _active_site.progress >= _site_seconds(_active_site):
 		var site: SearchSite = _active_site
 		if trait_mode and not trait_inputs.events.any(func(e: Dictionary) -> bool: return e.site==String(site.kind)) and not trait_inputs.accept_search(self,search_actor,site.kind):
 			_show_notice("特性搜集来源未确认，已暂停；不会重复发放收益。")
@@ -1104,6 +1127,7 @@ func _finish(evacuated: bool) -> void:
 		"sites_searched":_searched_count(),
 		"kills": kills, "searched": _kind_searched(&"cash"), "health": remaining_health, "elapsed": elapsed}
 	if not layout.world_data.is_empty(): report.site_facts = WorldSites.facts(self)
+	if supply.generated.get("version")==4: report.task_event=task_event.duplicate(true)
 	if not is_practice and not loadout_snapshot.is_empty():
 		report.growth_inputs = growth_inputs.snapshot(sortie_id,layout.id,elapsed)
 	if rescue_mode:
@@ -1204,7 +1228,7 @@ func _update_ui() -> void:
 	if is_practice:
 		engine_text = "结束交火练习 →"
 	var members: Array[Dictionary] = []
-	var activities: Array[String] = ["警戒", "移动", "搜集中", "倒地"]
+	var activities: Array[String] = ["警戒", "移动", "搜集中", "倒地", "回收中"]
 	for actor: FieldActor in survivors:
 		members.append({"id":actor.member_id,"label":"%s · %s" % [actor.call_sign, "阵亡" if actor.permanent_death else activities[actor.activity]],
 			"call_sign":actor.call_sign,"status":"阵亡" if actor.permanent_death else activities[actor.activity],
@@ -1219,6 +1243,7 @@ func _update_ui() -> void:
 			pending.append("%02d +%d" % [actor.member_id,0 if battle_drill or actor.health <= 0 else xp_inputs.pending(actor.member_id)])
 	var xp_text: String = "本次经验（归航后生效）："+" / ".join(pending) if growth_mode else ""
 	_hud.refresh({
+		"objective":TaskActions.hud(self),
 		"mission_title":("交火练习" if is_practice else mission_title) if los_setup == null else mission_title, "members":members,
 		"can_extract":phase != Phase.FINISHED if is_practice else phase == Phase.ACTIVE and elapsed >= tuning.bus_ready_seconds,
 		"boarding":boarding,
@@ -1241,8 +1266,8 @@ func _update_ui() -> void:
 	for site: SearchSite in sites:
 		site.prop.searched = site.searched
 		site.prop.update_work(search_actor.actor_id if search_actor != null and _active_site == site else -1,
-			site.progress / tuning.search_seconds,
-			search_actor != null and _active_site == site and search_actor.activity == FieldActor.Activity.SEARCHING,
+			site.progress / _site_seconds(site),
+			search_actor != null and _active_site == site and work_state_matches(search_actor,site),
 			search_actor.call_sign if search_actor != null and _active_site == site else "")
 
 
@@ -1280,6 +1305,7 @@ class SearchSite:
 	extends RefCounted
 	var id: StringName
 	var reward: int = 0
+	var seconds: float = WorldSites.WORK_SECONDS
 	var weapon: bool = false
 	var hit: Rect2
 	var kind: StringName
@@ -1352,11 +1378,34 @@ func _make_world_buildings() -> void:
 		var entity: Dictionary = {}
 		for row: Dictionary in layout.world_data.entities:
 			if row.id==def.building: entity=row
-		var site: SearchSite = SearchSite.new(StringName(def.kind),WorldLayout.point(entity.door))
-		site.id=StringName(def.id); site.reward=int(def.amount); site.weapon=def.weapon
-		site.prop=props[def.building]
-		site.hit=Rect2(site.prop.position-Vector2(site.prop.front_width/2,280),Vector2(site.prop.front_width,340)) if layout.world_data.get("version")==3 else Rect2(WorldLayout.rect(entity.rect).position-Vector2(0,160),WorldLayout.rect(entity.rect).size+Vector2(0,220))
+		var crate: bool = def.has("point")
+		var site: SearchSite = SearchSite.new(StringName(def.kind),WorldLayout.point(def.point) if crate else WorldLayout.point(entity.door))
+		site.id=StringName(def.id); site.reward=int(def.amount); site.weapon=def.weapon; site.seconds=float(def.seconds)
+		if crate:
+			site.prop=AirdropProp.new(); site.prop.position=site.door; site.prop.front_width=80; site.prop.ui_theme=ui_theme
+			_sort.add_child(site.prop)
+			site.hit=Rect2(site.door-Vector2(48,100),Vector2(96,150))
+		else:
+			site.prop=props[def.building]
+			site.hit=Rect2(site.prop.position-Vector2(site.prop.front_width/2,280),Vector2(site.prop.front_width,340)) if layout.world_data.get("version")==3 else Rect2(WorldLayout.rect(entity.rect).position-Vector2(0,160),WorldLayout.rect(entity.rect).size+Vector2(0,220))
+			site.prop.primary_target=supply.generated.get("objective",{}).get("site_ids",[]).has(def.id)
 		site.prop.reward_hint=("货币" if site.kind==&"cash" else "食物")+" +%d"%site.reward+(" / 武器" if site.weapon else "")
 		sites.append(site)
 		if site.id==&"cash": _cash_site=site; _shop=site.prop
 		if site.id==&"food": _food_site=site
+
+
+func _site_seconds(site: SearchSite) -> float:
+	return site.seconds if supply.generated.get("version")==4 else tuning.search_seconds
+
+
+func _trigger_airdrop() -> void:
+	if task_event.started: return
+	task_event.started=true
+	for index: int in range(int(TaskActions.PARAMETERS.reinforcements)):
+		if enemies.size()>=threat.rules.enemy_cap:
+			_record_spawn(&"capacity",Vector2.INF)
+			task_event.resolutions.append({"reason":"capacity","enemy_id":-1})
+		else: task_event.resolutions.append(_spawn_enemy(EnemyRules.NORMAL,search_site(&"cash").door))
+	print("BH_TASK_EVENT "+JSON.stringify(task_event))
+	_show_notice("空投信标已启动 · 留意来袭；回收后可直接集合归航。")

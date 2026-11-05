@@ -24,7 +24,7 @@ def main():
  def execute(label,args,flags=None,expected=0):
   folder=job/label;folder.mkdir();cmd=[exe,'--headless','--path',str(ROOT),'--audio-driver','Dummy',*args]
   flags=list(flags if flags is not None else ([] if label=='startup-default' else ['--bh-legacy-entry']))
-  cmd+=['--',*flags,'--bh-progress='+str(folder/('run.enemy-v1.json' if label in ['startup-default','rogue-contracts','world-contracts','neighborhood-contracts','journal-cache','world-bus'] or '--bh-enemy-trial' in flags else 'run.json')),'--bh-audio-settings='+str(folder/'audio.json')]
+  cmd+=['--',*flags,'--bh-progress='+str(folder/('run.enemy-v1.json' if label in ['startup-default','rogue-contracts','world-contracts','neighborhood-contracts','task-contracts','task-data','journal-cache','world-bus'] or '--bh-enemy-trial' in flags else 'run.json')),'--bh-audio-settings='+str(folder/'audio.json')]
   if label=='known-hash-cycle':cmd+=['--cycle-output='+(folder/'cycle.json').as_posix()]
   if label=='record-hash':cmd+=['--record-output='+(folder/'data').as_posix()]
   if label=='closeout-view':cmd+=['--view-output='+(folder/'frames').as_posix()]
@@ -52,6 +52,8 @@ def main():
  execute('neighborhood-contracts',['--script','res://tests/neighborhood_contracts.gd'],[])
  execute('world-contracts',['--script','res://tests/world_contracts.gd'],[])
  execute('rogue-contracts',['--script','res://tests/rogue_contracts.gd'],[])
+ execute('task-data',['--script','res://tests/task_data.gd'],[])
+ execute('task-contracts',['--script','res://tests/task_contracts.gd'],[])
  execute('known-hash-cycle',['--script','res://tests/known_hash_cycle.gd'])
  execute('record-hash',['--script','res://tests/record_hash.gd'])
  z=subprocess.run([sys.executable,'tools/validate_assets.py'],cwd=ROOT,capture_output=True);(job/'assets.txt').write_bytes(z.stdout+z.stderr);assert z.returncode==0,z.stderr

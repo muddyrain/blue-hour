@@ -22,7 +22,7 @@ func has_capacity() -> bool:
 func accept(world: Expedition, shooter: FieldActor, enemy: FieldActor, accepted: Dictionary) -> bool:
 	if not world.growth_mode or world.is_paused or world.phase == Expedition.Phase.FINISHED or not world.survivors.has(shooter) or not world.enemies.has(enemy):
 		return false
-	if shooter.health <= 0 or not shooter.visible or shooter.activity in [FieldActor.Activity.DOWN,FieldActor.Activity.SEARCHING] or not enemy.is_enemy or enemy.health != 0 or enemy.activity != FieldActor.Activity.DOWN:
+	if shooter.health <= 0 or not shooter.visible or shooter.activity in [FieldActor.Activity.DOWN,FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING] or not enemy.is_enemy or enemy.health != 0 or enemy.activity != FieldActor.Activity.DOWN:
 		return false
 	if not enemy.has_meta(GrowthInputs.RECEIPT_META) or not TransactionReceipt.same(accepted,enemy.get_meta(GrowthInputs.RECEIPT_META)) or accepted.get("member_id") != shooter.member_id:
 		return false

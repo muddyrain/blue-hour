@@ -528,16 +528,19 @@ func open_validation() -> void:
 func return_to_title() -> void:
 	if phase != Phase.VALIDATION and phase != Phase.RESULT:
 		return
-	if battle_mode and not _pending_settlement.is_empty() and _pending_settlement.journey.state == "FAILED":
+	if battle_mode and not _pending_settlement.is_empty() and (_pending_settlement.journey.state=="FAILED" or CampaignState.ended(_pending_settlement)):
+		var terminal: Dictionary=_pending_settlement.duplicate(true)
 		if not _accept_transaction(progress_session.commit_result(),true):
 			_show_battle_result(_pending_settlement,false)
 			return
-		_pending_settlement = {}
+		_pending_settlement={}
+		_show_battle_result(terminal,true)
+		return
 	audio.stop_world()
 	_disconnect_sortie_events()
 	if phase == Phase.RESULT and not _pending_settlement.is_empty():
 		if transactional_mode:
-			_accept_transaction(progress_session.commit_result(),true)
+			if not _accept_transaction(progress_session.commit_result(),true): return
 		elif _pending_settlement.last_settlement_id != last_settlement_id:
 			_apply_progress(_pending_settlement)
 			_progress_dirty = true
@@ -605,7 +608,7 @@ func _open_sortie(practice: bool, resume: Dictionary = {}) -> void:
 		return
 	if hunger_trial and not _hunger_consented:
 		return
-	if battle_mode and (practice or _battle_meta.get("state") == "FAILED"):
+	if battle_mode and (practice or _battle_meta.get("state") == "FAILED" or CampaignState.ended(camp_snapshot())):
 		return
 	if not practice and not battle_mode and (crew_health[0] <= 0.0 or crew_health[1] <= 0.0):
 		return
@@ -623,6 +626,7 @@ func _open_sortie(practice: bool, resume: Dictionary = {}) -> void:
 		_update_camp()
 		return
 	expedition = ExpeditionScene.instantiate() as Expedition
+	expedition.restoring_world = not resume.is_empty()
 	expedition.is_practice = practice
 	expedition.player_mode = playable_entry
 	expedition.battle_survival = battle_mode
@@ -782,6 +786,7 @@ func _new_game() -> void:
 	_pending_settlement = {}
 	_migration_notice = ""
 	profile_id = RunSave.new_profile_id()
+	if playable_entry: _battle_meta.campaign=CampaignRules.initial(profile_id)
 	_initialize_weapons("initial")
 	last_settlement_id = ""
 	_pending_save.clear()
@@ -875,7 +880,7 @@ func _update_camp() -> void:
 	if not last_day.is_empty() and last_day.food_shortage > 0:
 		change += "；损失候选%d人，未应用" % HungerOutcome.candidate(last_day).loss_count
 	$Interface/Screen/Title/Camp.text = "第 %d 天 / 货币 %d / 食物 %d / 队员生命 %d · %d\n%s\n%s" % [day,cash,food,ceili(crew_health[0]),ceili(crew_health[1]),ration_text,change]
-	var eligible: bool = _battle_meta.get("state") == "ACTIVE" if battle_mode else crew_health[0] > 0.0 and crew_health[1] > 0.0
+	var eligible: bool = (_battle_meta.get("state") == "ACTIVE" and not CampaignState.ended(camp_snapshot())) if battle_mode else crew_health[0] > 0.0 and crew_health[1] > 0.0
 	$Interface/Screen/Title/Start.disabled = _requires_continue or _progress_blocked or not eligible
 	_loadout_button.disabled = _requires_continue or _progress_blocked
 	_roster_button.disabled = _requires_continue or _progress_blocked
@@ -1448,7 +1453,7 @@ func continue_game() -> void:
 			return
 		if _accept_transaction(progress_session.activate(),true):
 			_request_audio(&"ui_confirm")
-			if battle_mode and _battle_meta.state == "FAILED":
+			if battle_mode and (_battle_meta.state == "FAILED" or CampaignState.ended(camp_snapshot())):
 				_show_battle_result(camp_snapshot(),true)
 		return
 	_apply_progress(_pending_save)
@@ -1543,8 +1548,9 @@ func _show_battle_result(snapshot: Dictionary, durable: bool) -> void:
 	_screen.show()
 	_title.hide()
 	_result.show()
-	var ended: bool = snapshot.journey.state == "FAILED"
-	$Interface/Screen/Result/Heading.text = "旅程结束 · 全员阵亡" if ended else "幸存者归航"
+	var ended: bool = snapshot.journey.state == "FAILED" or CampaignState.ended(snapshot)
+	var victory: bool = snapshot.journey.get("campaign",{}).get("outcome")=="VICTORY"
+	$Interface/Screen/Result/Heading.text = ("旅程胜利" if durable else "胜利预览 · 待确认保存") if victory else "旅程结束 · 全员阵亡" if ended else "幸存者归航"
 	var text: String = "隔离生存测试版 / 战斗永久死亡\n"
 	if snapshot.journey.seed != "NONE":
 		text = "隔离演练：初始两人4HP / 食物12 / 按钮近敌36像素\n"
@@ -2165,8 +2171,11 @@ func _refresh_playable_presentation() -> void:
 	$Interface/Screen/Title/Eyebrow.text = "开发试玩版 · 整备队伍，再次启程。" if _camp_open else "开发试玩版 · 独立进度 · 阵亡与缺粮损失会保存"
 	_home_button.text = "进入营地 →" if run_save.has_files() else "开始试玩 →"
 	_continue_button.text = "继续试玩 →" if not _pending_save.is_empty() else "继续出击 →"
-	if _pending_save.get("journey",{}).get("state")=="FAILED": _continue_button.text = "查看旅程记录 →"
+	if _pending_save.get("journey",{}).get("state")=="FAILED" or CampaignState.ended(_pending_save): _continue_button.text = "查看旅程记录 →"
 	$Interface/Screen/Title/Reset.text = "新的试玩旅程…"
+	if _battle_meta.has("campaign") and not _requires_continue:
+		var display: Dictionary=CampaignRules.display(_battle_meta.campaign)
+		$Interface/Screen/Title/Eyebrow.text=display.title+" · "+display.progress
 	$Interface/Screen/Title/Sound.text = "设置"
 	if _requires_continue and not _pending_save.is_empty():
 		$Interface/Screen/Title/Camp.text = "已保存：第%d天 · 货币%d · 食物%d\n继续同一旅程，或明确开始新的试玩。" % [_pending_save.day,_pending_save.cash,_pending_save.food]
@@ -2179,7 +2188,7 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	var meal: Dictionary = frozen.get("food",snapshot.last_day)
 	var battle: Dictionary = frozen.get("battle",{})
 	var text: String = "结算已保存。\n" if durable else "结果预览 · 确认后保存入账。\n"
-	if snapshot.last_day.has("task"): text+=TaskActions.summary_text(snapshot.last_day.task)+"\n"
+	if snapshot.last_day.has("task") and not frozen.get("rules",{}).get("mission",{}).get("generated",{}).get("campaign",{}).get("is_finale",false): text+=TaskActions.summary_text(snapshot.last_day.task)+"\n"
 	if not meal.is_empty():
 		text += "带回：货币%d · 食物%d（入库%d） · 武器%d件\n口粮：%d名队员需%d粮，消耗%d，缺口%d\n" % [snapshot.last_day.cash_gained,meal.get("food_found",0),meal.get("food_stored",0),battle.get("weapons",[]).size(),meal.ration_member_ids.size(),meal.food_required,meal.food_consumed,meal.food_shortage]
 	for item: Dictionary in battle.get("weapons",[]):text+="带回武器："+WeaponInventory.loot_description(item)+"\n"
@@ -2188,5 +2197,9 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 		var fate: String = _member_fate(snapshot,int(member.id)).replace(" / STARVATION", "").replace(" / BATTLE", "")
 		text += "\n%02d %s · %s · 生命%.0f/%.0f\nLv%d · %d XP（本次+%d）\n" % [member.id,member.call_sign,fate,member.health,GrowthRules.maximum(member),member.growth.level,member.growth.xp_total,awarded.get("xp_gained",0)]
 	text += "\n营地：第%d天 · 货币%d · 食物%d · 存活%d人\n" % [snapshot.day,snapshot.cash,snapshot.food,snapshot.journey.active_member_ids.size()]
-	text += "旅程已结束，不能再次出击。" if snapshot.journey.state=="FAILED" else "确认结算后可回营整备，再次出击。"
+	if CampaignState.is_short(snapshot):
+		var display: Dictionary=CampaignRules.display(snapshot.journey.campaign)
+		text+=display.title+" · "+display.progress+"\n"
+		if snapshot.journey.campaign.outcome=="VICTORY": text+="首领真实击败、存活者巴士撤离；"+("旅程胜利已保存。" if durable else "胜利仅为预览，确认保存成功才结束旅程。")+"\n"
+	text += "旅程已结束，不能再次出击。" if snapshot.journey.state=="FAILED" or CampaignState.ended(snapshot) else "确认结算后可回营整备，再次出击。"
 	return text

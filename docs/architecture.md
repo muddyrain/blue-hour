@@ -6,6 +6,8 @@ WorldActions/WorldLayout/WorldSites提供V2有限街区、站点预算与事实�
 
 # 架构与所有权
 
+CampaignRules只提供纯阶段/显示，CampaignActions在原V5之上冻结V6阶段及导航验证首领定义。BossBehavior只产生稳定请求，BossWarning只读绘图；EncounterRuntime在Expedition内调用原攻击、伤害、刷怪与击败/XP owner。FrozenSettlement在原结果内推演journey.campaign，ProductionProgress确认提交后才成为持久结果；世界9保存同一首领和请求事实，没有另一个存档或归航结算器。旧111无campaign字段时保持原模式，历史指纹分支保留。见[短局合同](design/m8-run-01.md)。
+
 WeaponActions只在原TaskActions描述上冻结V5站点枪型，WeaponInventory新增显式站点奖励分支并保留历史固定reward；WorldSites/FrozenSettlement继续拥有实际携带与唯一入库。FieldActor持有按实例绑定的WeaponMagazine，Expedition按活跃模拟推进并在原成功攻击提交后扣弹，HUD只读。世界8扩展原快照，不增加战斗/保存/奖励owner；见[弹匣与掉落合同](design/m7-weapon-01.md)。
 
 TaskActions只生成/校验V4任务描述并投影真实目标进度；DailyActions保留V1/V2/V3认证分支。Expedition沿原站点/刷怪owner推进空投工作和有界一次性压力，SortieSnapshot世界6保存同一task_event及原敌人事实；FrozenSettlement从报告计算任务摘要，EnemyState只对111开放经校验的last_day.task。没有新保存或收益owner；见[任务合同](design/m6-rogue-02.md)。

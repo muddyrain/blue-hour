@@ -28,14 +28,14 @@ static func name_for(kind: String) -> String:
 	return "疾奔" if kind==RUSH else "重压" if kind==HEAVY else "普通"
 
 
-static func snapshot_problem(row: Dictionary, world: Dictionary, receipt: Dictionary) -> String:
+static func snapshot_problem(row: Dictionary, world: Dictionary, receipt: Dictionary, summoned_normal: bool = false) -> String:
 	var value: Variant = row.get("behavior")
 	if not value is Dictionary or value.size()!=5 or not value.has_all(["kind","spawn_stage","target_id","state","windup_remaining"]):
 		return "ENEMY_BEHAVIOR_FIELDS"
 	if not value.kind is String or value.kind not in [NORMAL,RUSH,HEAVY] or not SurvivalContracts.integer(value.spawn_stage,0,3) or not SurvivalContracts.integer(value.target_id,0,SurvivorRoster.MAX_MEMBER_ID) or not value.state is String or value.state not in ["chase","rush","windup"] or not SurvivalContracts.number(value.windup_remaining) or value.windup_remaining<0 or value.windup_remaining>POLICY.windup:
 		return "ENEMY_BEHAVIOR_VALUES"
 	var actor: Dictionary = row.state
-	var expected: String = NORMAL if actor.actor_id>=10000 else pick(receipt.transaction_id,int(actor.actor_id),int(value.spawn_stage))
+	var expected: String = NORMAL if summoned_normal or actor.actor_id>=10000 else pick(receipt.transaction_id,int(actor.actor_id),int(value.spawn_stage))
 	if SortieSnapshot.task_version(world.get("version")):
 		for resolution: Dictionary in world.task_event.resolutions:
 			if resolution.reason=="spawned" and resolution.enemy_id==actor.actor_id: expected=NORMAL

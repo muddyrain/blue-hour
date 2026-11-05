@@ -121,6 +121,8 @@ var sites: Array[SearchSite] = []
 var task_event: Dictionary = TaskActions.empty_event()
 var _bus_sprite: Sprite2D
 var bus_view: BusJourney
+var restoring_world: bool=false
+var encounter: EncounterRuntime
 var _active_site: SearchSite
 
 
@@ -151,6 +153,7 @@ func _ready() -> void:
 		set_physics_process(false)
 		set_process_unhandled_input(false)
 		return
+	if supply.generated.get("version")==6: tuning.spawn_seconds*=float(supply.generated.campaign.pressure)
 	layout = supply.layout
 	_cash_site.door = layout.cash_door
 	_food_site.door = layout.food_door
@@ -228,8 +231,10 @@ func _ready() -> void:
 			actor.weapon_instance_id = item.instance_id
 			actor.weapon_definition = WeaponModifiers.combat_definition(item)
 		actor.visual.set_weapon(actor.weapon_definition.presentation)
-		if supply.generated.get("version")==5:actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
+		if (supply.generated.get("version")==5 or supply.generated.get("version")==6):actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
 		survivors.append(actor)
+	if supply.generated.get("version")==6:
+		encounter=EncounterRuntime.new();encounter.setup(self,restoring_world)
 	_make_ui()
 	var readout_layer: CanvasLayer = CanvasLayer.new()
 	readout_layer.layer = 5
@@ -398,6 +403,7 @@ func step(delta: float) -> void:
 		if actor.magazine!=null and not working_before.get(actor.member_id,false) and actor.activity not in [FieldActor.Activity.DOWN,FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING]:actor.magazine.advance(delta)
 	_update_enemy_behaviors(0.0)
 	_update_combat()
+	if encounter!=null and not is_paused: encounter.advance(delta)
 	if is_paused:
 		_update_ui()
 		return
@@ -449,7 +455,7 @@ func promote_target(event: Dictionary, restoring: bool = false) -> void:
 	actor.weapon_instance_id = gun.instance_id
 	actor.weapon_definition = WeaponModifiers.combat_definition(gun)
 	actor.visual.set_weapon(actor.weapon_definition.presentation)
-	if supply.generated.get("version")==5:actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
+	if (supply.generated.get("version")==5 or supply.generated.get("version")==6):actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
 	actor.clear_order()
 	if trait_mode:
 		TraitRules.apply(actor,profile,tuning.survivor_speed)
@@ -877,7 +883,7 @@ func _spawn_practice_enemy() -> void:
 
 func _update_enemy_paths(idle_only: bool = false) -> void:
 	for enemy: FieldActor in enemies:
-		if enemy.enemy_behavior!=null and enemy.enemy_behavior.state=="windup":
+		if (encounter!=null and encounter.holds(enemy)) or (enemy.enemy_behavior!=null and enemy.enemy_behavior.state=="windup"):
 			continue
 		var target: FieldActor = _nearest_target(enemy, survivors, INF)
 		if target == null or _hold_enemy_approach(enemy):
@@ -941,6 +947,7 @@ func _update_combat() -> void:
 								toggle_pause()
 								return
 							recorded=receipt
+						if encounter!=null: encounter.record_defeat(target,receipt)
 				actor.cooldown = weapon.shot_interval(actor.trait_shot_factor)
 				if actor.magazine!=null:actor.magazine.commit_shot()
 				if not recorded.is_empty():growth_input_recorded.emit(recorded)
@@ -963,7 +970,7 @@ func _update_combat() -> void:
 		else:
 			actor.aim = Vector2.ZERO
 	for enemy: FieldActor in enemies:
-		if enemy.activity == FieldActor.Activity.DOWN:
+		if enemy.activity == FieldActor.Activity.DOWN or (encounter!=null and encounter.is_boss(enemy)):
 			continue
 		var target: FieldActor = _nearest_target(enemy, survivors, 28.0)
 		var damage: float = tuning.enemy_damage
@@ -1014,7 +1021,7 @@ func _update_enemy_behaviors(delta: float) -> void:
 	if not enemy_mode:
 		return
 	for enemy: FieldActor in enemies:
-		if enemy.enemy_behavior!=null:
+		if enemy.enemy_behavior!=null and not (encounter!=null and encounter.is_boss(enemy)):
 			enemy.enemy_behavior.update(self,enemy,delta)
 			enemy.sync_enemy_visual()
 
@@ -1142,7 +1149,7 @@ func _finish(evacuated: bool) -> void:
 		"sites_searched":_searched_count(),
 		"kills": kills, "searched": _kind_searched(&"cash"), "health": remaining_health, "elapsed": elapsed}
 	if not layout.world_data.is_empty(): report.site_facts = WorldSites.facts(self)
-	if supply.generated.get("version")==4 or supply.generated.get("version")==5: report.task_event=task_event.duplicate(true)
+	if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or supply.generated.get("version")==6): report.task_event=task_event.duplicate(true)
 	if not is_practice and not loadout_snapshot.is_empty():
 		report.growth_inputs = growth_inputs.snapshot(sortie_id,layout.id,elapsed)
 	if rescue_mode:
@@ -1153,6 +1160,7 @@ func _finish(evacuated: bool) -> void:
 		report.trait_inputs = trait_inputs.snapshot(self)
 	if field_join_mode:
 		report.field_joins = field_joins.duplicate(true)
+	if encounter!=null: report.encounter=encounter.snapshot()
 	FreezeProfile.leave("report.build", profile_report)
 	print("BH_RESULT %s" % JSON.stringify(report))
 	finished.emit(report)
@@ -1412,7 +1420,7 @@ func _make_world_buildings() -> void:
 
 
 func _site_seconds(site: SearchSite) -> float:
-	return site.seconds if supply.generated.get("version")==4 or supply.generated.get("version")==5 else tuning.search_seconds
+	return site.seconds if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or supply.generated.get("version")==6) else tuning.search_seconds
 
 
 func _trigger_airdrop() -> void:

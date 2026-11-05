@@ -10,6 +10,7 @@ func run() -> void:
 	assert("/.local/" in OS.get_user_data_dir().replace("\\","/"))
 	var main: Node=load("res://src/app/main.tscn").instantiate();root.add_child(main)
 	await process_frame
+	main.playable_entry=false # Explicit historical fixture; normal new journeys use short V1.
 	main._new_game() # Existing isolated business initializer, not a fabricated camp.
 	var base: Dictionary=main.camp_snapshot()
 	expect(TransactionReceipt.camp_problem(base).is_empty(),"real initial complete-mode fixture is strict")

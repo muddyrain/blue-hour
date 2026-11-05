@@ -82,7 +82,7 @@ static func _profiled_compute(input: Dictionary) -> Dictionary:
 	after.food = food.food_after
 	after.cash = int(before.cash) + int(report.loot)
 	after.last_day = food.duplicate(true)
-	if (input.rules.get("data_version")==5 or input.rules.get("data_version")==6): after.last_day.task=TaskActions.outcome(input.rules.mission.generated,report)
+	if (input.rules.get("data_version")==5 or (input.rules.get("data_version")==6 or input.rules.get("data_version")==7)): after.last_day.task=TaskActions.outcome(input.rules.mission.generated,report)
 	after.last_day.merge({"settlement_id":identity,"day":before.day,"cash_before":before.cash,
 		"cash_gained":report.loot,"cash_after":after.cash,"evacuated":report.evacuated})
 	var xp: Dictionary = {}
@@ -109,6 +109,8 @@ static func _profiled_compute(input: Dictionary) -> Dictionary:
 		var meta: Dictionary = before.journey.duplicate(true)
 		meta.deaths = deaths.duplicate(true)
 		after = SurvivalState.rebuild(before,after,meta)
+	if CampaignState.is_short(before):
+		after.journey.campaign=CampaignState.settled(before,after,report,input.rules.mission.generated)
 	issue = state_problem(after)
 	if not issue.is_empty():
 		return _reject("AFTER: " + issue)
@@ -154,7 +156,7 @@ static func input_problem(input: Dictionary) -> String:
 	issue = _rules_problem(input.rules)
 	if not issue.is_empty():
 		return issue
-	if int(input.rules.get("data_version",0)) in [2,3,4,5,6] and not DailyActions.matches(input.before,input.rules.mission.generated):
+	if int(input.rules.get("data_version",0)) in [2,3,4,5,6,7] and not DailyActions.matches(input.before,input.rules.mission.generated):
 		return "DAILY_CAMP_BINDING"
 	if RescuePoolState.is_family(input.before) and not TransactionReceipt.same(input.rules.get("candidate",{}),RescuePoolState.offer(input.before,token.transaction_id,String(input.rules.mission.mission_id))):
 		return "POOL_CANDIDATE_BINDING"
@@ -194,7 +196,7 @@ static func input_problem(input: Dictionary) -> String:
 	for participant: Dictionary in input.report.participants:
 		if not TransactionReceipt.same(participant, SurvivorRoster.member(expected, int(participant.id))):
 			return "REPORT_EQUIPMENT"
-	if input.report.size() != REPORT_KEYS.size() + (1 if RescueState.is_family(input.before) else 0) + (1 if GrowthState.is_family(input.before) else 0) + int(FieldJoinState.is_family(input.before)) + int(TraitState.is_family(input.before)) + int((input.rules.get("data_version")==5 or input.rules.get("data_version")==6)) + int((input.rules.get("data_version")==3 or input.rules.get("data_version")==4 or (input.rules.get("data_version")==5 or input.rules.get("data_version")==6))) or not input.report.has_all(REPORT_KEYS):
+	if input.report.size() != REPORT_KEYS.size() + (1 if RescueState.is_family(input.before) else 0) + (1 if GrowthState.is_family(input.before) else 0) + int(FieldJoinState.is_family(input.before)) + int(TraitState.is_family(input.before)) + int(input.rules.get("data_version")==7) + int((input.rules.get("data_version")==5 or (input.rules.get("data_version")==6 or input.rules.get("data_version")==7))) + int((input.rules.get("data_version")==3 or input.rules.get("data_version")==4 or (input.rules.get("data_version")==5 or (input.rules.get("data_version")==6 or input.rules.get("data_version")==7)))) or not input.report.has_all(REPORT_KEYS):
 		return "REPORT_FIELDS"
 	if RescueState.is_family(input.before):
 		if not input.report.get("rescue") is Dictionary or not RescueTarget.fact_problem(input.report.rescue).is_empty() or (input.report.rescue.status == "RESCUED" and (input.rules.mission.mission_id != "rescue" or (RescuePoolState.available(input.before).is_empty() if RescuePoolState.is_family(input.before) else not input.before.recruits.is_empty()))):
@@ -385,7 +387,7 @@ static func foundation_rules(supply: MissionSupply) -> Dictionary:
 		"mission":{"map_id":String(supply.layout.id),"mission_id":String(supply.id),"cash_reward":supply.cash_reward,
 			"food_reward":supply.food_reward,"has_weapon_sample":supply.has_weapon_sample},"hunger":{},"dead_equipment":{}}
 	if not supply.generated.is_empty():
-		rules.data_version = 6 if supply.generated.get("version")==5 else 5 if supply.generated.get("version")==4 else 4 if supply.generated.get("version")==3 else 3 if supply.generated.get("version")==2 else 2
+		rules.data_version = 7 if supply.generated.get("version")==6 else 6 if supply.generated.get("version")==5 else 5 if supply.generated.get("version")==4 else 4 if supply.generated.get("version")==3 else 3 if supply.generated.get("version")==2 else 2
 		rules.mission.generated = supply.generated.duplicate(true)
 	return rules
 
@@ -464,10 +466,10 @@ static func _rules_problem(rules: Dictionary) -> String:
 		projected.erase("candidate")
 		projected.scope = TraitState.SCOPE
 		return _rules_problem(projected)
-	if (rules.get("data_version")==2 or rules.get("data_version")==3 or rules.get("data_version")==4 or (rules.get("data_version")==5 or rules.get("data_version")==6)):
+	if (rules.get("data_version")==2 or rules.get("data_version")==3 or rules.get("data_version")==4 or (rules.get("data_version")==5 or (rules.get("data_version")==6 or rules.get("data_version")==7))):
 		if rules.scope!=TraitState.SCOPE or not rules.get("mission") is Dictionary:
 			return "DAILY_RULES_SCOPE"
-		if not rules.mission.get("generated") is Dictionary or rules.mission.generated.get("version") != (5 if rules.data_version==6 else 4 if rules.data_version==5 else 3 if rules.data_version==4 else 2 if rules.data_version==3 else 1): return "DAILY_POLICY_VERSION_BINDING"
+		if not rules.mission.get("generated") is Dictionary or rules.mission.generated.get("version") != (6 if rules.data_version==7 else 5 if rules.data_version==6 else 4 if rules.data_version==5 else 3 if rules.data_version==4 else 2 if rules.data_version==3 else 1): return "DAILY_POLICY_VERSION_BINDING"
 		var daily_issue: String = DailyActions.mission_problem(rules.mission)
 		if not daily_issue.is_empty(): return daily_issue
 		# Validate unchanged policies with the legacy shape; actual generated mission
@@ -509,14 +511,17 @@ static func _rules_problem(rules: Dictionary) -> String:
 
 static func _facts_problem(input: Dictionary) -> String:
 	var report: Dictionary = input.report
+	if input.rules.get("data_version")==7:
+		var encounter_issue: String=EncounterRuntime.facts_problem(report.get("encounter"),input.rules.mission.generated,report.get("xp_inputs",{}))
+		if not encounter_issue.is_empty(): return encounter_issue
 	var source: Dictionary = input.rules.mission
-	var multi: bool = (input.rules.get("data_version")==3 or input.rules.get("data_version")==4 or (input.rules.get("data_version")==5 or input.rules.get("data_version")==6))
+	var multi: bool = (input.rules.get("data_version")==3 or input.rules.get("data_version")==4 or (input.rules.get("data_version")==5 or (input.rules.get("data_version")==6 or input.rules.get("data_version")==7)))
 	if multi:
 		if not report.searched is bool or not report.food_searched is bool or not SurvivalContracts.integer(report.sites_searched,0,6): return "SITE_REPORT_TYPES"
 		var issue: String = WorldSites.problem(source.generated.sites,report.get("site_facts"))
 		if not issue.is_empty(): return issue
 		if report.searched != (WorldSites.completed(source.generated.sites,report.site_facts,"cash")>0) or report.food_searched != (WorldSites.completed(source.generated.sites,report.site_facts,"food")>0) or report.sites_searched != WorldSites.completed(source.generated.sites,report.site_facts): return "SITE_REPORT_ALIAS"
-	if (input.rules.get("data_version")==5 or input.rules.get("data_version")==6):
+	if (input.rules.get("data_version")==5 or (input.rules.get("data_version")==6 or input.rules.get("data_version")==7)):
 		var spawn_count: Variant = report.get("xp_inputs",{}).get("spawn_count")
 		if not SurvivalContracts.integer(spawn_count,0,RunSave.MAX_COUNTER): return "TASK_EVENT_SPAWN_COUNT"
 		var issue: String = TaskActions.event_problem(source.generated,report.site_facts,report.get("task_event"),int(spawn_count))

@@ -113,7 +113,12 @@ func refresh_rescue(completed: bool, reason: String = "") -> void:
 func refresh_daily(base: Dictionary) -> void:
 	daily_offers = DailyActions.offers(base)
 	_heading.text = "第%d天 · 选择一项行动" % int(base.day)
+	if CampaignState.is_short(base):
+		var display: Dictionary=CampaignRules.display(base.journey.campaign)
+		_heading.text=display.title+" · "+display.progress
 	for index: int in range(3):
+		choices[index].get_parent().get_parent().visible=index<daily_offers.size()
+		if index>=daily_offers.size(): continue
 		var supply: MissionSupply = DailyActions.supply(daily_offers[index])
 		_active[index] = supply
 		_titles[index].text = "%02d / %s" % [index+1,supply.display_name]

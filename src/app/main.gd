@@ -1001,6 +1001,8 @@ func suspend_sortie() -> void:
 func _suspend_problem(result: Dictionary) -> String:
 	var reason: String = result.get("reason", "UNKNOWN")
 	print("BH_SUSPEND_DETAIL build=%s reason=%s" % [SortieSnapshot.GROWTH_BUILD if growth_mode else SortieSnapshot.BUILD, reason])
+	if "WORLD_OUTDOOR_BUILD_MISMATCH" in reason:
+		return "此空投途中暂存使用旧回收规则，请用原版本继续。暂存未消费，原件保留。"
 	if "WORLD_DAILY_BUILD_MISMATCH" in reason:
 		return "此途中进度属于旧街区版本，请用原版本继续。暂存未消费，原件保留，不回退旧营地。"
 	if "WORLD_CONTACT_BUILD_MISMATCH" in reason:
@@ -1518,6 +1520,7 @@ func _transaction_message(reason: String) -> String:
 	if playable_entry:
 		if "WRITER" in reason: return "进度正被其他窗口使用或暂时无法保存。请关闭其他实例后重开；原件保留。"
 		if "UNFINISHED_ACTION" in reason: return "上次行动中断且没有完整结算，当前无法继续。请保留进度；不会回退营地或发放战利品。"
+		if "WORLD_OUTDOOR_BUILD_MISMATCH" in reason: return _suspend_problem({"reason":reason})
 		if "COMPAT" in reason or "BUILD" in reason or "DAILY" in reason or "LAYOUT" in reason: return "此版本无法安全继续该途中进度。原件保留，不自动转换或回退。"
 		return "进度保存或校验未完成，已阻止出击。可重试或退出；原件保留，不自动回退旧档。"
 	if "HUNGER_EXPLICIT_TRIAL_REQUIRED" in reason:

@@ -902,7 +902,7 @@ func _nearest_target(actor: FieldActor, candidates: Array[FieldActor], limit: fl
 
 func _update_combat() -> void:
 	for actor: FieldActor in survivors:
-		if actor.activity == FieldActor.Activity.DOWN or actor.activity == FieldActor.Activity.SEARCHING:
+		if actor.activity in [FieldActor.Activity.DOWN, FieldActor.Activity.SEARCHING, FieldActor.Activity.RECOVERING]:
 			continue
 		var weapon: WeaponDefinition = actor.weapon_definition
 		var target: FieldActor = _attack_target(actor)
@@ -979,6 +979,7 @@ func _update_combat() -> void:
 				return
 			if battle_survival and target.health == 0:
 				_show_notice("%02d %s 已阵亡 · 战斗死亡已持久确认" % [target.member_id,target.call_sign])
+			_clear_dead_worker()
 			enemy.cooldown = tuning.enemy_interval
 			if behavior!=null and behavior.kind==EnemyRules.HEAVY:
 				behavior.reset(enemy,tuning.enemy_speed)
@@ -1037,21 +1038,35 @@ func _attack_target(actor: FieldActor) -> FieldActor:
 	return result
 
 
+func work_state_matches(actor: FieldActor, site: SearchSite) -> bool:
+	if site == null: return false
+	var outdoor: bool = TaskActions.outdoor_site(supply.generated,site.id)
+	return actor.health>0 and actor.activity == (FieldActor.Activity.RECOVERING if outdoor else FieldActor.Activity.SEARCHING) and actor.visible == outdoor and (not outdoor or actor.position.distance_to(site.door)<=14.0)
+
+
+func _clear_dead_worker() -> void:
+	if search_actor != null and search_actor.activity == FieldActor.Activity.DOWN:
+		# Existing death policy: unfinished progress resets; the once-only event survives.
+		_active_site.progress = 0.0
+		_release_searcher()
+
+
 func _update_search(delta: float) -> void:
+	_clear_dead_worker()
 	if search_actor == null:
 		return
-	if search_actor.activity == FieldActor.Activity.DOWN:
-		search_actor = null
-		_active_site.progress = 0.0
-		_active_site = null
-		return
-	if search_actor.activity != FieldActor.Activity.SEARCHING:
+	var outdoor: bool = TaskActions.outdoor_site(supply.generated,_active_site.id)
+	if search_actor.activity not in [FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING]:
 		if search_actor.position.distance_to(_active_site.door) > 14.0:
 			return
-		search_actor.activity = FieldActor.Activity.SEARCHING
-		if supply.generated.get("version")==4 and supply.generated.type=="airdrop" and _active_site.id==&"cash": _trigger_airdrop()
-		search_actor.hide()
+		search_actor.activity = FieldActor.Activity.RECOVERING if outdoor else FieldActor.Activity.SEARCHING
+		search_actor.visible = outdoor
+		if outdoor: _trigger_airdrop()
 		print("BH_SEARCH entered")
+	if not work_state_matches(search_actor,_active_site):
+		# Contact displacement interrupts outdoor work; cancellation retains earned progress.
+		_release_searcher()
+		return
 	_active_site.progress += delta / search_actor.trait_search_factor
 	if _active_site.progress >= _site_seconds(_active_site):
 		var site: SearchSite = _active_site
@@ -1213,7 +1228,7 @@ func _update_ui() -> void:
 	if is_practice:
 		engine_text = "结束交火练习 →"
 	var members: Array[Dictionary] = []
-	var activities: Array[String] = ["警戒", "移动", "搜集中", "倒地"]
+	var activities: Array[String] = ["警戒", "移动", "搜集中", "倒地", "回收中"]
 	for actor: FieldActor in survivors:
 		members.append({"id":actor.member_id,"label":"%s · %s" % [actor.call_sign, "阵亡" if actor.permanent_death else activities[actor.activity]],
 			"call_sign":actor.call_sign,"status":"阵亡" if actor.permanent_death else activities[actor.activity],
@@ -1252,7 +1267,7 @@ func _update_ui() -> void:
 		site.prop.searched = site.searched
 		site.prop.update_work(search_actor.actor_id if search_actor != null and _active_site == site else -1,
 			site.progress / _site_seconds(site),
-			search_actor != null and _active_site == site and search_actor.activity == FieldActor.Activity.SEARCHING,
+			search_actor != null and _active_site == site and work_state_matches(search_actor,site),
 			search_actor.call_sign if search_actor != null and _active_site == site else "")
 
 

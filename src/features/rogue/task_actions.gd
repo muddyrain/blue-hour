@@ -104,6 +104,13 @@ static func _airdrop_point(layout: Dictionary) -> Array:
 	assert(false,"V4 bounded airdrop placement has no legal point")
 	return []
 
+static func outdoor_site(value: Dictionary, id: StringName) -> bool:
+	if value.get("version")!=4 or value.get("type")!="airdrop" or id!=&"cash": return false
+	for site: Dictionary in value.sites:
+		if site.id==String(id): return site.has("point") and site.building.is_empty()
+	return false
+
+
 static func site_point(value: Dictionary, site: Dictionary) -> Vector2:
 	if site.has("point"): return WorldLayout.point(site.point)
 	for entity: Dictionary in value.layout.entities:

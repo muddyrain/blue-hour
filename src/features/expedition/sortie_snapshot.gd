@@ -2,6 +2,8 @@ class_name SortieSnapshot
 extends RefCounted
 ## Whitelisted simulation values. No resource paths or object deserialization.
 
+const OUTDOOR_VERSION: int = 7
+const OUTDOOR_BUILD: String = "M6-ROGUE-02-R1-1"
 const TASK_VERSION: int = 6
 const TASK_BUILD: String = "M6-ROGUE-02-1"
 const NEIGHBORHOOD_VERSION: int = 5
@@ -46,7 +48,7 @@ static func supply_for(identity: String) -> MissionSupply:
 
 
 static func supply_for_world(value: Dictionary) -> MissionSupply:
-	if (value.get("version")==ROGUE_VERSION or value.get("version")==WORLD_VERSION or value.get("version")==NEIGHBORHOOD_VERSION or value.get("version")==TASK_VERSION):
+	if (value.get("version")==ROGUE_VERSION or value.get("version")==WORLD_VERSION or value.get("version")==NEIGHBORHOOD_VERSION or task_version(value.get("version"))):
 		return DailyActions.supply(value.generated) if DailyActions.problem(value.get("generated")).is_empty() else null
 	if value.get("rescue_mission") == "rescue": return Supplies[2]
 	return supply_for(value.map)
@@ -81,32 +83,33 @@ static func capture(world: Expedition) -> Dictionary:
 		captured.field_joins = world.field_joins.duplicate(true)
 	captured.build = String(captured.build) + "+" + FieldContacts.BUILD
 	if not world.supply.generated.is_empty():
-		captured.version = TASK_VERSION if world.supply.generated.get("version")==4 else NEIGHBORHOOD_VERSION if world.supply.generated.get("version")==3 else WORLD_VERSION if world.supply.generated.get("version")==2 else ROGUE_VERSION
+		captured.version = (OUTDOOR_VERSION if TaskActions.outdoor_site(world.supply.generated,&"cash") else TASK_VERSION) if world.supply.generated.get("version")==4 else NEIGHBORHOOD_VERSION if world.supply.generated.get("version")==3 else WORLD_VERSION if world.supply.generated.get("version")==2 else ROGUE_VERSION
 		captured.build += "+"+_daily_build(captured.version)
 		captured.generated = world.supply.generated.duplicate(true)
-	if captured.version==WORLD_VERSION or captured.version==NEIGHBORHOOD_VERSION or captured.version==TASK_VERSION:
+	if captured.version==WORLD_VERSION or captured.version==NEIGHBORHOOD_VERSION or task_version(captured.version):
 		captured.sites=WorldSites.facts(world)
 		captured.active_site=String(world._active_site.id) if world._active_site!=null else ""
-	if captured.version==TASK_VERSION: captured.task_event=world.task_event.duplicate(true)
+	if task_version(captured.version): captured.task_event=world.task_event.duplicate(true)
 	return captured
 
 
 static func problem(value: Variant, receipt: Dictionary) -> String:
 	var enemy_mode: bool = EnemyState.is_state(receipt.base)
-	var generated: bool = value is Dictionary and (value.get("version")==ROGUE_VERSION or value.get("version")==WORLD_VERSION or value.get("version")==NEIGHBORHOOD_VERSION or value.get("version")==TASK_VERSION)
-	if not value is Dictionary or value.size() != KEYS.size() + (2 if RescueState.is_family(receipt.base) else 0) + (1 if GrowthState.is_family(receipt.base) else 0) + int(FieldJoinState.is_family(receipt.base)) + int(TraitState.is_family(receipt.base)) + int(generated) + int(value.get("version")==TASK_VERSION) or not value.has_all(KEYS) or not SurvivalContracts.json_value(value):
+	var generated: bool = value is Dictionary and (value.get("version")==ROGUE_VERSION or value.get("version")==WORLD_VERSION or value.get("version")==NEIGHBORHOOD_VERSION or task_version(value.get("version")))
+	if not value is Dictionary or value.size() != KEYS.size() + (2 if RescueState.is_family(receipt.base) else 0) + (1 if GrowthState.is_family(receipt.base) else 0) + int(FieldJoinState.is_family(receipt.base)) + int(TraitState.is_family(receipt.base)) + int(generated) + int(task_version(value.get("version"))) or not value.has_all(KEYS) or not SurvivalContracts.json_value(value):
 		return "WORLD_FIELDS"
 	var base_build: String = ENEMY_BUILD if enemy_mode else QUALITY_BUILD if WeaponState.is_state(receipt.base) else ROSTER_BUILD if RosterState.is_family(receipt.base) else POOL_BUILD if RescuePoolState.is_family(receipt.base) else TRAINING_BUILD if TrainingState.is_state(receipt.base) else TRAIT_BUILD if TraitState.is_family(receipt.base) else FIELD_BUILD if FieldJoinState.is_family(receipt.base) else (GROWTH_BUILD if GrowthState.is_family(receipt.base) else BUILD)
 	if generated:
-		if not enemy_mode or receipt.rules.get("data_version")!=(5 if value.version==TASK_VERSION else 4 if value.version==NEIGHBORHOOD_VERSION else 3 if value.version==WORLD_VERSION else 2) or not value.get("generated") is Dictionary or not TransactionReceipt.same(value.generated,receipt.rules.mission.generated) or not DailyActions.problem(value.generated).is_empty():
+		if not enemy_mode or receipt.rules.get("data_version")!=(5 if task_version(value.version) else 4 if value.version==NEIGHBORHOOD_VERSION else 3 if value.version==WORLD_VERSION else 2) or not value.get("generated") is Dictionary or not TransactionReceipt.same(value.generated,receipt.rules.mission.generated) or not DailyActions.problem(value.generated).is_empty():
 			return "WORLD_DAILY_BINDING"
-		if value.generated.version != (4 if value.version==TASK_VERSION else 3 if value.version==NEIGHBORHOOD_VERSION else 2 if value.version==WORLD_VERSION else 1): return "WORLD_GENERATION_VERSION"
+		if value.version==OUTDOOR_VERSION and not TaskActions.outdoor_site(value.generated,&"cash"): return "WORLD_OUTDOOR_SOURCE"
+		if value.generated.version != (4 if task_version(value.version) else 3 if value.version==NEIGHBORHOOD_VERSION else 2 if value.version==WORLD_VERSION else 1): return "WORLD_GENERATION_VERSION"
 	elif (receipt.rules.get("data_version")==2 or receipt.rules.get("data_version")==3 or receipt.rules.get("data_version")==4 or receipt.rules.get("data_version")==5):
 		return "WORLD_DAILY_VERSION"
 	var contact_build: bool = value.build == base_build + "+" + FieldContacts.BUILD + ("+"+_daily_build(value.version) if generated else "")
 	# Legacy snapshots remain strictly authenticatable in completed receipt history.
 	# Resuming their different motion semantics is separately rejected by apply().
-	if value.version != (TASK_VERSION if value.get("version")==TASK_VERSION else NEIGHBORHOOD_VERSION if value.get("version")==NEIGHBORHOOD_VERSION else WORLD_VERSION if value.get("version")==WORLD_VERSION else ROGUE_VERSION if generated else ENEMY_VERSION if enemy_mode else VERSION) or ((generated or value.build != base_build) and not contact_build) or not value.map is String or (value.map!=value.generated.layout.id if generated else supply_for(value.map)==null) or not value.hunger is bool:
+	if value.version != (int(value.version) if task_version(value.get("version")) else NEIGHBORHOOD_VERSION if value.get("version")==NEIGHBORHOOD_VERSION else WORLD_VERSION if value.get("version")==WORLD_VERSION else ROGUE_VERSION if generated else ENEMY_VERSION if enemy_mode else VERSION) or ((generated or value.build != base_build) and not contact_build) or not value.map is String or (value.map!=value.generated.layout.id if generated else supply_for(value.map)==null) or not value.hunger is bool:
 		return "WORLD_VERSION_OR_MAP"
 	if not value.compatibility is String or value.compatibility.length() != 64 or not value.compatibility.is_valid_hex_number(false):
 		return "WORLD_COMPATIBILITY"
@@ -125,7 +128,7 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 	if (sim.phase == 1 and (sim.elapsed + 0.0001 < 20 or sim._engine_clock <= 0 or sim._engine_clock > 3)) or (sim.phase == 2 and (sim.elapsed + 0.0001 < 23 or sim._engine_clock > 0)):
 		return "WORLD_BUS_CLOCK"
 	var supply: MissionSupply = supply_for_world(value)
-	if (value.version==WORLD_VERSION or value.version==NEIGHBORHOOD_VERSION or value.version==TASK_VERSION):
+	if (value.version==WORLD_VERSION or value.version==NEIGHBORHOOD_VERSION or task_version(value.version)):
 		var issue: String = WorldSites.problem(value.generated.sites,value.sites)
 		if not issue.is_empty(): return issue
 		var carry: Dictionary = WorldSites.carry(value.generated.sites,value.sites,receipt.transaction_id,true)
@@ -144,15 +147,16 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 		var expected_weapons: Array = [WeaponInventory.reward(receipt.transaction_id,WeaponState.is_family(receipt.base))] if value.sites.cash.searched and supply.has_weapon_sample else []
 		if not value.weapons is Array or not _same({"v":value.weapons},{"v":expected_weapons}):
 			return "WORLD_WEAPON_SOURCE"
-	if value.version==TASK_VERSION:
+	if task_version(value.version):
 		var event_issue: String = TaskActions.event_problem(value.generated,value.sites,value.get("task_event"),int(sim._spawn_count))
 		if not event_issue.is_empty(): return event_issue
 	if not value.survivors is Array or value.survivors.size() != FieldJoinRules.participants(receipt).size() or not value.enemies is Array or value.enemies.size() > ThreatRules.ENEMY_CAP:
 		return "WORLD_ACTOR_COUNTS"
+	if not value.active_site is String: return "WORLD_WORKER_FIELDS"
 	var ids: Array[int] = []
 	var workers: int = 0
 	for row: Variant in value.survivors:
-		if not _actor_shape(row,false,contact_build) or row.state.is_enemy:
+		if not _actor_shape(row,false,contact_build,value.version==OUTDOOR_VERSION) or row.state.is_enemy:
 			return "WORLD_SURVIVOR_FIELDS"
 		var state: Dictionary = row.state
 		var id: int = int(state.member_id)
@@ -166,11 +170,16 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 			return "WORLD_MEMBER_CHECKPOINT"
 		if (state.health == 0) != state.permanent_death or (state.health == 0) != (state.activity == FieldActor.Activity.DOWN) or state.health + state.damage_received != participant.health_before:
 			return "WORLD_DEATH_OR_DAMAGE"
-		if state.activity == FieldActor.Activity.SEARCHING:
+		if value.version==OUTDOOR_VERSION and state.health>0 and state.activity!=FieldActor.Activity.SEARCHING and not state.visible: return "WORLD_WORKER_VISIBILITY"
+		if int(state.activity) in [FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING]:
 			workers += 1
-			if id != value.worker or state.visible:
+			if id != value.worker or state.visible != (state.activity==FieldActor.Activity.RECOVERING):
 				return "WORLD_WORKER_ID"
-	if not SurvivalContracts.integer(value.worker,0,SurvivalContracts.MAX_ID) or not value.active_site is String or value.active_site not in ([""]+value.sites.keys() if (value.version==WORLD_VERSION or value.version==NEIGHBORHOOD_VERSION or value.version==TASK_VERSION) else ["","cash","food"]) or workers > 1:
+			if value.version==OUTDOOR_VERSION:
+				var outdoor: bool = TaskActions.outdoor_site(value.generated,StringName(value.active_site))
+				if (state.activity==FieldActor.Activity.RECOVERING)!=outdoor: return "WORLD_WORKER_POLICY"
+				if outdoor and _vec(state.position).distance_to(_work_point(value.generated,String(value.active_site)))>14.0: return "WORLD_WORKER_DISTANCE"
+	if not SurvivalContracts.integer(value.worker,0,SurvivalContracts.MAX_ID) or not value.active_site is String or value.active_site not in ([""]+value.sites.keys() if (value.version==WORLD_VERSION or value.version==NEIGHBORHOOD_VERSION or task_version(value.version)) else ["","cash","food"]) or workers > 1:
 		return "WORLD_WORKER_FIELDS"
 	var participant_order: Array = []
 	for row: Dictionary in FieldJoinRules.participants(receipt):
@@ -179,7 +188,7 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 		return "WORLD_EXECUTION_ORDER"
 	if (value.worker == 0) != value.active_site.is_empty() or (value.worker != 0 and (int(value.worker) not in ids or value.sites[value.active_site].searched)):
 		return "WORLD_WORKER_SOURCE"
-	if value.worker != 0 and int(_member(value.survivors,int(value.worker)).state.activity) not in [1,2]:
+	if value.worker != 0 and int(_member(value.survivors,int(value.worker)).state.activity) not in ([1,2,4] if value.version==OUTDOOR_VERSION else [1,2]):
 		return "WORLD_WORKER_ACTIVITY"
 	var enemy_ids: Array[int] = []
 	for row: Variant in value.enemies:
@@ -228,7 +237,7 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 			if int(event.enemy_id) in enemy_ids:
 				return "XP_ENEMY_STILL_ACTIVE"
 	if TraitState.is_family(receipt.base):
-		var report: Dictionary = {"participants":FieldJoinRules.participants(receipt),"growth_inputs":value.growth,"xp_inputs":value.xp_inputs,"field_joins":receipt.joins,"searched":WorldSites.completed(value.generated.sites,value.sites,"cash")>0 if (value.version==WORLD_VERSION or value.version==NEIGHBORHOOD_VERSION or value.version==TASK_VERSION) else value.sites.cash.searched,"food_searched":WorldSites.completed(value.generated.sites,value.sites,"food")>0 if (value.version==WORLD_VERSION or value.version==NEIGHBORHOOD_VERSION or value.version==TASK_VERSION) else value.sites.food.searched}
+		var report: Dictionary = {"participants":FieldJoinRules.participants(receipt),"growth_inputs":value.growth,"xp_inputs":value.xp_inputs,"field_joins":receipt.joins,"searched":WorldSites.completed(value.generated.sites,value.sites,"cash")>0 if (value.version==WORLD_VERSION or value.version==NEIGHBORHOOD_VERSION or task_version(value.version)) else value.sites.cash.searched,"food_searched":WorldSites.completed(value.generated.sites,value.sites,"food")>0 if (value.version==WORLD_VERSION or value.version==NEIGHBORHOOD_VERSION or task_version(value.version)) else value.sites.food.searched}
 		var trait_issue: String = TraitRules.inputs_problem(value.get("trait_inputs"),RunTransaction.token_for(receipt),report,FieldJoinRules.context(receipt),value.get("generated",{}))
 		if not trait_issue.is_empty():
 			return trait_issue
@@ -255,7 +264,7 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 		total += int(row.total)
 	if total != sim.kills or sim.kills + value.enemies.size() != sim._spawn_count + deployed.size():
 		return "WORLD_ENEMY_ACCOUNTING"
-	if value.version==TASK_VERSION:
+	if task_version(value.version):
 		for resolution: Dictionary in value.task_event.resolutions:
 			for enemy: Dictionary in value.enemies:
 				if enemy.state.actor_id==resolution.enemy_id and enemy.behavior.kind!=EnemyRules.NORMAL: return "TASK_EVENT_ENEMY_KIND"
@@ -265,7 +274,8 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 
 
 static func apply(world: Expedition, value: Dictionary) -> String:
-	if not String(value.get("build","")).ends_with("+" + FieldContacts.BUILD + ("+"+_daily_build(value.get("version")) if (value.get("version")==ROGUE_VERSION or value.get("version")==WORLD_VERSION or value.get("version")==NEIGHBORHOOD_VERSION or value.get("version")==TASK_VERSION) else "")):
+	if old_outdoor(value): return "WORLD_OUTDOOR_BUILD_MISMATCH"
+	if not String(value.get("build","")).ends_with("+" + FieldContacts.BUILD + ("+"+_daily_build(value.get("version")) if (value.get("version")==ROGUE_VERSION or value.get("version")==WORLD_VERSION or value.get("version")==NEIGHBORHOOD_VERSION or task_version(value.get("version"))) else "")):
 		return "WORLD_CONTACT_BUILD_MISMATCH"
 	if not world.setup_problem.is_empty() or world.survivors.size() != value.survivors.size() or not world.enemies.is_empty():
 		return "WORLD_RECONSTRUCTION_SETUP"
@@ -274,7 +284,7 @@ static func apply(world: Expedition, value: Dictionary) -> String:
 	if world.bus_view != null: world.bus_view.skip()
 	_restore(world,value.sim,SIM)
 	world.drill_panel._deployed.assign(value.drill.deployed)
-	if value.version==TASK_VERSION: world.task_event=value.task_event.duplicate(true)
+	if task_version(value.version): world.task_event=value.task_event.duplicate(true)
 	world.weapon_loot.assign(value.weapons.duplicate(true))
 	for kind: String in value.sites:
 		var site: Expedition.SearchSite = world.search_site(StringName(kind))
@@ -326,7 +336,7 @@ static func compatibility(world: Expedition) -> String:
 		data.enemy_rules = EnemyRules.POLICY
 	data.build = String(data.build) + "+" + FieldContacts.BUILD
 	if not world.supply.generated.is_empty():
-		data.build += "+"+(TASK_BUILD if world.supply.generated.get("version")==4 else NEIGHBORHOOD_BUILD if world.supply.generated.get("version")==3 else WORLD_BUILD if world.supply.generated.get("version")==2 else ROGUE_BUILD)
+		data.build += "+"+((OUTDOOR_BUILD if TaskActions.outdoor_site(world.supply.generated,&"cash") else TASK_BUILD) if world.supply.generated.get("version")==4 else NEIGHBORHOOD_BUILD if world.supply.generated.get("version")==3 else WORLD_BUILD if world.supply.generated.get("version")==2 else ROGUE_BUILD)
 		data.generated = world.supply.generated.duplicate(true)
 	data.contact = {"distance":FieldContacts.DISTANCE,"approach":FieldContacts.APPROACH,"rechase":FieldContacts.RECHASE,"step":FieldContacts.STEP_DISTANCE,"steps":FieldContacts.MAX_STEPS,"path_parts":FieldContacts.MAX_PATH_PARTS,"pass_dot":FieldContacts.PASS_DOT,"recovery_speed":FieldContacts.RECOVERY_SPEED,"recovery_cap":FieldContacts.MAX_RECOVERY,"recovery_passes":FieldContacts.RECOVERY_PASSES,"yield_speed":FieldContacts.YIELD_SPEED}
 	return SurvivalContracts.fingerprint(data)
@@ -416,12 +426,12 @@ static func _visual_spec(contact: bool) -> Dictionary:
 	return VISUAL.merged(CONTACT_VISUAL) if contact else VISUAL
 
 
-static func _actor_shape(row: Variant, enemy_mode: bool = false, contact: bool = true) -> bool:
+static func _actor_shape(row: Variant, enemy_mode: bool = false, contact: bool = true, outdoor: bool = false) -> bool:
 	if not row is Dictionary or row.size() != (3 if enemy_mode else 2) or (enemy_mode and not row.has("behavior")) or not _shape(row.get("state"),ACTOR) or not _shape(row.get("visual"),_visual_spec(contact)):
 		return false
 	if contact and row.visual._walk_rest < 0.0: return false
 	var state: Dictionary = row.state
-	return int(state.activity) in [0,1,2,3] and state.health >= 0 and state.health <= state.max_health and state.cooldown >= 0 and state.damage_received >= 0 and (state._path_index <= state.path.size() or state.activity == 3) and row.visual._is_defeated == (state.activity == 3)
+	return int(state.activity) in ([0,1,2,3,4] if outdoor else [0,1,2,3]) and state.health >= 0 and state.health <= state.max_health and state.cooldown >= 0 and state.damage_received >= 0 and (state._path_index <= state.path.size() or state.activity == 3) and row.visual._is_defeated == (state.activity == 3)
 
 
 static func _vector(value: Variant) -> bool:
@@ -447,4 +457,18 @@ static func _same(a: Dictionary, b: Dictionary) -> bool:
 	return SurvivalContracts.fingerprint(a) == SurvivalContracts.fingerprint(b)
 
 static func _daily_build(version: Variant) -> String:
-	return TASK_BUILD if version==TASK_VERSION else NEIGHBORHOOD_BUILD if version==NEIGHBORHOOD_VERSION else WORLD_BUILD if version==WORLD_VERSION else ROGUE_BUILD
+	return OUTDOOR_BUILD if version==OUTDOOR_VERSION else TASK_BUILD if version==TASK_VERSION else NEIGHBORHOOD_BUILD if version==NEIGHBORHOOD_VERSION else WORLD_BUILD if version==WORLD_VERSION else ROGUE_BUILD
+
+
+static func old_outdoor(value: Dictionary) -> bool:
+	return value.get("version")==TASK_VERSION and TaskActions.outdoor_site(value.get("generated",{}),&"cash")
+
+
+static func _work_point(generated: Dictionary, id: String) -> Vector2:
+	for site: Dictionary in generated.sites:
+		if site.id==id: return TaskActions.site_point(generated,site)
+	return Vector2.INF
+
+
+static func task_version(version: Variant) -> bool:
+	return version==TASK_VERSION or version==OUTDOOR_VERSION

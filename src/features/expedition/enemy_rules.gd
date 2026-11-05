@@ -36,7 +36,7 @@ static func snapshot_problem(row: Dictionary, world: Dictionary, receipt: Dictio
 		return "ENEMY_BEHAVIOR_VALUES"
 	var actor: Dictionary = row.state
 	var expected: String = NORMAL if actor.actor_id>=10000 else pick(receipt.transaction_id,int(actor.actor_id),int(value.spawn_stage))
-	if world.get("version")==SortieSnapshot.TASK_VERSION:
+	if SortieSnapshot.task_version(world.get("version")):
 		for resolution: Dictionary in world.task_event.resolutions:
 			if resolution.reason=="spawned" and resolution.enemy_id==actor.actor_id: expected=NORMAL
 	if value.kind!=expected or value.spawn_stage>world.threat.stage or actor.max_health!=health(value.kind,54.0) or actor.speed!=speed(value.kind,value.state=="rush",34.0):

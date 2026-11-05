@@ -10,7 +10,8 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--native', action='store_true')
     parser.add_argument('--movie', action='store_true')
-    parser.add_argument('--case', choices=['airdrop','supply','equipment','rescue','early','rescue-death','rescue-roster4'], required=True)
+    parser.add_argument('--outdoor', action='store_true', help='R1 outdoor work regression driver')
+    parser.add_argument('--case', choices=['airdrop','supply','equipment','rescue','early','rescue-death','rescue-roster4','probe','death','indoor','normal','legacy'], required=True)
     args = parser.parse_args()
     assert subprocess.check_output([args.godot,'--version'], text=True).strip() == (ROOT/'.godot-version').read_text().strip()
     out = args.output.resolve()
@@ -26,10 +27,11 @@ def main():
         subprocess.run(['clang','-dynamiclib','-framework','AppKit','-framework','Foundation','-o',str(guard),str(ROOT/'tools/macos_background.m')],check=True,capture_output=True)
     assert not args.movie or (args.native and args.case=='airdrop'), 'movie uses one native airdrop journey'
     results = []
-    for phase in ['first','resume'] if args.case == 'airdrop' and not args.movie else ['first']:
+    for phase in ['first','resume'] if args.case in ['airdrop','legacy'] and not args.movie else ['first']:
         command = [args.godot,'--path',str(ROOT),'--audio-driver','Dummy','--rendering-method','gl_compatibility']
         command += ['--position','-16000,-16000'] if args.native else ['--headless']
-        command += ['--script','res://tests/'+('task_movie' if args.movie else 'task_flow')+'.gd','--','--flow-output='+str(out/phase),'--task-case='+args.case,'--bh-rescue-seed='+('task-v4-2' if args.case=='equipment' else 'task-v4-3')]
+        command += ['--script','res://tests/'+('task_outdoor_flow' if args.outdoor else 'task_movie' if args.movie else 'task_flow')+'.gd','--','--flow-output='+str(out/phase),'--task-case='+args.case,'--bh-rescue-seed='+('task-v4-2' if args.case=='equipment' else 'task-v4-3')]
+        if args.outdoor and args.case=='airdrop': command += ['--bh-battle-drill']
         if phase != 'first': command += ['--flow-resume']
         started = time.monotonic()
         if args.native:

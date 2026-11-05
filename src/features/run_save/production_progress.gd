@@ -358,6 +358,8 @@ func resume_offer() -> Dictionary:
 	var receipt: Dictionary = state.receipt
 	if daily_actions and receipt.rules.get("data_version")!=4 and receipt.rules.get("data_version")!=5:
 		return _blocked("WORLD_DAILY_BUILD_MISMATCH")
+	if SortieSnapshot.old_outdoor(receipt.envelope.world):
+		return _blocked("WORLD_OUTDOOR_BUILD_MISMATCH")
 	if receipt.envelope.world.hunger != hunger_trial:
 		return _blocked("SUSPEND_HUNGER_ENTRY_MISMATCH")
 	_active_base = receipt.base.duplicate(true)

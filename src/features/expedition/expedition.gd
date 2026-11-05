@@ -107,6 +107,8 @@ var _engine_clock: float = 0.0
 var _spawn_count: int = 0
 var _spawn_attempts: int = 0
 var last_simulation_usec: int = 0
+# Read-only last-step diagnostics, not solver state or a saved decision input.
+var last_contact_metrics: Dictionary = {}
 var _notice_clock: float = 0.0
 var _corpses: Array[FieldActor] = []
 var _corpse_times: Array[float] = []
@@ -336,11 +338,20 @@ func step(delta: float) -> void:
 	if _ai_clock <= 0.0:
 		_update_enemy_paths()
 		_ai_clock = 0.7
+	var occupants: Array[FieldActor] = survivors + enemies
+	var previous: Dictionary = {}
+	for actor: FieldActor in occupants: previous[actor] = actor.position
 	for actor: FieldActor in survivors:
-		actor.advance(delta)
+		actor.advance(delta,false,false)
+	last_contact_metrics = FieldContacts.move(survivors,occupants,navigation,delta,true)
 	_update_enemy_behaviors(delta)
+	_update_enemy_paths(true)
 	for enemy: FieldActor in enemies:
-		enemy.advance(delta)
+		enemy.advance(delta,false,false)
+	var enemy_motion: Dictionary = FieldContacts.move(enemies,occupants,navigation,delta,false,_hold_enemy_approach)
+	last_contact_metrics.enemy_substeps = enemy_motion.substeps
+	last_contact_metrics.motion_deviation_max = maxf(last_contact_metrics.motion_deviation_max,enemy_motion.motion_deviation_max)
+	for actor: FieldActor in occupants: actor.present_motion(delta,previous[actor])
 	for index: int in range(_corpses.size() - 1, -1, -1):
 		_corpses[index].advance(delta)
 		_corpse_times[index] -= delta
@@ -821,23 +832,33 @@ func _spawn_practice_enemy() -> void:
 		_show_notice("交火练习 · 近身来袭可受伤；移动和自动开火规则与出击相同。")
 
 
-func _update_enemy_paths() -> void:
+func _update_enemy_paths(idle_only: bool = false) -> void:
 	for enemy: FieldActor in enemies:
 		if enemy.enemy_behavior!=null and enemy.enemy_behavior.state=="windup":
 			continue
 		var target: FieldActor = _nearest_target(enemy, survivors, INF)
-		if target != null and enemy.position.distance_to(target.position) > 23.0:
+		if target == null or _hold_enemy_approach(enemy):
+			enemy.clear_order()
+		elif not idle_only or (enemy.activity == FieldActor.Activity.IDLE and enemy.position.distance_to(target.position)>FieldContacts.RECHASE):
 			enemy.command_path(navigation.path_between(enemy.position, target.position))
+
+
+func _hold_enemy_approach(enemy: FieldActor) -> bool:
+	var target: FieldActor = _nearest_target(enemy,survivors,FieldContacts.APPROACH)
+	if target != null and navigation._segment_is_clear(enemy.position,target.position):
+		enemy.clear_order()
+		return true
+	return false
 
 
 func _nearest_target(actor: FieldActor, candidates: Array[FieldActor], limit: float) -> FieldActor:
 	var closest: float = limit * limit
 	var result: FieldActor
 	for candidate: FieldActor in candidates:
-		if candidate.activity == FieldActor.Activity.DOWN or candidate.activity == FieldActor.Activity.SEARCHING:
+		if candidate.health <= 0.0 or not candidate.visible or candidate.activity in [FieldActor.Activity.DOWN,FieldActor.Activity.SEARCHING]:
 			continue
 		var distance: float = actor.position.distance_squared_to(candidate.position)
-		if distance < closest:
+		if distance < closest or (result != null and distance == closest and FieldContacts.identity(candidate)<FieldContacts.identity(result)):
 			closest = distance
 			result = candidate
 	return result

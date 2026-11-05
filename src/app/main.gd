@@ -983,6 +983,8 @@ func suspend_sortie() -> void:
 func _suspend_problem(result: Dictionary) -> String:
 	var reason: String = result.get("reason", "UNKNOWN")
 	print("BH_SUSPEND_DETAIL build=%s reason=%s" % [SortieSnapshot.GROWTH_BUILD if growth_mode else SortieSnapshot.BUILD, reason])
+	if "WORLD_CONTACT_BUILD_MISMATCH" in reason:
+		return "此途中暂存使用旧接触规则，请使用原兼容版本继续；本次未消费或改写暂存。"
 	if "BINDING" in reason or "ACK" in reason:
 		return "保存确认尚未完成；请保留原记录并重试，不能视为保存成功。"
 	if "WRITER" in reason or "LOCK" in reason or "LEASE" in reason:

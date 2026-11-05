@@ -9,4 +9,4 @@
 7. 动画是原创原型：敌人三个左向镜像，部分passing、过渡及收招共享，45度离散转向、袖臂与纵向贴身遮挡仍待打磨；不是最终美术。
 8. 无完整品质池、制作台、弹匣/换弹、Boss或随机地图系统。本公开源码没有新增LICENSE或发行包。
 
-9. [ANIM-02](design/m5-anim-02.md)与[普通感染者V1](design/m5-art-infected-01.md)仅改善表现；五源三镜像、离散转向和过渡仍可打磨。角色逻辑脚点同点/穿越仍开放（ANIM03_CONTACT_OVERLAP_OPEN），Y排序和显示偏移不能保证分开。Windows软件层已受控复验；物理键鼠和显示刷新未验，不等于最终美术签核。
+9. [M5-CONTACT-01](design/m5-contact-01.md)在逻辑层限制脚点穿越并处理已有同点，保留[ANIM-02](design/m5-anim-02.md)与[V1](design/m5-art-infected-01.md)。拥挤恢复需要时间；无让位空间时允许阻塞，纵向身体遮挡和离散动作仍可见。当前接触候选Windows-NOT-VERIFIED，历史Windows表现结果不能复用为新移动规则通过；物理键鼠和显示刷新未验。旧途中世界明确拒绝跨接触BUILD恢复，原件保留。

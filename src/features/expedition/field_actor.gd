@@ -87,15 +87,15 @@ func command_path(points: PackedVector2Array) -> void:
 	activity = Activity.MOVING
 
 
-func advance(delta: float) -> void:
+func advance(delta: float, move_path: bool = true, animate: bool = true) -> void:
 	sync_enemy_visual()
 	if activity == Activity.DOWN:
-		visual.advance(delta, Vector2.ZERO, Vector2.ZERO)
+		if animate: visual.advance(delta, Vector2.ZERO, Vector2.ZERO)
 		return
 	cooldown = maxf(cooldown - delta, 0.0)
 	var previous: Vector2 = position
 	var remaining: float = speed * delta
-	while activity == Activity.MOVING and remaining > 0.0:
+	while move_path and activity == Activity.MOVING and remaining > 0.0:
 		if _path_index >= path.size():
 			activity = Activity.IDLE
 			break
@@ -108,6 +108,25 @@ func advance(delta: float) -> void:
 		else:
 			position = position.move_toward(destination, remaining)
 			remaining = 0.0
+	if animate: present_motion(delta,previous)
+
+
+func path_motion(distance: float, navigation: FieldNavigation) -> Vector2:
+	# Consume only reached/static-visible waypoints, never the blocked proposal.
+	while activity == Activity.MOVING and _path_index < path.size():
+		if position.distance_to(path[_path_index]) < 0.01:
+			_path_index += 1
+		elif _path_index+1 < path.size() and (_path_index == 0 or (position-path[_path_index]).dot(path[_path_index]-path[_path_index-1])>=0.0) and navigation._segment_is_clear(position,path[_path_index+1]):
+			_path_index += 1
+		else: break
+	if activity != Activity.MOVING: return Vector2.ZERO
+	if _path_index >= path.size():
+		activity = Activity.IDLE
+		return Vector2.ZERO
+	return position.direction_to(path[_path_index]) * minf(distance,position.distance_to(path[_path_index]))
+
+
+func present_motion(delta: float, previous: Vector2) -> void:
 	visual.contact_vector = visual_contact.call() if visual_contact.is_valid() else Vector2.INF
 	visual.advance(delta, (position - previous) / maxf(delta, 0.001), aim)
 	if _enemy_tag != null:

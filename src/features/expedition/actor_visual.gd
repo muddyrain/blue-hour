@@ -96,8 +96,8 @@ func advance(delta: float, movement: Vector2, aim: Vector2) -> void:
 	_clock += delta
 	_movement = movement
 	_aim = aim
-	# Preserve the ordinary9fps cadence; variants cover the same distance per gait cycle.
-	var stride: float = movement.length()/34.0 if is_enemy and enemy_kind!=EnemyRules.NORMAL else 1.0
+	# Contact steering can slow an enemy: gait follows accepted displacement.
+	var stride: float = movement.length()/34.0 if is_enemy else 1.0
 	if movement.length_squared() > 1.0:
 		_walk_clock += delta * stride
 		_walk_rest = 0.0

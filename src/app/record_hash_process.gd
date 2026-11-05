@@ -61,6 +61,48 @@ func _run() -> void:
 		_expect((state.error != OK if _expected_state == "BLOCKED" else state.error == OK and state.get("state") == _expected_state),"fresh PID state matches "+_expected_state)
 		if not _expected_camp.is_empty() and state.error == OK: _compare_expected(state.camp,_expected_camp,"new PID exact latest camp/death/edit/training")
 		if not _expected_world.is_empty() and state.error == OK: _compare_expected(state.receipt.envelope.world,_expected_world,"new PID exact world after publication/ACK crash")
+	elif _mode == "contact-old":
+		_expect(state.error == OK and state.get("state") == "SUSPENDED","legacy world authenticates under its exact historical shape")
+		if state.error == OK and state.get("state") == "SUSPENDED":
+			var malformed: Dictionary = state.receipt.envelope.world.duplicate(true)
+			malformed.survivors[0].visual._walk_rest = 0.0
+			_expect(not SortieSnapshot.problem(malformed,state.receipt).is_empty(),"legacy authentication still rejects extra contact fields")
+		var unchanged: String = _files_digest(main.progress_path)
+		main._hunger_consented = true
+		main.continue_game()
+		await get_tree().process_frame
+		_expect(main.expedition == null and main._progress_blocked and not main._requires_continue,"old contact rules explicitly refuse resume before a claim")
+		_expect("旧接触规则" in main._progress_message,"old-world rejection explains the compatibility boundary")
+		_expect(session.inspect().get("state") == "SUSPENDED" and unchanged == _files_digest(main.progress_path),"legacy in-flight records remain unconsumed and byte identical")
+	elif _mode == "contact-cache":
+		_expect(state.error == OK and state.get("state") == "SUSPENDED","new contact world is suspended")
+		var original: Dictionary = state.receipt.envelope.world.duplicate(true)
+		var missing: Dictionary = original.duplicate(true)
+		missing.survivors[0].visual.erase("_contact_display")
+		_expect(not SortieSnapshot.problem(missing,state.receipt).is_empty(),"new contact build cannot omit its required visual state")
+		main.survival_pilot = false
+		main._hunger_consented = true
+		main.continue_game()
+		await get_tree().process_frame
+		var world: Expedition = main.expedition
+		_expect(world != null and world.is_paused,"new PID restores paused without solver movement")
+		if world != null:
+			_expect(RecordEncoding.fingerprint(SortieSnapshot.capture(world)) == RecordEncoding.fingerprint(original),"restored position path clocks and contact visual caches exactly match")
+			var frozen: String = RecordEncoding.fingerprint(SortieSnapshot.capture(world))
+			world.step(1.0)
+			_expect(frozen == RecordEncoding.fingerprint(SortieSnapshot.capture(world)),"paused step does not separate, advance or change a single saved value")
+			world.toggle_pause()
+			var starts: Array[Vector2] = []
+			for actor: FieldActor in world.survivors: starts.append(actor.position)
+			world.step(1.0/60.0)
+			var bounded: bool = true
+			for index: int in range(world.survivors.size()): bounded = bounded and world.survivors[index].position.distance_to(starts[index])<=world.survivors[index].speed/60.0+FieldContacts.RECOVERY_SPEED/60.0+1.0
+			_expect(bounded,"first resumed contact tick stays within motion/recovery budget")
+			world.toggle_pause()
+			var continued: Dictionary = SortieSnapshot.capture(world)
+			_write_exact("continued.exact.json",continued)
+			var suspended: Dictionary = session.suspend_world(continued)
+			_expect(suspended.error == OK and session.inspect().get("state") == "SUSPENDED","continued contact world republishes a new real generation")
 	elif _mode == "journal-read":
 		if not _journal_path.is_absolute_path() or "/.local/p0-record-hash-02/" not in _journal_path:
 			get_tree().quit(2)

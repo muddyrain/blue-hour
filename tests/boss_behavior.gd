@@ -102,6 +102,26 @@ func run() -> void:
 	expect(BossBehavior.problem(behavior.snapshot(),IDENTITY).is_empty(),"dead snapshot authenticates")
 	var exact: Dictionary = RecordEncoding.unpack(JSON.parse_string(RecordEncoding.stringify(threshold_checkpoint))).payload
 	expect(same(exact,threshold_checkpoint) and BossBehavior.problem(exact,IDENTITY).is_empty(),"exact transport preserves cooldown and threshold facts")
+	behavior = fresh()
+	behavior.step(0.1,1.0,true,far,Vector2.ZERO)
+	requests = behavior.step(1.2,0.29,true,far,Vector2.ZERO)
+	expect(requests.size()==3 and requests[0].kind=="summon" and requests[1].kind=="summon" and requests[2].kind=="slam","same step creates two pending summons and one pending attack")
+	pending = behavior.snapshot()
+	exact = RecordEncoding.unpack(JSON.parse_string(RecordEncoding.stringify(pending))).payload
+	expect(BossBehavior.problem(exact,IDENTITY).is_empty(),"JSON numeric threshold types accept a complete unacknowledged state")
+	copy.restore(exact)
+	expect(same(copy.snapshot(),pending),"pending summon and attack restore without losing identity or timing")
+	expect(same(copy.step(0.4,0.29,true,far,Vector2.ZERO),requests) and same(copy.snapshot(),pending),"pending restored requests are stable and do not consume time")
+	for request: Dictionary in copy.snapshot().pending:
+		if request.kind=="summon":
+			copy.acknowledge(request.id,{"resolutions":[{"reason":"spawned","enemy_id":int(request.threshold)}]})
+		else:
+			copy.acknowledge(request.id,{"hits":[1]})
+	var handled: Dictionary = copy.snapshot()
+	expect(handled.pending.is_empty() and handled.thresholds[0].handled and handled.thresholds[1].handled and handled.last_handled==1 and BossBehavior.problem(handled,IDENTITY).is_empty(),"restored requests acknowledge each actual effect exactly once")
+	copy.restore(RecordEncoding.unpack(JSON.parse_string(RecordEncoding.stringify(handled))).payload)
+	expect(copy.step(0.1,0.29,true,far,Vector2.ZERO).is_empty(),"handled roundtrip cannot repeat summon or slam")
+	expect(same(copy.snapshot().attack_result.result.hits,[1]),"handled roundtrip preserves actual hit identities")
 	for change: String in ["identity","version","unknown","negative_timer","timer_nan","timer_infinite","cooldown","point","target","threshold_duplicate","threshold_retry","threshold_fake","result_extra","result_capacity","result_many","result_duplicate"]:
 		var bad: Dictionary = threshold_checkpoint.duplicate(true)
 		match change:

@@ -177,7 +177,7 @@ static func _request_problem(value: Variant, identity: String, sequence: int) ->
 	var summon: bool = value.kind=="summon"
 	if not _fields(value,REQUEST_KEYS+["threshold","count"] if summon else REQUEST_KEYS) or not _point(value.position): return "BOSS_REQUEST_FIELDS"
 	if summon:
-		if value.threshold not in [60,30] or value.count!=BossDefinition.POLICY.summon_count or value.target_id!=0 or value.sequence!=0 or value.id!=_summon_id(identity,int(value.threshold)): return "BOSS_SUMMON_IDENTITY"
+		if (value.threshold!=60 and value.threshold!=30) or value.count!=BossDefinition.POLICY.summon_count or value.target_id!=0 or value.sequence!=0 or value.id!=_summon_id(identity,int(value.threshold)): return "BOSS_SUMMON_IDENTITY"
 	elif not _integer(value.target_id,1,LIMIT) or not _integer(value.sequence,1,sequence) or value.sequence!=sequence or value.id!=_attack_id(identity,int(value.sequence)): return "BOSS_ATTACK_IDENTITY"
 	return ""
 

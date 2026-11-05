@@ -48,7 +48,8 @@ static func participants(crew: Array, equipment: Array = [], require_all_equipme
 	return result
 
 
-static func report_problem(crew: Array, report: Dictionary, growth: bool = false) -> String:
+static func report_problem(crew: Array, report: Dictionary, growth: bool = false, support_enabled: bool = false) -> String:
+	if report.has("support") and not support_enabled: return "旧行动不能增加支援事实"
 	var problem: String = identity_problem(crew,growth)
 	if not problem.is_empty():
 		return problem
@@ -89,7 +90,7 @@ static func report_problem(crew: Array, report: Dictionary, growth: bool = false
 			return "成员结果身份未知或重复"
 		if not number(value.get("health")) or not number(value.get("damage_received")) or not integer(value.get("kills"), 0, MAX_ID):
 			return "成员结果数字无效"
-		if not _loss_consistent(float(source.health_before),float(value.health),float(value.damage_received)):
+		if not _loss_consistent(float(source.health_before)+BuildAuthority.healed(report.get("support",{}).get("accepted",[]),int(value.id)),float(value.health),float(value.damage_received)):
 			return "战斗生命与独立伤害账不一致"
 		seen.append(int(value.id))
 		living += int(float(value.health) > 0.0)

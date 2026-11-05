@@ -44,7 +44,7 @@ static func problem(data: Dictionary) -> String:
 	return family_problem(data)
 
 
-static func family_problem(data: Dictionary, pool: bool = false, roster: bool = false, generated_maps: bool = false) -> String:
+static func family_problem(data: Dictionary, pool: bool = false, roster: bool = false, generated_maps: bool = false, build_context: Dictionary = {}) -> String:
 	if not (RosterState.is_state(data) if roster else RescuePoolState.is_state(data) if pool else is_state(data)) or data.size()!=16 or not data.get("profile_id") is String or not data.get("training") is Array or data.training.size()>(50 if roster else 40 if pool else 30) or not data.get("crew") is Array or not data.get("journey") is Dictionary or not data.journey.get("format") is String or data.journey.format!=(RosterState.FORMAT if roster else RescuePoolState.FORMAT if pool else FORMAT) or not SurvivalContracts.integer(data.get("day"),2,RunSave.MAX_COUNTER) or not SurvivalContracts.integer(data.get("food"),0,CampRules.FOOD_LIMIT):
 		return "TRAINING_FIELDS"
 	var seen: Array[String] = []
@@ -83,7 +83,7 @@ static func family_problem(data: Dictionary, pool: bool = false, roster: bool = 
 		member.growth.trait.progress -= bought
 		member.growth.trait.level = TraitRules.level_for(int(member.growth.trait.progress))
 		member.growth.training_state = "unavailable"
-	var issue: String = RescuePoolState.natural_problem(projected,roster,generated_maps) if pool else TraitState.problem(projected)
+	var issue: String = RescuePoolState.natural_problem(projected,roster,generated_maps,build_context) if pool else TraitState.problem(projected)
 	if not issue.is_empty():
 		return issue
 	for row: Dictionary in data.training:

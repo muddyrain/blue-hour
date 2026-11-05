@@ -320,7 +320,7 @@ func begin(before: Dictionary, supply: MissionSupply) -> Dictionary:
 
 
 func active_supply() -> MissionSupply:
-	return DailyActions.supply(_active_rules.mission.generated) if (_active_rules.get("data_version")==2 or _active_rules.get("data_version")==3 or _active_rules.get("data_version")==4 or (_active_rules.get("data_version")==5 or (_active_rules.get("data_version")==6 or _active_rules.get("data_version")==7))) else null
+	return DailyActions.supply(_active_rules.mission.generated) if (_active_rules.get("data_version")==2 or _active_rules.get("data_version")==3 or _active_rules.get("data_version")==4 or (_active_rules.get("data_version")==5 or (_active_rules.get("data_version")==6 or (_active_rules.get("data_version")==7 or _active_rules.get("data_version")==8)))) else null
 
 
 func join_field(at_ms: int) -> Dictionary:
@@ -357,7 +357,7 @@ func resume_offer() -> Dictionary:
 	if state.error != OK or state.state != "SUSPENDED":
 		return _blocked(state.get("reason","NO_SUSPEND_READY"))
 	var receipt: Dictionary = state.receipt
-	if daily_actions and receipt.rules.get("data_version")!=4 and receipt.rules.get("data_version")!=5 and (receipt.rules.get("data_version")!=6 and receipt.rules.get("data_version")!=7):
+	if daily_actions and receipt.rules.get("data_version")!=4 and receipt.rules.get("data_version")!=5 and (receipt.rules.get("data_version")!=6 and (receipt.rules.get("data_version")!=7 and receipt.rules.get("data_version")!=8)):
 		return _blocked("WORLD_DAILY_BUILD_MISMATCH")
 	if SortieSnapshot.old_outdoor(receipt.envelope.world):
 		return _blocked("WORLD_OUTDOOR_BUILD_MISMATCH")
@@ -471,3 +471,16 @@ func _fault(point: String) -> Error:
 
 func _blocked(reason: String) -> Dictionary:
 	return {"error":ERR_UNAVAILABLE,"state":"BLOCKED","reason":reason,"camp":{}}
+
+func accept_support(before: Dictionary, request: Dictionary) -> Dictionary:
+	if not suspend_enabled or _transaction==null or token.is_empty() or _active_rules.get("data_version")!=8: return _blocked("SUPPORT_MODE_REQUIRED")
+	var accepted: Dictionary=_transaction.accept_support(token,before,request)
+	if accepted.error!=OK: return accepted
+	var receipt: Dictionary=accepted.receipt
+	var world: Dictionary=receipt.envelope.world.duplicate(true)
+	if receipt.phase=="SUSPEND_READY":
+		accepted=_transaction.claim_suspend(token,receipt.envelope.world_hash,receipt.envelope.previous_head)
+		if accepted.error!=OK: return accepted
+	elif receipt.phase!="RESUME_CLAIMED": return _blocked("SUPPORT_ACK_PHASE")
+	accepted.world=world
+	return accepted

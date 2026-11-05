@@ -77,7 +77,7 @@ static func problem(data: Dictionary) -> String:
 	return EnemyState.problem(data) if EnemyState.is_state(data) else WeaponState.problem(data) if WeaponState.is_state(data) else RosterState.problem(data) if RosterState.is_family(data) else TrainingState.family_problem(data,true) if is_state(data) else "POOL_FORMAT"
 
 
-static func natural_problem(data: Dictionary, roster: bool = false, generated_maps: bool = false) -> String:
+static func natural_problem(data: Dictionary, roster: bool = false, generated_maps: bool = false, build_context: Dictionary = {}) -> String:
 	if data.size()!=15 or not data.has_all(FrozenSettlement.STATE_KEYS) or not data.get("origin") is Dictionary or not data.origin.is_empty() or not SurvivalContracts.integer(data.get("settled_sorties"),0,RunSave.MAX_COUNTER) or not data.get("crew") is Array or data.crew.size()<2 or data.crew.size()>(RosterState.MAX_HISTORY if roster else MAX_ROSTER) or not data.get("recruits") is Array or data.recruits.size()>(3 if roster else 2) or not data.get("journey") is Dictionary:
 		return "POOL_FIELDS"
 	var meta: Dictionary = data.journey
@@ -138,4 +138,4 @@ static func natural_problem(data: Dictionary, roster: bool = false, generated_ma
 	var common: Dictionary = data.duplicate(true)
 	for member: Dictionary in common.crew:
 		member.condition = "active" if member.health>0 else "down"
-	return FrozenSettlement.common_problem(common,generated_maps)
+	return FrozenSettlement.common_problem(common,generated_maps,build_context)

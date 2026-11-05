@@ -89,7 +89,7 @@ static func validate(entry: Dictionary, data: Dictionary, dynamic_identity: bool
 		return "队员战绩字段无效"
 	if not RunSave._integer(service.get("sorties"), 0, int(data.settled_sorties)) or not RunSave._integer(service.get("kills"), 0, RunSave.MAX_COUNTER):
 		return "队员战绩次数无效"
-	if not RunSave._number(service.get("damage_received")) or float(service.damage_received) < 0.0 or float(service.damage_received) > float(service.sorties) * SurvivorGrowth.maximum(data,entry) + 0.000001:
+	if not RunSave._number(service.get("damage_received")) or float(service.damage_received) < 0.0 or float(service.damage_received) > float(service.sorties) * SurvivorGrowth.maximum(data,entry) + (float(data.journey.build.healing.get(str(int(entry.id)),0.0)) if BuildState.enabled(data) else 0.0) + 0.000001:
 		return "队员累计受伤无效"
 	if not service.get("last_settlement_id") is String:
 		return "队员战绩结算身份无效"
@@ -125,7 +125,7 @@ static func record(after: Dictionary, before: Dictionary, report: Dictionary, id
 		var current: Dictionary = member(after.crew, member_id)
 		if previous.is_empty() or current.is_empty():
 			return "出击成员不在名册中"
-		if float(value.damage_received) < 0.0 or not is_equal_approx(float(previous.health) - float(current.health), float(value.damage_received)):
+		if float(value.damage_received) < 0.0 or not is_equal_approx(float(previous.health) + (BuildAuthority.healed(report.get("support",{}).get("accepted",[]),member_id) if BuildState.enabled(before) else 0.0) - float(current.health), float(value.damage_received)):
 			return "受伤记录与实际生命变化不符"
 		if float(previous.health) <= 0.0:
 			if int(value.kills) != 0 or float(value.damage_received) != 0.0:

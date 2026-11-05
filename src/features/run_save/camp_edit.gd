@@ -7,7 +7,7 @@ static func propose(before: Dictionary, request: Dictionary) -> Dictionary:
 	if request.size() != 3 or not request.get("kind") is String or not request.get("value") is String or not SurvivalContracts.integer(request.get("member_id"), 0, SurvivalContracts.MAX_ID):
 		return {}
 	if RescueState.is_family(before):
-		if not SurvivalState.extended_problem(before).is_empty() or before.journey.state != "ACTIVE" or (request.member_id > 0 and not WeaponInventory._living(before,int(request.member_id))):
+		if not SurvivalState.extended_problem(before).is_empty() or before.journey.state != "ACTIVE" or (request.kind!="build_slot" and request.member_id > 0 and not WeaponInventory._living(before,int(request.member_id))):
 			return {}
 		return _propose_valid(before,request)
 	if SurvivalState.is_extended(before):
@@ -25,6 +25,8 @@ static func propose(before: Dictionary, request: Dictionary) -> Dictionary:
 static func _propose_valid(before: Dictionary, request: Dictionary) -> Dictionary:
 	var member_id: int = int(request.member_id)
 	match request.kind:
+		"build_slot":
+			return BuildState.equip(before,member_id,request.value)
 		"train_trait":
 			return TrainingRules.propose(before,request)
 		"rename":

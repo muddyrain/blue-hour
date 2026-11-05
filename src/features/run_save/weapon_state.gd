@@ -51,7 +51,7 @@ static func projected(data: Dictionary) -> Dictionary:
 	return value
 
 
-static func problem(data: Dictionary, generated_maps: bool = false) -> String:
+static func problem(data: Dictionary, generated_maps: bool = false, build_context: Dictionary = {}) -> String:
 	if not is_state(data) or not data.get("journey") is Dictionary or data.journey.get("format")!=FORMAT or not data.get("weapons") is Array:
 		return "WEAPON_INSTANCE_CONTAINER"
 	for item: Variant in data.weapons:
@@ -60,7 +60,7 @@ static func problem(data: Dictionary, generated_maps: bool = false) -> String:
 			return "WEAPON_INSTANCE_ATTRIBUTES"
 	var legacy: Dictionary=projected(data)
 	if legacy.is_empty():return "WEAPON_DROP_GROWTH_SOURCE"
-	var issue: String = RosterState.problem(legacy,generated_maps)
+	var issue: String = RosterState.problem(legacy,generated_maps,build_context)
 	if not issue.is_empty():
 		return issue
 	for item: Dictionary in data.weapons:

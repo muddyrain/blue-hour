@@ -93,6 +93,12 @@ var los_range_case: bool = false
 var los_setup: LosPracticeSetup
 var threat: ThreatDirector = ThreatDirector.new()
 var threat_rehearsal: bool = false
+var basic_support: BasicSupport = BasicSupport.new()
+var support_commit: Callable
+var support_aiming: bool = false
+var pending_support: Dictionary = {}
+var support_panel: BasicSupportPanel
+var support_aim: BasicSupportAim
 var growth_inputs: GrowthInputs = GrowthInputs.new()
 var layout: StreetLayout
 var _buildings: Array[FieldProp] = []
@@ -146,6 +152,7 @@ func _ready() -> void:
 	growth_inputs.configure(participants_snapshot)
 	if growth_mode:
 		xp_inputs.configure(growth_binding)
+	if build_mode(): basic_support.configure(growth_binding)
 	if trait_mode:
 		trait_inputs.configure(growth_binding)
 	if is_practice and participants_snapshot.size() != 2:
@@ -153,7 +160,7 @@ func _ready() -> void:
 		set_physics_process(false)
 		set_process_unhandled_input(false)
 		return
-	if supply.generated.get("version")==6: tuning.spawn_seconds*=float(supply.generated.campaign.pressure)
+	if (supply.generated.get("version")==6 or supply.generated.get("version")==7): tuning.spawn_seconds*=float(supply.generated.campaign.pressure)
 	layout = supply.layout
 	_cash_site.door = layout.cash_door
 	_food_site.door = layout.food_door
@@ -231,9 +238,10 @@ func _ready() -> void:
 			actor.weapon_instance_id = item.instance_id
 			actor.weapon_definition = WeaponModifiers.combat_definition(item)
 		actor.visual.set_weapon(actor.weapon_definition.presentation)
-		if (supply.generated.get("version")==5 or supply.generated.get("version")==6):actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
+		if (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or supply.generated.get("version")==7)):actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
+		if build_mode(): apply_build(actor)
 		survivors.append(actor)
-	if supply.generated.get("version")==6:
+	if (supply.generated.get("version")==6 or supply.generated.get("version")==7):
 		encounter=EncounterRuntime.new();encounter.setup(self,restoring_world)
 	_make_ui()
 	var readout_layer: CanvasLayer = CanvasLayer.new()
@@ -293,6 +301,9 @@ func _draw() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if phase == Phase.FINISHED:
 		return
+	if _support_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	if is_practice and event.is_action_pressed("practice_far_target"):
 		practice_far_target()
 	elif is_practice and event.is_action_pressed("practice_cross"):
@@ -348,6 +359,9 @@ func step(delta: float) -> void:
 		return
 	var started_usec: int = Time.get_ticks_usec()
 	elapsed += delta
+	if build_mode():
+		basic_support.advance(delta,true)
+		if support_aim!=null: support_aim.advance(delta,true)
 	_notice_clock = maxf(0.0, _notice_clock - delta)
 	if not is_practice and threat.update(elapsed, tuning.daylight_seconds, tuning.spawn_seconds):
 		# Tighten the next deadline, without owing any historical spawns.
@@ -455,10 +469,11 @@ func promote_target(event: Dictionary, restoring: bool = false) -> void:
 	actor.weapon_instance_id = gun.instance_id
 	actor.weapon_definition = WeaponModifiers.combat_definition(gun)
 	actor.visual.set_weapon(actor.weapon_definition.presentation)
-	if (supply.generated.get("version")==5 or supply.generated.get("version")==6):actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
+	if (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or supply.generated.get("version")==7)):actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
 	actor.clear_order()
 	if trait_mode:
 		TraitRules.apply(actor,profile,tuning.survivor_speed)
+	if build_mode(): apply_build(actor)
 	survivors.append(actor)
 	if pool_mode:
 		# Match the existing participant/snapshot execution order, including 5 then 3/4.
@@ -482,6 +497,10 @@ func promote_target(event: Dictionary, restoring: bool = false) -> void:
 
 
 func toggle_pause() -> void:
+	support_aiming=false
+	if not pending_support.is_empty():
+		_accept_support(pending_support.before,pending_support.request)
+		return
 	if is_paused and not field_join_error.is_empty():
 		return
 	if suspend_sealed:
@@ -1089,7 +1108,7 @@ func _update_search(delta: float) -> void:
 		# Contact displacement interrupts outdoor work; cancellation retains earned progress.
 		_release_searcher()
 		return
-	_active_site.progress += delta / search_actor.trait_search_factor
+	_active_site.progress += delta / (search_actor.trait_search_factor * (BuildItems.factors(supply.generated.build.slots).work if build_mode() else 1.0))
 	if _active_site.progress >= _site_seconds(_active_site):
 		var site: SearchSite = _active_site
 		if trait_mode and not trait_inputs.events.any(func(e: Dictionary) -> bool: return e.site==String(site.kind)) and not trait_inputs.accept_search(self,search_actor,site.kind):
@@ -1111,6 +1130,10 @@ func _update_search(delta: float) -> void:
 		if site.kind == &"cash" and not is_practice and (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
 			_show_notice("获得损坏%s · 回营后入库维修"%WeaponInventory.definition(weapon_loot.back().weapon_id).display_name)
 			print("BH_WEAPON_FOUND %s" % JSON.stringify(weapon_loot.back()))
+		if build_mode() and site.id==&"cash" and not supply.generated.build.drops.is_empty():
+			var names: PackedStringArray=[]
+			for item: String in supply.generated.build.drops: names.append(BuildItems.definitions()[item].name)
+			_show_notice("携带道具："+"、".join(names)+" · 归航确认后入库")
 		print("BH_SEARCH completed kind=%s reward=%d cash=%d food=%d" % [site.kind,reward,loot,food_loot])
 		search_completed.emit(reward)
 
@@ -1149,7 +1172,8 @@ func _finish(evacuated: bool) -> void:
 		"sites_searched":_searched_count(),
 		"kills": kills, "searched": _kind_searched(&"cash"), "health": remaining_health, "elapsed": elapsed}
 	if not layout.world_data.is_empty(): report.site_facts = WorldSites.facts(self)
-	if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or supply.generated.get("version")==6): report.task_event=task_event.duplicate(true)
+	if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or supply.generated.get("version")==7)): report.task_event=task_event.duplicate(true)
+	if build_mode(): report.support=basic_support.snapshot()
 	if not is_practice and not loadout_snapshot.is_empty():
 		report.growth_inputs = growth_inputs.snapshot(sortie_id,layout.id,elapsed)
 	if rescue_mode:
@@ -1222,6 +1246,14 @@ func _make_ui() -> void:
 		drill_panel.theme = ui_theme
 		_hud.view.add_child(drill_panel)
 		drill_panel.visible = not player_mode
+	if build_mode():
+		support_panel=BasicSupportPanel.new()
+		support_panel.position=Vector2(320,166)
+		support_panel.heal_requested.connect(request_heal)
+		support_panel.airstrike_requested.connect(toggle_support_aim)
+		_hud.view.add_child(support_panel)
+		support_aim=BasicSupportAim.new()
+		_effects.add_child(support_aim)
 	_update_ui()
 
 
@@ -1231,6 +1263,7 @@ func _show_notice(message: String) -> void:
 
 
 func _update_ui() -> void:
+	_present_support()
 	if _hud == null:
 		return
 	if _readouts != null:
@@ -1414,13 +1447,14 @@ func _make_world_buildings() -> void:
 			site.hit=Rect2(site.prop.position-Vector2(site.prop.front_width/2,280),Vector2(site.prop.front_width,340)) if layout.world_data.get("version")==3 else Rect2(WorldLayout.rect(entity.rect).position-Vector2(0,160),WorldLayout.rect(entity.rect).size+Vector2(0,220))
 			site.prop.primary_target=supply.generated.get("objective",{}).get("site_ids",[]).has(def.id)
 		site.prop.reward_hint=("货币" if site.kind==&"cash" else "食物")+" +%d"%site.reward+(" / 武器" if site.weapon else "")
+		if build_mode() and site.id==&"cash" and supply.generated.type=="equipment": site.prop.reward_hint+=" / 道具%d件"%supply.generated.build.drops.size() if not supply.generated.build.drops.is_empty() else " / 道具已集齐"
 		sites.append(site)
 		if site.id==&"cash": _cash_site=site; _shop=site.prop
 		if site.id==&"food": _food_site=site
 
 
 func _site_seconds(site: SearchSite) -> float:
-	return site.seconds if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or supply.generated.get("version")==6) else tuning.search_seconds
+	return site.seconds if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or supply.generated.get("version")==7)) else tuning.search_seconds
 
 
 func _trigger_airdrop() -> void:
@@ -1451,3 +1485,108 @@ func _weapon_status(actor: FieldActor, action: String) -> String:
 	if actor.magazine!=null and actor.magazine.reloading:
 		return "%s · 换弹暂停"%action if actor.activity in [FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING] else "%s · 换弹%.1fs"%[action,actor.magazine.remaining]
 	return action
+
+func build_mode() -> bool:
+	return supply.generated.get("version")==7
+
+func apply_build(actor: FieldActor) -> void:
+	var factors: Dictionary=BuildItems.factors(supply.generated.build.slots)
+	# Definitions are freshly derived from immutable inventory once per actor setup.
+	actor.weapon_definition.damage*=factors.damage
+	actor.speed*=factors.move
+	actor.magazine.reload_factor=factors.reload
+
+func support_available() -> bool:
+	return build_mode() and not is_paused and not suspend_sealed and phase!=Phase.FINISHED and not (bus_view!=null and bus_view.running()) and field_join_error.is_empty()
+
+func support_world() -> Dictionary:
+	var paused: bool=is_paused
+	is_paused=true
+	_reap_defeated_enemies()
+	var value: Dictionary=SortieSnapshot.capture(self)
+	is_paused=paused
+	return value
+
+func request_heal() -> bool:
+	if not support_available(): return false
+	var before: Dictionary=support_world()
+	var plan: Dictionary=BuildAuthority.plan_heal(before)
+	if plan.is_empty(): return false
+	return _accept_support(before,basic_support.request("heal",plan))
+
+func request_airstrike(point: Vector2) -> bool:
+	if not support_available(): return false
+	var before: Dictionary=support_world()
+	var plan: Dictionary=BuildAuthority.plan_airstrike(before,point)
+	if plan.is_empty(): return false
+	var accepted: bool=_accept_support(before,basic_support.request("airstrike",plan))
+	if accepted: support_aiming=false
+	return accepted
+
+func _accept_support(before: Dictionary, request: Dictionary) -> bool:
+	if request.is_empty() or not support_commit.is_valid(): return false
+	var result: Dictionary=support_commit.call(before,request)
+	if result.get("error",ERR_UNAVAILABLE)!=OK:
+		pending_support={"before":before,"request":request}
+		is_paused=true
+		support_aiming=false
+		_show_notice("支援尚未确认，已暂停；请重试或暂存继续。"+String(result.get("reason","")))
+		_update_ui()
+		return false
+	pending_support={}
+	var after: Dictionary=result.world
+	# All fallible validation and I/O preceded this visible state replacement.
+	for enemy: FieldActor in enemies: enemy.free()
+	enemies.clear()
+	var issue: String=SortieSnapshot.apply(self,after)
+	assert(issue.is_empty(),issue)
+	is_paused=false
+	if request.kind=="airstrike": support_aim.impact(SortieSnapshot._vec(request.payload.point),request.payload.radius)
+	_show_notice("治疗已确认" if request.kind=="heal" else "空袭已确认 · 本次击败来源已保存")
+	_update_ui()
+	return true
+
+func toggle_support_aim() -> void:
+	if support_available() and basic_support.snapshot().cooldowns.airstrike==0.0:
+		support_aiming=not support_aiming
+
+func _support_input(event: InputEvent) -> bool:
+	if not build_mode(): return false
+	if event is InputEventKey and event.pressed and not event.echo and get_viewport().gui_get_focus_owner()==null:
+		if support_aiming and event.keycode in [KEY_ESCAPE,KEY_E]: support_aiming=false; return true
+		if event.keycode==KEY_Q: request_heal(); return true
+		if event.keycode==KEY_E: toggle_support_aim(); return true
+	if support_aiming and event is InputEventMouseButton and event.pressed:
+		if event.button_index==MOUSE_BUTTON_RIGHT: support_aiming=false; return true
+		if event.button_index==MOUSE_BUTTON_LEFT:
+			request_airstrike(get_global_transform_with_canvas().affine_inverse()*event.position)
+			return true
+	return false
+
+func _present_support() -> void:
+	if not build_mode() or support_panel==null: return
+	if not support_available(): support_aiming=false
+	var state: Dictionary=basic_support.snapshot()
+	var members: Array[Dictionary]=[]
+	for actor: FieldActor in survivors: members.append({"member_id":actor.member_id,"health":actor.health,"max_health":actor.max_health,"present":actor.activity!=FieldActor.Activity.DOWN})
+	var plan: Dictionary=basic_support.plan_heal(members,BuildItems.factors(supply.generated.build.slots).heal)
+	var heal_text: String="Q 治疗 · %.1fs"%state.cooldowns.heal if state.cooldowns.heal>0 else "Q 治疗 · 队员%d +%.0fHP"%[plan.member_id,plan.amount] if not plan.is_empty() else "Q 治疗 · 无受伤存活者"
+	var strike_text: String="E 空袭 · %.1fs"%state.cooldowns.airstrike if state.cooldowns.airstrike>0 else "左键确认 · 右键/Esc取消" if support_aiming else "E 空袭 · 就绪"
+	if not support_available(): heal_text="治疗 · 当前阶段不可用"; strike_text="空袭 · 当前阶段不可用"
+	support_panel.present(heal_text,strike_text,support_available() and state.cooldowns.heal==0 and not plan.is_empty(),support_available() and state.cooldowns.airstrike==0)
+	var point: Vector2=get_global_mouse_position()
+	var legal: bool=not support_plan_airstrike(point).is_empty() if support_aiming else false
+	if support_aiming:
+		var caller: FieldActor=null
+		for actor: FieldActor in survivors:
+			if actor.health>0 and actor.visible and actor.activity not in [2,3,4] and (caller==null or actor.position.distance_to(point)<caller.position.distance_to(point) or (actor.position.distance_to(point)==caller.position.distance_to(point) and actor.member_id<caller.member_id)): caller=actor
+		if caller!=null: support_aim.present_caller(caller.position)
+	support_aim.present(point,BasicSupport.POLICY.airstrike_radius*BuildItems.factors(supply.generated.build.slots).blast,legal,support_aiming)
+
+func support_plan_airstrike(point: Vector2) -> Dictionary:
+	var view: Dictionary={"version":10,"generated":supply.generated,"survivors":[],"enemies":[]}
+	for actor: FieldActor in survivors:
+		view.survivors.append({"state":{"member_id":actor.member_id,"health":actor.health,"visible":actor.visible,"activity":actor.activity,"position":[actor.position.x,actor.position.y]}})
+	for enemy: FieldActor in enemies:
+		view.enemies.append({"state":{"actor_id":enemy.actor_id,"health":enemy.health,"position":[enemy.position.x,enemy.position.y]}})
+	return BuildAuthority.plan_airstrike(view,point,layout)

@@ -4,8 +4,10 @@ extends Control
 
 signal equip_requested(member_id: int, instance_id: String)
 signal repair_requested(instance_id: String)
+signal build_requested(slot: int, item_id: String)
 signal closed
 
+var build_panel: BuildItemsPanel
 var player_mode: bool = false
 
 var items: ItemList
@@ -89,6 +91,9 @@ func _ready() -> void:
 	_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	detail_scroll.add_child(_detail)
+	build_panel=BuildItemsPanel.new()
+	build_panel.requested.connect(func(slot:int,item:String)->void: build_requested.emit(slot,item))
+	column.add_child(build_panel)
 	var actions: HBoxContainer = HBoxContainer.new()
 	actions.add_theme_constant_override("separation", 16)
 	column.add_child(actions)
@@ -123,6 +128,8 @@ func _ready() -> void:
 
 func refresh(data: Dictionary, feedback: String = "") -> void:
 	_data = data.duplicate(true)
+	build_panel.visible=BuildState.enabled(data)
+	if build_panel.visible: build_panel.present(data.journey.build.owned,data.journey.build.slots,true,not CampaignState.ended(data))
 	items.max_text_lines = 3 if WeaponState.is_family(_data) else 1
 	_sync_members()
 	for id: int in _member_equipment:
@@ -195,6 +202,10 @@ func _select(index: int) -> void:
 			var before: Dictionary = WeaponModifiers.effective(current,factor)
 			var proposed: Dictionary = WeaponModifiers.effective(item,factor)
 			_detail.text += "\n%02d %s · 当前→所选\n伤%.2f→%.2f / 秒%.3f→%.3f / 距%.2f→%.2f" % [int(member.id),member.call_sign.left(5),before.damage,proposed.damage,before.interval,proposed.interval,before.range,proposed.range]
+	if BuildState.enabled(_data):
+		var factors: Dictionary=BuildItems.factors(_data.journey.build.slots)
+		var values: Dictionary=WeaponModifiers.effective(item)
+		_detail.text+="\n本局道具有效：%.2f伤 · 换弹%.2f秒\n小队移速×%.2f · 搜刮耗时×%.2f\n原属性保留；仅本局已保存两槽生效。"%[values.damage*factors.damage,weapon.reload_seconds()*factors.reload,factors.move,factors.work]
 	_detail.tooltip_text = "实例 " + item.instance_id + "\n现有样板固定维修报价，尚无随机词条。"
 	if WeaponState.is_family(_data):
 		_detail.tooltip_text = "实例 "+item.instance_id+"\n属性生成即冻结，维修只改状态；全部PROJECT_TEMP。"

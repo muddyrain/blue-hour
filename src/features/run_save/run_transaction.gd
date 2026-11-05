@@ -45,6 +45,21 @@ func join_field(token: Dictionary, event: Dictionary) -> Dictionary:
 	return _execute(_checked.bind(token,_join_field.bind(event)))
 
 
+func accept_support(token: Dictionary, before_world: Dictionary, request: Dictionary) -> Dictionary:
+	return _execute(_checked.bind(token,_accept_support.bind(before_world,request)))
+
+
+func _accept_support(before_world: Dictionary, request: Dictionary) -> Dictionary:
+	var loaded: Dictionary=_recover()
+	if loaded.error!=OK: return loaded
+	for accepted: Dictionary in loaded.receipt.get("support",[]):
+		if accepted.id==request.get("id"):
+			return loaded if TransactionReceipt.same(accepted.payload,request.payload) and accepted.kind==request.kind and loaded.receipt.envelope.has("world") else _error(ERR_INVALID_DATA,"SUPPORT_RETRY_CONFLICT")
+	var after: Dictionary=BuildAuthority.propose(before_world,request)
+	if after.is_empty(): return _error(ERR_INVALID_DATA,"SUPPORT_REQUEST_REJECTED")
+	return _suspend(after,true,{"before":before_world,"request":request})
+
+
 func checkpoint(token: Dictionary, health: Array) -> Dictionary:
 	return _execute(_checked.bind(token, _checkpoint.bind(health)))
 
@@ -364,7 +379,7 @@ func _prepare(envelope: Dictionary, camp_key: String = "") -> Dictionary:
 	return _append(next, loaded.hash)
 
 
-func _suspend(world: Dictionary, publish: bool = true) -> Dictionary:
+func _suspend(world: Dictionary, publish: bool = true, support_proposal: Dictionary = {}) -> Dictionary:
 	var loaded: Dictionary = _recover()
 	if loaded.error != OK:
 		return loaded
@@ -380,8 +395,10 @@ func _suspend(world: Dictionary, publish: bool = true) -> Dictionary:
 			return _error(ERR_INVALID_DATA,"SUSPEND_ACTOR_FIELDS")
 		health.append({"id":row.state.member_id,"health":row.state.health})
 	next.health = health
+	if not support_proposal.is_empty(): next.support=world.support.accepted.duplicate(true)
 	next.phase = "SUSPEND_READY"
 	next.envelope = SuspendRecord.make(world,token_for(next),loaded.hash)
+	if not support_proposal.is_empty(): next.envelope.support_proposal=support_proposal.duplicate(true)
 	next.previous_hash = loaded.hash
 	next.revision += 1
 	var issue: String = TransactionReceipt.transition(loaded.receipt,next)

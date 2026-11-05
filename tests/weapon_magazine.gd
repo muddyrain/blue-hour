@@ -9,6 +9,7 @@ func run() -> void:
 	if not OS.get_user_data_dir().replace("\\","/").begins_with(ProjectSettings.globalize_path("res://.local/")):quit(2);return
 	var app: Node=load("res://src/app/main.tscn").instantiate();root.add_child(app)
 	await process_frame
+	app.playable_entry=false # Explicit historical fixture; normal new journeys use short V1.
 	app._new_game()
 	var base: Dictionary=app.camp_snapshot()
 	var types: Dictionary={}

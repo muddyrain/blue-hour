@@ -7,6 +7,7 @@ func run() -> void:
 		return
 	var app: Node = load("res://src/app/main.tscn").instantiate(); root.add_child(app)
 	await process_frame
+	app.playable_entry=false # Explicit historical fixture; normal new journeys use short V1.
 	app._new_game()
 	for offer: Dictionary in WorldActions.offers(app.camp_snapshot()):
 		if offer.type=="rescue": app._select_mission(WorldActions.supply(offer)); break

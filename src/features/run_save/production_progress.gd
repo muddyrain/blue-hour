@@ -169,7 +169,7 @@ func inspect() -> Dictionary:
 			if member.health <= 0:
 				return _blocked("LEGACY_ZERO_HP_NOT_ENROLLED")
 	var camp: Dictionary = TransactionReceipt.camp(receipt).duplicate(true)
-	return {"error":OK,"state":"RECOVERY_READY" if ready else ("ENDED" if battle_mode and camp.journey.state == "FAILED" else "CAMP"),"camp":camp,
+	return {"error":OK,"state":"RECOVERY_READY" if ready else ("ENDED" if battle_mode and (camp.journey.state == "FAILED" or CampaignState.ended(camp)) else "CAMP"),"camp":camp,
 		"receipt":receipt,"hash":recovered.hash,"reason":recovered.state}
 
 
@@ -293,6 +293,7 @@ func _retry_edit() -> Dictionary:
 
 
 func begin(before: Dictionary, supply: MissionSupply) -> Dictionary:
+	if CampaignState.ended(before): return _blocked("CAMPAIGN_ALREADY_ENDED")
 	var state: Dictionary = inspect()
 	if state.error != OK or state.state != "CAMP" or not TransactionReceipt.same(state.camp,before):
 		return _blocked("CAMP_NOT_CONFIRMED")
@@ -319,7 +320,7 @@ func begin(before: Dictionary, supply: MissionSupply) -> Dictionary:
 
 
 func active_supply() -> MissionSupply:
-	return DailyActions.supply(_active_rules.mission.generated) if (_active_rules.get("data_version")==2 or _active_rules.get("data_version")==3 or _active_rules.get("data_version")==4 or (_active_rules.get("data_version")==5 or _active_rules.get("data_version")==6)) else null
+	return DailyActions.supply(_active_rules.mission.generated) if (_active_rules.get("data_version")==2 or _active_rules.get("data_version")==3 or _active_rules.get("data_version")==4 or (_active_rules.get("data_version")==5 or (_active_rules.get("data_version")==6 or _active_rules.get("data_version")==7))) else null
 
 
 func join_field(at_ms: int) -> Dictionary:
@@ -356,7 +357,7 @@ func resume_offer() -> Dictionary:
 	if state.error != OK or state.state != "SUSPENDED":
 		return _blocked(state.get("reason","NO_SUSPEND_READY"))
 	var receipt: Dictionary = state.receipt
-	if daily_actions and receipt.rules.get("data_version")!=4 and receipt.rules.get("data_version")!=5 and receipt.rules.get("data_version")!=6:
+	if daily_actions and receipt.rules.get("data_version")!=4 and receipt.rules.get("data_version")!=5 and (receipt.rules.get("data_version")!=6 and receipt.rules.get("data_version")!=7):
 		return _blocked("WORLD_DAILY_BUILD_MISMATCH")
 	if SortieSnapshot.old_outdoor(receipt.envelope.world):
 		return _blocked("WORLD_OUTDOOR_BUILD_MISMATCH")

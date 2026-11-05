@@ -120,6 +120,9 @@ func refresh(data: Dictionary, daily: Dictionary, can_depart: bool, reason: Stri
 		eligibility_text.text=TaskActions.summary_text(data.last_day.task)+" · 实得货币%d / 食物%d / 武器%d"%[data.last_day.cash_gained,data.last_day.food_found,found]
 	notice.text = feedback if not feedback.is_empty() else "Tab选设施 · Enter/Space确认 · Esc关闭当前页"
 	hotspots[&"bus"].disabled = not can_depart
+	if CampaignState.is_short(data):
+		var display:Dictionary=CampaignRules.display(data.journey.campaign)
+		eligibility_text.text=display.title+" · "+display.progress+"\n"+display.detail
 	hotspots[&"bus"].tooltip_text = "选择出击目标" if can_depart else reason
 	hotspots[&"crew"].set_meta("member_id", world.visible_member_ids[0] if not world.visible_member_ids.is_empty() else 0)
 	for id: int in member_buttons:

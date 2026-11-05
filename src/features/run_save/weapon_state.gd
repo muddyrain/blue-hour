@@ -55,9 +55,12 @@ static func problem(data: Dictionary, generated_maps: bool = false, build_contex
 	if not is_state(data) or not data.get("journey") is Dictionary or data.journey.get("format")!=FORMAT or not data.get("weapons") is Array:
 		return "WEAPON_INSTANCE_CONTAINER"
 	for item: Variant in data.weapons:
+		if item is Dictionary and item.get("weapon_id") in ["fire_axe_v1","shotgun_v1"] and (not item.get("drop") is Dictionary or item.drop.get("version")!=2): return "COMBAT_WEAPON_SOURCE"
 		if item is Dictionary and item.has("drop") and not generated_maps:return "WEAPON_DROP_SCHEMA"
 		if not item is Dictionary or not WeaponModifiers.problem(item).is_empty():
 			return "WEAPON_INSTANCE_ATTRIBUTES"
+	for item: Dictionary in data.weapons:
+		if item.get("drop",{}).get("version")==2 and build_context.get("combat_version")!=1: return "COMBAT_DROP_MODE"
 	var legacy: Dictionary=projected(data)
 	if legacy.is_empty():return "WEAPON_DROP_GROWTH_SOURCE"
 	var issue: String = RosterState.problem(legacy,generated_maps,build_context)

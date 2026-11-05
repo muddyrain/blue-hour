@@ -55,7 +55,7 @@ def main():
  execute('task-data',['--script','res://tests/task_data.gd'],[])
  execute('task-contracts',['--script','res://tests/task_contracts.gd'],[])
  execute('weapon-magazine',['--script','res://tests/weapon_magazine.gd'],[])
- for name in ['campaign_rules','boss_behavior','campaign_contracts','encounter_termination','build_items','basic_support','build_contracts']:
+ for name in ['campaign_rules','boss_behavior','campaign_contracts','encounter_termination','build_items','basic_support','build_contracts','combat_patterns_v1','toxic_v1','combat_integration']:
   execute(name.replace('_','-'),['--script','res://tests/'+name+'.gd'],[])
  execute('known-hash-cycle',['--script','res://tests/known_hash_cycle.gd'])
  execute('record-hash',['--script','res://tests/record_hash.gd'])

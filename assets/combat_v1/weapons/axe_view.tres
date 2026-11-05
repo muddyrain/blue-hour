@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="WeaponPresentation" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/features/expedition/weapon_presentation.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/combat_v1/weapons/fire_axe_v1.svg" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"fire_axe_v1"
+display_name = "消防斧"
+texture = ExtResource("2")
+grip_pixel = Vector2(40, 48)
+muzzle_pixel = Vector2(142, 48)
+display_scale = 0.34
+direction_layers = PackedInt32Array(2, 2, 2)

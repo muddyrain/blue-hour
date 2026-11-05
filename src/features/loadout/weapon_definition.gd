@@ -18,8 +18,8 @@ func shot_interval(personal_factor: float = 1.0) -> float:
 
 
 func magazine_capacity() -> int:
-	return MAGAZINES[String(id)].capacity
+	return int(CombatEquipment.magazine(String(id)).get("capacity",0))
 
 
 func reload_seconds() -> float:
-	return MAGAZINES[String(id)].seconds
+	return float(CombatEquipment.magazine(String(id)).get("seconds",0.0))

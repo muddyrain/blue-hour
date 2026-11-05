@@ -48,7 +48,7 @@ static func initial(base: Dictionary, identity: String, rules: Dictionary, previ
 		"phase":"STARTED", "base":base.duplicate(true), "transaction_id":identity,
 		"participants":participants, "rules":rules.duplicate(true), "health":health,
 		"deaths":previous.get("deaths", []).duplicate(true), "envelope":{}, "camp_key":"", "root_id":previous.get("root_id", "")}
-	if rules.get("data_version")==8: value.support=[]
+	if (rules.get("data_version")==8 or rules.get("data_version")==9): value.support=[]
 	if FieldJoinState.is_family(base):
 		value.joins = []
 	return value
@@ -81,7 +81,7 @@ static func _profiled_problem(value: Variant) -> String:
 	if not value is Dictionary or not SurvivalContracts.json_value(value, -2):
 		return "RECEIPT_FIELDS"
 	var field: bool = value.get("base") is Dictionary and FieldJoinState.is_family(value.base)
-	if value.size() != KEYS.size()+int(field)+int(value.get("rules",{}).get("data_version")==8) or (field and not value.get("joins") is Array):
+	if value.size() != KEYS.size()+int(field)+int((value.get("rules",{}).get("data_version")==8 or value.get("rules",{}).get("data_version")==9)) or (field and not value.get("joins") is Array):
 		return "RECEIPT_FIELDS"
 	for key: String in KEYS:
 		if not value.has(key):
@@ -101,7 +101,7 @@ static func _profiled_problem(value: Variant) -> String:
 	if RescuePoolState.is_family(value.base) and value.phase not in ["CAMP_REGISTERED","EDIT_READY","EDIT_COMMITTED"]:
 		if not value.rules.get("scope") is String or value.rules.scope!=RescuePoolState.SCOPE or not FrozenSettlement._rules_problem(value.rules).is_empty() or not TransactionReceipt.same(value.rules.get("candidate",{}),RescuePoolState.offer(value.base,value.transaction_id,String(value.rules.mission.mission_id))):
 			return "POOL_CANDIDATE_BINDING"
-	if value.phase not in ["CAMP_REGISTERED","EDIT_READY","EDIT_COMMITTED"] and (value.rules.get("data_version")==2 or value.rules.get("data_version")==3 or value.rules.get("data_version")==4 or (value.rules.get("data_version")==5 or (value.rules.get("data_version")==6 or (value.rules.get("data_version")==7 or value.rules.get("data_version")==8)))):
+	if value.phase not in ["CAMP_REGISTERED","EDIT_READY","EDIT_COMMITTED"] and (value.rules.get("data_version")==2 or value.rules.get("data_version")==3 or value.rules.get("data_version")==4 or (value.rules.get("data_version")==5 or (value.rules.get("data_version")==6 or (value.rules.get("data_version")==7 or (value.rules.get("data_version")==8 or value.rules.get("data_version")==9))))):
 		if not value.rules.get("mission") is Dictionary or not DailyActions.matches(value.base,value.rules.mission.get("generated")):
 			return "DAILY_RECEIPT_BINDING"
 	if field and not FieldJoinRules.problem(value.joins,value.base,value.transaction_id).is_empty():
@@ -125,7 +125,7 @@ static func _profiled_problem(value: Variant) -> String:
 	expected = FieldJoinRules.participants(value)
 	if not value.health is Array or value.health.size() != expected.size() or not value.deaths is Array:
 		return "CHECKPOINT_FIELDS"
-	if value.rules.get("data_version")==8:
+	if (value.rules.get("data_version")==8 or value.rules.get("data_version")==9):
 		if not value.get("support") is Array: return "SUPPORT_RECEIPT_FIELDS"
 		var component: Dictionary={"version":1,"binding":token_for_compat(value),"sequence":value.support.size(),"cooldowns":{"heal":0.0,"airstrike":0.0},"accepted":value.support}
 		var support_issue: String=BuildAuthority.support_problem(component,token_for_compat(value),value.rules.mission.generated)
@@ -208,7 +208,7 @@ static func _profiled_transition(previous: Dictionary, next: Dictionary) -> Stri
 		joining = previous.joins.is_empty() and next.joins.size() == 1
 		if not same({"v":previous.joins},{"v":next.joins}) and not (joining and next.phase in ["IN_PROGRESS","DEATH_CONFIRMED"] and previous.phase in ["STARTED","IN_PROGRESS","DEATH_CONFIRMED","RESUME_CLAIMED"] and same({"v":previous.deaths},{"v":next.deaths})):
 			return "FIELD_JOIN_RETRACTED_OR_CHANGED"
-	if next.rules.get("data_version")==8:
+	if (next.rules.get("data_version")==8 or next.rules.get("data_version")==9):
 		issue=BuildAuthority.transition(previous,next)
 		if not issue.is_empty(): return issue
 	if previous.phase == "SUSPEND_READY":

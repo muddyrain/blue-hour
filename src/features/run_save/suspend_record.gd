@@ -10,7 +10,7 @@ static func make(world: Dictionary, token: Dictionary, head: String) -> Dictiona
 
 static func problem(receipt: Dictionary) -> String:
 	var value: Dictionary = receipt.envelope
-	if not SurvivalState.is_survival(receipt.base) or not receipt.camp_key.is_empty() or value.size() != 5+int(receipt.rules.get("data_version")==8 and value.has("support_proposal")) or not value.has_all(["suspend_version","binding","previous_head","world_hash","world"]):
+	if not SurvivalState.is_survival(receipt.base) or not receipt.camp_key.is_empty() or value.size() != 5+int((receipt.rules.get("data_version")==8 or receipt.rules.get("data_version")==9) and value.has("support_proposal")) or not value.has_all(["suspend_version","binding","previous_head","world_hash","world"]):
 		return "SUSPEND_FIELDS_OR_SCOPE"
 	if value.suspend_version != 1 or not value.binding is Dictionary or not TransactionReceipt.same(value.binding,RunTransaction.token_for(receipt)) or not value.previous_head is String or value.previous_head.length() != 64 or not value.previous_head.is_valid_hex_number(false):
 		return "SUSPEND_BINDING"

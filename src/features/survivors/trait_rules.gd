@@ -85,8 +85,8 @@ static func inputs_problem(value: Variant, token: Dictionary, report: Dictionary
 	for row: Variant in value.events:
 		if not row is Dictionary or row.size() != 4 or not row.has_all(["member_id","kind","site","at_ms"]) or not row.kind is String or row.kind != "search_complete" or not row.site is String or row.site not in ["cash","food"] or row.site in seen or not SurvivalContracts.integer(row.member_id,1,5 if RescuePoolState.is_family(context) else 3):
 			return "TRAIT_SEARCH_IDENTITY"
-		var minimum_ms: int = floori(TaskActions.PARAMETERS.airdrop_seconds*700.0) if (task.get("version")==4 or (task.get("version")==5 or (task.get("version")==6 or task.get("version")==7))) and task.get("type")=="airdrop" and row.site=="cash" else 21000
-		if task.get("version")==7: minimum_ms=floori(minimum_ms*BuildItems.factors(task.build.slots).work)
+		var minimum_ms: int = floori(TaskActions.PARAMETERS.airdrop_seconds*700.0) if (task.get("version")==4 or (task.get("version")==5 or (task.get("version")==6 or (task.get("version")==7 or task.get("version")==8)))) and task.get("type")=="airdrop" and row.site=="cash" else 21000
+		if (task.get("version")==7 or task.get("version")==8): minimum_ms=floori(minimum_ms*BuildItems.factors(task.build.slots).work)
 		if SurvivorRoster.member(report.get("participants",[]),int(row.member_id)).is_empty() or SurvivorRoster.member(context.crew,int(row.member_id)).is_empty() or not SurvivalContracts.integer(row.at_ms,minimum_ms,int(report.get("growth_inputs",{}).get("duration_ms",-1))) or row.at_ms < previous:
 			return "TRAIT_SEARCH_SOURCE"
 		if not report.get("field_joins",[]).is_empty() and row.member_id == report.field_joins[0].member_id and row.at_ms < report.field_joins[0].at_ms:

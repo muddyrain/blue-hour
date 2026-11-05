@@ -10,7 +10,7 @@ static func initial() -> Dictionary:
 static func problem(camp: Dictionary) -> String:
 	if not enabled(camp): return ""
 	var v: Variant=camp.journey.build
-	if not CampaignState.is_short(camp) or not v is Dictionary or v.size()!=5 or not v.has_all(["version","owned","slots","sources","healing"]) or v.version!=1 or not v.sources is Array: return "BUILD_FIELDS"
+	if not CampaignState.is_short(camp) or not v is Dictionary or v.size()!=(6 if v.get("version")==2 else 5) or not v.has_all(["version","owned","slots","sources","healing"]) or ((v.version!=1 and v.version!=2) or (v.version==2 and v.get("combat_version")!=1)) or not v.sources is Array: return "BUILD_FIELDS"
 	var issue: String=BuildItems.problem(v.owned,v.slots)
 	if not issue.is_empty(): return issue
 	if not v.healing is Dictionary or v.healing.size()>5: return "BUILD_HEALING_HISTORY"
@@ -48,7 +48,7 @@ static func equip(before: Dictionary, slot: int, item: String) -> Dictionary:
 	return after if problem(after).is_empty() else {}
 
 static func acquired(generated: Dictionary, sites: Dictionary, evacuated: bool) -> Array:
-	return generated.build.drops.duplicate() if generated.get("version")==7 and evacuated and sites.get("cash",{}).get("searched",false) else []
+	return generated.build.drops.duplicate() if (generated.get("version")==7 or generated.get("version")==8) and evacuated and sites.get("cash",{}).get("searched",false) else []
 
 static func settled(before: Dictionary, report: Dictionary, generated: Dictionary) -> Dictionary:
 	var result: Dictionary=before.journey.build.duplicate(true)

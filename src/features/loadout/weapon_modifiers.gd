@@ -39,7 +39,7 @@ static func effective(item: Dictionary, personal_factor: float = 1.0) -> Diction
 	var base: WeaponDefinition = WeaponInventory.definition(item.weapon_id)
 	var level_factor: float = 1.10 if item.get("weapon_level",1)==2 else 1.0
 	var affixes: Array = item.get("affixes",[])
-	return {"damage":base.damage*level_factor,"interval":base.interval*(0.90 if "quick_v1" in affixes else 1.0)*personal_factor,"range":base.shot_range*(1.15 if "reach_v1" in affixes else 1.0)}
+	return {"damage":base.damage*level_factor,"interval":base.interval*(0.90 if "quick_v1" in affixes else 1.0)*(1.0 if CombatEquipment.melee(item.weapon_id) else personal_factor),"range":base.shot_range*(1.15 if "reach_v1" in affixes else 1.0)}
 
 
 static func combat_definition(item: Dictionary) -> WeaponDefinition:
@@ -54,5 +54,5 @@ static func combat_definition(item: Dictionary) -> WeaponDefinition:
 static func description(item: Dictionary) -> String:
 	var names: PackedStringArray = []
 	for id: String in item.get("affixes",[]):
-		names.append("延伸瞄具：射程×1.15" if id=="reach_v1" else "轻快机件：间隔×0.90")
+		names.append(("延长握柄：距离×1.15" if CombatEquipment.melee(item.weapon_id) else "延伸瞄具：射程×1.15") if id=="reach_v1" else "轻快机件：间隔×0.90")
 	return "武器Lv%d · %s · %s" % [int(item.get("weapon_level",1)),"稀有" if item.get("quality","")=="rare" else "普通","无词条" if names.is_empty() else " / ".join(names)]

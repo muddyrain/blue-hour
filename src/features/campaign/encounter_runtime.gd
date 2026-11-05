@@ -100,7 +100,7 @@ static func facts_problem(value: Variant, generated: Dictionary, xp: Variant) ->
 	if generated.encounter.is_empty(): return "" if value.is_empty() else "ENCOUNTER_UNEXPECTED"
 	if not xp is Dictionary or not xp.get("events") is Array: return "ENCOUNTER_XP_FIELDS"
 	for event: Variant in xp.events:
-		if not event is Dictionary or not event.has_all(["enemy_id","kind","member_id","at_ms","instance_id","weapon_id"]) and not (generated.get("version")==7 and BuildAuthority.ability(event) and BuildAuthority.ability_problem(event,String(event.get("request_id","")).get_slice(":",0)+":"+String(event.get("request_id","")).get_slice(":",1)).is_empty()): return "ENCOUNTER_XP_EVENT"
+		if not event is Dictionary or not event.has_all(["enemy_id","kind","member_id","at_ms","instance_id","weapon_id"]) and not ((generated.get("version")==7 or generated.get("version")==8) and BuildAuthority.ability(event) and BuildAuthority.ability_problem(event,String(event.get("request_id","")).get_slice(":",0)+":"+String(event.get("request_id","")).get_slice(":",1)).is_empty()): return "ENCOUNTER_XP_EVENT"
 	if value.size()!=6 or not value.has_all(["version","boss_id","health","behavior","defeat","handling"]) or value.version!=1 or value.boss_id!=generated.encounter.boss_id or not SurvivalContracts.number(value.health) or value.health<0 or value.health>BossDefinition.POLICY.health or not value.defeat is Dictionary or not value.handling is Dictionary: return "ENCOUNTER_IDENTITY"
 	var issue: String=BossBehavior.problem(value.behavior,value.boss_id)
 	if not issue.is_empty(): return issue

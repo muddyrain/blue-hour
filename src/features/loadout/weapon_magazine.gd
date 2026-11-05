@@ -15,10 +15,10 @@ func _init(identity: String, gun: String) -> void:
 	instance_id=identity;weapon_id=gun;rounds=capacity()
 
 func capacity() -> int:
-	return PARAMETERS[weapon_id].capacity
+	return CombatEquipment.magazine(weapon_id).capacity
 
 func seconds() -> float:
-	return PARAMETERS[weapon_id].seconds * reload_factor
+	return CombatEquipment.magazine(weapon_id).seconds * reload_factor
 
 func can_fire() -> bool:
 	return not reloading and rounds>0
@@ -43,7 +43,7 @@ func restore(value: Dictionary) -> void:
 
 static func problem(value: Variant, identity: String, gun: String, factor: float = 1.0) -> String:
 	if not value is Dictionary or value.size()!=5 or not value.has_all(["version","instance_id","rounds","reloading","remaining"]):return "MAGAZINE_FIELDS"
-	if not SurvivalContracts.integer(value.version,1,1) or value.instance_id!=identity or not PARAMETERS.has(gun):return "MAGAZINE_IDENTITY"
-	if not SurvivalContracts.integer(value.rounds,0,PARAMETERS[gun].capacity) or not value.reloading is bool or not SurvivalContracts.number(value.remaining) or value.remaining<0 or value.remaining>PARAMETERS[gun].seconds*factor:return "MAGAZINE_VALUES"
+	if not SurvivalContracts.integer(value.version,1,1) or value.instance_id!=identity or CombatEquipment.magazine(gun).is_empty():return "MAGAZINE_IDENTITY"
+	if not SurvivalContracts.integer(value.rounds,0,CombatEquipment.magazine(gun).capacity) or not value.reloading is bool or not SurvivalContracts.number(value.remaining) or value.remaining<0 or value.remaining>CombatEquipment.magazine(gun).seconds*factor:return "MAGAZINE_VALUES"
 	if value.reloading!=(value.rounds==0) or value.reloading!=(value.remaining>0):return "MAGAZINE_PHASE"
 	return ""

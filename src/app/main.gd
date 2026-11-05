@@ -2176,6 +2176,7 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	var meal: Dictionary = frozen.get("food",snapshot.last_day)
 	var battle: Dictionary = frozen.get("battle",{})
 	var text: String = "结算已保存。\n" if durable else "结果预览 · 确认后保存入账。\n"
+	if snapshot.last_day.has("task"): text+=TaskActions.summary_text(snapshot.last_day.task)+"\n"
 	if not meal.is_empty():
 		text += "带回：货币%d · 食物%d（入库%d） · 武器%d件\n口粮：%d名队员需%d粮，消耗%d，缺口%d\n" % [snapshot.last_day.cash_gained,meal.get("food_found",0),meal.get("food_stored",0),battle.get("weapons",[]).size(),meal.ration_member_ids.size(),meal.food_required,meal.food_consumed,meal.food_shortage]
 	for member: Dictionary in snapshot.crew:

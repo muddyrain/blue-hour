@@ -73,7 +73,7 @@ static func description(member: Dictionary) -> String:
 	return "%s · Trait Lv%d · 进度 %s\n%s · PROJECT_TEMP" % [NAMES[id-1],int(value.level),next,effect]
 
 
-static func inputs_problem(value: Variant, token: Dictionary, report: Dictionary, context: Dictionary) -> String:
+static func inputs_problem(value: Variant, token: Dictionary, report: Dictionary, context: Dictionary, task: Dictionary = {}) -> String:
 	if not report.get("xp_inputs") is Dictionary or not report.get("growth_inputs") is Dictionary or not report.get("participants") is Array or not report.get("field_joins") is Array:
 		return "TRAIT_REPORT_SOURCE"
 	if not value is Dictionary or value.size() != 4 or not value.has_all(["ruleset_id","binding","diagnostic","events"]):
@@ -85,7 +85,8 @@ static func inputs_problem(value: Variant, token: Dictionary, report: Dictionary
 	for row: Variant in value.events:
 		if not row is Dictionary or row.size() != 4 or not row.has_all(["member_id","kind","site","at_ms"]) or not row.kind is String or row.kind != "search_complete" or not row.site is String or row.site not in ["cash","food"] or row.site in seen or not SurvivalContracts.integer(row.member_id,1,5 if RescuePoolState.is_family(context) else 3):
 			return "TRAIT_SEARCH_IDENTITY"
-		if SurvivorRoster.member(report.get("participants",[]),int(row.member_id)).is_empty() or SurvivorRoster.member(context.crew,int(row.member_id)).is_empty() or not SurvivalContracts.integer(row.at_ms,21000,int(report.get("growth_inputs",{}).get("duration_ms",-1))) or row.at_ms < previous:
+		var minimum_ms: int = floori(TaskActions.PARAMETERS.airdrop_seconds*700.0) if task.get("version")==4 and task.get("type")=="airdrop" and row.site=="cash" else 21000
+		if SurvivorRoster.member(report.get("participants",[]),int(row.member_id)).is_empty() or SurvivorRoster.member(context.crew,int(row.member_id)).is_empty() or not SurvivalContracts.integer(row.at_ms,minimum_ms,int(report.get("growth_inputs",{}).get("duration_ms",-1))) or row.at_ms < previous:
 			return "TRAIT_SEARCH_SOURCE"
 		if not report.get("field_joins",[]).is_empty() and row.member_id == report.field_joins[0].member_id and row.at_ms < report.field_joins[0].at_ms:
 			return "TRAIT_SEARCH_BEFORE_JOIN"
@@ -96,8 +97,8 @@ static func inputs_problem(value: Variant, token: Dictionary, report: Dictionary
 	return ""
 
 
-static func bank(after: Dictionary, before: Dictionary, report: Dictionary, token: Dictionary) -> Dictionary:
-	var issue: String = inputs_problem(report.get("trait_inputs"),token,report,before)
+static func bank(after: Dictionary, before: Dictionary, report: Dictionary, token: Dictionary, task: Dictionary = {}) -> Dictionary:
+	var issue: String = inputs_problem(report.get("trait_inputs"),token,report,before,task)
 	if not issue.is_empty():
 		return {"error":issue}
 	var rows: Array[Dictionary] = []

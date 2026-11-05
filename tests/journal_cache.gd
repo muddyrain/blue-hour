@@ -33,7 +33,7 @@ func run() -> void:
 	var alias: Dictionary = journal.read_all()
 	alias.receipt.rules.mission.generated.layout.entities[0].rect[0] += 16
 	expect(TransactionReceipt.same(journal.read_all().receipt, valid.receipt), "caller mutation cannot poison cached receipt")
-	for kind: String in ["geometry", "budget", "record", "death"]:
+	for kind: String in ["geometry", "budget", "record", "death", "task", "template"]:
 		var changed: Dictionary = valid.receipt.duplicate(true)
 		if kind == "geometry":
 			changed.rules.mission.generated.layout.entities[0].rect[0] += 16
@@ -41,6 +41,10 @@ func run() -> void:
 			changed.rules.mission.generated.cash += 1
 		elif kind == "record":
 			changed.rules.data_version = 999
+		elif kind == "task":
+			changed.rules.mission.generated.objective.site_ids=["foreign"]
+		elif kind == "template":
+			changed.rules.mission.generated.template_version=999
 		else:
 			changed.deaths.append({"member_id":1})
 		write(source, RecordEncoding.stringify(changed))

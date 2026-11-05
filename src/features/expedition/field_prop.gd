@@ -3,6 +3,7 @@ extends Node2D
 ## Front edge is the sort anchor. Only the roof fades for a friend behind it.
 
 const ShopTexture: Texture2D = preload("res://assets/candidates/shop_02.png")
+var primary_target: bool = false
 var calibrated: bool = false
 var roof_cut: int = 512
 var body_depth: float = 112
@@ -72,6 +73,9 @@ func _part(region: Rect2, point: Vector2, factor: float) -> Sprite2D:
 
 
 func _draw() -> void:
+	if primary_target:
+		draw_arc(Vector2(door_offset,20),18,0,TAU,24,Color("a8ebd4") if searched else Color("ffd385"),3,true)
+		draw_colored_polygon(PackedVector2Array([Vector2(door_offset,-9),Vector2(door_offset-6,-19),Vector2(door_offset+6,-19)]),Color("ffd385"))
 	if calibrated:
 		var shadow: PackedVector2Array=PackedVector2Array([Vector2(-front_width/2,-body_depth),Vector2(front_width/2,-body_depth),Vector2(front_width/2+26,8),Vector2(-front_width/2+16,10)])
 		draw_colored_polygon(shadow,Color(0.08,0.14,0.17,0.23))
@@ -104,7 +108,7 @@ func update_work(actor_id: int, fraction: float, inside: bool, call_sign: String
 	if _work != null:
 		_work.visible = searchable
 		_work.text = "已搜集" if searched else reward_hint + " · 左键"
-		if calibrated: _work.text=("已搜集" if searched else title+" · "+reward_hint)
+		if calibrated: _work.text=("主目标 · " if primary_target else "")+("已搜集" if searched else title+" · "+reward_hint)
 		if actor_id >= 0:
 			_work.text = "%s · %s · 再点取消" % [call_sign if not call_sign.is_empty() else "队员%d" % (actor_id + 1), "搜集中" if inside else "前往中"]
 		_work.add_theme_color_override("font_color", Color("a8ebd4") if searched else Color("ffe0a4"))

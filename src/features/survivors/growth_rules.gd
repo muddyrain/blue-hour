@@ -160,7 +160,7 @@ static func result_problem(receipt: Dictionary) -> String:
 	var report: Variant = result.get("battle")
 	if not report is Dictionary or not report.get("growth_inputs") is Dictionary or not report.get("xp_inputs") is Dictionary:
 		return "XP_RESULT_SOURCE"
-	if report.size() != FrozenSettlement.REPORT_KEYS.size()+2+int(FieldJoinState.is_family(receipt.base))+int(TraitState.is_family(receipt.base))+int(receipt.rules.get("data_version")==3) or not report.has_all(FrozenSettlement.REPORT_KEYS) or not report.has("rescue"):
+	if report.size() != FrozenSettlement.REPORT_KEYS.size()+2+int(FieldJoinState.is_family(receipt.base))+int(TraitState.is_family(receipt.base))+int((receipt.rules.get("data_version")==3 or receipt.rules.get("data_version")==4)) or not report.has_all(FrozenSettlement.REPORT_KEYS) or not report.has("rescue"):
 		return "XP_RESULT_REPORT_FIELDS"
 	if not FrozenSettlement._rules_problem(receipt.rules).is_empty() or receipt.rules.get("scope") != (RescuePoolState.SCOPE if RescuePoolState.is_family(receipt.base) else TraitState.SCOPE if TraitState.is_family(receipt.base) else (FieldJoinState.SCOPE if FieldJoinState.is_family(receipt.base) else GrowthState.SCOPE)) or not result.get("rules") is Dictionary or not TransactionReceipt.same(result.rules,receipt.rules):
 		return "XP_RESULT_RULES"
@@ -179,7 +179,7 @@ static func result_problem(receipt: Dictionary) -> String:
 	var carry: Dictionary = {"loot":source.cash_reward if report.searched else 0,
 		"food":source.food_reward if report.food_searched else 0,
 		"weapons":[WeaponInventory.reward(receipt.transaction_id,WeaponState.is_family(receipt.base))] if report.searched and source.has_weapon_sample else []}
-	if receipt.rules.get("data_version")==3:
+	if (receipt.rules.get("data_version")==3 or receipt.rules.get("data_version")==4):
 		var site_issue: String = WorldSites.problem(source.generated.sites,report.get("site_facts"))
 		if not site_issue.is_empty(): return site_issue
 		carry=WorldSites.carry(source.generated.sites,report.site_facts,receipt.transaction_id,WeaponState.is_family(receipt.base))

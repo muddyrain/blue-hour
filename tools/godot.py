@@ -24,9 +24,12 @@ def main():
  def execute(label,args,flags=None,expected=0):
   folder=job/label;folder.mkdir();cmd=[exe,'--headless','--path',str(ROOT),'--audio-driver','Dummy',*args]
   flags=list(flags if flags is not None else ([] if label=='startup-default' else ['--bh-legacy-entry']))
-  cmd+=['--',*flags,'--bh-progress='+str(folder/('run.enemy-v1.json' if label in ['startup-default','rogue-contracts','world-contracts','world-bus'] or '--bh-enemy-trial' in flags else 'run.json')),'--bh-audio-settings='+str(folder/'audio.json')]
+  cmd+=['--',*flags,'--bh-progress='+str(folder/('run.enemy-v1.json' if label in ['startup-default','rogue-contracts','world-contracts','neighborhood-contracts','journal-cache','world-bus'] or '--bh-enemy-trial' in flags else 'run.json')),'--bh-audio-settings='+str(folder/'audio.json')]
   if label=='known-hash-cycle':cmd+=['--cycle-output='+(folder/'cycle.json').as_posix()]
   if label=='record-hash':cmd+=['--record-output='+(folder/'data').as_posix()]
+  if label=='closeout-view':cmd+=['--view-output='+(folder/'frames').as_posix()]
+  if label=='neighborhood-view':cmd+=['--view-output='+(folder/'frames').as_posix()]
+  if label=='neighborhood-data':cmd+=['--neighborhood-output='+(folder/'data.json').as_posix()]
   if label=='rogue-data':cmd+=['--rogue-data-output='+(folder/'data.json').as_posix()]
   with (folder/'console.txt').open('xb') as out:z=subprocess.run(cmd,cwd=ROOT,stdout=out,stderr=out,env=env,timeout=150)
   text=(folder/'console.txt').read_text(encoding='utf-8',errors='replace');assert z.returncode==expected and not re.search(r'(?m)^(SCRIPT ERROR|ERROR):',text),(label,z.returncode,text[-2000:])
@@ -42,6 +45,11 @@ def main():
  for name in ['rogue_data','rogue_navigation','hud_compact','rogue_legacy_scope','world_data']:
   execute(name.replace('_','-'),['--script','res://tests/'+name+'.gd'])
  execute('world-bus',['--script','res://tests/world_bus.gd'],[])
+ execute('journal-cache',['--script','res://tests/journal_cache.gd'],[])
+ execute('closeout-view',['--script','res://tests/closeout_view.gd'])
+ execute('neighborhood-data',['--script','res://tests/neighborhood_data.gd'])
+ execute('neighborhood-view',['--script','res://tests/neighborhood_view.gd'])
+ execute('neighborhood-contracts',['--script','res://tests/neighborhood_contracts.gd'],[])
  execute('world-contracts',['--script','res://tests/world_contracts.gd'],[])
  execute('rogue-contracts',['--script','res://tests/rogue_contracts.gd'],[])
  execute('known-hash-cycle',['--script','res://tests/known_hash_cycle.gd'])

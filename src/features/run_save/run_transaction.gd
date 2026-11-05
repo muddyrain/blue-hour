@@ -197,6 +197,13 @@ func _commit_edit(identity: String) -> Dictionary:
 
 
 func _binding_check() -> Dictionary:
+	var stamp: int = FreezeProfile.enter("binding.check")
+	var result: Dictionary = _profiled_binding_check()
+	FreezeProfile.leave("binding.check", stamp)
+	return result
+
+
+func _profiled_binding_check() -> Dictionary:
 	var file: FileAccess = FileAccess.open(_binding_path, FileAccess.READ)
 	if file == null:
 		return _error(ERR_FILE_CORRUPT, "REQUIRED_BINDING_MISSING_OR_UNREADABLE")
@@ -223,6 +230,13 @@ func _binding_check() -> Dictionary:
 
 
 func _remember(loaded: Dictionary) -> Dictionary:
+	var stamp: int = FreezeProfile.enter("binding.remember")
+	var result: Dictionary = _profiled_remember(loaded)
+	FreezeProfile.leave("binding.remember", stamp)
+	return result
+
+
+func _profiled_remember(loaded: Dictionary) -> Dictionary:
 	var receipt: Dictionary = loaded.receipt
 	var payload: Dictionary = {"binding_version":1, "run_id":_run_id, "root_id":_root_id,
 		"journal":_journal.directory, "revision":receipt.revision,
@@ -476,6 +490,13 @@ func _active() -> Dictionary:
 
 
 func _load() -> Dictionary:
+	var stamp: int = FreezeProfile.enter("transaction.load")
+	var result: Dictionary = _profiled_load()
+	FreezeProfile.leave("transaction.load", stamp)
+	return result
+
+
+func _profiled_load() -> Dictionary:
 	if not _path_problem.is_empty():
 		return _error(ERR_INVALID_PARAMETER, _path_problem)
 	var loaded: Dictionary = _journal.read_all()

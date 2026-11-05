@@ -4,6 +4,7 @@ extends RefCounted
 const WORK_SECONDS: float = 30.0
 
 static func definitions(layout: Dictionary, cash: int, food: int, weapons: int) -> Array:
+	if layout.get("version")==3: return _neighborhood_definitions(layout,cash,food,weapons)
 	var result: Array = []
 	var used: Array[String] = []
 	for kind: String in ["cash","food"]:
@@ -47,3 +48,25 @@ static func completed(defs: Array, facts: Dictionary, kind: String = "") -> int:
 	for def: Dictionary in defs:
 		if facts[def.id].searched and (kind.is_empty() or def.kind==kind): count+=1
 	return count
+
+static func _neighborhood_definitions(layout: Dictionary, cash: int, food: int, weapons: int) -> Array:
+	var rank: int = NeighborhoodLayout.SIZES.find(layout["size"])
+	var defs: Array = []
+	var used: Array[String] = []
+	var start: Vector2 = WorldLayout.point(layout.bus.door)
+	for kind: String in ["cash","food"]:
+		var budget: int = cash if kind=="cash" else food
+		var count: int = mini(budget, (3+rank if food==0 else rank+1) if kind=="cash" else (2 if rank==0 else 3))
+		var candidates: Array = layout.entities.filter(func(e: Dictionary) -> bool: return e.id not in used)
+		var preferred: Array = ["warehouse","garage","small_apartment","row_house"] if kind=="cash" else ["supermarket","convenience_store","eatery","detached_home"]
+		candidates.sort_custom(func(a: Dictionary,b: Dictionary) -> bool:
+			var ad: float = start.distance_to(WorldLayout.point(a.door))
+			var bd: float = start.distance_to(WorldLayout.point(b.door))
+			return ad+(0 if a.archetype in preferred else 400)<bd+(0 if b.archetype in preferred else 400))
+		for i: int in range(count):
+			# Main sources stay near; remaining sources span the block rather than rewarding decorative outskirts.
+			var index: int = 0 if i==0 else candidates.size()-1 if i==1 else candidates.size()/2
+			var entity: Dictionary = candidates.pop_at(index)
+			used.append(entity.id)
+			defs.append({"id":kind if i==0 else kind+"_%d"%(i+1),"building":entity.id,"kind":kind,"amount":budget/count+int(i<budget%count),"weapon":kind=="cash" and i==0 and weapons==1,"seconds":WORK_SECONDS})
+	return defs

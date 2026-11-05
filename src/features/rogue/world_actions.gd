@@ -79,4 +79,4 @@ static func supply(value: Dictionary) -> MissionSupply:
 	return result
 
 static func risk(value: Dictionary) -> String:
-	return "最远目标基础步行约%d秒%s；敌人可从街区四侧进入。"%[ceili(float(value.route_length)/125.0),"，留意中央住宅的遮挡" if value.layout.bone=="ring" else "，沿分岔巷道接近" if value.layout.bone=="fork" else "，留意长街侧面来敌"]
+	return {"avenue":"沿主街接近目标","lanes":"留意住宅侧巷来敌","court":"留意仓储区与路口"}[value.layout.bone]+"；最远目标基础步行约%d秒，敌人遵循原威胁规则。"%ceili(float(value.route_length)/125)

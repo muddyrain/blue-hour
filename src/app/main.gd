@@ -1002,7 +1002,7 @@ func _suspend_problem(result: Dictionary) -> String:
 	var reason: String = result.get("reason", "UNKNOWN")
 	print("BH_SUSPEND_DETAIL build=%s reason=%s" % [SortieSnapshot.GROWTH_BUILD if growth_mode else SortieSnapshot.BUILD, reason])
 	if "WORLD_DAILY_BUILD_MISMATCH" in reason:
-		return "此途中进度属于旧固定街区版本，请用原版本继续。暂存未消费，原件保留，不回退旧营地。"
+		return "此途中进度属于旧街区版本，请用原版本继续。暂存未消费，原件保留，不回退旧营地。"
 	if "WORLD_CONTACT_BUILD_MISMATCH" in reason:
 		return "此途中暂存使用旧接触规则，请使用原兼容版本继续；本次未消费或改写暂存。"
 	if "BINDING" in reason or "ACK" in reason:

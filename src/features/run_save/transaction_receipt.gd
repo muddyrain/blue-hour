@@ -19,6 +19,13 @@ static func fingerprint(value: Dictionary) -> String:
 
 
 static func legacy_fingerprint(value: Dictionary) -> String:
+	var stamp: int = FreezeProfile.enter("legacy.fingerprint")
+	var result: String = _profiled_legacy_fingerprint(value)
+	FreezeProfile.leave("legacy.fingerprint", stamp)
+	return result
+
+
+static func _profiled_legacy_fingerprint(value: Dictionary) -> String:
 	# The receipt/envelope add two levels; the public result itself still has its full 64.
 	if not SurvivalContracts.json_value(value, -2):
 		return ""
@@ -63,6 +70,13 @@ static func camp(receipt: Dictionary) -> Dictionary:
 
 
 static func problem(value: Variant) -> String:
+	var stamp: int = FreezeProfile.enter("receipt.problem")
+	var result: String = _profiled_problem(value)
+	FreezeProfile.leave("receipt.problem", stamp)
+	return result
+
+
+static func _profiled_problem(value: Variant) -> String:
 	if not value is Dictionary or not SurvivalContracts.json_value(value, -2):
 		return "RECEIPT_FIELDS"
 	var field: bool = value.get("base") is Dictionary and FieldJoinState.is_family(value.base)
@@ -86,7 +100,7 @@ static func problem(value: Variant) -> String:
 	if RescuePoolState.is_family(value.base) and value.phase not in ["CAMP_REGISTERED","EDIT_READY","EDIT_COMMITTED"]:
 		if not value.rules.get("scope") is String or value.rules.scope!=RescuePoolState.SCOPE or not FrozenSettlement._rules_problem(value.rules).is_empty() or not TransactionReceipt.same(value.rules.get("candidate",{}),RescuePoolState.offer(value.base,value.transaction_id,String(value.rules.mission.mission_id))):
 			return "POOL_CANDIDATE_BINDING"
-	if value.phase not in ["CAMP_REGISTERED","EDIT_READY","EDIT_COMMITTED"] and (value.rules.get("data_version")==2 or value.rules.get("data_version")==3):
+	if value.phase not in ["CAMP_REGISTERED","EDIT_READY","EDIT_COMMITTED"] and (value.rules.get("data_version")==2 or value.rules.get("data_version")==3 or value.rules.get("data_version")==4):
 		if not value.rules.get("mission") is Dictionary or not DailyActions.matches(value.base,value.rules.mission.get("generated")):
 			return "DAILY_RECEIPT_BINDING"
 	if field and not FieldJoinRules.problem(value.joins,value.base,value.transaction_id).is_empty():
@@ -152,6 +166,13 @@ static func problem(value: Variant) -> String:
 
 
 static func transition(previous: Dictionary, next: Dictionary) -> String:
+	var stamp: int = FreezeProfile.enter("receipt.transition")
+	var result: String = _profiled_transition(previous,next)
+	FreezeProfile.leave("receipt.transition", stamp)
+	return result
+
+
+static func _profiled_transition(previous: Dictionary, next: Dictionary) -> String:
 	var issue: String = problem(next)
 	if not issue.is_empty():
 		return issue

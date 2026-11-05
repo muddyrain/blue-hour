@@ -1,3 +1,7 @@
+ReceiptJournal的R1缓存仅复用完整原文和相邻原文的纯认证证明；每次仍重读真实文件、检查全链与binding，不缓存当前营地/ACK权威。FreezeProfile仅为默认关闭的聚合计时；没有新保存格式或异步owner。
+
+NeighborhoodActions/Layout/Art提供V3尺寸、主题和每类门尺度；实体院墙与所有空间消费者读取同一StreetLayout。DailyActions保留V1/V2认证，新增规则4/世界5，不另造保存或奖励owner。见[尺度与拓扑](design/m6-world-02.md)。
+
 WorldActions/WorldLayout/WorldSites提供V2有限街区、站点预算与事实校验；DailyActions按版本保留V1解释。BuildingLibrary拥有素材和门锚点，BusJourney只读已登记行动/冻结结果并推进表现。原数据owner继续唯一保存；详见[街区合同](design/m6-world-01.md)。
 
 # 架构与所有权

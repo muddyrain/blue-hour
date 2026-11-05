@@ -6,25 +6,25 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument('--godot',required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--native',action='store_true');p.add_argument('--case',choices=['flow','suspend','exit','movie','compat'],default='flow');p.add_argument('--pack',type=Path);a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('--godot',required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--native',action='store_true');p.add_argument('--case',choices=['flow','suspend','exit','movie','compat','neighborhood','neighborhood-movie','neighborhood-compat','closeout','closeout-three','closeout-two','closeout-exit','closeout-fault'],default='flow');p.add_argument('--pack',type=Path);a=p.parse_args()
  assert subprocess.check_output([a.godot,'--version'],text=True).strip()==(ROOT/'.godot-version').read_text().strip()
  out=a.output.resolve();assert out.is_relative_to(ROOT/'.local');out.mkdir(parents=True,exist_ok=False)
  env=dict(os.environ,APPDATA=str(out/'user'),HOME=str(out/'home'),XDG_DATA_HOME=str(out/'user'))
- phases={'flow':['first','restore','second','third','fourth','final'],'suspend':['first','restore'],'exit':['first','resume'],'movie':['first'],'compat':['old-complete','new-accept','old-suspend','new-refuse']}[a.case]
+ phases={'closeout-fault':['first'],'closeout-two':['first','restore','large','large2'],'closeout-exit':['first','resume'],'closeout':['first','restore','large'],'closeout-three':['first','restore','large','large2','large3'],'neighborhood':['first','restore','large','small','final'],'neighborhood-movie':['first'],'neighborhood-compat':['old-complete','new-accept','old-suspend','new-refuse'],'flow':['first','restore','second','third','fourth','final'],'suspend':['first','restore'],'exit':['first','resume'],'movie':['first'],'compat':['old-complete','new-accept','old-suspend','new-refuse']}[a.case]
  results=[]
  for phase in phases:
-  folder=out/phase;script={'flow':'world_flow','suspend':'world_flow','exit':'world_exit','movie':'world_movie','compat':'rogue_compat'}[a.case]
+  folder=out/phase;script={'closeout-fault':'closeout_fault','closeout-two':'closeout_flow','closeout-exit':'closeout_exit','closeout':'closeout_flow','closeout-three':'closeout_flow','neighborhood':'neighborhood_flow','neighborhood-movie':'neighborhood_movie','neighborhood-compat':'neighborhood_compat','flow':'world_flow','suspend':'world_flow','exit':'world_exit','movie':'world_movie','compat':'rogue_compat'}[a.case]
   flags=['--flow-output='+folder.as_posix(),'--bh-rescue-seed=rogue-sample-008']
   if phase not in ['first','old-complete','old-suspend']:flags+=['--flow-resume']
-  if a.case=='compat':
+  if a.case in ['compat','neighborhood-compat']:
    profile=out/('complete-profile' if phase in ['old-complete','new-accept'] else 'suspend-profile')
    env.update(APPDATA=str(profile/'user'),HOME=str(profile/'home'),XDG_DATA_HOME=str(profile/'user'))
    # The explicit old entry writes the exact same canonical isolated path that normal entry reads.
-   if phase.startswith('old-'):
+   if phase.startswith('old-') and a.case=='compat':
     flags+=['--flow-fixed','--bh-enemy-trial','--bh-safe-suspend','--bh-camp-prototype']
     flags+=['--bh-progress='+str(profile/('user/Godot/app_userdata/'+re.search(r'config/name="([^"]+)"',(ROOT/'project.godot').read_text(encoding='utf-8'))[1].replace('|','-')+'/playable-v1/run.enemy-v1.json')).replace(chr(92),'/')]
   encoder=None;encoding_log=None
-  if a.case=='movie':
+  if a.case in ['movie','neighborhood-movie']:
    assert a.native,'movie requires real native renderer'
    with socket.socket() as probe:probe.bind(('127.0.0.1',0));port=probe.getsockname()[1]
    encoding_log=(out/'encoding.txt').open('wb')
@@ -36,7 +36,7 @@ def main():
   # Export omits tests. Copy only the external driver inheritance chain; game paths stay res:// from PCK.
   if a.pack:
    drivers=out/'drivers';drivers.mkdir(exist_ok=True)
-   for name in ['playable_flow','world_flow','world_exit','world_movie','rogue_compat']:
+   for name in ['playable_flow','world_flow','world_exit','world_movie','rogue_compat','neighborhood_flow','neighborhood_movie','neighborhood_compat','closeout_flow','closeout_exit','closeout_fault']:
     content=(ROOT/'tests'/(name+'.gd')).read_text(encoding='utf-8').replace('extends "res://tests/','extends "')
     (drivers/(name+'.gd')).write_text(content,encoding='utf-8')
   cmd+=['--script',str(drivers/(script+'.gd')) if a.pack else 'res://tests/'+script+'.gd','--',*flags]

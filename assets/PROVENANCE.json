@@ -460,6 +460,16 @@
       "path": "assets/world_v1/warehouse.png",
       "sha256": "215f3206b9ed718b790bf994e6a03c964bc5c3f93c6691ca987f344d12f5a8ef",
       "source": "Original built-in image_gen; normalization and source hashes in assets/world_v1/manifest.json"
+    },
+    {
+      "path": "assets/world_v2/supermarket.png",
+      "sha256": "3d80b31b00be9e76fb2674bdee1169d2c6f329f2917a38d75cde73fe15967ec0",
+      "source": "Original built-in image_gen; source and normalization hashes in assets/world_v2/manifest.json"
+    },
+    {
+      "path": "assets/world_v2/row_house.png",
+      "sha256": "b0456f48497c15656af8ff84b96993c4f04030ea6fccae5ff9011ace960307a5",
+      "source": "Original built-in image_gen; source and normalization hashes in assets/world_v2/manifest.json"
     }
   ]
 }

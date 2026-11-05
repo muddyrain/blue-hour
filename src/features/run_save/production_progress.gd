@@ -319,7 +319,7 @@ func begin(before: Dictionary, supply: MissionSupply) -> Dictionary:
 
 
 func active_supply() -> MissionSupply:
-	return DailyActions.supply(_active_rules.mission.generated) if (_active_rules.get("data_version")==2 or _active_rules.get("data_version")==3) else null
+	return DailyActions.supply(_active_rules.mission.generated) if (_active_rules.get("data_version")==2 or _active_rules.get("data_version")==3 or _active_rules.get("data_version")==4) else null
 
 
 func join_field(at_ms: int) -> Dictionary:
@@ -356,7 +356,7 @@ func resume_offer() -> Dictionary:
 	if state.error != OK or state.state != "SUSPENDED":
 		return _blocked(state.get("reason","NO_SUSPEND_READY"))
 	var receipt: Dictionary = state.receipt
-	if daily_actions and receipt.rules.get("data_version")!=3:
+	if daily_actions and receipt.rules.get("data_version")!=4:
 		return _blocked("WORLD_DAILY_BUILD_MISMATCH")
 	if receipt.envelope.world.hunger != hunger_trial:
 		return _blocked("SUSPEND_HUNGER_ENTRY_MISMATCH")
@@ -385,6 +385,13 @@ func release_frozen_world(world_hash: String) -> Dictionary:
 
 
 func finish(report: Dictionary, carried: Dictionary) -> Dictionary:
+	var stamp: int = FreezeProfile.enter("progress.finish")
+	var result: Dictionary = _profiled_finish(report,carried)
+	FreezeProfile.leave("progress.finish", stamp)
+	return result
+
+
+func _profiled_finish(report: Dictionary, carried: Dictionary) -> Dictionary:
 	if _transaction == null or token.is_empty():
 		return _blocked("NO_ACTIVE_TRANSACTION")
 	var input: Dictionary = {"before":_active_base.duplicate(true),"token":token.duplicate(true),

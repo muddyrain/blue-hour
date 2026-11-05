@@ -81,7 +81,7 @@ static func member_row(rows: Array, id: int) -> Dictionary:
 	return {}
 
 
-static func inputs_problem(value: Variant, token: Dictionary, action: Dictionary, participants: Array, inventory: Dictionary) -> String:
+static func inputs_problem(value: Variant, token: Dictionary, action: Dictionary, participants: Array, inventory: Dictionary, support: Array = []) -> String:
 	if not value is Dictionary or value.size() != 5 or not value.has_all(["ruleset_id","binding","diagnostic","spawn_count","events"]):
 		return "XP_INPUT_FIELDS"
 	if value.ruleset_id != RULESET or not value.binding is Dictionary or not TransactionReceipt.same(value.binding,token) or not value.diagnostic is bool or not SurvivalContracts.integer(value.spawn_count,0,RunSave.MAX_COUNTER) or not value.events is Array or value.events.size() > MAX_EVENTS:
@@ -94,7 +94,7 @@ static func inputs_problem(value: Variant, token: Dictionary, action: Dictionary
 	for participant: Dictionary in participants:
 		by_member[int(participant.id)] = []
 	for event: Variant in value.events:
-		if not event is Dictionary or event.size() != 6 or not event.has_all(["member_id","kind","enemy_id","at_ms","weapon_id","instance_id"]):
+		if not event is Dictionary or (event.size() != 6 or not event.has_all(["member_id","kind","enemy_id","at_ms","weapon_id","instance_id"])) and not (BuildState.enabled(inventory) and BuildAuthority.ability(event) and BuildAuthority.ability_problem(event,String(token.transaction_id)).is_empty()):
 			return "XP_EVENT_FIELDS"
 		if not SurvivalContracts.integer(event.member_id,1,SurvivalContracts.MAX_ID) or not by_member.has(int(event.member_id)) or event.kind != "defeat" or not SurvivalContracts.integer(event.enemy_id,0,RunSave.MAX_COUNTER) or seen.has(int(event.enemy_id)):
 			return "XP_EVENT_IDENTITY"
@@ -104,7 +104,9 @@ static func inputs_problem(value: Variant, token: Dictionary, action: Dictionary
 			return "XP_EVENT_TIME"
 		var participant: Dictionary = SurvivorRoster.member(participants,int(event.member_id))
 		var weapon: Dictionary = WeaponInventory.find(inventory,participant.weapon_instance_id)
-		if weapon.is_empty() or event.instance_id != participant.weapon_instance_id or event.weapon_id != weapon.weapon_id:
+		if BuildAuthority.ability(event):
+			if not BuildAuthority.lethal_source(event,support): return "XP_ABILITY_REQUEST_SOURCE"
+		elif weapon.is_empty() or event.instance_id != participant.weapon_instance_id or event.weapon_id != weapon.weapon_id:
 			return "XP_EVENT_WEAPON_OWNER"
 		seen[int(event.enemy_id)] = true
 		previous = int(event.at_ms)
@@ -125,7 +127,7 @@ static func inputs_problem(value: Variant, token: Dictionary, action: Dictionary
 static func bank(after: Dictionary, before: Dictionary, report: Dictionary, token: Dictionary) -> Dictionary:
 	if not report.get("growth_inputs") is Dictionary or not report.get("participants") is Array:
 		return {"error":"XP_REPORT_FIELDS"}
-	var issue: String = inputs_problem(report.get("xp_inputs"),token,report.growth_inputs,report.participants,before)
+	var issue: String = inputs_problem(report.get("xp_inputs"),token,report.growth_inputs,report.participants,before,report.get("support",{}).get("accepted",[]))
 	if not issue.is_empty():
 		return {"error":issue}
 	var rows: Array[Dictionary] = []
@@ -160,7 +162,7 @@ static func result_problem(receipt: Dictionary) -> String:
 	var report: Variant = result.get("battle")
 	if not report is Dictionary or not report.get("growth_inputs") is Dictionary or not report.get("xp_inputs") is Dictionary:
 		return "XP_RESULT_SOURCE"
-	if report.size() != FrozenSettlement.REPORT_KEYS.size()+2+int(receipt.rules.get("data_version")==7)+int((receipt.rules.get("data_version")==5 or (receipt.rules.get("data_version")==6 or receipt.rules.get("data_version")==7)))+int(FieldJoinState.is_family(receipt.base))+int(TraitState.is_family(receipt.base))+int((receipt.rules.get("data_version")==3 or receipt.rules.get("data_version")==4 or (receipt.rules.get("data_version")==5 or (receipt.rules.get("data_version")==6 or receipt.rules.get("data_version")==7)))) or not report.has_all(FrozenSettlement.REPORT_KEYS) or not report.has("rescue"):
+	if report.size() != FrozenSettlement.REPORT_KEYS.size()+int(receipt.rules.get("data_version")==8)+2+int((receipt.rules.get("data_version")==7 or receipt.rules.get("data_version")==8))+int((receipt.rules.get("data_version")==5 or (receipt.rules.get("data_version")==6 or (receipt.rules.get("data_version")==7 or receipt.rules.get("data_version")==8))))+int(FieldJoinState.is_family(receipt.base))+int(TraitState.is_family(receipt.base))+int((receipt.rules.get("data_version")==3 or receipt.rules.get("data_version")==4 or (receipt.rules.get("data_version")==5 or (receipt.rules.get("data_version")==6 or (receipt.rules.get("data_version")==7 or receipt.rules.get("data_version")==8))))) or not report.has_all(FrozenSettlement.REPORT_KEYS) or not report.has("rescue"):
 		return "XP_RESULT_REPORT_FIELDS"
 	if not FrozenSettlement._rules_problem(receipt.rules).is_empty() or receipt.rules.get("scope") != (RescuePoolState.SCOPE if RescuePoolState.is_family(receipt.base) else TraitState.SCOPE if TraitState.is_family(receipt.base) else (FieldJoinState.SCOPE if FieldJoinState.is_family(receipt.base) else GrowthState.SCOPE)) or not result.get("rules") is Dictionary or not TransactionReceipt.same(result.rules,receipt.rules):
 		return "XP_RESULT_RULES"
@@ -168,30 +170,33 @@ static func result_problem(receipt: Dictionary) -> String:
 		var join_issue: String = FieldJoinRules.report_problem(receipt.base,report,receipt.joins)
 		if not join_issue.is_empty():
 			return join_issue
+	if BuildState.enabled(receipt.base)!=BuildState.enabled(result.camp): return "BUILD_MODE_CHANGED"
+	if BuildState.enabled(receipt.base):
+		if receipt.rules.get("data_version")!=8 or not TransactionReceipt.same(actual_build(receipt),BuildState.settled(receipt.base,report,receipt.rules.mission.generated)): return "BUILD_RESULT_TRANSITION"
 	var before: Dictionary = FieldJoinRules.context(receipt)
 	var actual: Dictionary = result.camp
 	if CampaignState.is_short(receipt.base)!=CampaignState.is_short(actual): return "CAMPAIGN_MODE_CHANGED"
 	if CampaignState.is_short(receipt.base):
-		if receipt.rules.get("data_version")!=7 or not TransactionReceipt.same(actual.journey.campaign,CampaignState.settled(receipt.base,actual,report,receipt.rules.mission.generated)): return "CAMPAIGN_RESULT_TRANSITION"
+		if (receipt.rules.get("data_version")!=7 and receipt.rules.get("data_version")!=8) or not TransactionReceipt.same(actual.journey.campaign,CampaignState.settled(receipt.base,actual,report,receipt.rules.mission.generated)): return "CAMPAIGN_RESULT_TRANSITION"
 	if TrainingState.is_family(before) and not TransactionReceipt.same({"v":before.training},{"v":actual.get("training")}):
 		return "TRAINING_HISTORY_CHANGED_IN_SORTIE"
-	var issue: String = SurvivalContracts.report_problem(before.crew,report,true)
+	var issue: String = SurvivalContracts.report_problem(before.crew,report,true,BuildState.enabled(before))
 	if not issue.is_empty() or not TransactionReceipt.same({"v":report.participants},{"v":FieldJoinRules.participants(receipt)}):
 		return "XP_RESULT_PARTICIPANTS"
 	var source: Dictionary = receipt.rules.mission
 	var carry: Dictionary = {"loot":source.cash_reward if report.searched else 0,
 		"food":source.food_reward if report.food_searched else 0,
 		"weapons":[WeaponInventory.reward(receipt.transaction_id,WeaponState.is_family(receipt.base))] if report.searched and source.has_weapon_sample else []}
-	if (receipt.rules.get("data_version")==3 or receipt.rules.get("data_version")==4 or (receipt.rules.get("data_version")==5 or (receipt.rules.get("data_version")==6 or receipt.rules.get("data_version")==7))):
+	if (receipt.rules.get("data_version")==3 or receipt.rules.get("data_version")==4 or (receipt.rules.get("data_version")==5 or (receipt.rules.get("data_version")==6 or (receipt.rules.get("data_version")==7 or receipt.rules.get("data_version")==8)))):
 		var site_issue: String = WorldSites.problem(source.generated.sites,report.get("site_facts"))
 		if not site_issue.is_empty(): return site_issue
 		carry=WorldSites.carry(source.generated.sites,report.site_facts,receipt.transaction_id,WeaponState.is_family(receipt.base),source.generated)
 	issue = FrozenSettlement._facts_problem({"before":receipt.base,"report":report,"rules":receipt.rules,"carried":carry,"token":RunTransaction.token_for(receipt)})
 	if not issue.is_empty():
 		return "XP_RESULT_FACTS:"+issue
-	if (receipt.rules.get("data_version")==5 or (receipt.rules.get("data_version")==6 or receipt.rules.get("data_version")==7)) and not TransactionReceipt.same(actual.last_day.get("task",{}),TaskActions.outcome(receipt.rules.mission.generated,report)):
+	if (receipt.rules.get("data_version")==5 or (receipt.rules.get("data_version")==6 or (receipt.rules.get("data_version")==7 or receipt.rules.get("data_version")==8))) and not TransactionReceipt.same(actual.last_day.get("task",{}),TaskActions.outcome(receipt.rules.mission.generated,report)):
 		return "TASK_RESULT_SUMMARY"
-	if receipt.rules.get("data_version")!=5 and (receipt.rules.get("data_version")!=6 and receipt.rules.get("data_version")!=7) and actual.last_day.has("task"):
+	if receipt.rules.get("data_version")!=5 and (receipt.rules.get("data_version")!=6 and (receipt.rules.get("data_version")!=7 and receipt.rules.get("data_version")!=8)) and actual.last_day.has("task"):
 		return "TASK_RESULT_VERSION"
 	if not result.get("food") is Dictionary or not result.get("hunger") is Dictionary:
 		return "XP_RESULT_RATIONS"
@@ -225,3 +230,6 @@ static func result_problem(receipt: Dictionary) -> String:
 		if target.health != observed.health or not TransactionReceipt.same(target.growth,observed.growth) or not TransactionReceipt.same(target.service,observed.service):
 			return "XP_RESULT_EFFECT"
 	return ""
+
+static func actual_build(receipt: Dictionary) -> Dictionary:
+	return receipt.envelope.result.camp.journey.get("build",{})

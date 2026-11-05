@@ -1,3 +1,5 @@
+M8-BUILD-01 WIN-R1接入六被动/两槽、基础治疗和空袭。#11/#12已依次正常合入main，新候选PR以main为base，保持Draft。当前Windows定向验收；[规则与版本](design/m8-build-01.md)，正式生存BLOCKED。
+
 # 公开开发状态
 
 M8-RUN-01独立候选接入[短局V1](design/m8-run-01.md)：四次准备、单一突围压力系数、固定首领终局和持久胜负。B/C独立工作区真实并行并正常合并，A负责唯一主流程/结算/世界9恢复。新建才启用，旧记录不改模式；依赖Draft #11，最终集成PR保持Draft，不自动合并或Release。所有新参数为PROJECT_TEMP，正式生存发布门禁仍BLOCKED。

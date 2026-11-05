@@ -48,6 +48,7 @@ static func initial(base: Dictionary, identity: String, rules: Dictionary, previ
 		"phase":"STARTED", "base":base.duplicate(true), "transaction_id":identity,
 		"participants":participants, "rules":rules.duplicate(true), "health":health,
 		"deaths":previous.get("deaths", []).duplicate(true), "envelope":{}, "camp_key":"", "root_id":previous.get("root_id", "")}
+	if rules.get("data_version")==8: value.support=[]
 	if FieldJoinState.is_family(base):
 		value.joins = []
 	return value
@@ -80,7 +81,7 @@ static func _profiled_problem(value: Variant) -> String:
 	if not value is Dictionary or not SurvivalContracts.json_value(value, -2):
 		return "RECEIPT_FIELDS"
 	var field: bool = value.get("base") is Dictionary and FieldJoinState.is_family(value.base)
-	if value.size() != KEYS.size()+int(field) or (field and not value.get("joins") is Array):
+	if value.size() != KEYS.size()+int(field)+int(value.get("rules",{}).get("data_version")==8) or (field and not value.get("joins") is Array):
 		return "RECEIPT_FIELDS"
 	for key: String in KEYS:
 		if not value.has(key):
@@ -100,7 +101,7 @@ static func _profiled_problem(value: Variant) -> String:
 	if RescuePoolState.is_family(value.base) and value.phase not in ["CAMP_REGISTERED","EDIT_READY","EDIT_COMMITTED"]:
 		if not value.rules.get("scope") is String or value.rules.scope!=RescuePoolState.SCOPE or not FrozenSettlement._rules_problem(value.rules).is_empty() or not TransactionReceipt.same(value.rules.get("candidate",{}),RescuePoolState.offer(value.base,value.transaction_id,String(value.rules.mission.mission_id))):
 			return "POOL_CANDIDATE_BINDING"
-	if value.phase not in ["CAMP_REGISTERED","EDIT_READY","EDIT_COMMITTED"] and (value.rules.get("data_version")==2 or value.rules.get("data_version")==3 or value.rules.get("data_version")==4 or (value.rules.get("data_version")==5 or (value.rules.get("data_version")==6 or value.rules.get("data_version")==7))):
+	if value.phase not in ["CAMP_REGISTERED","EDIT_READY","EDIT_COMMITTED"] and (value.rules.get("data_version")==2 or value.rules.get("data_version")==3 or value.rules.get("data_version")==4 or (value.rules.get("data_version")==5 or (value.rules.get("data_version")==6 or (value.rules.get("data_version")==7 or value.rules.get("data_version")==8)))):
 		if not value.rules.get("mission") is Dictionary or not DailyActions.matches(value.base,value.rules.mission.get("generated")):
 			return "DAILY_RECEIPT_BINDING"
 	if field and not FieldJoinRules.problem(value.joins,value.base,value.transaction_id).is_empty():
@@ -124,12 +125,17 @@ static func _profiled_problem(value: Variant) -> String:
 	expected = FieldJoinRules.participants(value)
 	if not value.health is Array or value.health.size() != expected.size() or not value.deaths is Array:
 		return "CHECKPOINT_FIELDS"
+	if value.rules.get("data_version")==8:
+		if not value.get("support") is Array: return "SUPPORT_RECEIPT_FIELDS"
+		var component: Dictionary={"version":1,"binding":token_for_compat(value),"sequence":value.support.size(),"cooldowns":{"heal":0.0,"airstrike":0.0},"accepted":value.support}
+		var support_issue: String=BuildAuthority.support_problem(component,token_for_compat(value),value.rules.mission.generated)
+		if not support_issue.is_empty(): return support_issue
 	var ids: Array[int] = []
 	for row: Variant in value.health:
 		if not row is Dictionary or row.size() != 2 or not SurvivalContracts.integer(row.get("id"), 1, SurvivalContracts.MAX_ID):
 			return "CHECKPOINT_MEMBER"
 		var member: Dictionary = SurvivorRoster.member(expected, int(row.id))
-		if member.is_empty() or int(row.id) in ids or not SurvivalContracts.number(row.get("health")) or row.health < 0 or row.health > member.health_before:
+		if member.is_empty() or int(row.id) in ids or not SurvivalContracts.number(row.get("health")) or row.health < 0 or row.health > member.health_before+BuildAuthority.healed(value.get("support",[]),int(row.id)):
 			return "CHECKPOINT_HEALTH"
 		ids.append(int(row.id))
 	ids.clear()
@@ -144,7 +150,7 @@ static func _profiled_problem(value: Variant) -> String:
 			return "DEATH_UNKNOWN_MEMBER"
 		if death.transaction_id == value.transaction_id:
 			var row: Dictionary = SurvivorRoster.member(value.health, int(death.member_id))
-			if row.is_empty() or row.health != 0 or checkpoint.health_before > member.health:
+			if row.is_empty() or row.health != 0 or checkpoint.health_before > member.health+BuildAuthority.healed(value.get("support",[]),int(member.id)):
 				return "DEATH_HEALTH"
 		elif member.health != 0 or int(death.transaction_id.get_slice(":", 1)) > int(value.base.settled_sorties):
 			return "DEATH_HISTORY"
@@ -202,6 +208,9 @@ static func _profiled_transition(previous: Dictionary, next: Dictionary) -> Stri
 		joining = previous.joins.is_empty() and next.joins.size() == 1
 		if not same({"v":previous.joins},{"v":next.joins}) and not (joining and next.phase in ["IN_PROGRESS","DEATH_CONFIRMED"] and previous.phase in ["STARTED","IN_PROGRESS","DEATH_CONFIRMED","RESUME_CLAIMED"] and same({"v":previous.deaths},{"v":next.deaths})):
 			return "FIELD_JOIN_RETRACTED_OR_CHANGED"
+	if next.rules.get("data_version")==8:
+		issue=BuildAuthority.transition(previous,next)
+		if not issue.is_empty(): return issue
 	if previous.phase == "SUSPEND_READY":
 		return "" if next.phase == "RESUME_CLAIMED" and _same_frozen(previous,next) else "SUSPEND_MUST_BE_CLAIMED"
 	if next.phase == "RESUME_CLAIMED":
@@ -221,7 +230,7 @@ static func _profiled_transition(previous: Dictionary, next: Dictionary) -> Stri
 			if joining and row.id == next.joins[0].member_id and row.health == 200:
 				continue
 			return "FIELD_JOIN_HEALTH_SOURCE"
-		if row.health > old.health:
+		if row.health > old.health + BuildAuthority.healed(next.get("support",[]),int(row.id))-BuildAuthority.healed(previous.get("support",[]),int(row.id)):
 			return "HEALTH_RESTORED"
 	if previous.phase == "RESULT_READY":
 		var copy: Dictionary = next.duplicate(true)
@@ -295,6 +304,10 @@ static func _result_problem(receipt: Dictionary) -> String:
 			if not found:
 				return "RESULT_UNCONFIRMED_DEATH"
 	return ""
+
+
+static func token_for_compat(value: Dictionary) -> Dictionary:
+	return RunTransaction.token_for(value)
 
 
 static func _initial_health(receipt: Dictionary) -> bool:

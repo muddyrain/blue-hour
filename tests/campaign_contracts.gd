@@ -50,7 +50,7 @@ func run() -> void:
 			var old:Dictionary=WeaponActions._upgrade(TaskActions._make("m8-arena-grid".md5_text(),6,0,"supply",topology,size,0))
 			var action:Dictionary=CampaignActions._upgrade(old,base.profile_id,4)
 			check(CampaignActions.problem(action).is_empty(),"all size/topology finale descriptors have legal interior spawn: "+size+topology)
-	var legacy:Dictionary=base.duplicate(true);legacy.journey.erase("campaign")
+	var legacy:Dictionary=base.duplicate(true);legacy.journey.erase("campaign");legacy.journey.erase("build")
 	check(TransactionReceipt.camp_problem(legacy).is_empty() and DailyActions.offers(legacy)[0].version==5,"old completed camp keeps old mode and V5 offers")
 	for key:String in ["settled_sorties","last_day"]:
 		var bad:Dictionary=base.duplicate(true);bad.erase(key)

@@ -67,12 +67,16 @@ static func _validate_legacy_member(member: Dictionary, data: Dictionary, genera
 	var seen: Array[int] = []
 	var previous: int = -1
 	for receipt: Variant in action.recent:
-		if not receipt is Dictionary or receipt.size() != 5 or not receipt.has_all(["kind","enemy_id","at_ms","weapon_id","instance_id"]):
+		if not receipt is Dictionary or (receipt.size() != 5 or not receipt.has_all(["kind","enemy_id","at_ms","weapon_id","instance_id"])) and not (BuildState.enabled(data) and BuildAuthority.ability(receipt) and BuildAuthority.ability_problem(receipt,action.settlement_id,false).is_empty()):
 			return "击退输入字段无效"
 		if receipt.kind != "defeat" or not RunSave._integer(receipt.enemy_id,0,RunSave.MAX_COUNTER) or int(receipt.enemy_id) in seen:
 			return "击退输入重复或事件种类无效"
 		if not RunSave._integer(receipt.at_ms,0,int(action.duration_ms)) or receipt.at_ms < previous:
 			return "击退输入时间无效"
+		if BuildAuthority.ability(receipt):
+			seen.append(int(receipt.enemy_id))
+			previous=int(receipt.at_ms)
+			continue
 		if not receipt.instance_id is String or not receipt.weapon_id is String:
 			return "击退输入武器身份无效"
 		var item: Dictionary = WeaponInventory.find(data,receipt.instance_id)

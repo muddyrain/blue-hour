@@ -473,6 +473,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if is_instance_valid(pause_menu) and pause_menu.root.visible:
 		get_viewport().set_input_as_handled()
 		return
+	if event.is_action_pressed("return_to_title") and phase == Phase.EXPEDITION and expedition.support_aiming:
+		expedition.support_aiming=false
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed("return_to_title") and phase == Phase.EXPEDITION:
 		if event.is_echo():
 			return
@@ -645,6 +649,7 @@ func _open_sortie(practice: bool, resume: Dictionary = {}) -> void:
 	expedition.pool_mode = pool_mode
 	if pool_mode:
 		expedition.rescue_completed = RescuePoolState.available(expedition.field_departure).is_empty()
+	expedition.support_commit=progress_session.accept_support if transactional_mode else Callable()
 	expedition.growth_binding = progress_session.token.duplicate(true) if growth_mode else {}
 	expedition.rescue_mode = rescue_mode
 	expedition.rescue_completed = RescuePoolState.available(expedition.field_departure).is_empty() if pool_mode else not _recruits.is_empty()
@@ -786,7 +791,9 @@ func _new_game() -> void:
 	_pending_settlement = {}
 	_migration_notice = ""
 	profile_id = RunSave.new_profile_id()
-	if playable_entry: _battle_meta.campaign=CampaignRules.initial(profile_id)
+	if playable_entry:
+		_battle_meta.campaign=CampaignRules.initial(profile_id)
+		_battle_meta.build=BuildState.initial()
 	_initialize_weapons("initial")
 	last_settlement_id = ""
 	_pending_save.clear()
@@ -1235,6 +1242,7 @@ func open_loadout() -> void:
 		loadout_panel.player_mode = playable_entry
 		_screen.add_child(loadout_panel)
 		loadout_panel.equip_requested.connect(equip_weapon)
+		loadout_panel.build_requested.connect(equip_build_item)
 		loadout_panel.repair_requested.connect(repair_weapon)
 		loadout_panel.closed.connect(close_loadout)
 	_title.hide()
@@ -2191,6 +2199,11 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	if snapshot.last_day.has("task") and not frozen.get("rules",{}).get("mission",{}).get("generated",{}).get("campaign",{}).get("is_finale",false): text+=TaskActions.summary_text(snapshot.last_day.task)+"\n"
 	if not meal.is_empty():
 		text += "带回：货币%d · 食物%d（入库%d） · 武器%d件\n口粮：%d名队员需%d粮，消耗%d，缺口%d\n" % [snapshot.last_day.cash_gained,meal.get("food_found",0),meal.get("food_stored",0),battle.get("weapons",[]).size(),meal.ration_member_ids.size(),meal.food_required,meal.food_consumed,meal.food_shortage]
+	if BuildState.enabled(snapshot) and frozen.get("rules",{}).get("data_version")==8:
+		var obtained: Array=BuildState.acquired(frozen.rules.mission.generated,battle.site_facts,battle.evacuated)
+		var names: PackedStringArray=[]
+		for item: String in obtained: names.append(BuildItems.definitions()[item].name)
+		text+="本次道具："+("、".join(names) if not names.is_empty() else "无")+" · 本局库存%d/6（"%snapshot.journey.build.owned.size()+("已保存" if durable else "确认后入库")+"）\n"
 	for item: Dictionary in battle.get("weapons",[]):text+="带回武器："+WeaponInventory.loot_description(item)+"\n"
 	for member: Dictionary in snapshot.crew:
 		var awarded: Dictionary = GrowthRules.member_row(frozen.get("xp",{}).get("members",[]),int(member.id))
@@ -2203,3 +2216,9 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 		if snapshot.journey.campaign.outcome=="VICTORY": text+="首领真实击败、存活者巴士撤离；"+("旅程胜利已保存。" if durable else "胜利仅为预览，确认保存成功才结束旅程。")+"\n"
 	text += "旅程已结束，不能再次出击。" if snapshot.journey.state=="FAILED" or CampaignState.ended(snapshot) else "确认结算后可回营整备，再次出击。"
 	return text
+
+func equip_build_item(slot: int, item: String) -> void:
+	if phase!=Phase.TITLE or not loadout_panel.visible or not BuildState.enabled(camp_snapshot()): return
+	var saved: bool=_accept_transaction(progress_session.edit(camp_snapshot(),{"kind":"build_slot","member_id":slot,"value":item}),true)
+	loadout_panel.refresh(camp_snapshot(),"本局道具配装已保存；下一行动生效。" if saved else _progress_message)
+	if not saved: loadout_panel.build_panel.present(camp_snapshot().journey.build.owned,camp_snapshot().journey.build.slots,false,false)

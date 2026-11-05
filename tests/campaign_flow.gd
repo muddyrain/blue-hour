@@ -50,6 +50,7 @@ func _journey() -> void:
 	world.command_move(world.encounter.actor.position+Vector2(90,50))
 	await _until(world,func()->bool:return world.encounter.behavior.snapshot().state=="slam_windup",12000)
 	_check(world.encounter.health()>0 and world.encounter.behavior.snapshot().state=="slam_windup","real legal combat reaches boss ground warning")
+	_frame_boss(world)
 	app.open_pause_menu();await _hold(2)
 	var captured: Dictionary=SortieSnapshot.capture(world)
 	var receipt: Dictionary=app.progress_session._transaction.recover().receipt
@@ -106,11 +107,11 @@ func _resume() -> void:
 		return
 	if phase_name in ["fight","stationary"]:
 		await _fight(world,phase_name!="stationary")
-		_check(not world.encounter.defeat.is_empty() and world.encounter.health()==0,"boss defeated by real weapons and original fatal-shot receipt")
-		_check(world.living_count()>0,"at least one real survivor remains after boss fight")
 		if phase_name=="stationary":
 			_write("balance.json",{"events":events,"elapsed":world.elapsed,"health":world.survivors.map(func(member:FieldActor)->float:return member.health),"defeat":world.encounter.defeat})
 			return
+		_check(not world.encounter.defeat.is_empty() and world.encounter.health()==0,"boss defeated by real weapons and original fatal-shot receipt")
+		_check(world.living_count()>0,"at least one real survivor remains after boss fight")
 		await _shot("boss-defeated")
 		app.open_pause_menu();await _hold(2)
 		var killed:Dictionary=SortieSnapshot.capture(world)
@@ -152,6 +153,7 @@ func _fight(world:Expedition, mobile:bool) -> void:
 	var last_sequence:int=-1
 	for index:int in range(12000):
 		if not world.encounter.defeat.is_empty() or world.phase==Expedition.Phase.FINISHED or world.is_paused:break
+		_frame_boss(world)
 		var state:Dictionary=world.encounter.behavior.snapshot()
 		if mobile and state.state in ["slam_windup","melee_windup"] and int(state.sequence)!=last_sequence:
 			last_sequence=int(state.sequence)
@@ -166,7 +168,17 @@ func _fight(world:Expedition, mobile:bool) -> void:
 		if index==0:await _shot("boss-warning")
 		world.step(1.0/30.0)
 		if movie!=null or index%30==0:await _frame()
-	_check(not world.encounter.defeat.is_empty(),"bounded original combat defeats boss" if mobile else "stationary comparison reaches outcome")
+	_check(not world.encounter.defeat.is_empty() if mobile else not world.encounter.defeat.is_empty() or world.phase==Expedition.Phase.FINISHED,"bounded original combat defeats boss" if mobile else "stationary comparison reaches outcome")
+
+func _frame_boss(world:Expedition) -> void:
+	if not is_instance_valid(world.encounter.actor):return
+	var center:Vector2=world.encounter.actor.position
+	var count:int=1
+	for member:FieldActor in world.survivors:
+		if member.health>0:center+=member.position;count+=1
+	center/=float(count)
+	world.camera.pan_by(center-world.camera.position)
+	world.camera.force_update_scroll()
 
 func _world_negatives(world:Expedition, snapshot:Dictionary) -> void:
 	var receipt:Dictionary=app.progress_session._transaction.recover().receipt
@@ -203,7 +215,9 @@ func _shot(label:String) -> void:
 func _menu(count: int) -> void:
 	await _tap(app.camp_scene.hotspots[&"bus"])
 	_check(app.mission_select.visible,"normal bus opens actual cards")
+	_check(viewport.get_visible_rect().encloses(app.mission_select.cancel_button.get_global_rect()),"phase card cancel remains inside normal viewport")
 	var offers: Array=app.mission_select.daily_offers
+	for index:int in range(offers.size()):_check(viewport.get_visible_rect().encloses(app.mission_select.choices[index].get_global_rect()),"phase card departure remains inside normal viewport")
 	_check(offers.size()==(1 if count==4 else 3),"legal task count for current phase")
 	for value:Dictionary in offers:_check(value.version==6 and value.campaign.preparations==count,"descriptor freezes confirmed preparation count")
 

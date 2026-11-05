@@ -39,7 +39,7 @@ static func _spawn(layout: StreetLayout) -> Array:
 		for x: int in range(96,int(layout.world_bounds.end.x)-64,96): candidates.append(Vector2(x,y))
 	candidates.sort_custom(func(a:Vector2,b:Vector2)->bool:return absf(a.distance_to(start)-520.0)<absf(b.distance_to(start)-520.0))
 	for point: Vector2 in candidates:
-		if point.distance_to(start)>=360.0 and navigation.is_clear(point) and navigation.path_between(start,point).size()>=2: return [point.x,point.y]
+		if layout.world_bounds.grow(-320.0).has_point(point) and point.distance_to(start)>=360.0 and navigation.is_clear(point) and navigation.path_between(start,point).size()>=2: return [point.x,point.y]
 	return []
 
 static func problem(value: Variant) -> String:
@@ -62,9 +62,7 @@ static func matches(base: Dictionary,value: Variant) -> bool:
 static func supply(value: Dictionary) -> MissionSupply:
 	assert(problem(value).is_empty())
 	var result: MissionSupply=WeaponActions.supply(legacy(value));result.generated=value.duplicate(true)
-	var mode: Dictionary=CampaignRules.initial(value.campaign.run_id);mode.preparations=int(value.campaign.preparations)
-	var display: Dictionary=CampaignRules.display(mode)
-	result.description=display.title+" · "+display.progress+"\n"+display.detail+"\n"+result.description
+	result.description=("突围 · 刷怪间隔 ×0.90" if value.campaign.stage=="breakout" else "筹备 · 常规敌情")+"\n"+result.description
 	if value.campaign.is_finale:
 		result.display_name="突破封锁"
 		result.description="终局 · 突破封锁\n击败破阵者，再让至少一名队员经巴士归航并确认。\n可提前撤离，下次首领重新开始；此行仍需口粮。"

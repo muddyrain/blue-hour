@@ -42,9 +42,14 @@ func run() -> void:
 				var supply:MissionSupply=DailyActions.supply(action)
 				var nav:FieldNavigation=FieldNavigation.new();nav.configure(supply.layout.blockers(),supply.layout.world_bounds)
 				var point:Vector2=SortieSnapshot._vec(action.encounter.position)
-				check(nav.is_clear(point) and nav.path_between(supply.layout.arrivals[0],point).size()>=2,"boss spawn and original bus arrival share real navigation")
+				check(supply.layout.world_bounds.grow(-320).has_point(point) and nav.is_clear(point) and nav.path_between(supply.layout.arrivals[0],point).size()>=2,"boss spawn and original bus arrival share real navigation")
 				bad=action.duplicate(true);bad.encounter.position=[0,0]
 				check(not DailyActions.problem(bad).is_empty(),"boss spawn cannot be replaced")
+	for size:String in NeighborhoodLayout.SIZES:
+		for topology:String in NeighborhoodLayout.TOPOLOGIES:
+			var old:Dictionary=WeaponActions._upgrade(TaskActions._make("m8-arena-grid".md5_text(),6,0,"supply",topology,size,0))
+			var action:Dictionary=CampaignActions._upgrade(old,base.profile_id,4)
+			check(CampaignActions.problem(action).is_empty(),"all size/topology finale descriptors have legal interior spawn: "+size+topology)
 	var legacy:Dictionary=base.duplicate(true);legacy.journey.erase("campaign")
 	check(TransactionReceipt.camp_problem(legacy).is_empty() and DailyActions.offers(legacy)[0].version==5,"old completed camp keeps old mode and V5 offers")
 	for key:String in ["settled_sorties","last_day"]:

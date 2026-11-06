@@ -530,6 +530,36 @@
       "sha256": "aec0440e03d87a9be9a520e8ac058c585cd9d1295d5247c8c739f0bb3c62880b",
       "origin": "original project-authored vector icon for M12 survivor information",
       "license": "No additional license granted"
+    },
+    {
+      "path": "assets/exploration/apple_tree.svg",
+      "sha256": "c2d31132ff5ac369465a999d52a52bd1a0979120e8130bc9cfab5d63782d9fcc",
+      "origin": "original hand-authored lightweight SVG for M13 exploration; no external assets",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/exploration/apple_tree_empty.svg",
+      "sha256": "36cc57c4a5ac3bc6a3cc18ba9cbfbd711ce3eac690293c6f2c7519bbfb24c7ed",
+      "origin": "original hand-authored lightweight SVG for M13 exploration; no external assets",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/exploration/sedan.svg",
+      "sha256": "12b0ba2f1e2d08568dfbd52f8e5e34a150b452e6b8f806ecee8abc385810c953",
+      "origin": "original hand-authored lightweight SVG for M13 exploration; no external assets",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/exploration/tree_trunk.svg",
+      "sha256": "45fb4b4630c66f324ec4ed910bf4d7fec8026e78e0ab3117aa785c65317763b5",
+      "origin": "original hand-authored lightweight SVG for M13 exploration; no external assets",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/exploration/van.svg",
+      "sha256": "5a1b80484d59d1cacd4bfd7d1dae4016df985a12f4dd2961ebce7bc6707cd14f",
+      "origin": "original hand-authored lightweight SVG for M13 exploration; no external assets",
+      "license": "No additional license granted"
     }
   ]
 }

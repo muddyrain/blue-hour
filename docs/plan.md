@@ -1,3 +1,11 @@
+# M13-EXPLORE-01 当前候选
+
+PR #17 精确已审 `153094f130918c37a6d8b9e6faa18e0ffc6b5f25` 已正常合入 main `890bff3097a34bafbc6c37df8dedf370e921ae1f`；当前唯一目录分支 `codex/m13-explore-01`，本轮新 Draft PR base main，等待审阅。
+
+[探索合同](design/m13-explore-01.md)只在新旅程非终局行动启用 build5/generated9/layout4/rules10/world15。小中大实际范围为2560×1920、3584×2688、4608×3456，增加有明确预算的可选建筑、停放车辆和果树；三行目标从站点事实派生，定位只移动镜头。原工作、人物、携带、伤亡、支援和归航确认继续拥有实际状态。旧 build4/world14 与四次准备后的终局保持原模式。
+
+当前 Mac 验收与证据范围见[验证记录](VALIDATION.md#m13-explore-01mac)。正式生产门禁仍 BLOCKED；本轮不合并、不发布。下一步只记录“目标驱动的较完整旅程”，不自动开始。
+
 # M12-SURVIVOR-01 当前候选
 
 PR #16 精确已审 `ef4c0afb1d72dcf266eb6551b4649e25da9e24bf` 已普通合入 main `662ae1754b96eeb1bee9a4177059d050f5722787`；唯一目录开发分支 `codex/m12-survivor-01`，新 Draft PR base main。

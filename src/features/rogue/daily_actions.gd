@@ -2,8 +2,9 @@ class_name DailyActions
 extends RefCounted
 ## Dispatch by explicit version; old receipt authentication never uses the new generator.
 static func offers(base: Dictionary) -> Array[Dictionary]:
-	return PersonaActions.offers(base) if PersonaState.enabled(base) else PowerActions.offers(base) if PowerState.enabled(base) else CombatActions.offers(base) if CombatActions.enabled(base) else BuildActions.offers(base) if BuildState.enabled(base) else CampaignActions.offers(base) if CampaignState.is_short(base) else WeaponActions.offers(base)
+	return ExplorationActions.offers(base) if ExplorationState.enabled(base) else PersonaActions.offers(base) if PersonaState.enabled(base) else PowerActions.offers(base) if PowerState.enabled(base) else CombatActions.offers(base) if CombatActions.enabled(base) else BuildActions.offers(base) if BuildState.enabled(base) else CampaignActions.offers(base) if CampaignState.is_short(base) else WeaponActions.offers(base)
 static func problem(value: Variant) -> String:
+	if value is Dictionary and value.get("version")==9: return ExplorationActions.problem(value)
 	if value is Dictionary and value.has("persona"): return PersonaActions.problem(value)
 	if value is Dictionary and value.has("powers"): return PowerActions.problem(value)
 	if value is Dictionary and value.get("version")==8: return CombatActions.problem(value)
@@ -14,6 +15,7 @@ static func problem(value: Variant) -> String:
 	if value is Dictionary and value.get("version")==3: return NeighborhoodActions.problem(value)
 	return WorldActions.problem(value) if value is Dictionary and value.get("version")==2 else RogueActions.problem(value)
 static func matches(base: Dictionary, value: Variant) -> bool:
+	if ExplorationState.enabled(base): return ExplorationActions.matches(base,value)
 	if PersonaState.enabled(base): return PersonaActions.matches(base,value)
 	if PowerState.enabled(base): return PowerActions.matches(base,value)
 	if CombatActions.enabled(base): return CombatActions.matches(base,value)
@@ -25,6 +27,7 @@ static func matches(base: Dictionary, value: Variant) -> bool:
 	if value is Dictionary and value.get("version")==3: return NeighborhoodActions.matches(base,value)
 	return WorldActions.matches(base,value) if value is Dictionary and value.get("version")==2 else RogueActions.matches(base,value)
 static func supply(value: Dictionary) -> MissionSupply:
+	if value.get("version")==9: return ExplorationActions.supply(value)
 	if value.has("persona"): return PersonaActions.supply(value)
 	if value.has("powers"): return PowerActions.supply(value)
 	if value.get("version")==8: return CombatActions.supply(value)
@@ -35,6 +38,7 @@ static func supply(value: Dictionary) -> MissionSupply:
 	if value is Dictionary and value.get("version")==3: return NeighborhoodActions.supply(value)
 	return WorldActions.supply(value) if value.get("version")==2 else RogueActions.supply(value)
 static func mission_problem(mission: Dictionary) -> String:
+	if mission.get("generated",{}).get("version")==9: return ExplorationActions.mission_problem(mission)
 	if mission.get("generated",{}).has("persona"): return PersonaActions.mission_problem(mission)
 	if mission.get("generated",{}).has("powers"): return PowerActions.mission_problem(mission)
 	if mission.get("generated",{}).get("version")==8: return CombatActions.mission_problem(mission)

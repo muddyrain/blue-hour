@@ -2,6 +2,8 @@ class_name SortieSnapshot
 extends RefCounted
 ## Whitelisted simulation values. No resource paths or object deserialization.
 
+const EXPLORATION_VERSION: int = 15
+const EXPLORATION_BUILD: String = "M13-EXPLORE-01-1"
 const PERSONA_VERSION: int = 14
 const PERSONA_BUILD: String = "M12-SURVIVOR-01-1"
 const POWER_VERSION: int = 13
@@ -97,7 +99,7 @@ static func capture(world: Expedition) -> Dictionary:
 		captured.field_joins = world.field_joins.duplicate(true)
 	captured.build = String(captured.build) + "+" + FieldContacts.BUILD
 	if not world.supply.generated.is_empty():
-		captured.version = PERSONA_VERSION if world.persona_mode() else POWER_VERSION if world.power_mode() else SEARCH_VERSION if world.parallel_search else COMBAT_VERSION if world.combat_mode() else BUILD_VERSION if (world.supply.generated.get("version")==7 or world.supply.generated.get("version")==8) else CAMPAIGN_VERSION if world.supply.generated.get("version")==6 else WEAPON_VERSION if world.supply.generated.get("version")==5 else (OUTDOOR_VERSION if TaskActions.outdoor_site(world.supply.generated,&"cash") else TASK_VERSION) if world.supply.generated.get("version")==4 else NEIGHBORHOOD_VERSION if world.supply.generated.get("version")==3 else WORLD_VERSION if world.supply.generated.get("version")==2 else ROGUE_VERSION
+		captured.version = EXPLORATION_VERSION if world.exploration_mode() else PERSONA_VERSION if world.persona_mode() else POWER_VERSION if world.power_mode() else SEARCH_VERSION if world.parallel_search else COMBAT_VERSION if world.combat_mode() else BUILD_VERSION if (world.supply.generated.get("version")==7 or (world.supply.generated.get("version")==8 or world.supply.generated.get("version")==9)) else CAMPAIGN_VERSION if world.supply.generated.get("version")==6 else WEAPON_VERSION if world.supply.generated.get("version")==5 else (OUTDOOR_VERSION if TaskActions.outdoor_site(world.supply.generated,&"cash") else TASK_VERSION) if world.supply.generated.get("version")==4 else NEIGHBORHOOD_VERSION if world.supply.generated.get("version")==3 else WORLD_VERSION if world.supply.generated.get("version")==2 else ROGUE_VERSION
 		captured.build += "+"+_daily_build(captured.version)
 		captured.generated = world.supply.generated.duplicate(true)
 	if captured.version==WORLD_VERSION or captured.version==NEIGHBORHOOD_VERSION or task_version(captured.version):
@@ -122,11 +124,11 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 		return "WORLD_FIELDS"
 	var base_build: String = ENEMY_BUILD if enemy_mode else QUALITY_BUILD if WeaponState.is_state(receipt.base) else ROSTER_BUILD if RosterState.is_family(receipt.base) else POOL_BUILD if RescuePoolState.is_family(receipt.base) else TRAINING_BUILD if TrainingState.is_state(receipt.base) else TRAIT_BUILD if TraitState.is_family(receipt.base) else FIELD_BUILD if FieldJoinState.is_family(receipt.base) else (GROWTH_BUILD if GrowthState.is_family(receipt.base) else BUILD)
 	if generated:
-		if not enemy_mode or receipt.rules.get("data_version")!=(9 if combat_version(value.version) else 8 if value.version==BUILD_VERSION else 7 if value.version==CAMPAIGN_VERSION else 6 if value.version==WEAPON_VERSION else 5 if task_version(value.version) else 4 if value.version==NEIGHBORHOOD_VERSION else 3 if value.version==WORLD_VERSION else 2) or not value.get("generated") is Dictionary or not TransactionReceipt.same(value.generated,receipt.rules.mission.generated) or not DailyActions.problem(value.generated).is_empty():
+		if not enemy_mode or receipt.rules.get("data_version")!=(10 if value.version==EXPLORATION_VERSION else 9 if combat_version(value.version) else 8 if value.version==BUILD_VERSION else 7 if value.version==CAMPAIGN_VERSION else 6 if value.version==WEAPON_VERSION else 5 if task_version(value.version) else 4 if value.version==NEIGHBORHOOD_VERSION else 3 if value.version==WORLD_VERSION else 2) or not value.get("generated") is Dictionary or not TransactionReceipt.same(value.generated,receipt.rules.mission.generated) or not DailyActions.problem(value.generated).is_empty():
 			return "WORLD_DAILY_BINDING"
 		if value.version==OUTDOOR_VERSION and not TaskActions.outdoor_site(value.generated,&"cash"): return "WORLD_OUTDOOR_SOURCE"
-		if value.generated.version != (8 if combat_version(value.version) else 7 if value.version==BUILD_VERSION else 6 if value.version==CAMPAIGN_VERSION else 5 if value.version==WEAPON_VERSION else 4 if task_version(value.version) else 3 if value.version==NEIGHBORHOOD_VERSION else 2 if value.version==WORLD_VERSION else 1): return "WORLD_GENERATION_VERSION"
-	elif (receipt.rules.get("data_version")==2 or receipt.rules.get("data_version")==3 or receipt.rules.get("data_version")==4 or receipt.rules.get("data_version")==5 or (receipt.rules.get("data_version")==6 or (receipt.rules.get("data_version")==7 or (receipt.rules.get("data_version")==8 or receipt.rules.get("data_version")==9)))):
+		if value.generated.version != (9 if value.version==EXPLORATION_VERSION else 8 if combat_version(value.version) else 7 if value.version==BUILD_VERSION else 6 if value.version==CAMPAIGN_VERSION else 5 if value.version==WEAPON_VERSION else 4 if task_version(value.version) else 3 if value.version==NEIGHBORHOOD_VERSION else 2 if value.version==WORLD_VERSION else 1): return "WORLD_GENERATION_VERSION"
+	elif (receipt.rules.get("data_version")==2 or receipt.rules.get("data_version")==3 or receipt.rules.get("data_version")==4 or receipt.rules.get("data_version")==5 or (receipt.rules.get("data_version")==6 or (receipt.rules.get("data_version")==7 or (receipt.rules.get("data_version")==8 or (receipt.rules.get("data_version")==9 or receipt.rules.get("data_version")==10))))):
 		return "WORLD_DAILY_VERSION"
 	var contact_build: bool = value.build == base_build + "+" + FieldContacts.BUILD + ("+"+_daily_build(value.version) if generated else "")
 	# Legacy snapshots remain strictly authenticatable in completed receipt history.
@@ -151,7 +153,7 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 		return "WORLD_BUS_CLOCK"
 	var supply: MissionSupply = supply_for_world(value)
 	if (value.version==WORLD_VERSION or value.version==NEIGHBORHOOD_VERSION or task_version(value.version)):
-		var issue: String = WorldSites.problem(value.generated.sites,value.sites)
+		var issue: String = WorldSites.problem(value.generated.sites,value.sites,value.version==EXPLORATION_VERSION)
 		if not issue.is_empty(): return issue
 		var carry: Dictionary = WorldSites.carry(value.generated.sites,value.sites,receipt.transaction_id,true,value.generated)
 		if sim.loot!=carry.loot or sim.food_loot!=carry.food or not TransactionReceipt.same({"v":value.weapons},{"v":carry.weapons}): return "WORLD_SITE_CARRY"
@@ -178,7 +180,8 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 		var support_issue: String=BuildAuthority.world_problem(value,receipt)
 		if not support_issue.is_empty(): return support_issue
 	if generated and (power_version(value.version)!=value.generated.has("powers")): return "POWER_MODE_BINDING"
-	if generated and ((value.version==PERSONA_VERSION)!=value.generated.has("persona")): return "PERSONA_MODE_BINDING"
+	if generated and ((value.version==PERSONA_VERSION or value.version==EXPLORATION_VERSION)!=value.generated.has("persona")): return "PERSONA_MODE_BINDING"
+	if generated and ((value.version==EXPLORATION_VERSION)!=(value.generated.get("version")==9)): return "EXPLORATION_MODE_BINDING"
 	if power_version(value.version):
 		var power_issue: String=PowerAuthority.world_problem(value,receipt)
 		if not power_issue.is_empty(): return power_issue
@@ -290,7 +293,7 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 				return "XP_ENEMY_STILL_ACTIVE"
 	if TraitState.is_family(receipt.base):
 		var report: Dictionary = {"participants":FieldJoinRules.participants(receipt),"growth_inputs":value.growth,"xp_inputs":value.xp_inputs,"field_joins":receipt.joins,"searched":WorldSites.completed(value.generated.sites,value.sites,"cash")>0 if (value.version==WORLD_VERSION or value.version==NEIGHBORHOOD_VERSION or task_version(value.version)) else value.sites.cash.searched,"food_searched":WorldSites.completed(value.generated.sites,value.sites,"food")>0 if (value.version==WORLD_VERSION or value.version==NEIGHBORHOOD_VERSION or task_version(value.version)) else value.sites.food.searched}
-		if value.version==PERSONA_VERSION: report.site_facts=value.sites
+		if value.version==PERSONA_VERSION or value.version==EXPLORATION_VERSION: report.site_facts=value.sites
 		var trait_issue: String = TraitRules.inputs_problem(value.get("trait_inputs"),RunTransaction.token_for(receipt),report,FieldJoinRules.context(receipt),value.get("generated",{}))
 		if not trait_issue.is_empty():
 			return trait_issue
@@ -414,17 +417,18 @@ static func compatibility(world: Expedition) -> String:
 		data.enemy_rules = EnemyRules.POLICY
 	data.build = String(data.build) + "+" + FieldContacts.BUILD
 	if not world.supply.generated.is_empty():
-		data.build += "+"+(PERSONA_BUILD if world.persona_mode() else POWER_BUILD if world.power_mode() else SEARCH_BUILD if world.parallel_search else COMBAT_BUILD if world.combat_mode() else BUILD_BUILD if (world.supply.generated.get("version")==7 or world.supply.generated.get("version")==8) else CAMPAIGN_BUILD if world.supply.generated.get("version")==6 else WEAPON_BUILD if world.supply.generated.get("version")==5 else (OUTDOOR_BUILD if TaskActions.outdoor_site(world.supply.generated,&"cash") else TASK_BUILD) if world.supply.generated.get("version")==4 else NEIGHBORHOOD_BUILD if world.supply.generated.get("version")==3 else WORLD_BUILD if world.supply.generated.get("version")==2 else ROGUE_BUILD)
+		data.build += "+"+(EXPLORATION_BUILD if world.exploration_mode() else PERSONA_BUILD if world.persona_mode() else POWER_BUILD if world.power_mode() else SEARCH_BUILD if world.parallel_search else COMBAT_BUILD if world.combat_mode() else BUILD_BUILD if (world.supply.generated.get("version")==7 or (world.supply.generated.get("version")==8 or world.supply.generated.get("version")==9)) else CAMPAIGN_BUILD if world.supply.generated.get("version")==6 else WEAPON_BUILD if world.supply.generated.get("version")==5 else (OUTDOOR_BUILD if TaskActions.outdoor_site(world.supply.generated,&"cash") else TASK_BUILD) if world.supply.generated.get("version")==4 else NEIGHBORHOOD_BUILD if world.supply.generated.get("version")==3 else WORLD_BUILD if world.supply.generated.get("version")==2 else ROGUE_BUILD)
 		data.generated = world.supply.generated.duplicate(true)
-	if (world.supply.generated.get("version")==5 or (world.supply.generated.get("version")==6 or (world.supply.generated.get("version")==7 or world.supply.generated.get("version")==8))):data.magazines=WeaponDefinition.MAGAZINES
-	if (world.supply.generated.get("version")==6 or (world.supply.generated.get("version")==7 or world.supply.generated.get("version")==8)): data.campaign_policy={"version":CampaignRules.VERSION,"preparations":CampaignRules.PREPARATIONS,"pressure":CampaignRules.BREAKOUT_INTERVAL,"boss":BossDefinition.POLICY}
-	if (world.supply.generated.get("version")==7 or world.supply.generated.get("version")==8): data.build_policy={"items":BuildItems.definitions(),"support":BasicSupport.POLICY}
+	if (world.supply.generated.get("version")==5 or (world.supply.generated.get("version")==6 or (world.supply.generated.get("version")==7 or (world.supply.generated.get("version")==8 or world.supply.generated.get("version")==9)))):data.magazines=WeaponDefinition.MAGAZINES
+	if (world.supply.generated.get("version")==6 or (world.supply.generated.get("version")==7 or (world.supply.generated.get("version")==8 or world.supply.generated.get("version")==9))): data.campaign_policy={"version":CampaignRules.VERSION,"preparations":CampaignRules.PREPARATIONS,"pressure":CampaignRules.BREAKOUT_INTERVAL,"boss":BossDefinition.POLICY}
+	if (world.supply.generated.get("version")==7 or (world.supply.generated.get("version")==8 or world.supply.generated.get("version")==9)): data.build_policy={"items":BuildItems.definitions(),"support":BasicSupport.POLICY}
 	data.contact = {"distance":FieldContacts.DISTANCE,"approach":FieldContacts.APPROACH,"rechase":FieldContacts.RECHASE,"step":FieldContacts.STEP_DISTANCE,"steps":FieldContacts.MAX_STEPS,"path_parts":FieldContacts.MAX_PATH_PARTS,"pass_dot":FieldContacts.PASS_DOT,"recovery_speed":FieldContacts.RECOVERY_SPEED,"recovery_cap":FieldContacts.MAX_RECOVERY,"recovery_passes":FieldContacts.RECOVERY_PASSES,"yield_speed":FieldContacts.YIELD_SPEED}
 	if world.combat_mode(): data.combat_policy={"weapons":CombatEquipment.policy(),"definitions":[_resource(CombatEquipment.definition("fire_axe_v1")),_resource(CombatEquipment.definition("shotgun_v1"))],"toxic":ToxicV1.POLICY}
 	if world.parallel_search:
 		data.search_policy={"version":SearchAssignments.VERSION,"occupancy":"one_member_one_site","order":"site_id"}
 	if world.power_mode(): data.power_policy=SpecialPowers.POLICY
 	if world.persona_mode(): data.persona_policy=SurvivorPersona.policy()
+	if world.exploration_mode(): data.exploration_policy=ExplorationLayout.policy()
 	return SurvivalContracts.fingerprint(data)
 
 
@@ -544,7 +548,7 @@ static func _same(a: Dictionary, b: Dictionary) -> bool:
 	return SurvivalContracts.fingerprint(a) == SurvivalContracts.fingerprint(b)
 
 static func _daily_build(version: Variant) -> String:
-	return PERSONA_BUILD if version==PERSONA_VERSION else POWER_BUILD if version==POWER_VERSION else SEARCH_BUILD if version==SEARCH_VERSION else COMBAT_BUILD if version==COMBAT_VERSION else BUILD_BUILD if version==BUILD_VERSION else CAMPAIGN_BUILD if version==CAMPAIGN_VERSION else WEAPON_BUILD if version==WEAPON_VERSION else OUTDOOR_BUILD if version==OUTDOOR_VERSION else TASK_BUILD if version==TASK_VERSION else NEIGHBORHOOD_BUILD if version==NEIGHBORHOOD_VERSION else WORLD_BUILD if version==WORLD_VERSION else ROGUE_BUILD
+	return EXPLORATION_BUILD if version==EXPLORATION_VERSION else PERSONA_BUILD if version==PERSONA_VERSION else POWER_BUILD if version==POWER_VERSION else SEARCH_BUILD if version==SEARCH_VERSION else COMBAT_BUILD if version==COMBAT_VERSION else BUILD_BUILD if version==BUILD_VERSION else CAMPAIGN_BUILD if version==CAMPAIGN_VERSION else WEAPON_BUILD if version==WEAPON_VERSION else OUTDOOR_BUILD if version==OUTDOOR_VERSION else TASK_BUILD if version==TASK_VERSION else NEIGHBORHOOD_BUILD if version==NEIGHBORHOOD_VERSION else WORLD_BUILD if version==WORLD_VERSION else ROGUE_BUILD
 
 
 static func old_outdoor(value: Dictionary) -> bool:
@@ -610,4 +614,4 @@ static func search_version(version: Variant) -> bool:
 	return version==SEARCH_VERSION or power_version(version)
 
 static func power_version(version: Variant) -> bool:
-	return version==POWER_VERSION or version==PERSONA_VERSION
+	return version==POWER_VERSION or version==PERSONA_VERSION or version==EXPLORATION_VERSION

@@ -53,7 +53,7 @@ static func _validate_legacy_member(member: Dictionary, data: Dictionary, genera
 	var action: Dictionary = value.last_action
 	if action.size() != 6 or not action.has_all(["settlement_id","map_id","duration_ms","total","recent","evacuated"]):
 		return "行动明细字段无效"
-	if not action.settlement_id is String or not action.evacuated is bool or (action.map_id not in MAPS and not (generated_maps and (RogueLayout.is_map_id(action.map_id) or WorldLayout.is_map_id(action.map_id) or NeighborhoodLayout.is_map_id(action.map_id)))):
+	if not action.settlement_id is String or not action.evacuated is bool or (action.map_id not in MAPS and not (generated_maps and (RogueLayout.is_map_id(action.map_id) or WorldLayout.is_map_id(action.map_id) or NeighborhoodLayout.is_map_id(action.map_id) or (ExplorationState.enabled(data) and ExplorationLayout.is_map_id(action.map_id))))):
 		return "行动明细来源无效"
 	var parts: PackedStringArray = action.settlement_id.split(":")
 	if parts.size() != 2 or parts[0] != data.profile_id or not parts[1].is_valid_int() or not RunSave._integer(int(parts[1]),1,int(data.settled_sorties)):

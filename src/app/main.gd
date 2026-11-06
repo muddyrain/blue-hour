@@ -804,7 +804,7 @@ func _new_game() -> void:
 	profile_id = RunSave.new_profile_id()
 	if playable_entry:
 		_battle_meta.campaign=CampaignRules.initial(profile_id)
-		_battle_meta.build=PersonaState.initial_build(_battle_meta.seed)
+		_battle_meta.build=ExplorationState.initial_build(_battle_meta.seed)
 	_initialize_weapons("initial")
 	last_settlement_id = ""
 	_pending_save.clear()
@@ -2223,7 +2223,7 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	if snapshot.last_day.has("task") and not frozen.get("rules",{}).get("mission",{}).get("generated",{}).get("campaign",{}).get("is_finale",false): text+=TaskActions.summary_text(snapshot.last_day.task)+"\n"
 	if not meal.is_empty():
 		text += "带回：货币%d · 食物%d（入库%d） · 武器%d件\n口粮：%d名队员需%d粮，消耗%d，缺口%d\n" % [snapshot.last_day.cash_gained,meal.get("food_found",0),meal.get("food_stored",0),battle.get("weapons",[]).size(),meal.ration_member_ids.size(),meal.food_required,meal.food_consumed,meal.food_shortage]
-	if BuildState.enabled(snapshot) and int(frozen.get("rules",{}).get("data_version",0)) in [8,9]:
+	if BuildState.enabled(snapshot) and int(frozen.get("rules",{}).get("data_version",0)) in [8,9,10]:
 		var obtained: Array=BuildState.acquired(frozen.rules.mission.generated,battle.site_facts,battle.evacuated)
 		var names: PackedStringArray=[]
 		for item: String in obtained: names.append(BuildItems.definitions()[item].name)

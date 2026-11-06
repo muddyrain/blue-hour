@@ -19,12 +19,12 @@ static func generate(seed: String, size: String, topology: String) -> Dictionary
 		return {}
 	return fallback
 
-static func _assemble(seed: String, size: String, topology: String, attempt: int, fallback: bool) -> Dictionary:
-	var random: RandomNumberGenerator = RogueLayout.rng(("verified-v3:"+size+topology) if fallback else "neighborhood-v3:"+seed+":"+str(attempt))
-	var dimensions: Array = DIMENSIONS[size]
+static func _assemble(seed: String, size: String, topology: String, attempt: int, fallback: bool, expanded: bool = false) -> Dictionary:
+	var random: RandomNumberGenerator = RogueLayout.rng((("verified-exploration-v1:" if expanded else "verified-v3:")+size+topology) if fallback else ("exploration-v1:" if expanded else "neighborhood-v3:")+seed+":"+str(attempt))
+	var dimensions: Array = {"small":[2560,1920],"medium":[3584,2688],"large":[4608,3456]}[size] if expanded else DIMENSIONS[size]
 	var width: int = dimensions[0]; var height: int = dimensions[1]
 	var rank: int = SIZES.find(size)
-	var cols: int = rank+3; var rows: int = rank+2
+	var cols: int = rank+(4 if expanded else 3); var rows: int = rank+(3 if expanded else 2)
 	var cell: int = (width-192)/cols
 	var main_y: int = height-368
 	var spacing: int = (main_y-160-464)/(rows-1)
@@ -46,6 +46,8 @@ static func _assemble(seed: String, size: String, topology: String, attempt: int
 			if row==0 and topology=="commercial" and size=="large" and col==cols-1:type="supermarket"
 			if row==rows-1 and col==0: type="small_apartment" if topology!="industrial" else "garage"
 			if row==rows-1 and col==1: type="convenience_store"
+			if expanded and row==0 and col==0: type="convenience_store" if size=="small" or (size=="medium" and topology=="industrial") else "supermarket"
+			if expanded and row==0 and col==cols-1: type="warehouse"
 			var frontage: int = NeighborhoodArt.WIDTH[type]
 			var depth: int = NeighborhoodArt.DEPTH[type]
 			var x: int = 96+col*cell+(cell-frontage)/2+random.randi_range(-1,1)*8
@@ -89,10 +91,10 @@ static func _assemble(seed: String, size: String, topology: String, attempt: int
 	stop_x=clampi(stop_x+random.randi_range(0,2)*8,144,width-400)
 	var foot_y: int = main_y+192
 	var door: Array = [stop_x+190,main_y+288]
-	var data: Dictionary = {"version":3,"seed":seed,"size":size,"topology":topology,"attempt":attempt,"fallback":fallback,"bounds":[0,0,width,height],"entities":entities,"roads":roads,"barriers":barriers,"gates":gates,
+	var data: Dictionary = {"version":4 if expanded else 3,"seed":seed,"size":size,"topology":topology,"attempt":attempt,"fallback":fallback,"bounds":[0,0,width,height],"entities":entities,"roads":roads,"barriers":barriers,"gates":gates,
 		"bus":{"rect":[stop_x,foot_y-80,240,80],"door":door,"passenger_door":[stop_x+190,foot_y-16],"entry":[-160,foot_y],"exit":[width+160,foot_y],"sweep":[0,main_y+92,width,120],"facing":"right"},
 		"arrivals":[[door[0]-48,door[1]+24],[door[0],door[1]+24],[door[0]+48,door[1]+24],[door[0],door[1]+56]],"enemy_points":[[24,main_y-40],[width-24,main_y-40],[width/2,24],[width/2,height-20]],"rescue":entities[0].door.duplicate()}
-	data.id="rogue_v3_"+SurvivalContracts.fingerprint(data).substr(0,32)
+	data.id=("explore_v1_" if expanded else "rogue_v3_")+SurvivalContracts.fingerprint(data).substr(0,32)
 	return data
 
 static func _add_wall(result: Array, y: int, width: int, openings: Array) -> void:

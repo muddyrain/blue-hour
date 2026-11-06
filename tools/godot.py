@@ -33,6 +33,7 @@ def main():
   if label=='rogue-data':cmd+=['--rogue-data-output='+(folder/'data.json').as_posix()]
   with (folder/'console.txt').open('xb') as out:z=subprocess.run(cmd,cwd=ROOT,stdout=out,stderr=out,env=env,timeout=150)
   text=(folder/'console.txt').read_text(encoding='utf-8',errors='replace');assert z.returncode==expected and not re.search(r'(?m)^(SCRIPT ERROR|ERROR):',text),(label,z.returncode,text[-2000:])
+  assert all(int(n)==0 for n in re.findall(r'"failures"\s*:\s*(\d+)',text)),(label,'structured failures')
   if label=='known-hash-cycle':assert 'MINIMAL_HASH_CYCLE=true' in text and 'EXACT_RECORD_ROUNDTRIP=true' in text
   if label.startswith('startup-'):assert 'BH_READY' in text
   rows.append({'case':label,'exit':z.returncode,'expected_exit':expected,'status':'EXPECTED_KNOWN_FAILURE' if expected else 'PASS'});print(label,rows[-1]['status'],flush=True)
@@ -55,7 +56,7 @@ def main():
  execute('task-data',['--script','res://tests/task_data.gd'],[])
  execute('task-contracts',['--script','res://tests/task_contracts.gd'],[])
  execute('weapon-magazine',['--script','res://tests/weapon_magazine.gd'],[])
- for name in ['campaign_rules','boss_behavior','campaign_contracts','encounter_termination','build_items','basic_support','build_contracts','combat_patterns_v1','toxic_v1','combat_integration','search_assignments','search_work_view','special_powers','power_boundaries','persona_rules','persona_runtime','persona_ui']:
+ for name in ['campaign_rules','boss_behavior','campaign_contracts','encounter_termination','build_items','basic_support','build_contracts','combat_patterns_v1','toxic_v1','combat_integration','search_assignments','search_work_view','special_powers','power_boundaries','persona_rules','persona_runtime','persona_ui','exploration_generation','exploration_contracts','exploration_presentation','exploration_boundaries']:
   execute(name.replace('_','-'),['--script','res://tests/'+name+'.gd'],[])
  execute('known-hash-cycle',['--script','res://tests/known_hash_cycle.gd'])
  execute('record-hash',['--script','res://tests/record_hash.gd'])

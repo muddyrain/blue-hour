@@ -9,6 +9,17 @@ static func initial() -> Dictionary:
 
 static func problem(camp: Dictionary) -> String:
 	if not enabled(camp): return ""
+	if ExplorationState.enabled(camp):
+		if camp.journey.build.size()!=9: return "EXPLORATION_BUILD_FIELDS"
+		var issue: String=ExplorationState.problem(camp)
+		if not issue.is_empty(): return issue
+		issue=PowerState.problem(camp)
+		if not issue.is_empty(): return issue
+		var old: Dictionary=camp.duplicate(true)
+		old.journey.build.version=4
+		old.journey.build.erase("exploration")
+		for source: Dictionary in old.journey.build.powers.sources: source.generated=ExplorationActions.origin(source.generated)
+		return problem(old)
 	if PersonaState.enabled(camp):
 		if camp.journey.build.size()!=8: return "PERSONA_BUILD_FIELDS"
 		var issue: String=SurvivorPersona.problem(camp.journey.build.get("persona"),String(camp.journey.get("seed","")))
@@ -69,7 +80,7 @@ static func equip(before: Dictionary, slot: int, item: String) -> Dictionary:
 	return after if problem(after).is_empty() else {}
 
 static func acquired(generated: Dictionary, sites: Dictionary, evacuated: bool) -> Array:
-	return generated.build.drops.duplicate() if (generated.get("version")==7 or generated.get("version")==8) and evacuated and sites.get("cash",{}).get("searched",false) else []
+	return generated.build.drops.duplicate() if (generated.get("version")==7 or (generated.get("version")==8 or generated.get("version")==9)) and evacuated and sites.get("cash",{}).get("searched",false) else []
 
 static func settled(before: Dictionary, report: Dictionary, generated: Dictionary) -> Dictionary:
 	var result: Dictionary=before.journey.build.duplicate(true)

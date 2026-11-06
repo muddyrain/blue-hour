@@ -105,6 +105,10 @@ static func _airdrop_point(layout: Dictionary) -> Array:
 	return []
 
 static func outdoor_site(value: Dictionary, id: StringName) -> bool:
+	if value.get("version")==9:
+		for site: Dictionary in value.sites:
+			if site.id==String(id): return site.work_mode=="outdoor"
+		return false
 	if (value.get("version")!=4 and (value.get("version")!=5 and (value.get("version")!=6 and (value.get("version")!=7 and value.get("version")!=8)))) or value.get("type")!="airdrop" or id!=&"cash": return false
 	for site: Dictionary in value.sites:
 		if site.id==String(id): return site.has("point") and site.building.is_empty()
@@ -112,6 +116,7 @@ static func outdoor_site(value: Dictionary, id: StringName) -> bool:
 
 
 static func site_point(value: Dictionary, site: Dictionary) -> Vector2:
+	if value.get("version")==9: return ExplorationSites.site_point(value.layout,site)
 	if site.has("point"): return WorldLayout.point(site.point)
 	for entity: Dictionary in value.layout.entities:
 		if entity.id==site.building: return WorldLayout.point(entity.door)
@@ -208,6 +213,7 @@ static func hud(world: Expedition) -> String:
 		var state:String=world.encounter.behavior.snapshot().state
 		var cue:String="落击预警：离开红圈" if state=="slam_windup" else "重击预警：拉开距离" if state=="melee_windup" else "击败后返回巴士"
 		return "破阵者 %d/%d · %s"%[ceili(world.encounter.health()),BossDefinition.POLICY.health,cue]
+	if value.get("version")==9: return "" # The new list derives all three rows from actual facts.
 	if value.get("version")!=VERSION and (value.get("version")!=5 and (value.get("version")!=6 and (value.get("version")!=7 and value.get("version")!=8))): return ""
 	if value.type=="rescue":
 		if world.rescue_target!=null and world.rescue_target.status=="IN_FIELD_JOINED": return "主目标：带%s归航"%world.rescue_target.candidate_name() if world.rescue_target.npc.health>0 else "主目标：救援对象已阵亡 · 可撤离"

@@ -49,6 +49,7 @@ static func initial(base: Dictionary, identity: String, rules: Dictionary, previ
 		"participants":participants, "rules":rules.duplicate(true), "health":health,
 		"deaths":previous.get("deaths", []).duplicate(true), "envelope":{}, "camp_key":"", "root_id":previous.get("root_id", "")}
 	if (rules.get("data_version")==8 or rules.get("data_version")==9): value.support=[]
+	if PowerAuthority.mode(rules): value.powers=[]
 	if FieldJoinState.is_family(base):
 		value.joins = []
 	return value
@@ -81,7 +82,7 @@ static func _profiled_problem(value: Variant) -> String:
 	if not value is Dictionary or not SurvivalContracts.json_value(value, -2):
 		return "RECEIPT_FIELDS"
 	var field: bool = value.get("base") is Dictionary and FieldJoinState.is_family(value.base)
-	if value.size() != KEYS.size()+int(field)+int((value.get("rules",{}).get("data_version")==8 or value.get("rules",{}).get("data_version")==9)) or (field and not value.get("joins") is Array):
+	if value.size() != KEYS.size()+int(field)+int(PowerAuthority.mode(value.get("rules",{})))+int((value.get("rules",{}).get("data_version")==8 or value.get("rules",{}).get("data_version")==9)) or (field and not value.get("joins") is Array):
 		return "RECEIPT_FIELDS"
 	for key: String in KEYS:
 		if not value.has(key):
@@ -130,6 +131,13 @@ static func _profiled_problem(value: Variant) -> String:
 		var component: Dictionary={"version":1,"binding":token_for_compat(value),"sequence":value.support.size(),"cooldowns":{"heal":0.0,"airstrike":0.0},"accepted":value.support}
 		var support_issue: String=BuildAuthority.support_problem(component,token_for_compat(value),value.rules.mission.generated)
 		if not support_issue.is_empty(): return support_issue
+	if PowerAuthority.mode(value.rules):
+		if not value.get("powers") is Array or (value.phase=="STARTED" and not value.powers.is_empty()): return "POWER_RECEIPT_FIELDS"
+		var powers: Dictionary=SpecialPowers.initial(token_for_compat(value),value.rules.mission.generated.powers.slot)
+		powers.accepted=value.powers
+		var at: float=float(value.powers.back().get("at",-1)) if not value.powers.is_empty() and value.powers.back() is Dictionary and SurvivalContracts.number(value.powers.back().get("at")) else 0.0
+		var power_issue: String=SpecialPowers.problem(powers,token_for_compat(value),powers.equipped,at)
+		if not power_issue.is_empty(): return power_issue
 	var ids: Array[int] = []
 	for row: Variant in value.health:
 		if not row is Dictionary or row.size() != 2 or not SurvivalContracts.integer(row.get("id"), 1, SurvivalContracts.MAX_ID):
@@ -210,6 +218,9 @@ static func _profiled_transition(previous: Dictionary, next: Dictionary) -> Stri
 			return "FIELD_JOIN_RETRACTED_OR_CHANGED"
 	if (next.rules.get("data_version")==8 or next.rules.get("data_version")==9):
 		issue=BuildAuthority.transition(previous,next)
+		if not issue.is_empty(): return issue
+	if PowerAuthority.mode(next.rules):
+		issue=PowerAuthority.transition(previous,next)
 		if not issue.is_empty(): return issue
 	if previous.phase == "SUSPEND_READY":
 		return "" if next.phase == "RESUME_CLAIMED" and _same_frozen(previous,next) else "SUSPEND_MUST_BE_CLAIMED"

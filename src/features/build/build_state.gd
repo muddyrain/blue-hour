@@ -9,6 +9,13 @@ static func initial() -> Dictionary:
 
 static func problem(camp: Dictionary) -> String:
 	if not enabled(camp): return ""
+	if PowerState.enabled(camp):
+		if camp.journey.build.size()!=7 or camp.journey.build.get("combat_version")!=1: return "POWER_BUILD_FIELDS"
+		var old: Dictionary=camp.duplicate(true)
+		old.journey.build.version=2
+		old.journey.build.erase("powers")
+		var issue: String=problem(old)
+		return PowerState.problem(camp) if issue.is_empty() else issue
 	var v: Variant=camp.journey.build
 	if not CampaignState.is_short(camp) or not v is Dictionary or v.size()!=(6 if v.get("version")==2 else 5) or not v.has_all(["version","owned","slots","sources","healing"]) or ((v.version!=1 and v.version!=2) or (v.version==2 and v.get("combat_version")!=1)) or not v.sources is Array: return "BUILD_FIELDS"
 	var issue: String=BuildItems.problem(v.owned,v.slots)
@@ -59,4 +66,5 @@ static func settled(before: Dictionary, report: Dictionary, generated: Dictionar
 	for item: String in acquired(generated,report.site_facts,report.evacuated):
 		result.owned.append(item)
 		result.sources.append({"item_id":item,"transaction_id":report.sortie_id,"context":generated.build.drop_context.duplicate(true),"owned":generated.build.owned.duplicate()})
+	if PowerState.enabled(before): result.powers=PowerState.settled(before,report,generated)
 	return result

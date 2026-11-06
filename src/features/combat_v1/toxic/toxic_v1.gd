@@ -36,7 +36,7 @@ static func pick(identity: String, index: int, stage: int, live_toxic: int = 0) 
 	return KIND if live_toxic < int(POLICY.caster_cap) else EnemyRules.NORMAL
 
 
-static func plan(state: Dictionary, delta: float, casters: Array[Dictionary], members: Array[Dictionary], obstacles: Array[ShotObstacle]) -> Dictionary:
+static func plan(state: Dictionary, delta: float, casters: Array[Dictionary], members: Array[Dictionary], obstacles: Array[ShotObstacle], caster_active: bool = true) -> Dictionary:
 	var next: Dictionary = state.duplicate(true)
 	if not problem(state).is_empty() or not _number(delta) or delta < 0.0 or not _rows_valid(casters, 0, RunSave.MAX_COUNTER) or not _rows_valid(members, 1, SurvivorRoster.MAX_MEMBER_ID):
 		return {"state":next, "hits":[]}
@@ -58,6 +58,7 @@ static func plan(state: Dictionary, delta: float, casters: Array[Dictionary], me
 		if not next.casters.has(key):
 			next.casters[key] = _caster(int(caster.id))
 		var intent: Dictionary = next.casters[key]
+		if not caster_active: continue
 		if intent.phase == "windup":
 			if not caster.available:
 				_cooldown(intent)

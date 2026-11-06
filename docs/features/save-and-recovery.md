@@ -38,3 +38,9 @@ M6默认试玩使用固定 `user://playable-v1/run.enemy-v1.json`，声音设置
 保存协议是Blue Hour工程实现；人数、饥饿、成长和装备策略为 **PROJECT_TEMP**，不是经典Deadly Days原作证据。原作本机精确规则未知项保持UNKNOWN，不新增LOCAL_VERIFIED。
 
 [营地与配装](camp-and-loadouts.md) · [巴士与结果](bus-evacuation.md) · [功能导航](README.md)
+
+## M11 能力世界13
+
+只在新建旅程启用build3/powers1。原行动描述增加独立能力扩展，旧V8投影仍完整认证；世界13保存全量jobs与原敌人动作，另存绑定旅程/行动/能力的唯一激活和模拟时间有效区间。原营地编辑、Journal和归航结算分别继续唯一提交，能力激活不冒充空袭事件。
+
+已确认能力不会因基础支援的完整世界替换或安全暂存继续而刷新、延长或叠加。Mac实际在成功发布SUSPEND_READY之后强杀进程，新PID精确恢复有效期与多人任务；这不覆盖消费后再次任意强退、断电或未知历史档。旧世界12/旧营地代表保持完整指纹；旧11未改格式与算法，复用原已审代表。WORLD_CAMERA/COMBAT_ACTION_PHASE等原有效校验保留，正式生存门禁仍BLOCKED。

@@ -1,3 +1,11 @@
+# M11-POWER-01 当前候选
+
+PR #15 的精确已审 `03e48952d7bf3ce7ab25d8c2ecf283f87844cadd` 已按普通 merge 合入 main `664f8a553c5a1d265d365d19f0035861de71e486`，本轮独立 `codex/m11-power-01`，新 Draft PR base main。
+
+[特殊能力与紧凑出击界面](design/m11-power-01.md)只在新建旅程启用 build3/powers1/world13；旧世界11/12和旧营地保持模式与严格验证。原装备站点搜获、原结算确认入库、独立单槽装配、每日一次和模拟时钟持续效果贯通；图标/HUD只读。疾行×1.5/8秒、全场冻结4秒及首领处理均为PROJECT_TEMP项目适配。当前Mac定向验收，正式生产门禁仍BLOCKED，候选不自动合并或发布。
+
+下一步：幸存者特长组合与人物详情，再到较完整旅程和内容扩充。本轮结束不自动启动后续。
+
 M8-BUILD-01 WIN-R1接入六被动/两槽、基础治疗和空袭。#11/#12已依次正常合入main，新候选PR以main为base，保持Draft。当前Windows定向验收；[规则与版本](design/m8-build-01.md)，正式生存BLOCKED。
 
 # 公开开发状态

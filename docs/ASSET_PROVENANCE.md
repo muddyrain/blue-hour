@@ -13,3 +13,7 @@ M6-ROGUE-02的空投箱、信标和主目标入口圈由 `airdrop_prop.gd` 与 `
 ## M9-COMBAT-01
 
 assets/combat_v1/weapons/fire_axe_v1.svg、shotgun_v1.svg及toxic/carrier_sacs.svg为本项目新绘原创矢量；对应tres为原创持握/配置，CombatWeaponVisualV1与Toxic*VisualV1程序绘制挥击/预警/气体/消退。不使用外部生图服务、原作素材或新增许可。复用人物与普通感染者基底的既有来源保持。
+
+## M11 特殊能力与技能图标
+
+`assets/powers/` 五个 SVG 为本轮原创矢量图标（治疗、空袭、疾行、冻结与空槽），SHA 列入运行资源清单。场景足部速度线和冰霜标记由代码绘制。参考截图仅用于信息层级研究，未进入运行资源或公开 Git。没有新增许可。

@@ -60,6 +60,21 @@ func _accept_support(before_world: Dictionary, request: Dictionary) -> Dictionar
 	return _suspend(after,true,{"before":before_world,"request":request})
 
 
+func accept_power(token: Dictionary, before_world: Dictionary, request: Dictionary) -> Dictionary:
+	return _execute(_checked.bind(token,_accept_power.bind(before_world,request)))
+
+func _accept_power(before_world: Dictionary, request: Dictionary) -> Dictionary:
+	var loaded: Dictionary=_recover()
+	if loaded.error!=OK: return loaded
+	if not PowerAuthority.mode(loaded.receipt.rules): return _error(ERR_INVALID_DATA,"POWER_MODE_REQUIRED")
+	for event: Dictionary in loaded.receipt.powers:
+		if event.id==request.get("id"):
+			return loaded if event.ability_id==request.get("ability_id") and TransactionReceipt.same({"id":event.id,"ability_id":event.ability_id},request) and loaded.receipt.envelope.has("world") and TransactionReceipt.same(loaded.receipt.envelope.get("power_proposal",{}).get("before",{}),before_world) else _error(ERR_INVALID_DATA,"POWER_RETRY_CONFLICT")
+	var after: Dictionary=PowerAuthority.propose(before_world,request)
+	if after.is_empty(): return _error(ERR_INVALID_DATA,"POWER_REQUEST_REJECTED")
+	return _suspend(after,true,{}, {"before":before_world,"request":request})
+
+
 func checkpoint(token: Dictionary, health: Array) -> Dictionary:
 	return _execute(_checked.bind(token, _checkpoint.bind(health)))
 
@@ -379,7 +394,7 @@ func _prepare(envelope: Dictionary, camp_key: String = "") -> Dictionary:
 	return _append(next, loaded.hash)
 
 
-func _suspend(world: Dictionary, publish: bool = true, support_proposal: Dictionary = {}) -> Dictionary:
+func _suspend(world: Dictionary, publish: bool = true, support_proposal: Dictionary = {}, power_proposal: Dictionary = {}) -> Dictionary:
 	var loaded: Dictionary = _recover()
 	if loaded.error != OK:
 		return loaded
@@ -396,9 +411,11 @@ func _suspend(world: Dictionary, publish: bool = true, support_proposal: Diction
 		health.append({"id":row.state.member_id,"health":row.state.health})
 	next.health = health
 	if not support_proposal.is_empty(): next.support=world.support.accepted.duplicate(true)
+	if not power_proposal.is_empty(): next.powers=world.powers.accepted.duplicate(true)
 	next.phase = "SUSPEND_READY"
 	next.envelope = SuspendRecord.make(world,token_for(next),loaded.hash)
 	if not support_proposal.is_empty(): next.envelope.support_proposal=support_proposal.duplicate(true)
+	if not power_proposal.is_empty(): next.envelope.power_proposal=power_proposal.duplicate(true)
 	next.previous_hash = loaded.hash
 	next.revision += 1
 	var issue: String = TransactionReceipt.transition(loaded.receipt,next)

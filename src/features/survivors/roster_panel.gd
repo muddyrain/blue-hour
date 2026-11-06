@@ -5,6 +5,7 @@ extends PanelContainer
 signal call_sign_requested(member_id: int, call_sign: String)
 signal equipment_requested(member_id: int)
 signal growth_requested(member_id: int)
+signal training_requested(member_id: int)
 signal closed
 
 var player_mode: bool = false
@@ -31,6 +32,10 @@ var _equipment: Label
 var _service: Label
 var growth_button: Button
 var _members_list: VBoxContainer
+var persona_details: PersonaDetails
+var _legacy_detail: VBoxContainer
+var _detail_host: ScrollContainer
+var _history_link: Button
 var _heading: Label
 
 
@@ -82,7 +87,22 @@ func _ready() -> void:
 	detail_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	detail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	row.add_child(detail_scroll)
+	_detail_host=detail_scroll
+	_legacy_detail=detail
 	detail_scroll.add_child(detail)
+	persona_details=PersonaDetails.new()
+	persona_details.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	persona_details.size_flags_vertical=Control.SIZE_EXPAND_FILL
+	persona_details.custom_minimum_size.y=220
+	# Replace the scroll's direct child only when the explicit new mode is selected.
+	persona_details.equipment_requested.connect(func(id: int) -> void: equipment_requested.emit(id))
+	persona_details.training_requested.connect(func(id: int) -> void: training_requested.emit(id))
+	persona_details.closed.connect(func() -> void:
+		# The original leave guard owns whether camp closes; a cancelled rename
+		# confirmation must leave this read-only pane visible beside the editor.
+		persona_details.show()
+		closed.emit()
+	)
 	var identity_row: HBoxContainer = HBoxContainer.new()
 	detail.add_child(identity_row)
 	_portrait = TextureRect.new()
@@ -142,6 +162,14 @@ func _ready() -> void:
 	equipment_button.text = "管理该队员装备 →"
 	equipment_button.pressed.connect(func() -> void: equipment_requested.emit(selected_member_id))
 	name_row.add_child(equipment_button)
+	_history_link=Button.new()
+	_history_link.text="行动记录 →"
+	_history_link.pressed.connect(func() -> void: growth_requested.emit(selected_member_id))
+	name_row.add_child(_history_link)
+	_history_link.hide()
+	_detail_host.resized.connect(func() -> void:
+		if PersonaState.enabled(_data): persona_details.custom_minimum_size.y=maxf(220.0,_detail_host.size.y)
+	)
 	message = Label.new()
 	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	message.custom_minimum_size.y = 30
@@ -152,11 +180,28 @@ func _ready() -> void:
 	back_button.custom_minimum_size.y = 44
 	back_button.pressed.connect(func() -> void: closed.emit())
 	column.add_child(back_button)
+	get_viewport().size_changed.connect(_fit_viewport)
 
 
 func refresh(data: Dictionary, feedback: String = "") -> void:
 	_data = data.duplicate(true)
 	_sync_members()
+	_fit_viewport()
+	var persona_mode: bool=PersonaState.enabled(_data)
+	growth_button.visible=not persona_mode
+	back_button.visible=not persona_mode
+	equipment_button.visible=not persona_mode
+	_history_link.visible=persona_mode
+	message.visible=not persona_mode or not feedback.is_empty()
+	if SurvivorRoster.member(_data.crew,selected_member_id).is_empty(): selected_member_id=int(_data.crew[0].id)
+	if persona_mode and persona_details.get_parent()==null:
+		_detail_host.remove_child(_legacy_detail)
+		_detail_host.add_child(persona_details)
+	elif not persona_mode and _legacy_detail.get_parent()==null:
+		_detail_host.remove_child(persona_details)
+		_detail_host.add_child(_legacy_detail)
+	if persona_mode: persona_details.present(PersonaViewModel.camp(_data,selected_member_id))
+	if persona_mode: persona_details.custom_minimum_size.y=maxf(220.0,_detail_host.size.y)
 	if SurvivorRoster.member(_data.crew,selected_member_id).is_empty():
 		selected_member_id = int(_data.crew[0].id)
 	_heading.text = "幸存者名册 · 存活%d / 历史%d" % [_data.crew.filter(func(m: Dictionary) -> bool: return m.health>0).size(),_data.crew.size()]
@@ -170,6 +215,11 @@ func refresh(data: Dictionary, feedback: String = "") -> void:
 		button.tooltip_text = "%s · %s\n呼号：%s" % [definition.default_display_name, definition.gender_text(), entry.call_sign]
 		button.text = "%02d  %s\n%s · %.0f / %.0f" % [member_id, list_name,
 			"存活" if entry.condition == "active" else ("已阵亡" if entry.condition == "dead" else "倒地"), float(entry.health),SurvivorGrowth.maximum(_data,entry)]
+		if PersonaState.enabled(_data):
+			var model: Dictionary=PersonaViewModel.camp(_data,member_id)
+			button.text="%s\n%02d %s · HP %.0f/%.0f\n＋%s / －%s"%[model.primary,member_id,list_name,model.hp,model.max_hp,model.positive.name,model.negative.name]
+			button.add_theme_font_size_override("font_size",14)
+			button.custom_minimum_size.y=100
 		button.add_theme_color_override("font_color", SurvivorRoster.definition(member_id).colour)
 	var member: Dictionary = SurvivorRoster.member(_data.crew, selected_member_id)
 	var base: SurvivorDefinition = SurvivorRoster.definition(selected_member_id)
@@ -240,3 +290,14 @@ func _sync_members() -> void:
 		_member_genders.append(badge)
 		member_buttons.append(button)
 		buttons_by_id[member_id] = button
+
+
+func _exit_tree() -> void:
+	# Only one detail subtree is mounted at a time; release the retained sibling.
+	if is_instance_valid(_legacy_detail) and _legacy_detail.get_parent()==null: _legacy_detail.free()
+	if is_instance_valid(persona_details) and persona_details.get_parent()==null: persona_details.free()
+
+
+func _fit_viewport() -> void:
+	# Keep the regular 720px composition; reclaim the title gap in shorter views.
+	offset_top=64.0 if PersonaState.enabled(_data) and get_viewport_rect().size.y<700.0 else 104.0

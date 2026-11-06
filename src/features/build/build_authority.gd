@@ -157,7 +157,7 @@ static func propose(before: Dictionary, request: Dictionary) -> Dictionary:
 					var distance: float=SortieSnapshot._vec(state.position).distance_to(SortieSnapshot._vec(row.state.position))
 					var legal: bool=state.health>0 and state.visible and int(state.activity) not in [2,3] and line_clear(layout,SortieSnapshot._vec(row.state.position),SortieSnapshot._vec(state.position))
 					targets.append({"member_id":int(state.member_id),"position":SortieSnapshot._vec(state.position),"melee_legal":legal and distance<BossDefinition.POLICY.melee_range,"slam_legal":legal and distance<BossDefinition.POLICY.slam_range})
-				if after.get("version")==SortieSnapshot.POWER_VERSION and SpecialPowers.frozen(after.powers,float(after.sim.elapsed)):
+				if SortieSnapshot.power_version(after.get("version")) and SpecialPowers.frozen(after.powers,float(after.sim.elapsed)):
 					behavior.observe_frozen_health(row.state.health/float(BossDefinition.POLICY.health),SortieSnapshot._vec(row.state.position))
 				else: behavior.step(0.0,row.state.health/float(BossDefinition.POLICY.health),true,targets,SortieSnapshot._vec(row.state.position))
 				after.encounter.behavior=behavior.snapshot()

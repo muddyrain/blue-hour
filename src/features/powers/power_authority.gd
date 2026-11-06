@@ -5,13 +5,13 @@ static func mode(rules: Variant) -> bool:
 	return rules is Dictionary and rules.get("data_version")==9 and rules.get("mission") is Dictionary and rules.mission.get("generated") is Dictionary and rules.mission.generated.has("powers")
 
 static func world_problem(world: Dictionary, receipt: Dictionary) -> String:
-	if world.get("version")!=SortieSnapshot.POWER_VERSION or not mode(receipt.rules): return "POWER_WORLD_MODE"
+	if not SortieSnapshot.power_version(world.get("version")) or not mode(receipt.rules): return "POWER_WORLD_MODE"
 	var issue: String=SpecialPowers.problem(world.get("powers"),RunTransaction.token_for(receipt),world.generated.powers.slot,float(world.sim.elapsed))
 	if not issue.is_empty(): return issue
 	return "" if TransactionReceipt.same({"v":world.powers.accepted},{"v":receipt.get("powers")}) else "POWER_NOT_DURABLE"
 
 static func propose(before: Dictionary, request: Dictionary) -> Dictionary:
-	if before.get("version")!=SortieSnapshot.POWER_VERSION or not before.get("powers") is Dictionary or not before.get("sim") is Dictionary or not SurvivalContracts.number(before.sim.get("elapsed")) or not SurvivalContracts.integer(before.sim.get("phase"),0,2) or not before.get("survivors") is Array or not before.get("generated") is Dictionary or not before.generated.get("powers") is Dictionary or not before.generated.powers.get("slot") is String: return {}
+	if not SortieSnapshot.power_version(before.get("version")) or not before.get("powers") is Dictionary or not before.get("sim") is Dictionary or not SurvivalContracts.number(before.sim.get("elapsed")) or not SurvivalContracts.integer(before.sim.get("phase"),0,2) or not before.get("survivors") is Array or not before.get("generated") is Dictionary or not before.generated.get("powers") is Dictionary or not before.generated.powers.get("slot") is String: return {}
 	var living: bool=false
 	for row: Variant in before.survivors:
 		if not row is Dictionary or not row.get("state") is Dictionary or not SurvivalContracts.number(row.state.get("health")): return {}

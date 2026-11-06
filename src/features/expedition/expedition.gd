@@ -67,6 +67,7 @@ var day: int = 2
 var mission_title: String = "旧街补给点"
 var starting_health: Array[float] = [200.0, 200.0]
 var crew_snapshot: Array[Dictionary] = []
+var persona_views: Dictionary = {} # Derived immutable presentation cache; never serialized.
 var participants_snapshot: Array[Dictionary] = []
 var setup_problem: String = ""
 var _setup_crew: Array[Dictionary] = []
@@ -518,7 +519,7 @@ func promote_target(event: Dictionary, restoring: bool = false) -> void:
 	actor.clear_order()
 	if trait_mode:
 		TraitRules.apply(actor,profile,tuning.survivor_speed)
-	if build_mode(): apply_build(actor)
+	if build_mode(): apply_build(actor,profile,gun)
 	survivors.append(actor)
 	if pool_mode:
 		# Match the existing participant/snapshot execution order, including 5 then 3/4.
@@ -1233,7 +1234,7 @@ func _update_search(delta: float) -> void:
 			_search_log("interrupted",site)
 			continue
 		var prior_progress: float = site.progress
-		site.progress += delta / (actor.trait_search_factor * (BuildItems.factors(supply.generated.build.slots).work if build_mode() else 1.0))
+		site.progress += delta / (actor.trait_search_factor * actor.persona_work_factor * (BuildItems.factors(supply.generated.build.slots).work if build_mode() else 1.0))
 		if site.progress >= _site_seconds(site):
 			if not _complete_search(actor,site):
 				site.progress = prior_progress
@@ -1440,6 +1441,9 @@ func _update_ui() -> void:
 	if growth_mode:
 		for member: Dictionary in members:
 			member.level = SurvivorRoster.member(_setup_crew,int(member.id)).growth.level
+	if persona_mode():
+		for member: Dictionary in members:
+			member.persona=PersonaViewModel.field(self,search_member(int(member.id)),String(member.status))
 	var pending: PackedStringArray = []
 	if growth_mode:
 		for actor: FieldActor in survivors:
@@ -1645,8 +1649,26 @@ func combat_mode() -> bool:
 func build_mode() -> bool:
 	return (supply.generated.get("version")==7 or supply.generated.get("version")==8)
 
-func apply_build(actor: FieldActor) -> void:
+func apply_build(actor: FieldActor, profile: Dictionary = {}, item: Dictionary = {}) -> void:
 	var factors: Dictionary=BuildItems.factors(supply.generated.build.slots)
+	if persona_mode():
+		if profile.is_empty(): profile=SurvivorRoster.member(_setup_crew,actor.member_id)
+		var recipe: Dictionary=PersonaState.recipe(supply.generated,actor.member_id,actor.definition_id)
+		var personal: Dictionary=SurvivorPersona.factors(recipe)
+		if profile.is_empty() or personal.is_empty():
+			setup_problem="PERSONA_ACTOR_IDENTITY"
+			return
+		if item.is_empty(): item=WeaponInventory.for_member(field_departure,actor.member_id)
+		actor.weapon_definition=WeaponModifiers.combat_definition(item)
+		var melee: bool=CombatEquipment.melee(String(actor.weapon_definition.id))
+		actor.weapon_definition.damage*=personal.melee if melee else personal.ranged*factors.damage
+		actor.speed=125.0*TraitRules.factor(profile,"move")*personal.move*factors.move
+		actor.trait_shot_factor=TraitRules.factor(profile,"shot")
+		actor.trait_search_factor=TraitRules.factor(profile,"search")
+		actor.persona_work_factor=personal.work
+		actor.power_move_factor=SpecialPowers.move_factor(powers,elapsed)
+		if actor.magazine!=null: actor.magazine.reload_factor=personal.reload*factors.reload
+		return
 	# Definitions are freshly derived from immutable inventory once per actor setup.
 	if not CombatEquipment.melee(String(actor.weapon_definition.id)): actor.weapon_definition.damage*=factors.damage
 	actor.speed*=factors.move
@@ -1714,6 +1736,7 @@ func toggle_support_aim() -> void:
 
 func _support_input(event: InputEvent) -> bool:
 	if not build_mode(): return false
+	if _hud.view.persona_details.visible and event is InputEventKey and event.keycode in [KEY_Q,KEY_E,KEY_3]: return true
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode==KEY_3 and power_mode():
 		if get_viewport().gui_get_focus_owner()==null: request_power()
 		return true
@@ -1755,6 +1778,9 @@ func support_plan_airstrike(point: Vector2) -> Dictionary:
 	for enemy: FieldActor in enemies:
 		view.enemies.append({"state":{"actor_id":enemy.actor_id,"health":enemy.health,"position":[enemy.position.x,enemy.position.y]}})
 	return BuildAuthority.plan_airstrike(view,point,layout)
+
+func persona_mode() -> bool:
+	return supply.generated.has("persona")
 
 func power_mode() -> bool:
 	return supply.generated.has("powers")

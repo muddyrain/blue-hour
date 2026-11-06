@@ -9,6 +9,20 @@ static func initial() -> Dictionary:
 
 static func problem(camp: Dictionary) -> String:
 	if not enabled(camp): return ""
+	if PersonaState.enabled(camp):
+		if camp.journey.build.size()!=8: return "PERSONA_BUILD_FIELDS"
+		var issue: String=SurvivorPersona.problem(camp.journey.build.get("persona"),String(camp.journey.get("seed","")))
+		if not issue.is_empty(): return issue
+		issue=PowerState.problem(camp)
+		if not issue.is_empty(): return issue
+		var old: Dictionary=camp.duplicate(true)
+		old.journey.build.version=3
+		old.journey.build.erase("persona")
+		# Only already-authenticated full sources are projected for the unchanged
+		# old validator. Legacy camps still reject every persona-bearing source.
+		for source: Dictionary in old.journey.build.powers.sources:
+			source.generated=PersonaActions.legacy(source.generated)
+		return problem(old)
 	if PowerState.enabled(camp):
 		if camp.journey.build.size()!=7 or camp.journey.build.get("combat_version")!=1: return "POWER_BUILD_FIELDS"
 		var old: Dictionary=camp.duplicate(true)

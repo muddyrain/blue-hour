@@ -35,3 +35,5 @@ CombatActions显式分派generated8/rules9/world11，旧M8及更早投影保留�
 SearchAssignments只拥有稳定member_id↔site_id与approach/working一对一关联；SearchWorkView只格式化只读状态。Expedition继续拥有导航、各站点进度、原伤害/奖励/巴士推进，TraitInputs用显式site_id认证实际完成者且保持原类别事件粒度。世界12在generated8/rules9上增加严格jobs交叉证明，支援整世界替换保持任务。旧11原格式/指纹严格恢复并保持单任务至归航，后续出击12；无第二套生成、结算或迁移写者。见[多人工作合同](design/m10-search-01.md)。
 
 SpecialPowers只提供严格请求/激活事实与模拟时间派生；PowerActions为generated8附加显式powers1扩展，移除此字段后的原V8必须完整认证，旧分支不变。PowerState只推演原营地库存、来源与日使用事实；PowerAuthority提供世界13完整前后态证明。原CampEdit、RunTransaction/Journal、FrozenSettlement仍分别唯一拥有营地编辑、激活持久化和归航入库。FieldActor.effective_speed读取基础speed与一次派生因子，快照继续保存原基础值；Expedition分割到期步进并停敌人运动/攻击/首领时钟，ToxicV1单独保留毒区时钟。PowerSlotPanel/PowerEffectView/HUD无游戏状态owner。见[能力合同](design/m11-power-01.md)。
+
+M12-SURVIVOR-01 在原新旅程 owner 增加独立 persona1 事实（build4），PersonaActions 仅在完整原 PowerActions 描述上追加严格目录与来源认证；五个配方不授予入队资格。World14 绑定新目录与身份，旧 World13/营地保持原格式/指纹。Actor 从不可变武器/主特长/本人配方/道具派生，疾行仍单独临时因子；PersonaViewModel 缓存不变显示来源并只读投影实时数值。共享站点进度可接力，新工作下界从当时真实参与者的最快合法因子推导，保留旧版下界和 cash/food 类别上限。参见[合同](design/m12-survivor-01.md)。

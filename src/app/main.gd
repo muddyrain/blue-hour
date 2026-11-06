@@ -450,6 +450,16 @@ func _exit_tree() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if phase==Phase.EXPEDITION and is_instance_valid(expedition) and expedition._hud!=null and expedition._hud.view.persona_details.visible and event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode==KEY_ESCAPE:
+			expedition._hud.view.persona_details.close()
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode==KEY_SPACE:
+			expedition.toggle_pause()
+			get_viewport().set_input_as_handled()
+			return
+
 	if event.is_action_pressed("return_to_title") and not event.is_echo() and _camp_escape():
 		get_viewport().set_input_as_handled()
 		return
@@ -794,7 +804,7 @@ func _new_game() -> void:
 	profile_id = RunSave.new_profile_id()
 	if playable_entry:
 		_battle_meta.campaign=CampaignRules.initial(profile_id)
-		_battle_meta.build=PowerState.initial_build()
+		_battle_meta.build=PersonaState.initial_build(_battle_meta.seed)
 	_initialize_weapons("initial")
 	last_settlement_id = ""
 	_pending_save.clear()
@@ -1155,6 +1165,10 @@ func open_roster() -> void:
 		roster_panel.call_sign_requested.connect(rename_survivor)
 		roster_panel.equipment_requested.connect(_roster_equipment)
 		roster_panel.growth_requested.connect(open_growth)
+		roster_panel.training_requested.connect(func(id: int) -> void:
+			if _guard_camp_editor(func() -> void: _roster_training(id)): return
+			_roster_training(id)
+		)
 		roster_panel.closed.connect(close_roster)
 	if camp_prototype and SurvivorRoster.member(crew, roster_panel.selected_member_id).is_empty():
 		roster_panel.selected_member_id = int(crew[0].id)
@@ -2130,6 +2144,14 @@ func _camp_escape() -> bool:
 func _camp_input_allowed() -> bool:
 	return not (is_instance_valid(training_panel) and training_panel.visible) and phase == Phase.TITLE and not _new_game_confirmation.visible and not _hunger_confirmation.visible and not (is_instance_valid(pause_menu) and pause_menu.root.visible) and not (is_instance_valid(_camp_leave_dialog) and _camp_leave_dialog.visible)
 
+
+func _roster_training(id: int) -> void:
+	if not is_instance_valid(roster_panel) or not roster_panel.visible: return
+	roster_panel.hide()
+	open_training()
+	if is_instance_valid(training_panel) and training_panel.visible:
+		training_panel.selected_member_id=id
+		training_panel.refresh(camp_snapshot())
 
 func open_training() -> void:
 	if not training_mode or phase!=Phase.TITLE or not _camp_open or _settings_open() or _requires_continue or _progress_blocked or not _pending_settlement.is_empty():

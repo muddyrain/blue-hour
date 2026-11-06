@@ -40,6 +40,12 @@ var _threat_content: Label
 var _member_details: Label
 var _member_details_panel: PanelContainer
 var _member_detail_index: int = -1
+var persona_details: PersonaDetails
+var _persona_cards: Array[PersonaCard] = []
+var _persona_models: Dictionary = {}
+var _persona_id: int = 0
+var _members_panel: PanelContainer
+var _member_scroll: ScrollContainer
 
 
 func _ready() -> void:
@@ -112,6 +118,36 @@ func refresh(state: Dictionary) -> void:
 			if value is Dictionary:
 				members.append(value)
 	members.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("id",0)) < int(b.get("id",0)))
+	if _bus_button.disabled: _bus_button.release_focus()
+	_bus_button.focus_mode=Control.FOCUS_NONE if _bus_button.disabled else Control.FOCUS_ALL
+	var persona_mode: bool=not members.is_empty() and members[0].has("persona")
+	_members_panel.offset_left=-280 if persona_mode else -224
+	# Old HUD rows retain their reviewed direct VBox layout. Only new cards
+	# need a bounded scrolling client; otherwise ScrollContainer shrinks labels.
+	if persona_mode and _members_parent.get_parent()!=_member_scroll:
+		_members_parent.reparent(_member_scroll)
+	elif not persona_mode and _members_parent.get_parent()==_member_scroll:
+		_members_parent.reparent(_member_scroll.get_parent())
+	_member_scroll.visible=persona_mode
+	_members_panel.anchor_bottom=1.0 if persona_mode else 0.0
+	_members_panel.offset_bottom=-16 if persona_mode else 0
+	for row: Dictionary in _members: row.box.visible=not persona_mode
+	for card: PersonaCard in _persona_cards: card.visible=persona_mode
+	if persona_mode:
+		_persona_models.clear()
+		while _persona_cards.size()<members.size():
+			var card: PersonaCard=PersonaCard.new()
+			_members_parent.add_child(card)
+			card.selected.connect(open_persona)
+			_persona_cards.append(card)
+		for index: int in range(_persona_cards.size()):
+			_persona_cards[index].visible=index<members.size()
+			if index<members.size():
+				var model: Dictionary=members[index].persona
+				_persona_models[int(model.id)]=model
+				_persona_cards[index].present(model,true)
+		if _persona_id>0 and _persona_models.has(_persona_id): persona_details.present(_persona_models[_persona_id])
+		return
 	var count: int = members.size() if not members.is_empty() else 2
 	while _members.size() < count:
 		_build_member(_members_parent, _members.size())
@@ -209,6 +245,7 @@ func _build_top() -> void:
 	_pause_button.custom_minimum_size.y=30
 	_pause_button.add_theme_font_size_override("font_size",14)
 	var members_panel: PanelContainer = _panel(self,"MembersPanel")
+	_members_panel=members_panel
 	members_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	members_panel.offset_left=-224
 	members_panel.offset_right=-16
@@ -216,9 +253,16 @@ func _build_top() -> void:
 	var list: VBoxContainer = _column(members_panel)
 	_label(list,"TeamTitle",13).text="行动小队"
 	_members_parent = VBoxContainer.new()
+	_members_parent.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	_members_parent.add_theme_constant_override("separation",4)
 	_passive(_members_parent)
-	list.add_child(_members_parent)
+	_member_scroll=ScrollContainer.new()
+	_member_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+	_member_scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL
+	_member_scroll.follow_focus=true
+	_member_scroll.mouse_force_pass_scroll_events=false
+	list.add_child(_member_scroll)
+	_member_scroll.add_child(_members_parent)
 	for index: int in range(2):
 		_build_member(_members_parent,index)
 	_member_details_panel = _panel(self,"MemberDetails")
@@ -230,6 +274,16 @@ func _build_top() -> void:
 	_member_details = _label(_member_details_panel,"MemberText",15)
 	_wrap(_member_details)
 	_member_details_panel.hide()
+	persona_details=PersonaDetails.new()
+	add_child(persona_details)
+	persona_details.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	persona_details.offset_left=-720
+	persona_details.offset_right=-292
+	persona_details.offset_top=168
+	persona_details.offset_bottom=-144
+	persona_details.anchor_bottom=1.0
+	persona_details.closed.connect(func() -> void: _persona_id=0)
+	persona_details.hide()
 
 
 func _build_member(parent: Control, index: int) -> void:
@@ -389,6 +443,13 @@ func _toggle_objective() -> void:
 
 func _toggle_threat() -> void:
 	_threat_details.visible=not _threat_details.visible
+
+
+func open_persona(id: int) -> void:
+	if not _persona_models.has(id): return
+	_persona_id=id
+	persona_details.present(_persona_models[id])
+	persona_details.grab_focus()
 
 
 func _toggle_member(index: int) -> void:

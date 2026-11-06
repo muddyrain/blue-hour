@@ -1570,6 +1570,10 @@ func _clicked_site(point: Vector2) -> bool:
 func _make_world_buildings() -> void:
 	if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4 or layout.world_data.get("version")==5):
 		for wall: Rect2 in layout.fences:
+			if layout.world_data.get("version")==5:
+				var stone: WorldgenFurniture=WorldgenFurniture.new()
+				stone.detail={"kind":"wall","width":wall.size.x};stone.position=Vector2(wall.get_center().x,wall.end.y);_sort.add_child(stone)
+				continue
 			var barrier: NeighborhoodWall=NeighborhoodWall.new()
 			barrier.footprint=wall;barrier.position=wall.position+Vector2(0,wall.size.y);_sort.add_child(barrier)
 	if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4 or layout.world_data.get("version")==5):
@@ -1588,14 +1592,19 @@ func _make_world_buildings() -> void:
 				var offset: Vector2 = {"lamp":Vector2(-24,48),"planter":Vector2(44,52),"crate":Vector2(-32,-16),"fence":Vector2(100,-30)}[kind]
 				prop.position=Vector2(row.rect[0],row.rect[1]+row.rect[3])+offset
 				_sort.add_child(prop)
+	if layout.world_data.get("version")==5:
+		for parcel: Dictionary in layout.world_data.parcels:
+			for detail: Dictionary in parcel.get("dressing",[]):
+				var scenery: WorldgenFurniture=WorldgenFurniture.new()
+				scenery.detail=detail;scenery.position=WorldLayout.point(detail.point);_sort.add_child(scenery)
 	var props: Dictionary = {}
 	for entity: Dictionary in layout.world_data.entities:
 		var block: Rect2 = WorldLayout.rect(entity.rect)
-		var definition: Dictionary = WorldgenScale.definition(entity.archetype) if layout.world_data.get("version")==5 else NeighborhoodArt.definition(entity.archetype) if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4 or layout.world_data.get("version")==5) else BuildingLibrary.definition(entity.archetype)
+		var definition: Dictionary = WorldgenArt.definition(entity) if layout.world_data.get("version")==5 else NeighborhoodArt.definition(entity.archetype) if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4) else BuildingLibrary.definition(entity.archetype)
 		var building: FieldProp = FieldProp.new()
 		building.facade = definition.texture
 		if layout.world_data.get("version")==5:
-			building.modulate=[Color.WHITE,Color(0.92,0.97,1.0),Color(1.0,0.97,0.9)][int(entity.variant)]
+			building.modulate=[Color.WHITE,Color(0.92,0.97,1.0),Color(1.0,0.97,0.9),Color.WHITE][int(entity.variant)]
 		building.world_asset = true
 		if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4 or layout.world_data.get("version")==5):
 			building.calibrated=true;building.roof_cut=int(definition.roof_split);building.body_depth=block.size.y

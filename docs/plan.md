@@ -1,10 +1,10 @@
-# M14-WORLDGEN-01 当前候选
+# M14-WORLDGEN-01-R1 当前候选
 
-PR #18 精确已审 `51aafbbaecca95799b40ada6088c84260724e43e` 已普通合入 main `85bf39cbe81820bdebef192bf0dc7efa32d11d21`；唯一目录分支 `codex/m14-worldgen-01`，本轮新 Draft PR base main，保持未合并等待审阅。
+PR #18 精确已审 `51aafbbaecca95799b40ada6088c84260724e43e` 已普通合入 main `85bf39cbe81820bdebef192bf0dc7efa32d11d21`；唯一目录分支 `codex/m14-worldgen-01`，同一 Draft PR #19 base main，保持未合并等待审阅。
 
 [随机街区合同](design/m14-worldgen-01.md)在新旅程普通行动启用 build6/worldgen1/layout5。道路先行，按种子划分街区和用途，再生成店面、住宅/庭院、停车与装卸组合。原角色、125移速、0.82镜头、三规模边界及M13互动预算保持；旧build5/layout4/world15、战斗/工作/人物/支援和终局合同保留。原事务与唯一结算继续拥有恢复和收益，HUD只读。
 
-当前Mac源码与后台原生验收见[验证记录](VALIDATION.md#m14-worldgen-01mac)。正式生产门禁仍BLOCKED；不导出、不验另一平台、不操作用户桌面。下一步等待本轮Draft及私有实机媒体审阅，不自动启动后续。
+R1 按地块宽深补齐连续门面与后排，收紧主街至176并冻结有用途的院落、步道和静态环境；policy revision2 的隔离入口使用新旅程。当前Mac源码与后台原生验收见[验证记录](VALIDATION.md#m14-worldgen-01-r1mac)。正式生产门禁仍BLOCKED；不导出、不验另一平台、不操作用户桌面。下一步等待本轮Draft及私有实机媒体审阅，不自动启动后续。
 
 # M13-EXPLORE-01 历史阶段
 

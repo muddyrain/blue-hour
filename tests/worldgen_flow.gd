@@ -15,19 +15,24 @@ func _journey() -> void:
 		if world==null:return
 		var graph: Dictionary=world.layout.world_data.graph
 		var target: Vector2=world.layout.bus_door
+		var reference: Vector2=world.layout.bus_door
+		for arg: String in OS.get_cmdline_user_args():
+			if arg.begins_with("--flow-reference="):
+				var parts: PackedStringArray=arg.trim_prefix("--flow-reference=").split(",")
+				reference=Vector2(float(parts[0]),float(parts[1]))
 		var distance: float=INF
 		for node_index: int in range(graph.nodes.size()):
 			var degree: int=0
 			for edge: Array in graph.edges:
 				if int(edge[0])==node_index or int(edge[1])==node_index:degree+=1
 			var point: Vector2=WorldLayout.point(graph.nodes[node_index])
-			if degree>=3 and point.distance_to(world.layout.bus_door)<distance:
-				distance=point.distance_to(world.layout.bus_door);target=point
+			if degree>=3 and point.distance_to(reference)<distance:
+				distance=point.distance_to(reference);target=point
 		world.command_move(target)
 		await _until(world,func()->bool:return world.survivors.all(func(actor:FieldActor)->bool:return actor.position.distance_to(target)<100.0))
 		world.camera.pan_by(target-Vector2(0,180)-world.camera.position)
 		await _shot("street-sample")
-		_write("acceptance.json",{"representative_load":requested,"camera_zoom":world.camera.zoom.x,"initialization_only":true})
+		_write("acceptance.json",{"representative_load":requested,"camera_zoom":world.camera.zoom.x,"initialization_only":true,"reference_point":[reference.x,reference.y],"junction":[target.x,target.y],"camera":[world.camera.position.x,world.camera.position.y],"layout_seed":world.layout.world_data.seed,"action_id":world.supply.generated.id})
 		return
 	if "--flow-legacy-worldgen" not in OS.get_cmdline_user_args():
 		await super._journey()

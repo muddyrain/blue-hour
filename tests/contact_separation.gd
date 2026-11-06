@@ -37,6 +37,7 @@ func _expect(value: bool, label: String) -> void:
 		print("CONTACT_FAIL ",label)
 
 func _run() -> void:
+	_corner_body_truncation()
 	var nav: FieldNavigation = FieldNavigation.new()
 	nav.configure([])
 	for octant: int in [0,2,4,6]:
@@ -236,3 +237,18 @@ func _world_crossings() -> void:
 		_expect(progress>40.0,"real World passes a holding pursuer instead of orbiting an occupied waypoint "+str(direction))
 		world.queue_free()
 		await process_frame
+
+
+func _corner_body_truncation() -> void:
+	# R1's real garage corner: a body-truncated step must not strand a mover
+	# inside the static margin even when the original 4-unit sampling missed it.
+	var nav: FieldNavigation=FieldNavigation.new()
+	nav.configure([Rect2(1016,1272,264,96)],Rect2(0,0,3584,2688))
+	var actors: Array[FieldActor]=[_actor(1,Vector2(1297,1386.5)),_actor(2,Vector2(1312,1371.5))]
+	var wish: Vector2=Vector2(2,-2)
+	var body_limit: float=FieldContacts._sweep(actors[0].position-actors[1].position,wish)
+	_expect(nav._segment_is_clear(actors[0].position,actors[0].position+wish) and not nav.is_clear(actors[0].position+wish*body_limit),"fixture exposes a body-truncated sampled-clear step inside a static corner")
+	var accepted: Vector2=FieldContacts._limited(actors[0],wish,actors,nav)
+	var endpoint: Vector2=actors[0].position+accepted
+	_expect(nav.is_clear(endpoint) and nav._segment_is_clear(actors[0].position,endpoint) and endpoint.distance_to(actors[1].position)>=FieldContacts.DISTANCE and accepted.length()<=wish.length()*body_limit,"final contact displacement keeps static clearance and the original body bound")
+	_clear(actors)

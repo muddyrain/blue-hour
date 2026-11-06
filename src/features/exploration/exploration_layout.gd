@@ -160,6 +160,8 @@ static func _reserved(data: Dictionary) -> Array[Rect2]:
 	if data.version==5:
 		for parcel: Dictionary in data.parcels:
 			zones.append(Rect2(WorldLayout.point(parcel.entrance)-Vector2(44,44),Vector2(88,88)))
+			for court: Dictionary in parcel.courtyards:
+				zones.append(Rect2(WorldLayout.point(court.entrance)-Vector2(36,36),Vector2(72,72)))
 	for entity: Dictionary in data.entities:
 		zones.append(Rect2(WorldLayout.point(entity.door) - Vector2(28, 28), Vector2(56, 56)))
 	zones.append(Rect2(WorldLayout.point(data.rescue) - Vector2(52, 52), Vector2(104, 104)))
@@ -240,7 +242,9 @@ static func _all_routes(data: Dictionary, nav: FieldNavigation) -> bool:
 	var goals: Array = data.arrivals.duplicate(true)
 	goals.append(data.rescue)
 	if data.version==5:
-		for parcel: Dictionary in data.parcels: goals.append(parcel.entrance)
+		for parcel: Dictionary in data.parcels:
+			goals.append(parcel.entrance)
+			for court: Dictionary in parcel.courtyards:goals.append(court.entrance)
 	goals.append_array(data.enemy_points)
 	for object: Dictionary in data.objects:
 		goals.append(object.work_point)

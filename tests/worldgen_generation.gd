@@ -36,14 +36,35 @@ func _connected(graph: Dictionary) -> bool:
 func _geometry(layout: Dictionary,label: String) -> void:
 	var bounds: Rect2=WorldLayout.rect(layout.bounds)
 	var safe: bool=true
+	var roofs_safe: bool=true
 	for entity: Dictionary in layout.entities:
 		var block: Rect2=WorldLayout.rect(entity.rect)
+		var visible: Rect2=WorldgenScale.visible_rect(entity)
+		for parcel: Dictionary in layout.parcels:
+			if parcel.id==entity.parcel:roofs_safe=roofs_safe and WorldLayout.rect(parcel.rect).grow(-16).encloses(visible)
 		safe=safe and bounds.encloses(block) and bounds.has_point(WorldLayout.point(entity.door))
 		for road: Array in layout.roads:safe=safe and not block.intersects(WorldLayout.rect(road))
 		for other: Dictionary in layout.entities:
-			if entity.id!=other.id:safe=safe and not block.grow(12).intersects(WorldLayout.rect(other.rect))
+			if entity.id!=other.id:
+				safe=safe and not block.grow(12).intersects(WorldLayout.rect(other.rect))
+				roofs_safe=roofs_safe and not visible.intersects(WorldgenScale.visible_rect(other))
 	expect(safe,"actual buildings do not overlap roads, each other or bounds "+label)
+	expect(roofs_safe,"actual sprite roofs stay inside parcels and leave successive rows readable "+label)
 	expect(_connected(layout.graph),"actual road centerline graph is connected "+label)
+	var land_use_ok: bool=true
+	for parcel: Dictionary in layout.parcels:
+		var plot: Rect2=WorldLayout.rect(parcel.rect)
+		land_use_ok=land_use_ok and parcel.has_all(["courtyards","walks","frontage"]) and parcel.frontage.available>0 and parcel.frontage.occupied>=0 and absf(float(parcel.frontage.coverage)-float(parcel.frontage.occupied)/float(parcel.frontage.available))<0.00001
+		land_use_ok=land_use_ok and parcel.frontage.scope==("street" if parcel.road_edges[1] else "internal")
+		for court: Dictionary in parcel.courtyards:
+			var area: Rect2=WorldLayout.rect(court.rect)
+			land_use_ok=land_use_ok and plot.encloses(area) and court.kind in ["garden","parking","loading","court"]
+			for entity: Dictionary in layout.entities:land_use_ok=land_use_ok and not area.intersects(WorldgenScale.visible_rect(entity))
+		for value: Array in parcel.walks:
+			var walk: Rect2=WorldLayout.rect(value)
+			land_use_ok=land_use_ok and plot.encloses(walk) and walk.size.x>0 and walk.size.y>0
+	expect(land_use_ok,"explicit courtyards, orthogonal walks and measured frontage use real parcels "+label)
+
 	var street: StreetLayout=WorldgenLayout.resource(layout)
 	var sweep_ok: bool=true
 	var sweep: Rect2=WorldLayout.rect(layout.bus.sweep)
@@ -87,6 +108,10 @@ func _case(size: String,topology: String,index: int) -> void:
 		var reachable: bool=_reachable(nav,start,WorldLayout.point(parcel.entrance))
 		if not reachable:printerr("WORLDGEN_YARD_BLOCKED "+label+" "+parcel.id+" "+str(parcel.entrance))
 		routes_ok=routes_ok and reachable
+		for court: Dictionary in parcel.courtyards:
+			var court_reachable: bool=_reachable(nav,start,WorldLayout.point(court.entrance))
+			if not court_reachable:printerr("WORLDGEN_COURT_BLOCKED "+label+" "+parcel.id+" "+str(court.entrance))
+			routes_ok=routes_ok and court_reachable
 	for offset: Vector2 in [Vector2(-48,-48),Vector2(48,-48),Vector2(-48,48),Vector2(48,48)]:routes_ok=routes_ok and _reachable(nav,start,start+offset)
 	for object: Dictionary in layout.objects:routes_ok=routes_ok and _reachable(nav,start,WorldLayout.point(object.work_point))
 	expect(routes_ok and absf(dmax-float(routing.dmax))<0.0001,"all actual doors, props, yards, rescue, arrivals, gather and spawns reachable after collisions "+label)
@@ -165,7 +190,7 @@ func _fallbacks() -> void:
 func _negatives() -> void:
 	var layout: Dictionary=WorldgenLayout.generate("worldgen-v1-negatives","medium","commercial")
 	if layout.is_empty():expect(false,"negative fixture exists");return
-	for mutation: String in ["missing","extra","version","graph","parcels","variant","road","bus"]:
+	for mutation: String in ["missing","extra","version","graph","parcels","courtyard","walk","frontage","variant","road","bus"]:
 		var changed: Dictionary=layout.duplicate(true)
 		match mutation:
 			"missing":changed.erase("parcels")
@@ -173,6 +198,9 @@ func _negatives() -> void:
 			"version":changed.version=4
 			"graph":changed.graph.edges.pop_back()
 			"parcels":changed.parcels[0].kind="free_rewards"
+			"courtyard":changed.parcels[0].courtyards.append({"rect":[0,0,1,1],"kind":"garden","entrance":[0,0]})
+			"walk":changed.parcels[0].walks.append([0,0,1,1])
+			"frontage":changed.parcels[0].frontage.coverage=1.0
 			"variant":changed.entities[0].variant=99
 			"road":changed.roads[0][2]-=64
 			"bus":changed.bus.sweep[1]+=32

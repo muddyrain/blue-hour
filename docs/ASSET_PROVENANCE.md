@@ -21,3 +21,5 @@ assets/combat_v1/weapons/fire_axe_v1.svg、shotgun_v1.svg及toxic/carrier_sacs.s
 M13探索的 assets/exploration 五张SVG为本项目手工绘制的原创轻量轿车、厢车、带果/采空树冠及树干。资源无外部链接、嵌入图片或脚本；逐文件SHA登记于PROVENANCE.json并经公开检查解析。私有任务包及参照图未进入运行资源，不新增许可。
 
 M14新增 `assets/worldgen/apple_tree.png` 与 `apple_tree_empty.png`：内置生图工具制作的原创二次元斜俯视果树及采空状态，透明输出经授权等比缩放至320×360；实际以160×180世界单位接入新layout5，旧布局继续原SVG。生成提示要点：单树透明底、蓝绿叶簇、短树干、左上柔光、无地面/文字；空树保持原轮廓仅移除果实。参考图不入仓库。SHA见清单，无新增许可。
+
+M14-WORLDGEN-01-R1 新增 `assets/worldgen/courtyard_home.png`、`hedge.png`、`courtyard_wall.png`、`loading_cargo.png`、`scrap_car.png`：内置image_gen原创生成，经授权按透明边界裁切、等比缩放。住宅统一512×640/脚点608，入口145；环境四件分离为256宽PNG，窄墙/树篱/货物/报废车用于冻结院落，报废车不提供搜索或奖励。具体归一与源SHA记录于素材清单和私有审阅原件；未使用参考图切片。

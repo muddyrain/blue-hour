@@ -43,15 +43,33 @@ static func metrics(layout: Dictionary) -> Dictionary:
 	var kinds: Dictionary = {}
 	var combinations: Array[String] = []
 	var entrances: int = 0
+	var parcel_details: Array = []
+	var courtyard_kinds: Dictionary = {}
 	for parcel: Dictionary in layout.parcels:
 		kinds[parcel.kind]=int(kinds.get(parcel.kind,0))+1
 		var ports: int = 0
 		for active: bool in parcel.road_edges:
 			if active:ports+=1
-		combinations.append("%s:%d:%d:%d"%[parcel.kind,parcel.buildings.size(),ports,int(parcel.dead_end)])
+		var uses_signature: Array[String]=[]
+		for court: Dictionary in parcel.courtyards:uses_signature.append(court.kind)
+		uses_signature.sort()
+		combinations.append("%s:%d:%d:%d:%s"%[parcel.kind,parcel.buildings.size(),ports,int(parcel.dead_end),"/".join(uses_signature)])
 		if not parcel.entrance.is_empty():entrances+=1
+		var uses: Dictionary={}
+		for court: Dictionary in parcel.courtyards:
+			uses[court.kind]=int(uses.get(court.kind,0))+1
+			courtyard_kinds[court.kind]=int(courtyard_kinds.get(court.kind,0))+1
+		var rows: Dictionary={}
+		for entity: Dictionary in layout.entities:
+			if entity.parcel!=parcel.id:continue
+			var foot: float=float(entity.rect[1])+float(entity.rect[3])-float(parcel.rect[1])
+			var key: String=str(foot)
+			if not rows.has(key):rows[key]={"foot":foot,"buildings":0,"visible_height":0.0}
+			rows[key].buildings+=1
+			rows[key].visible_height=maxf(float(rows[key].visible_height),WorldgenScale.visible_height(entity.archetype,int(entity.variant)))
+		parcel_details.append({"id":parcel.id,"dimensions":[parcel.rect[2],parcel.rect[3]],"kind":parcel.kind,"buildings":parcel.buildings.size(),"frontage":parcel.frontage.duplicate(),"courtyards":uses,"walks":parcel.walks.size(),"rows":rows.values()})
 	combinations.sort()
-	return {"buildings":layout.entities.size(),"blocks":layout.parcels.size(),"junctions":junctions,"crossroads":crosses,"degree_two":turns,"ends":ends,"loops":graph_data.edges.size()-graph_data.nodes.size()+1,"parcel_kinds":kinds,"parcel_combinations":combinations,"entrances":entrances}
+	return {"buildings":layout.entities.size(),"blocks":layout.parcels.size(),"junctions":junctions,"crossroads":crosses,"degree_two":turns,"ends":ends,"loops":graph_data.edges.size()-graph_data.nodes.size()+1,"parcel_kinds":kinds,"parcel_combinations":combinations,"entrances":entrances,"parcel_details":parcel_details,"courtyard_kinds":courtyard_kinds}
 
 static func signature(layout: Dictionary) -> String:
 	var graph_data: Dictionary = layout.graph

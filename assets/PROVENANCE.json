@@ -572,6 +572,36 @@
       "sha256": "eacc8d643477482a7fb13154ae9e1eee4a2078fdce5917e8ef7f73ab49b2bbda",
       "origin": "AI-assisted original project art; built-in image generation; M14 tree and picked-empty variant; resized with preserved alpha",
       "license": "No additional license granted"
+    },
+    {
+      "path": "assets/worldgen/hedge.png",
+      "sha256": "e02ddae64324ef88e798df640202b6af1de77912fa9cd3b6dac6331457c320f8",
+      "origin": "original_ai_assisted",
+      "source": "Original built-in image_gen for M14 R1; transparent sprite crop/resize. Source SHA256 c8bda9f413e6679c0409eb3a1892a22e09f82a41b72165ba9eb9b9f096e4b243"
+    },
+    {
+      "path": "assets/worldgen/courtyard_wall.png",
+      "sha256": "696bca9c8f529af48bf0c60a1ab3087a062f372a868d4ed1d6a2ca236bd20c5b",
+      "origin": "original_ai_assisted",
+      "source": "Original built-in image_gen for M14 R1; transparent sprite crop/resize. Source SHA256 c8bda9f413e6679c0409eb3a1892a22e09f82a41b72165ba9eb9b9f096e4b243"
+    },
+    {
+      "path": "assets/worldgen/loading_cargo.png",
+      "sha256": "ebf726dea69d4a561668981f14f1ac752eb897304defb85d1b0b31cbda3bc884",
+      "origin": "original_ai_assisted",
+      "source": "Original built-in image_gen for M14 R1; transparent sprite crop/resize. Source SHA256 c8bda9f413e6679c0409eb3a1892a22e09f82a41b72165ba9eb9b9f096e4b243"
+    },
+    {
+      "path": "assets/worldgen/scrap_car.png",
+      "sha256": "03c3df2df574b86b62160b2250b71204239cb8ed4bfa763d7249b03dc1eebdc9",
+      "origin": "original_ai_assisted",
+      "source": "Original built-in image_gen for M14 R1; transparent sprite crop/resize. Source SHA256 c8bda9f413e6679c0409eb3a1892a22e09f82a41b72165ba9eb9b9f096e4b243"
+    },
+    {
+      "path": "assets/worldgen/courtyard_home.png",
+      "sha256": "e2ca67f88e9bba8b6706b91b8981be6625f44b299471e1a2a5f96069a4ea78c1",
+      "origin": "original_ai_assisted",
+      "source": "Original built-in image_gen for M14 R1; transparent sprite crop/resize. Source SHA256 03440f3d9255eadec947be6e1de1eec7679805d43a8e8141de8305008b974d37"
     }
   ]
 }

@@ -31,6 +31,7 @@ def main():
   if label=='neighborhood-view':cmd+=['--view-output='+(folder/'frames').as_posix()]
   if label=='neighborhood-data':cmd+=['--neighborhood-output='+(folder/'data.json').as_posix()]
   if label=='rogue-data':cmd+=['--rogue-data-output='+(folder/'data.json').as_posix()]
+  if label=='worldgen-generation':cmd+=['--worldgen-output='+(folder/'data').as_posix()]
   with (folder/'console.txt').open('xb') as out:z=subprocess.run(cmd,cwd=ROOT,stdout=out,stderr=out,env=env,timeout=150)
   text=(folder/'console.txt').read_text(encoding='utf-8',errors='replace');assert z.returncode==expected and not re.search(r'(?m)^(SCRIPT ERROR|ERROR):',text),(label,z.returncode,text[-2000:])
   assert all(int(n)==0 for n in re.findall(r'"failures"\s*:\s*(\d+)',text)),(label,'structured failures')

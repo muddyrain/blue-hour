@@ -1,0 +1,13 @@
+class_name WorldgenFurniture
+extends Node2D
+## Static frozen scenery, no input, timers, search sites or gameplay state.
+var detail: Dictionary
+
+func _draw() -> void:
+	var texture: Texture2D=WorldgenArt.texture(detail.kind)
+	var width: float=float(detail.width)
+	var height: float=width*texture.get_height()/texture.get_width()
+	draw_set_transform(Vector2(5,-2),0,Vector2(1,0.2))
+	draw_circle(Vector2.ZERO,width*0.48,Color(0.07,0.12,0.14,0.22))
+	draw_set_transform(Vector2.ZERO)
+	draw_texture_rect(texture,Rect2(-width/2,-height,width,height),false)

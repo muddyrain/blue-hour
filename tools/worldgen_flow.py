@@ -20,6 +20,7 @@ def main():
     parser.add_argument('--legacy', action='store_true')
     parser.add_argument('--seed', default='m9-r1', help='Deterministic journey identity for repeatable input evidence')
     parser.add_argument('--preview', action='store_true', help='Only load a normal action and capture its streets')
+    parser.add_argument('--reference', help='Prior junction x,y; capture its closest corresponding real road junction')
     parser.add_argument('--size', choices=['small','medium','large'], default='medium')
     parser.add_argument('--movie', action='store_true')
     parser.add_argument('--kill-after-suspend', action='store_true', help='Kill first process after its completed SUSPEND_READY report, before normal cleanup')
@@ -45,6 +46,9 @@ def main():
     for phase in (['first', 'resume'] if (args.size=='medium' or args.legacy) and not args.preview else ['first']):
         flags = ['--flow-output=' + str(out / phase), '--bh-rescue-seed='+args.seed, '--flow-size='+args.size]
         if args.preview: flags.append('--flow-preview')
+        if args.reference:
+            assert args.preview and re.fullmatch(r'-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?',args.reference)
+            flags.append('--flow-reference='+args.reference)
         if args.legacy:
             flags.append('--flow-legacy-worldgen')
             if phase == 'first': flags.append('--flow-bootstrap-m13')

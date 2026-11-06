@@ -8,35 +8,25 @@ func _draw() -> void:
 	draw_texture_rect(StreetBlock.GrassTexture,layout.world_bounds,true,Color(0.77,0.88,0.76,0.42))
 	for parcel: Dictionary in layout.world_data.parcels:
 		var area: Rect2=WorldLayout.rect(parcel.rect)
-		var paved: bool=parcel.kind in ["shopfront","loading","service","parking"]
-		draw_rect(area,Color("788079") if paved else Color("63745e"))
-		draw_texture_rect(StreetBlock.ConcreteTexture if paved else StreetBlock.GrassTexture,area,true,Color(0.9,0.94,0.88,0.28))
-		if parcel.kind in ["parking","loading"]:
-			var court: Rect2=Rect2(area.position.x+40,area.end.y-150,area.size.x-80,120)
-			draw_rect(court,Color("626d6d"))
-			draw_texture_rect(StreetBlock.ConcreteTexture,court,true,Color(0.92,0.95,0.92,0.4))
-			for x: int in range(int(court.position.x)+32,int(court.end.x)-80,104):
-				draw_line(Vector2(x,court.position.y+12),Vector2(x,court.end.y-24),Color("b2b6a5"),2)
-				draw_line(Vector2(x,court.end.y-24),Vector2(x+58,court.end.y-24),Color("b2b6a5"),2)
-	# Shared court access follows the same final navigation used by the actors.
-	var routes: Dictionary=ExplorationLayout._routing(layout.world_data)
-	var nav: FieldNavigation=routes.nav
-	for parcel: Dictionary in layout.world_data.parcels:
-		for entity: Dictionary in layout.world_data.entities:
-			if entity.id not in parcel.buildings: continue
-			var path: PackedVector2Array=nav.path_between(WorldLayout.point(parcel.entrance),WorldLayout.point(entity.door))
-			if path.size()>1:
-				draw_polyline(path,Color("7b8777"),38,true)
-				draw_polyline(path,Color("949b87"),30,true)
+		draw_rect(area,Color("56664e"))
+		draw_texture_rect(StreetBlock.GrassTexture,area,true,Color(0.7,0.84,0.66,0.5))
+		for court: Dictionary in parcel.courtyards:
+			_court(court)
+		# Authored orthogonal shared paths join frontages and courts; no nav debug lines.
+		for walk: Array in parcel.walks:
+			var paving: Rect2=WorldLayout.rect(walk).intersection(area)
+			draw_rect(paving.grow(3).intersection(area),Color("676e62"))
+			draw_rect(paving,Color("909384"))
+			draw_texture_rect(StreetBlock.PavingTexture,paving,true,Color(0.83,0.89,0.81,0.65))
 	# One continuous verge on each street, cut by all actual connections.
 	for road: Rect2 in layout.roads:
-		var paving: Rect2=road.grow(32).intersection(layout.world_bounds)
+		var paving: Rect2=road.grow(28).intersection(layout.world_bounds)
 		draw_rect(paving,Color("93998a"))
 		draw_texture_rect(StreetBlock.PavingTexture,paving,true,Color(0.88,0.91,0.86,0.52))
 	for entity: Dictionary in layout.world_data.entities:
 		var block: Rect2=WorldLayout.rect(entity.rect)
 		var door: Vector2=WorldLayout.point(entity.door)
-		var apron: Rect2=Rect2(block.position.x-8,block.end.y-3,block.size.x+16,80)
+		var apron: Rect2=Rect2(block.position.x-8,block.end.y-3,block.size.x+16,64)
 		draw_rect(apron,Color("969b8c"))
 		draw_texture_rect(StreetBlock.PavingTexture,apron,true,Color(0.9,0.94,0.87,0.56))
 		draw_rect(Rect2(block.position.x-5,block.end.y-5,block.size.x+10,10),Color("434e48"))
@@ -65,6 +55,31 @@ func _draw() -> void:
 			for stripe: int in range(8,int(b.size.x)-8,17):
 				var y: float=a.position.y-25 if b.position.y<a.position.y else a.end.y+8
 				draw_rect(Rect2(b.position.x+stripe,y,9,18),Color("b9bca9"))
+
+func _court(court: Dictionary) -> void:
+	var area: Rect2=WorldLayout.rect(court.rect)
+	var garden: bool=court.kind=="garden"
+	var parking: bool=court.kind=="parking"
+	var loading: bool=court.kind=="loading"
+	draw_rect(area.grow(3),Color("46574d") if garden else Color("535f5f"))
+	draw_rect(area,Color("506b49") if garden else Color("5b6869") if parking or loading else Color("858c7c"))
+	draw_texture_rect(StreetBlock.GrassTexture if garden else StreetBlock.ConcreteTexture if parking or loading else StreetBlock.PavingTexture,area,true,Color(0.82,0.87,0.78,0.55))
+	if garden:
+		# Low planting and soil remain traversable; raised hedges have frozen collisions.
+		var bed: Rect2=Rect2(area.position+Vector2(8,8),Vector2(maxf(8,area.size.x-16),minf(38,area.size.y*0.22)))
+		draw_rect(bed,Color("4c5440"))
+		for x: int in range(int(bed.position.x)+8,int(bed.end.x)-4,19):
+			draw_circle(Vector2(x,bed.get_center().y),5,Color("79945b"))
+			if x%3==0:draw_circle(Vector2(x-2,bed.get_center().y-2),1.8,Color("cec277"))
+	elif parking or loading:
+		for x: int in range(int(area.position.x)+20,int(area.end.x)-132,164):
+			var y: float=area.position.y+8
+			var depth: float=minf(86,area.size.y-16)
+			draw_line(Vector2(x,y),Vector2(x,y+depth),Color("c2c1a5"),2)
+			draw_line(Vector2(x,y+depth),Vector2(x+132,y+depth),Color("c2c1a5"),2)
+		if loading:
+			for x: int in range(int(area.position.x)+12,int(area.end.x)-16,24):
+				draw_line(Vector2(x,area.end.y-8),Vector2(x+12,area.end.y-20),Color("b8a877"),3)
 
 func _junction(point: Vector2,current: Rect2) -> bool:
 	for other: Rect2 in layout.roads:

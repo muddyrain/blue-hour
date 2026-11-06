@@ -38,6 +38,8 @@ func run() -> void:
 		expect(not DailyActions.problem(changed).is_empty(),"layout5 cannot masquerade as old explored geometry")
 		changed=value.duplicate(true);changed.worldgen.version=99
 		expect(not DailyActions.problem(changed).is_empty(),"unknown worldgen policy rejects")
+		changed=value.duplicate(true);changed.worldgen.erase("revision")
+		expect(not DailyActions.problem(changed).is_empty(),"unpublished R0 policy is rejected, never silently regenerated as R1")
 		var malformed: Dictionary=value.duplicate(true);malformed.campaign.run_id="bad"
 		expect(not DailyActions.problem(malformed).is_empty(),"malformed source identity rejects before original constructor")
 		var bad: Dictionary=value.duplicate(true);bad.cash+=1

@@ -5,7 +5,7 @@ const PREFIX: String="worldgen_v1_"
 const KEYS: Array[String]=["version","seed","size","topology","attempt","fallback","bounds","entities","roads","barriers","gates","bus","arrivals","enemy_points","rescue","id","objects","graph","parcels"]
 
 static func policy() -> Dictionary:
-	return {"version":1,"policy_id":"BH_WORLDGEN_V1","status":"PROJECT_TEMP","layout_version":5,"attempts":3,"fallback":"same_size_theme_bounded_partition","base_walk_speed":125,"scale":WorldgenScale.WIDTH}
+	return {"version":1,"revision":2,"policy_id":"BH_WORLDGEN_V1","status":"PROJECT_TEMP","layout_version":5,"attempts":3,"fallback":"same_size_theme_bounded_partition","base_walk_speed":125,"scale":WorldgenScale.WIDTH}
 
 static func generate(seed: String, size: String, topology: String) -> Dictionary:
 	if seed.is_empty() or seed.length()>128 or size not in NeighborhoodLayout.SIZES or topology not in NeighborhoodLayout.TOPOLOGIES: return {}
@@ -16,6 +16,7 @@ static func generate(seed: String, size: String, topology: String) -> Dictionary
 
 static func _assemble(seed: String,size: String,topology: String,attempt: int,fallback: bool) -> Dictionary:
 	var data: Dictionary=WorldgenGeometry.assemble(seed,size,topology,attempt,fallback)
+	if not data.is_empty(): WorldgenDressing.freeze(data)
 	return ExplorationLayout.complete(data) if not data.is_empty() else {}
 
 static func validate(value: Variant,cached: bool=true) -> String:

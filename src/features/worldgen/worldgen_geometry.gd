@@ -12,10 +12,11 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 	var height: int = int(dimensions[1])
 	var rank: int = NeighborhoodLayout.SIZES.find(size)
 	var main_y: int = int(round(float(height) * random.randf_range(0.40,0.61) / 32.0)) * 32
-	var segments: Array = [[0,main_y+112,width,main_y+112,224]]
+	var main_width: int = WorldgenScale.MAIN_WIDTH
+	var segments: Array = [[0,main_y+main_width/2,width,main_y+main_width/2,main_width]]
 	var leaves: Array = [
 		{"rect":[0,0,width,main_y],"edges":[false,true,false,false]},
-		{"rect":[0,main_y+224,width,height-main_y-224],"edges":[true,false,false,false]}
+		{"rect":[0,main_y+main_width,width,height-main_y-main_width],"edges":[true,false,false,false]}
 	]
 	var target: int = [5,8,11][rank] + random.randi_range(-1,1)
 	# Each cut joins at least one existing road edge. Both children retain that edge.
@@ -51,17 +52,18 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 			segments.append([x,mini(from_y,to_y),x,maxi(from_y,to_y),96])
 			segments.append([x-160,to_y,x,to_y,96])
 			kind = "service" if topology == "industrial" else "courtyard"
-		parcels.append({"id":"p%02d"%index,"rect":leaf.rect.duplicate(),"kind":kind,"road_edges":leaf.edges.duplicate(),"buildings":[],"entrance":[],"dead_end":stub})
+		parcels.append({"id":"p%02d"%index,"rect":leaf.rect.duplicate(),"kind":kind,"road_edges":leaf.edges.duplicate(),"buildings":[],"entrance":[],"dead_end":stub,"courtyards":[],"walks":[],"frontage":{"available":0.0,"occupied":0.0,"coverage":0.0}})
 	roads = _roads(segments,width,height)
 	var stop_x: int = _stop_x(width,main_y,roads,random)
-	var foot_y: int = main_y+176
-	var door: Array = [stop_x+190,main_y+272]
-	var bus: Dictionary = {"rect":[stop_x,foot_y-80,240,80],"door":door,"passenger_door":[stop_x+190,foot_y-16],"entry":[-160,foot_y],"exit":[width+160,foot_y],"sweep":[0,main_y+76,width,120],"facing":"right"}
+	var foot_y: int = main_y+main_width-48
+	var door: Array = [stop_x+190,main_y+main_width+48]
+	var bus: Dictionary = {"rect":[stop_x,foot_y-80,240,80],"door":door,"passenger_door":[stop_x+190,foot_y-16],"entry":[-160,foot_y],"exit":[width+160,foot_y],"sweep":[0,foot_y-100,width,120],"facing":"right"}
 	var entities: Array = []
 	for parcel: Dictionary in parcels:
 		_populate(parcel,topology,random,entities,roads,bus)
 	# Food and equipment are actual parcels, not rewards granted to every building.
-	_ensure_categories(entities,WorldLayout.point(door))
+	_ensure_categories(entities,parcels,roads,bus)
+	_update_frontages(parcels,entities)
 	var rescue: Array = entities[0].door.duplicate() if not entities.is_empty() else [64,64]
 	var furthest: float = 0.0
 	for entity: Dictionary in entities:
@@ -92,8 +94,8 @@ static func _split(parent: Dictionary, vertical: bool, random: RandomNumberGener
 
 static func _connect(edge: int, along: int, vertical: bool, segments: Array) -> int:
 	for segment: Array in segments:
-		if vertical and segment[1]==segment[3] and absi(int(segment[1])-edge)<=112 and along>=int(segment[0]) and along<=int(segment[2]):return int(segment[1])
-		if not vertical and segment[0]==segment[2] and absi(int(segment[0])-edge)<=112 and along>=int(segment[1]) and along<=int(segment[3]):return int(segment[0])
+		if vertical and segment[1]==segment[3] and absi(int(segment[1])-edge)<=WorldgenScale.MAIN_WIDTH/2 and along>=int(segment[0]) and along<=int(segment[2]):return int(segment[1])
+		if not vertical and segment[0]==segment[2] and absi(int(segment[0])-edge)<=WorldgenScale.MAIN_WIDTH/2 and along>=int(segment[1]) and along<=int(segment[3]):return int(segment[0])
 	return edge
 
 static func _roads(segments: Array, width: int, height: int) -> Array:
@@ -110,7 +112,7 @@ static func _roads(segments: Array, width: int, height: int) -> Array:
 static func _stop_x(width: int, main_y: int, roads: Array, random: RandomNumberGenerator) -> int:
 	var candidates: Array[int] = []
 	for x: int in range(176,width-448,32):
-		var berth: Rect2 = Rect2(x-48,main_y,336,224)
+		var berth: Rect2 = Rect2(x-48,main_y,336,WorldgenScale.MAIN_WIDTH)
 		var clear: bool = true
 		for value: Array in roads:
 			var road: Rect2 = WorldLayout.rect(value)
@@ -119,61 +121,165 @@ static func _stop_x(width: int, main_y: int, roads: Array, random: RandomNumberG
 	return candidates[random.randi_range(0,candidates.size()-1)] if not candidates.is_empty() else 176
 
 static func _populate(parcel: Dictionary, topology: String, random: RandomNumberGenerator, entities: Array, roads: Array, bus: Dictionary) -> void:
-	var box: Rect2 = WorldLayout.rect(parcel.rect)
-	var pools: Dictionary = {
-		"shopfront":["convenience_store","eatery","supermarket","garage","convenience_store"],
-		"courtyard":["row_house","small_apartment","eatery"] if topology=="commercial" else ["detached_home","row_house","small_apartment"],
-		"parking":["convenience_store","garage","supermarket"] if topology=="commercial" else ["warehouse","garage","convenience_store"],
-		"garden":["detached_home","row_house"],"homes":["detached_home","row_house","small_apartment"],
-		"loading":["warehouse","warehouse","garage"],"service":["warehouse","garage","convenience_store"]}
-	var pool: Array = pools[parcel.kind]
-	var gap: float = {"shopfront":24.0,"courtyard":48.0,"parking":64.0,"garden":88.0,"homes":40.0,"loading":56.0,"service":48.0}[parcel.kind]
-	var front: Array[String] = []
-	var available: float = box.size.x-112
-	var wanted: int = 2 if box.size.x < 1000 else 3
-	if topology=="industrial" or parcel.kind in ["garden","parking"]: wanted=2
-	for index: int in range(wanted):
-		var choices: Array = pool.filter(func(type: String) -> bool: return float(WorldgenScale.WIDTH[type]) <= available-(wanted-index-1)*(256+gap))
-		if choices.is_empty(): break
-		var type: String=choices[random.randi_range(0,choices.size()-1)]
-		if index>0 and type==front[-1] and choices.size()>1:type=choices[(choices.find(type)+1)%choices.size()]
-		front.append(type)
-		available-=float(WorldgenScale.WIDTH[type])+gap
-	if front.is_empty():front.append("garage" if topology=="industrial" else "row_house" if topology=="residential" else "convenience_store")
-	var frontage: float = 0.0
-	for type: String in front: frontage+=float(WorldgenScale.WIDTH[type])
-	frontage+=gap*(front.size()-1)
-	var left: float = box.position.x+maxf(56,(box.size.x-frontage)*random.randf_range(0.35,0.65))
-	var setback: float = 200 if parcel.kind=="parking" else 168 if parcel.kind=="loading" else (80 if parcel.road_edges[1] else 120) if parcel.kind=="garden" else (64 if parcel.road_edges[1] else 104)
-	var foot: float = box.end.y-setback
-	for type: String in front:
-		_add_building(type,left,foot,parcel,entities,roads,bus,random)
-		left+=float(WorldgenScale.WIDTH[type])+gap
-	# A second, staggered frontage faces an actual shared courtyard; it is not a second grid row.
-	if box.size.y >= (800 if parcel.kind in ["loading","parking"] else 520) and parcel.buildings.size()<4:
-		var type: String = "garage" if topology=="industrial" else "detached_home" if topology=="residential" else "small_apartment"
-		if parcel.kind in ["parking","service"]:type="convenience_store"
-		var back_x: float = box.position.x+80+maxf(0,box.size.x-float(WorldgenScale.WIDTH[type])-176)*random.randf_range(0.0,1.0)
-		_add_building(type,back_x,foot-272,parcel,entities,roads,bus,random)
-	# Store the court access as geometry, regardless of the façade orientation.
-	var entrance: Vector2 = Vector2(box.get_center().x,box.end.y-32) if parcel.road_edges[1] else Vector2(box.get_center().x,box.position.y+32) if parcel.road_edges[0] else Vector2(box.position.x+32,box.get_center().y) if parcel.road_edges[2] else Vector2(box.end.x-32,box.get_center().y)
-	parcel.entrance=[entrance.x,entrance.y]
+	var box: Rect2=WorldLayout.rect(parcel.rect)
+	var group_count: int=maxi(1,int((box.size.x-96.0)/720.0))
+	var group_width: float=(box.size.x-96.0-96.0*(group_count-1))/group_count
+	var setback: float=200.0 if parcel.kind=="loading" else 208.0 if parcel.kind=="parking" else (80.0 if parcel.road_edges[1] else 120.0) if parcel.kind=="garden" else (64.0 if parcel.road_edges[1] else 104.0)
+	var front_foot: float=box.end.y-setback
+	var front_available: float=0.0
+	var front_occupied: float=0.0
+	var entry_x: float=box.position.x+32.0
+	var entry_y: float=box.end.y-32.0 if parcel.road_edges[1] else box.position.y+32.0 if parcel.road_edges[0] else front_foot+48.0
+	parcel.entrance=[entry_x,entry_y]
+	# Explicit orthogonal lanes are authored from groups, never from a navigation polyline.
+	_add_walk(parcel,Rect2(entry_x-24,box.position.y+16,48,box.size.y-32))
+	for group: int in range(group_count):
+		var left: float=box.position.x+48+group*(group_width+96)
+		var lane_x: float=left-24 if group==0 else left-48
+		_add_walk(parcel,Rect2(lane_x-28,box.position.y+16,56,box.size.y-32))
+		var foot: float=front_foot
+		var row: int=0
+		var rear_roof: float=box.end.y
+		while foot>box.position.y+128:
+			var headroom: float=foot-box.position.y-16.0
+			var pool: Array=_building_pool(parcel.kind,topology,row)
+			# A shallow commercial back row uses low shops; homes are admitted only
+			# when their actual roof fits, including the shorter courtyard variant.
+			if row>0 and topology=="commercial" and headroom<WorldgenScale.visible_height("detached_home",3):
+				pool=["convenience_store","eatery","garage"]
+			pool=pool.filter(func(type: String) -> bool: return WorldgenScale.visible_height(type,3 if type=="detached_home" else 0)<=headroom)
+			if pool.is_empty():break
+			var gap: float=24.0 if row==0 and parcel.kind=="shopfront" else 32.0 if topology=="commercial" else 40.0
+			var types: Array[String]=_fill_frontage(pool,group_width,gap,random)
+			if types.is_empty():break
+			var used: float=gap*maxi(0,types.size()-1)
+			for type: String in types:used+=float(WorldgenScale.WIDTH[type])
+			var x: float=left+(group_width-used)*0.5
+			var occupied: float=0.0
+			var row_height: float=0.0
+			var row_depth: float=0.0
+			for type: String in types:
+				var variant: int=3 if type=="detached_home" and (headroom<WorldgenScale.visible_height(type) or random.randi_range(0,1)==0) else random.randi_range(0,2)
+				row_height=maxf(row_height,WorldgenScale.visible_height(type,variant))
+				row_depth=maxf(row_depth,float(WorldgenScale.DEPTH[type]))
+				if _add_building(type,variant,x,foot,parcel,entities,roads,bus):occupied+=float(WorldgenScale.WIDTH[type])
+				x+=float(WorldgenScale.WIDTH[type])+gap
+			# At least 24 world units separate visible roofs and rear feet. The
+			# physical gap also leaves the rear door +48 and its 48-wide walk clear.
+			var spacing: float=ceil(maxf(208.0,maxf(row_height+24.0,row_depth+112.0))/16.0)*16.0
+			if row_height<=240.0:spacing+=16.0*random.randi_range(0,1)
+			var roof_top: float=foot-row_height
+			if occupied>0:rear_roof=minf(rear_roof,roof_top)
+			_add_walk(parcel,Rect2(lane_x-28,foot+24,left+group_width-lane_x+28,48))
+			if row==0:
+				front_available+=_available_frontage(left,group_width,foot,roads,bus)
+				front_occupied+=occupied
+			var kind: String="loading" if topology=="industrial" else "garden" if topology=="residential" or row>0 else "court"
+			# Courts occupy visible free land, not the physical space under a roof.
+			# The next row's foot is below this strip; its roof extends northward.
+			var court_top: float=maxf(box.position.y+24,foot-spacing+16)
+			_add_court(parcel,Rect2(left+8,court_top,group_width-16,roof_top-16-court_top),kind,Vector2(lane_x,foot-spacing+48),entities,roads,bus)
+			var side_width: float=(group_width-used)*0.5-16.0
+			_add_court(parcel,Rect2(left+8,roof_top,side_width,row_height-16),kind,Vector2(lane_x,foot+48),entities,roads,bus)
+			_add_court(parcel,Rect2(left+group_width-side_width-8,roof_top,side_width,row_height-16),kind,Vector2(lane_x,foot+48),entities,roads,bus)
+			if row==0 and parcel.kind in ["parking","loading"]:
+				_add_court(parcel,Rect2(left+8,foot+60,group_width-16,box.end.y-32-(foot+60)),parcel.kind,Vector2(lane_x,foot+72),entities,roads,bus)
+			foot-=spacing
+			row+=1
+		# The shallow strip behind the last roofs is a planted/back-service edge, not an unassigned lawn.
+		var rear_end: float=rear_roof-16
+		if rear_end>box.position.y+56:
+			_add_court(parcel,Rect2(left+8,box.position.y+24,group_width-16,rear_end-box.position.y-24),"loading" if topology=="industrial" else "garden",Vector2(lane_x,box.position.y+40),entities,roads,bus)
+	# A top or side road connects the same straight lane; gaps between groups stay open.
+	if parcel.road_edges[0]:_add_walk(parcel,Rect2(box.position.x+16,box.position.y+16,box.size.x-32,48))
+	if parcel.road_edges[3]:_add_walk(parcel,Rect2(box.position.x+16,front_foot+24,box.size.x-32,48))
+	parcel.frontage={"available":front_available,"occupied":front_occupied,"coverage":front_occupied/front_available if front_available>0 else 0.0}
 
-static func _add_building(type: String, x: float, foot: float, parcel: Dictionary, entities: Array, roads: Array, bus: Dictionary, random: RandomNumberGenerator) -> void:
+static func _building_pool(kind: String, topology: String, row: int) -> Array:
+	if row>0:
+		if topology=="industrial":return ["warehouse","garage","convenience_store"]
+		# Apartments are occasional back-of-block landmarks, never a repeated front wall.
+		return ["detached_home","row_house","detached_home","garage","small_apartment"] if row>=2 else ["detached_home","row_house","convenience_store","detached_home"]
+	return {"shopfront":["convenience_store","eatery","garage","convenience_store","supermarket"],
+		"courtyard":["eatery","row_house","convenience_store"] if topology=="commercial" else ["detached_home","row_house"],
+		"parking":["garage","convenience_store","supermarket"] if topology=="commercial" else ["warehouse","garage"],
+		"garden":["detached_home","row_house"],"homes":["detached_home","row_house"],
+		"loading":["warehouse","garage","warehouse"],"service":["warehouse","garage","convenience_store"]}[kind]
+
+static func _fill_frontage(pool: Array, width: float, gap: float, random: RandomNumberGenerator) -> Array[String]:
+	var result: Array[String]=[]
+	var remaining: float=width*0.90 # Includes inter-building gaps; measured façade coverage is lower.
+	while remaining>=256:
+		var choices: Array=pool.filter(func(type: String) -> bool: return float(WorldgenScale.WIDTH[type])<=remaining)
+		if choices.is_empty():break
+		var type: String=choices[random.randi_range(0,choices.size()-1)]
+		if not result.is_empty() and type==result[-1] and choices.any(func(other: String) -> bool: return other!=type):
+			choices=choices.filter(func(other: String) -> bool: return other!=type)
+			type=choices[random.randi_range(0,choices.size()-1)]
+		result.append(type)
+		remaining-=float(WorldgenScale.WIDTH[type])+gap
+	return result
+
+static func _available_frontage(left: float, width: float, foot: float, roads: Array, bus: Dictionary) -> float:
+	var spans: Array[Vector2]=[Vector2(left,left+width)]
+	var clearances: Array[Rect2]=[WorldLayout.rect(bus.sweep).grow(32),Rect2(WorldLayout.point(bus.door)-Vector2(148,148),Vector2(296,296))]
+	for road: Array in roads:clearances.append(WorldLayout.rect(road).grow(16))
+	for area: Rect2 in clearances:
+		if area.end.y<=foot-128 or area.position.y>=foot:continue
+		var next: Array[Vector2]=[]
+		for span: Vector2 in spans:
+			if area.end.x<=span.x or area.position.x>=span.y:next.append(span);continue
+			if area.position.x>span.x:next.append(Vector2(span.x,area.position.x))
+			if area.end.x<span.y:next.append(Vector2(area.end.x,span.y))
+		spans=next
+	var result: float=0.0
+	for span: Vector2 in spans:result+=span.y-span.x
+	return result
+
+static func _add_walk(parcel: Dictionary, rect: Rect2) -> void:
+	var area: Rect2=rect.intersection(WorldLayout.rect(parcel.rect))
+	if area.size.x>0 and area.size.y>0:parcel.walks.append([area.position.x,area.position.y,area.size.x,area.size.y])
+
+static func _add_court(parcel: Dictionary, area: Rect2, kind: String, entrance: Vector2, entities: Array, roads: Array, bus: Dictionary) -> void:
+	if area.size.x<40 or area.size.y<40:return
+	for entity: Dictionary in entities:
+		if area.intersects(WorldgenScale.visible_rect(entity)):return
+	for road: Array in roads:
+		if area.intersects(WorldLayout.rect(road)):return
+	if area.intersects(WorldLayout.rect(bus.rect)):return
+	parcel.courtyards.append({"rect":[area.position.x,area.position.y,area.size.x,area.size.y],"kind":kind,"entrance":[entrance.x,entrance.y]})
+
+static func _add_building(type: String, variant: int, x: float, foot: float, parcel: Dictionary, entities: Array, roads: Array, bus: Dictionary) -> bool:
 	var width: float = float(WorldgenScale.WIDTH[type]);var depth: float=float(WorldgenScale.DEPTH[type])
 	var block: Rect2 = Rect2(x,foot-depth,width,depth)
 	var plot: Rect2 = WorldLayout.rect(parcel.rect)
-	if not plot.grow(-32).encloses(block):return
+	if not plot.grow(-32).encloses(block):return false
+	if foot-WorldgenScale.visible_height(type,variant)<plot.position.y+16:return false
 	# Keep all boarding/arrival positions and the full sweep free before props are added.
-	if block.grow(32).intersects(WorldLayout.rect(bus.sweep)) or block.grow(20).intersects(Rect2(WorldLayout.point(bus.door)-Vector2(128,128),Vector2(256,256))):return
+	if block.grow(32).intersects(WorldLayout.rect(bus.sweep)) or block.grow(20).intersects(Rect2(WorldLayout.point(bus.door)-Vector2(128,128),Vector2(256,256))):return false
 	for value: Array in roads:
-		if block.grow(16).intersects(WorldLayout.rect(value)):return
+		if block.grow(16).intersects(WorldLayout.rect(value)):return false
 	for entity: Dictionary in entities:
-		if block.grow(16).intersects(WorldLayout.rect(entity.rect)):return
+		if block.grow(16).intersects(WorldLayout.rect(entity.rect)):return false
 	var id: String = "b%02d"%entities.size()
-	var door_x: float = x+width/2.0+(float(WorldgenScale.DOOR_X[type])-256.0)*width/448.0
-	entities.append({"id":id,"archetype":type,"rect":[x,foot-depth,width,depth],"door":[door_x,foot+48],"variant":random.randi_range(0,2),"parcel":parcel.id})
+	var door_x: float = x+width/2.0+(WorldgenScale.door_x(type,variant)-256.0)*width/448.0
+	entities.append({"id":id,"archetype":type,"rect":[x,foot-depth,width,depth],"door":[door_x,foot+48],"variant":variant,"parcel":parcel.id})
 	parcel.buildings.append(id)
+	return true
+
+static func _update_frontages(parcels: Array, entities: Array) -> void:
+	for parcel: Dictionary in parcels:
+		# A blocked frontage stays empty; a remaining rear row must not become the street façade.
+		var setback: float=200.0 if parcel.kind=="loading" else 208.0 if parcel.kind=="parking" else (80.0 if parcel.road_edges[1] else 120.0) if parcel.kind=="garden" else (64.0 if parcel.road_edges[1] else 104.0)
+		var foot: float=WorldLayout.rect(parcel.rect).end.y-setback
+		var occupied: float=0.0
+		for entity: Dictionary in entities:
+			if entity.parcel==parcel.id and is_equal_approx(float(entity.rect[1])+float(entity.rect[3]),foot):occupied+=float(entity.rect[2])
+		parcel.frontage.occupied=occupied
+		parcel.frontage.coverage=occupied/float(parcel.frontage.available) if parcel.frontage.available>0 else 0.0
+		# South-facing art fronts a street only where this parcel has a south road.
+		# Other first rows serve an internal court, and cannot prove street coverage.
+		parcel.frontage.scope="street" if parcel.road_edges[1] else "internal"
 
 static func _walls(parcels: Array, entities: Array, roads: Array, bus: Dictionary) -> Dictionary:
 	var barriers: Array=[]
@@ -187,17 +293,21 @@ static func _walls(parcels: Array, entities: Array, roads: Array, bus: Dictionar
 		for entity: Dictionary in entities:
 			var block: Rect2=WorldLayout.rect(entity.rect)
 			clear=clear and not wall.grow(32).intersects(block) and not block.grow(32).has_point(gate) and not wall.grow(56).has_point(WorldLayout.point(entity.door))
-		for other: Dictionary in parcels:clear=clear and not wall.grow(44).has_point(WorldLayout.point(other.entrance))
+		for other: Dictionary in parcels:
+			clear=clear and not wall.grow(44).has_point(WorldLayout.point(other.entrance))
+			for court: Dictionary in other.courtyards:
+				clear=clear and not wall.grow(44).has_point(WorldLayout.point(court.entrance))
 		for road: Array in roads:clear=clear and not wall.grow(24).intersects(WorldLayout.rect(road))
 		clear=clear and not wall.grow(40).intersects(WorldLayout.rect(bus.sweep)) and not Rect2(WorldLayout.point(bus.door)-Vector2(160,160),Vector2(320,320)).intersects(wall)
 		if clear:
 			barriers.append([wall.position.x,wall.position.y,wall.size.x,wall.size.y]);gates.append([gate.x,gate.y])
 	return {"barriers":barriers,"gates":gates}
 
-static func _ensure_categories(entities: Array, bus_door: Vector2) -> void:
+static func _ensure_categories(entities: Array, parcels: Array, roads: Array, bus: Dictionary) -> void:
 	# Geometric distance is only a placement preference. The final navigation certificate
 	# must still prove a non-near real food/workshop entrance after every prop is added.
 	var farthest: float=0.0
+	var bus_door: Vector2=WorldLayout.point(bus.door)
 	var ranked: Array=entities.duplicate()
 	ranked.sort_custom(func(a: Dictionary,b: Dictionary) -> bool: return WorldLayout.point(a.door).distance_squared_to(bus_door)>WorldLayout.point(b.door).distance_squared_to(bus_door))
 	for entity: Dictionary in entities:farthest=maxf(farthest,WorldLayout.point(entity.door).distance_squared_to(bus_door))
@@ -220,6 +330,7 @@ static func _ensure_categories(entities: Array, bus_door: Vector2) -> void:
 			if entity.archetype in category or (entity.archetype in opposite and (other_count<=2 or (distant and other_away<=1))):continue
 			var type: String="eatery" if category==TaskActions.FOOD_TYPES else "garage"
 			if float(entity.rect[2])<float(WorldgenScale.WIDTH[type]):continue
+			if not _replacement_fits(entity,type,entities,parcels,roads,bus):continue
 			if entity.archetype in opposite:
 				other_count-=1
 				if distant:other_away-=1
@@ -230,3 +341,19 @@ static func _ensure_categories(entities: Array, bus_door: Vector2) -> void:
 			entity.door=[float(entity.rect[0])+float(entity.rect[2])/2.0+(float(WorldgenScale.DOOR_X[type])-256.0)*float(entity.rect[2])/448.0,foot+48]
 			count+=1
 			away=away or WorldLayout.point(entity.door).distance_squared_to(bus_door)>=farthest*0.36
+
+static func _replacement_fits(entity: Dictionary, type: String, entities: Array, parcels: Array, roads: Array, bus: Dictionary) -> bool:
+	var foot: float=float(entity.rect[1])+float(entity.rect[3])
+	var block: Rect2=Rect2(float(entity.rect[0]),foot-float(WorldgenScale.DEPTH[type]),float(WorldgenScale.WIDTH[type]),float(WorldgenScale.DEPTH[type]))
+	var visible: Rect2=Rect2(block.position.x,foot-WorldgenScale.visible_height(type),block.size.x,WorldgenScale.visible_height(type))
+	for parcel: Dictionary in parcels:
+		if parcel.id==entity.parcel:
+			var plot: Rect2=WorldLayout.rect(parcel.rect)
+			if not plot.grow(-16).encloses(visible) or not plot.grow(-32).encloses(block):return false
+		for court: Dictionary in parcel.courtyards:
+			if visible.intersects(WorldLayout.rect(court.rect)):return false
+	for other: Dictionary in entities:
+		if other.id!=entity.id and (block.grow(16).intersects(WorldLayout.rect(other.rect)) or visible.intersects(WorldgenScale.visible_rect(other))):return false
+	for road: Array in roads:
+		if block.grow(16).intersects(WorldLayout.rect(road)):return false
+	return not block.grow(32).intersects(WorldLayout.rect(bus.sweep)) and not block.grow(20).intersects(Rect2(WorldLayout.point(bus.door)-Vector2(128,128),Vector2(256,256)))

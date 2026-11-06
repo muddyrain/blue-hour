@@ -38,10 +38,10 @@ static func drop_weapon(seed: String, action: String, site: String) -> String:
 
 
 static func site_reward(sortie_id: String, generated: Dictionary, site: Dictionary, quality: bool) -> Dictionary:
-	if (generated.get("version")!=5 and (generated.get("version")!=6 and (generated.get("version")!=7 and generated.get("version")!=8))):return reward(sortie_id,quality)
+	if (generated.get("version")!=5 and (generated.get("version")!=6 and (generated.get("version")!=7 and (generated.get("version")!=8 and generated.get("version")!=9)))):return reward(sortie_id,quality)
 	var value: Dictionary=reward(sortie_id)
 	value.weapon_id=site.drop.weapon_id
-	value.drop={"version":2 if generated.get("version")==8 else 1,"slot":generated.slot,"site_id":site.id}
+	value.drop={"version":2 if (generated.get("version")==8 or generated.get("version")==9) else 1,"slot":generated.slot,"site_id":site.id}
 	return WeaponModifiers.reward(value) if quality else value
 
 
@@ -211,7 +211,7 @@ static func bank(after: Dictionary, rewards: Array, identity: String, generated:
 	var seen: Array[String] = []
 	var quality: bool = WeaponState.is_family(after)
 	var expected: Dictionary = reward(identity,quality)
-	if (generated.get("version")==5 or (generated.get("version")==6 or (generated.get("version")==7 or generated.get("version")==8))):
+	if (generated.get("version")==5 or (generated.get("version")==6 or (generated.get("version")==7 or (generated.get("version")==8 or generated.get("version")==9)))):
 		for site: Dictionary in generated.sites:
 			if site.weapon:expected=site_reward(identity,generated,site,quality)
 	for value: Variant in rewards:

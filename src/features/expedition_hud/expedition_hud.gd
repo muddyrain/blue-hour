@@ -5,6 +5,7 @@ extends Control
 
 signal pause_requested
 signal resume_requested
+signal objective_locate_requested(objective_id: String)
 signal bus_start_requested
 
 # Matches the verified P03-2 ActorVisual identities; no dependency on that class.
@@ -45,6 +46,8 @@ var _persona_cards: Array[PersonaCard] = []
 var _persona_models: Dictionary = {}
 var _persona_id: int = 0
 var _members_panel: PanelContainer
+var _has_exploration_rows: bool=false
+var _exploration_objectives: ExplorationObjectives
 var _member_scroll: ScrollContainer
 
 
@@ -57,6 +60,7 @@ func _ready() -> void:
 	# Let native traversal include objective, threat, member and skill controls.
 	# No initial focus: Space continues to mean pause in the world.
 	visibility_changed.connect(_on_visibility_changed)
+	get_viewport().size_changed.connect(_fit_persona_members)
 	refresh({})
 
 
@@ -83,6 +87,11 @@ func refresh(state: Dictionary) -> void:
 		_text(state, "search_progress_text", "—"), _text(state, "defeated_text", "—"),
 	]
 	_day.text = _text(state, "day_text", "天数 —")
+	var rows: Array[Dictionary]=[]
+	for row: Dictionary in state.get("exploration_objectives",[]): rows.append(row)
+	_has_exploration_rows=not rows.is_empty()
+	_exploration_objectives.present(rows)
+	_exploration_objectives.visible=not rows.is_empty() and _objective_expanded
 	_objective.text=_text(state,"objective")
 	_objective.visible=_objective_expanded and not _objective.text.is_empty()
 	_objective_toggle.text = "收起目标 −" if _objective_expanded else "展开目标 +"
@@ -129,8 +138,8 @@ func refresh(state: Dictionary) -> void:
 	elif not persona_mode and _members_parent.get_parent()==_member_scroll:
 		_members_parent.reparent(_member_scroll.get_parent())
 	_member_scroll.visible=persona_mode
-	_members_panel.anchor_bottom=1.0 if persona_mode else 0.0
-	_members_panel.offset_bottom=-16 if persona_mode else 0
+	_members_panel.anchor_bottom=0.0
+	_members_panel.offset_bottom=0
 	for row: Dictionary in _members: row.box.visible=not persona_mode
 	for card: PersonaCard in _persona_cards: card.visible=persona_mode
 	if persona_mode:
@@ -147,6 +156,9 @@ func refresh(state: Dictionary) -> void:
 				_persona_models[int(model.id)]=model
 				_persona_cards[index].present(model,true)
 		if _persona_id>0 and _persona_models.has(_persona_id): persona_details.present(_persona_models[_persona_id])
+		_fit_persona_members()
+		# Font/theme minimum sizes settle after compact cards are populated.
+		_fit_persona_members.call_deferred()
 		return
 	var count: int = members.size() if not members.is_empty() else 2
 	while _members.size() < count:
@@ -197,6 +209,10 @@ func _build_top() -> void:
 	_progress = _label(mission_box, "Progress", 14)
 	_objective = _label(mission_box,"Objective",15)
 	_wrap(_objective)
+	_exploration_objectives=ExplorationObjectives.new()
+	mission_box.add_child(_exploration_objectives)
+	_exploration_objectives.locate_requested.connect(func(id: String) -> void: objective_locate_requested.emit(id))
+	_exploration_objectives.hide()
 	var time_panel: PanelContainer = _panel(self,"TimePanel")
 	time_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	time_panel.offset_left = -104
@@ -439,6 +455,7 @@ func _toggle_objective() -> void:
 	_objective_expanded=not _objective_expanded
 	_objective.visible=_objective_expanded and not _objective.text.is_empty()
 	_objective_toggle.text="收起目标 −" if _objective_expanded else "展开目标 +"
+	_exploration_objectives.visible=_objective_expanded and _has_exploration_rows
 
 
 func _toggle_threat() -> void:
@@ -549,3 +566,17 @@ func _tone(data: Dictionary) -> Color:
 
 func _finite_number(value: Variant) -> bool:
 	return (value is int or value is float) and is_finite(float(value))
+
+
+func _fit_persona_members() -> void:
+	if _persona_cards.is_empty() or not _persona_cards[0].visible: return
+	var height: float=0.0
+	var count: int=0
+	for card: PersonaCard in _persona_cards:
+		if card.visible:
+			height+=card.get_combined_minimum_size().y
+			count+=1
+	height+=4.0*maxi(0,count-1)
+	var client_height: float=maxf(40.0,get_viewport_rect().size.y-128.0-16.0-40.0)
+	_member_scroll.custom_minimum_size.y=minf(height,client_height)
+	_members_panel.reset_size()

@@ -68,6 +68,7 @@ func refresh(state: Dictionary) -> void:
 		"defeated_text":str(state["kills"]), "currency_text":str(state["cash"]),
 		"currency_delta_text":"+%d 携带 · 食物 %d（携带+%d）· 武器+%d" % [state["loot"],state["food"],state["food_loot"],int(state.get("weapon_loot",0))], "paused":state["paused"],
 		"survivors":state["members"],
+		"exploration_objectives":state.get("exploration_objectives",[]),
 		"time":{"label":time_label,
 			"text":("+" if night else "") + "%02d:%02d" % [display_seconds / 60, display_seconds % 60],
 			"hint":threat.get("hint", "") if threat.get("enabled", false) else ""},

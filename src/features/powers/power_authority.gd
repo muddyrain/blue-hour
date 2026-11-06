@@ -2,7 +2,7 @@ class_name PowerAuthority
 extends RefCounted
 ## The original transaction owns publication; this module only proves proposals.
 static func mode(rules: Variant) -> bool:
-	return rules is Dictionary and rules.get("data_version")==9 and rules.get("mission") is Dictionary and rules.mission.get("generated") is Dictionary and rules.mission.generated.has("powers")
+	return rules is Dictionary and (rules.get("data_version")==9 or rules.get("data_version")==10) and rules.get("mission") is Dictionary and rules.mission.get("generated") is Dictionary and rules.mission.generated.has("powers")
 
 static func world_problem(world: Dictionary, receipt: Dictionary) -> String:
 	if not SortieSnapshot.power_version(world.get("version")) or not mode(receipt.rules): return "POWER_WORLD_MODE"

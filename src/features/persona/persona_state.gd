@@ -2,7 +2,7 @@ class_name PersonaState
 extends RefCounted
 ## Facts live in the original journey owner. Old journeys never acquire this extension.
 static func enabled(camp: Dictionary) -> bool:
-	return camp.get("journey") is Dictionary and camp.journey.get("build") is Dictionary and camp.journey.build.get("version")==4
+	return camp.get("journey") is Dictionary and camp.journey.get("build") is Dictionary and (camp.journey.build.get("version")==4 or camp.journey.build.get("version")==5)
 
 static func initial_build(seed: String) -> Dictionary:
 	var build: Dictionary=PowerState.initial_build()

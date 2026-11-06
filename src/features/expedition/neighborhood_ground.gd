@@ -6,7 +6,7 @@ func _draw() -> void:
 	var bounds: Rect2=layout.world_bounds
 	draw_rect(bounds,Color("65756e"))
 	draw_texture_rect(StreetBlock.ConcreteTexture,bounds,true,Color(0.62,0.77,0.74,0.32))
-	var cols: int=NeighborhoodLayout.SIZES.find(layout.world_data["size"])+3
+	var cols: int=NeighborhoodLayout.SIZES.find(layout.world_data["size"])+(4 if layout.world_data.get("version")==4 else 3)
 	for index: int in range(0,layout.world_data.entities.size(),cols):
 		var foot: float=0
 		for i: int in range(cols):foot+=float(layout.world_data.entities[index+i].rect[1]+layout.world_data.entities[index+i].rect[3])/cols

@@ -1,3 +1,5 @@
+当前候选 **M13-EXPLORE-01**：新旅程的普通行动提供更大的小/中/大街区，加入停放车辆搜刮、果树采集与可选建筑。一个主目标和两条可选目标按真实对象显示进度；点击定位只移动镜头，仍可随时按原条件归航。旧World14/build4和终局保持原模式。PR #17已按精确已审HEAD普通合入，本轮Draft待审，不合并或发布。[探索合同](docs/design/m13-explore-01.md) · [Mac验证与已知退出问题](docs/VALIDATION.md#m13-explore-01mac)。新增数值为PROJECT_TEMP，正式生产门禁BLOCKED。以下保留历史阶段说明。
+
 当前候选 **M12-SURVIVOR-01**：新旅程为稳定身份固定一正一负特质，营地、出击与已揭示救援对象共用只读人物详情。保留原三主特长、训练和随机掉落；旧营地/世界13保持原模式。PR #16 已按精确已审 HEAD 普通合入，本轮 Draft 等待审阅、不合并或发布。[合同与边界](docs/design/m12-survivor-01.md)。只验当前 Mac，新增数值为 PROJECT_TEMP，正式生存门禁仍 BLOCKED。
 
 当前候选 **M10-SEARCH-01**：连续点击不同房屋可分别派遣空闲且可达的队员，全队均可参与；重复点击只取消该栋，其他工作继续。队员/建筑显示各自任务与进度，普通移动只影响未工作成员，巴士等待所有存活者。世界12保存全部分配，旧M9世界11途中保留单任务至归航，下一次新出击启用多人。[合同与兼容](docs/design/m10-search-01.md) · [Windows验收](docs/VALIDATION.md#m10-search-01windows)。数值PROJECT_TEMP，正式生存门禁仍BLOCKED。

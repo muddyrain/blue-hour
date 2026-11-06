@@ -27,12 +27,12 @@ static func facts(world: Expedition) -> Dictionary:
 		result[String(site.id)]={"searched":site.searched,"progress":site.progress}
 	return result
 
-static func problem(defs: Array, facts: Variant) -> String:
+static func problem(defs: Array, facts: Variant, exploration: bool = false) -> String:
 	if not facts is Dictionary or facts.size()!=defs.size(): return "SITE_FIELDS"
 	for def: Dictionary in defs:
 		if not facts.has(def.id): return "SITE_ID"
 		var state: Variant = facts[def.id]
-		if not state is Dictionary or state.size()!=2 or not state.get("searched") is bool or not SurvivalContracts.number(state.get("progress")) or state.progress<0 or state.progress>31 or state.searched!=(state.progress>=def.seconds): return "SITE_PROGRESS"
+		if not state is Dictionary or state.size()!=2 or not state.get("searched") is bool or not SurvivalContracts.number(state.get("progress")) or state.progress<0 or state.progress>(float(def.seconds) if exploration else 31.0) or state.searched!=(state.progress>=def.seconds): return "SITE_PROGRESS"
 	return ""
 
 static func carry(defs: Array, facts: Dictionary, transaction: String, quality: bool, generated: Dictionary = {}) -> Dictionary:

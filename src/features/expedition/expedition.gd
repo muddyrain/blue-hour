@@ -67,6 +67,10 @@ var day: int = 2
 var mission_title: String = "旧街补给点"
 var starting_health: Array[float] = [200.0, 200.0]
 var crew_snapshot: Array[Dictionary] = []
+var exploration_props: Dictionary = {}
+var _objective_cursors: Dictionary = {}
+var _locate_marker: Node2D
+var _locate_tween: Tween
 var persona_views: Dictionary = {} # Derived immutable presentation cache; never serialized.
 var participants_snapshot: Array[Dictionary] = []
 var setup_problem: String = ""
@@ -181,11 +185,12 @@ func _ready() -> void:
 		set_physics_process(false)
 		set_process_unhandled_input(false)
 		return
-	if (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or supply.generated.get("version")==8)): tuning.spawn_seconds*=float(supply.generated.campaign.pressure)
+	if (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9))): tuning.spawn_seconds*=float(supply.generated.campaign.pressure)
 	layout = supply.layout
 	_cash_site.door = layout.cash_door
 	_food_site.door = layout.food_door
-	navigation.configure(layout.blockers(),layout.world_bounds)
+	if exploration_mode(): navigation=ExplorationLayout._routing(layout.world_data).nav
+	else: navigation.configure(layout.blockers(),layout.world_bounds)
 	shot_obstacles = layout.shot_obstacles()
 	if is_practice and los_practice:
 		los_setup = LosPracticeSetup.for_layout(layout, los_range_case)
@@ -230,7 +235,7 @@ func _ready() -> void:
 		for block: Rect2 in layout.residences:
 			_make_building(block,"柳巷住宅",preload("res://assets/m402/rowhouse.png"),false,true)
 		sites.assign([_cash_site,_food_site])
-	for block: Rect2 in ([] if layout.world_data.get("version")==3 else layout.fences):
+	for block: Rect2 in ([] if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4) else layout.fences):
 		var fence: StreetFence = StreetFence.new()
 		fence.footprint = block
 		fence.position = Vector2(block.position.x,block.end.y)
@@ -260,11 +265,11 @@ func _ready() -> void:
 			actor.weapon_definition = WeaponModifiers.combat_definition(item)
 		actor.visual.set_weapon(actor.weapon_definition.presentation)
 		if combat_mode() and String(actor.weapon_definition.id) in ["fire_axe_v1","shotgun_v1"]: combat.action(actor)
-		if (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or supply.generated.get("version")==8))):
+		if (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9)))):
 			if not CombatEquipment.melee(String(actor.weapon_definition.id)): actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
 		if build_mode(): apply_build(actor)
 		survivors.append(actor)
-	if (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or supply.generated.get("version")==8)):
+	if (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9))):
 		encounter=EncounterRuntime.new();encounter.setup(self,restoring_world)
 	_make_ui()
 	var readout_layer: CanvasLayer = CanvasLayer.new()
@@ -515,7 +520,7 @@ func promote_target(event: Dictionary, restoring: bool = false) -> void:
 	actor.weapon_instance_id = gun.instance_id
 	actor.weapon_definition = WeaponModifiers.combat_definition(gun)
 	actor.visual.set_weapon(actor.weapon_definition.presentation)
-	if (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or supply.generated.get("version")==8))) and not CombatEquipment.melee(String(actor.weapon_definition.id)):actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
+	if (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9)))) and not CombatEquipment.melee(String(actor.weapon_definition.id)):actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
 	actor.clear_order()
 	if trait_mode:
 		TraitRules.apply(actor,profile,tuning.survivor_speed)
@@ -1226,7 +1231,7 @@ func _update_search(delta: float) -> void:
 			search_assignments.begin(actor.member_id)
 			if combat_mode():
 				combat.cancel_unavailable(self)
-			if outdoor:
+			if outdoor and (not exploration_mode() or (site.id==&"cash" and supply.generated.type=="airdrop")):
 				_trigger_airdrop()
 			_search_log("entered",site)
 		if not work_state_matches(actor,site):
@@ -1242,11 +1247,13 @@ func _update_search(delta: float) -> void:
 
 
 func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
+	if exploration_mode() and site.searched: return false
 	if trait_mode and not trait_inputs.events.any(func(e: Dictionary) -> bool: return e.site == String(site.kind)) and not trait_inputs.accept_search(self,actor,site.kind,site.id):
 		_show_notice("特性搜集来源未确认，已暂停；不会重复发放收益。")
 		toggle_pause()
 		return false
 	site.searched = true
+	if exploration_mode(): site.progress=_site_seconds(site)
 	var reward: int = site.reward if not layout.world_data.is_empty() else supply.reward(site.kind)
 	if site.kind == &"cash":
 		loot += reward
@@ -1307,7 +1314,7 @@ func _finish(evacuated: bool) -> void:
 		"sites_searched":_searched_count(),
 		"kills": kills, "searched": _kind_searched(&"cash"), "health": remaining_health, "elapsed": elapsed}
 	if not layout.world_data.is_empty(): report.site_facts = WorldSites.facts(self)
-	if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or supply.generated.get("version")==8))): report.task_event=task_event.duplicate(true)
+	if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9)))): report.task_event=task_event.duplicate(true)
 	if build_mode(): report.support=basic_support.snapshot()
 	if power_mode(): report.powers=powers.duplicate(true)
 	if not is_practice and not loadout_snapshot.is_empty():
@@ -1374,7 +1381,8 @@ func _make_ui() -> void:
 	_hud.extraction_requested.connect(request_bus_action)
 	_hud.help_changed.connect(func(expanded: bool) -> void: help_changed.emit(expanded))
 	add_child(_hud)
-	if layout.world_data.get("version") == 3:
+	_hud.view.objective_locate_requested.connect(locate_objective)
+	if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4):
 		_hud.view.place_help_above_lane()
 	if battle_survival:
 		drill_panel = BattleDrillPanel.new()
@@ -1451,6 +1459,7 @@ func _update_ui() -> void:
 	var xp_text: String = "本次经验（归航后生效）："+" / ".join(pending) if growth_mode else ""
 	if not weapon_loot.is_empty():xp_text+="\n携带："+WeaponInventory.loot_description(weapon_loot[0])
 	_hud.refresh({
+		"exploration_objectives":ExplorationSites.objective_rows({"type":supply.generated.type,"objective":supply.generated.objective,"optional_objectives":supply.generated.exploration.optional_objectives},WorldSites.facts(self),rescue_target!=null and rescue_target.status=="IN_FIELD_JOINED" and rescue_target.npc.health>0) if exploration_mode() else [],
 		"objective":TaskActions.hud(self),
 		"mission_title":("交火练习" if is_practice else mission_title) if los_setup == null else mission_title, "members":members,
 		"can_extract":phase != Phase.FINISHED if is_practice else phase == Phase.ACTIVE and elapsed >= tuning.bus_ready_seconds,
@@ -1472,6 +1481,10 @@ func _update_ui() -> void:
 	if drill_panel != null:
 		drill_panel.refresh()
 	for site: SearchSite in sites:
+		if site.prop is ExplorationProp:
+			var owner: FieldActor=search_member(search_assignments.member_for(String(site.id)))
+			var faded: bool=survivors.any(func(actor: FieldActor) -> bool: return actor.visible and actor.health>0 and actor.position.y<site.prop.position.y and actor.position.distance_to(site.prop.position)<105.0)
+			(site.prop as ExplorationProp).present({"searched":site.searched,"progress":site.progress},owner.member_id if owner!=null else 0,owner.call_sign if owner!=null else "",faded)
 		site.prop.searched = site.searched
 		var worker: FieldActor = search_member(search_assignments.member_for(String(site.id)))
 		var text: String = SearchWorkView.building_text(worker.member_id,worker.call_sign,search_assignments.phase_for(worker.member_id),TaskActions.outdoor_site(supply.generated,site.id)) if worker != null else ""
@@ -1537,7 +1550,14 @@ func _searched_count() -> int:
 	return sites.filter(func(site: SearchSite) -> bool: return site.searched).size()
 
 func _clicked_site(point: Vector2) -> bool:
+	# Foreground object art takes precedence over the broad building facade hit.
+	var candidates: Array[SearchSite]=[]
+	if exploration_mode():
+		for site: SearchSite in sites:
+			if site.prop is ExplorationProp: candidates.append(site)
 	for site: SearchSite in sites:
+		if not candidates.has(site): candidates.append(site)
+	for site: SearchSite in candidates:
 		if site.hit.has_point(point):
 			if not site.searched: request_search(site.id)
 			else: command_move(site.door)
@@ -1545,11 +1565,11 @@ func _clicked_site(point: Vector2) -> bool:
 	return false
 
 func _make_world_buildings() -> void:
-	if layout.world_data.get("version")==3:
+	if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4):
 		for wall: Rect2 in layout.fences:
 			var barrier: NeighborhoodWall=NeighborhoodWall.new()
 			barrier.footprint=wall;barrier.position=wall.position+Vector2(0,wall.size.y);_sort.add_child(barrier)
-	if layout.world_data.get("version") == 3:
+	if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4):
 		for detail: Dictionary in NeighborhoodDecor.placements(layout):
 			var prop: WorldFurniture = WorldFurniture.new()
 			prop.kind = detail.kind
@@ -1568,11 +1588,11 @@ func _make_world_buildings() -> void:
 	var props: Dictionary = {}
 	for entity: Dictionary in layout.world_data.entities:
 		var block: Rect2 = WorldLayout.rect(entity.rect)
-		var definition: Dictionary = NeighborhoodArt.definition(entity.archetype) if layout.world_data.get("version")==3 else BuildingLibrary.definition(entity.archetype)
+		var definition: Dictionary = NeighborhoodArt.definition(entity.archetype) if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4) else BuildingLibrary.definition(entity.archetype)
 		var building: FieldProp = FieldProp.new()
 		building.facade = definition.texture
 		building.world_asset = true
-		if layout.world_data.get("version")==3:
+		if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4):
 			building.calibrated=true;building.roof_cut=int(definition.roof_split);building.body_depth=block.size.y
 			building.door_offset=WorldLayout.point(entity.door).x-block.get_center().x
 		building.title = definition.title
@@ -1583,22 +1603,38 @@ func _make_world_buildings() -> void:
 		_sort.add_child(building)
 		_buildings.append(building)
 		props[entity.id] = building
+	if exploration_mode():
+		for definition: Dictionary in layout.world_data.objects:
+			var prop: ExplorationProp=ExplorationProp.new()
+			prop.ui_theme=ui_theme
+			_sort.add_child(prop)
+			prop.configure(definition)
+			props[definition.id]=prop
+			exploration_props[definition.id]=prop
 	for def: Dictionary in supply.generated.sites:
 		var entity: Dictionary = {}
 		for row: Dictionary in layout.world_data.entities:
 			if row.id==def.building: entity=row
-		var crate: bool = def.has("point")
-		var site: SearchSite = SearchSite.new(StringName(def.kind),WorldLayout.point(def.point) if crate else WorldLayout.point(entity.door))
+		var object_site: bool=exploration_mode() and def.source in ["vehicle","fruit_tree"]
+		var crate: bool = def.has("point") and not object_site
+		var site: SearchSite = SearchSite.new(StringName(def.kind),TaskActions.site_point(supply.generated,def) if exploration_mode() else WorldLayout.point(def.point) if crate else WorldLayout.point(entity.door))
 		site.id=StringName(def.id); site.reward=int(def.amount); site.weapon=def.weapon; site.seconds=float(def.seconds)
-		if crate:
+		if object_site:
+			site.door=TaskActions.site_point(supply.generated,def)
+			site.prop=props[def.object_id]
+			site.hit=Rect2(site.prop.position+Vector2(-80,-180 if def.source=="fruit_tree" else -96),Vector2(160,192 if def.source=="fruit_tree" else 108))
+		elif crate:
 			site.prop=AirdropProp.new(); site.prop.position=site.door; site.prop.front_width=80; site.prop.ui_theme=ui_theme
 			_sort.add_child(site.prop)
 			site.hit=Rect2(site.door-Vector2(48,100),Vector2(96,150))
 		else:
 			site.prop=props[def.building]
-			site.hit=Rect2(site.prop.position-Vector2(site.prop.front_width/2,280),Vector2(site.prop.front_width,340)) if layout.world_data.get("version")==3 else Rect2(WorldLayout.rect(entity.rect).position-Vector2(0,160),WorldLayout.rect(entity.rect).size+Vector2(0,220))
+			site.hit=Rect2(site.prop.position-Vector2(site.prop.front_width/2,280),Vector2(site.prop.front_width,340)) if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4) else Rect2(WorldLayout.rect(entity.rect).position-Vector2(0,160),WorldLayout.rect(entity.rect).size+Vector2(0,220))
 			site.prop.primary_target=supply.generated.get("objective",{}).get("site_ids",[]).has(def.id)
 		site.prop.reward_hint=("货币" if site.kind==&"cash" else "食物")+" +%d"%site.reward+(" / 武器" if site.weapon else "")
+		if exploration_mode():
+			site.prop.primary_target=supply.generated.objective.site_ids.has(def.id)
+			site.prop.reward_hint=("货币" if site.kind==&"cash" else "食物")+" +%d"%site.reward
 		if build_mode() and site.id==&"cash" and supply.generated.type=="equipment": site.prop.reward_hint+=" / 道具%d件"%supply.generated.build.drops.size() if not supply.generated.build.drops.is_empty() else " / 道具已集齐"
 		sites.append(site)
 		if site.id==&"cash": _cash_site=site; _shop=site.prop
@@ -1606,7 +1642,7 @@ func _make_world_buildings() -> void:
 
 
 func _site_seconds(site: SearchSite) -> float:
-	return site.seconds if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or supply.generated.get("version")==8))) else tuning.search_seconds
+	return site.seconds if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9)))) else tuning.search_seconds
 
 
 func _trigger_airdrop() -> void:
@@ -1644,10 +1680,10 @@ func _weapon_status(actor: FieldActor, action: String) -> String:
 	return action
 
 func combat_mode() -> bool:
-	return supply.generated.get("version")==8
+	return (supply.generated.get("version")==8 or supply.generated.get("version")==9)
 
 func build_mode() -> bool:
-	return (supply.generated.get("version")==7 or supply.generated.get("version")==8)
+	return (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9))
 
 func apply_build(actor: FieldActor, profile: Dictionary = {}, item: Dictionary = {}) -> void:
 	var factors: Dictionary=BuildItems.factors(supply.generated.build.slots)
@@ -1779,6 +1815,9 @@ func support_plan_airstrike(point: Vector2) -> Dictionary:
 		view.enemies.append({"state":{"actor_id":enemy.actor_id,"health":enemy.health,"position":[enemy.position.x,enemy.position.y]}})
 	return BuildAuthority.plan_airstrike(view,point,layout)
 
+func exploration_mode() -> bool:
+	return supply.generated.get("version")==9
+
 func persona_mode() -> bool:
 	return supply.generated.has("persona")
 
@@ -1830,3 +1869,45 @@ func _present_power() -> void:
 	for actor: FieldActor in survivors: members.append({"position":actor.position,"moving":actor.activity==FieldActor.Activity.MOVING,"alive":actor.health>0 and actor.visible})
 	for actor: FieldActor in enemies: foes.append({"position":actor.position,"moving":actor.activity==FieldActor.Activity.MOVING,"alive":actor.health>0 and actor.visible})
 	power_view.present(members,foes,id=="speed_boost_v1" and remaining>0,id=="map_freeze_v1" and remaining>0,elapsed)
+
+
+func locate_objective(id: String) -> void:
+	if not exploration_mode(): return
+	var rows: Array[Dictionary]=ExplorationSites.objective_rows({"type":supply.generated.type,"objective":supply.generated.objective,"optional_objectives":supply.generated.exploration.optional_objectives},WorldSites.facts(self),rescue_target!=null and rescue_target.status=="IN_FIELD_JOINED" and rescue_target.npc.health>0)
+	var target: Vector2=Vector2.INF
+	for row: Dictionary in rows:
+		if row.id!=id: continue
+		var pending: Array[String]=[]
+		for site_id: String in row.site_ids:
+			var site: SearchSite=search_site(StringName(site_id))
+			if site!=null and not site.searched: pending.append(site_id)
+		if pending.is_empty(): pending.assign(row.site_ids)
+		if pending.is_empty():
+			target=layout.rescue_point
+		else:
+			var index: int=int(_objective_cursors.get(id,0))%pending.size()
+			target=search_site(StringName(pending[index])).door
+			_objective_cursors[id]=index+1
+		break
+	if not target.is_finite(): return
+	camera.position=target
+	camera._clamp_position()
+	camera.force_update_scroll()
+	if _locate_marker==null:
+		_locate_marker=Node2D.new()
+		_effects.add_child(_locate_marker)
+		var ring: Line2D=Line2D.new()
+		ring.width=3.0; ring.default_color=Color("f2c47c")
+		for i: int in range(33):ring.add_point(Vector2.from_angle(TAU*i/32.0)*34.0)
+		_locate_marker.add_child(ring)
+		var label: Label=Label.new()
+		label.text="目标位置"; label.position=Vector2(-30,-60); label.mouse_filter=Control.MOUSE_FILTER_IGNORE
+		label.add_theme_font_size_override("font_size",16)
+		label.add_theme_color_override("font_color",Color("ffe5a7"))
+		_locate_marker.add_child(label)
+	if _locate_tween!=null: _locate_tween.kill()
+	_locate_marker.position=target
+	_locate_marker.modulate.a=1.0
+	_locate_tween=create_tween()
+	_locate_tween.tween_interval(0.6)
+	_locate_tween.tween_property(_locate_marker,"modulate:a",0.0,1.3)

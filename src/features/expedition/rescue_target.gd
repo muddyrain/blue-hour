@@ -78,7 +78,7 @@ func request() -> void:
 		return
 	var nearest: FieldActor
 	for actor: FieldActor in world.survivors:
-		if actor.health > 0 and actor.visible and actor != world.search_actor and (nearest == null or actor.position.distance_to(npc.position) < nearest.position.distance_to(npc.position)):
+		if actor.health > 0 and actor.visible and not world.has_search_job(actor.member_id) and (nearest == null or actor.position.distance_to(npc.position) < nearest.position.distance_to(npc.position)):
 			nearest = actor
 	if nearest == null:
 		world._show_notice("需要一名可见、存活且未搜集的队员援救。")

@@ -31,3 +31,5 @@ RunSave、ProductionProgress、RunTransaction、ReceiptJournal和SortieSnapshot�
 公共测试只用独立新数据；不包含内部原始证据或玩家档案。[验证范围](VALIDATION.md)说明与内部完整矩阵的区别。
 
 CombatActions显式分派generated8/rules9/world11，旧M8及更早投影保留。CombatRuntime只在Expedition原步进内组合CombatPatternsV1/ToxicV1，前者只出几何计划，后者只出定时固定目标批次。原FieldActor/PersistedDamageGate、GrowthInputs/XpInputs、EncounterRuntime和RunTransaction分别继续拥有生命/死亡、唯一XP、首领致命和磁盘。CombatEnemyRules核新出生与毒气释放身份；SortieSnapshot严格保存模式/动作/毒区，不引入第二结算器或存档写者。
+
+SearchAssignments只拥有稳定member_id↔site_id与approach/working一对一关联；SearchWorkView只格式化只读状态。Expedition继续拥有导航、各站点进度、原伤害/奖励/巴士推进，TraitInputs用显式site_id认证实际完成者且保持原类别事件粒度。世界12在generated8/rules9上增加严格jobs交叉证明，支援整世界替换保持任务。旧11原格式/指纹严格恢复并保持单任务至归航，后续出击12；无第二套生成、结算或迁移写者。见[多人工作合同](design/m10-search-01.md)。

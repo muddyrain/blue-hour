@@ -60,7 +60,7 @@ func refresh(state: Dictionary) -> void:
 		action = bus_text
 	if gathering:
 		action = "集合至巴士"
-		bus_text = "%s · %d / %d 已到" % ["集合中" if boarding.ordered else "等待集合", boarding.arrived, boarding.required]
+		bus_text = "%s · %d / %d 已到 · %d 工作" % ["集合中" if boarding.ordered else "等待集合", boarding.arrived, boarding.required, boarding.working]
 	view.refresh({
 		"objective":state.get("objective",""), "mission_title":state["mission_title"], "day_text":"第 %d 天" % state["day"],
 		"search_progress_text":"%d / %d" % [state["sites_searched"],state["sites_total"]],

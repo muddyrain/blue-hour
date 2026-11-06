@@ -5,7 +5,7 @@ static func pick(identity: String,index: int,stage: int) -> String:
 	return ToxicV1.pick(identity,index,stage)
 
 static func snapshot_problem(row: Dictionary,world: Dictionary,receipt: Dictionary,summoned: bool=false) -> String:
-	if world.get("version")!=11: return EnemyRules.snapshot_problem(row,world,receipt,summoned)
+	if not SortieSnapshot.combat_version(world.get("version")): return EnemyRules.snapshot_problem(row,world,receipt,summoned)
 	var state: Dictionary=row.state
 	var behavior: Variant=row.get("behavior")
 	if not behavior is Dictionary or behavior.size()!=5 or not behavior.has_all(["kind","spawn_stage","target_id","state","windup_remaining"]): return "COMBAT_ENEMY_FIELDS"

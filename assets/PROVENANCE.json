@@ -602,6 +602,30 @@
       "sha256": "e2ca67f88e9bba8b6706b91b8981be6625f44b299471e1a2a5f96069a4ea78c1",
       "origin": "original_ai_assisted",
       "source": "Original built-in image_gen for M14 R1; transparent sprite crop/resize. Source SHA256 03440f3d9255eadec947be6e1de1eec7679805d43a8e8141de8305008b974d37"
+    },
+    {
+      "path": "assets/worldgen/r2/street_shop.png",
+      "sha256": "e32d6be56bce6661c453c48b4d176ba9e7e65d9ce17252a28af81fb5c29cdcad",
+      "origin": "Original Blue Hour artwork generated with built-in image generation; supplied PNG bytes preserved without resizing or pixel rewriting",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/worldgen/r2/street_eatery.png",
+      "sha256": "a887518c714aa7a49f642470359d74f2273bf6ecfffbe7ec7f01fe174c31aa37",
+      "origin": "Original Blue Hour artwork generated with built-in image generation; supplied PNG bytes preserved without resizing or pixel rewriting",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/worldgen/r2/paving_material.png",
+      "sha256": "2dab5c8f2e3de683e6e6cf14cb9d118ec46ef7469f8da078733937b664b38b13",
+      "origin": "Original Blue Hour artwork generated with built-in image generation; supplied PNG bytes preserved without resizing or pixel rewriting",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/worldgen/r2/courtyard_edge.png",
+      "sha256": "d264e64e249a4b3a3d98d071d41637167da03a4f7654975736fb5a2df518a26c",
+      "origin": "Original Blue Hour artwork generated with built-in image generation; supplied PNG bytes preserved without resizing or pixel rewriting",
+      "license": "No additional license granted"
     }
   ]
 }

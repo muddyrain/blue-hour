@@ -1,4 +1,4 @@
-当前候选 **M14-WORLDGEN-01-R1**：新旅程普通行动先生成道路和街区，再组合连续店面、住宅簇、院落与仓储地块；统一建筑/路缘尺度并收紧 HUD。旧 build5/layout4/world15 继续原冻结布局，奖励与工作时间不变。PR #18 已按精确已审 HEAD 合入，同一 Draft PR #19 返修等待审阅。[随机街区合同](docs/design/m14-worldgen-01.md) · [Mac验证](docs/VALIDATION.md#m14-worldgen-01-r1mac)。数值均为 PROJECT_TEMP，正式生产门禁仍 BLOCKED。以下按各阶段保留历史说明。
+当前候选 **M14-WORLDGEN-01-R2**：普通新旅程商业地块接入真实画布的连续双店、共用铺装和可通行内院；同一47栋合成档的暂存与归航GUI同步回调三次均低于500ms，保留完整认证、持久ACK与唯一结算。旧 build5/layout4/world15 保持原冻结布局；未发布R1隔离档需原候选继续，R2入口使用新旅程。同一 Draft PR #19 待审、未合并。[随机街区合同](docs/design/m14-worldgen-01.md) · [Windows验证](docs/VALIDATION.md#m14-worldgen-01-r2windows)。数值均为 PROJECT_TEMP，正式生产门禁仍 BLOCKED。以下按各阶段保留历史说明。
 
 历史阶段 **M13-EXPLORE-01**：新旅程的普通行动提供更大的小/中/大街区，加入停放车辆搜刮、果树采集与可选建筑。一个主目标和两条可选目标按真实对象显示进度；点击定位只移动镜头，仍可随时按原条件归航。旧World14/build4和终局保持原模式。PR #17已按精确已审HEAD普通合入，本轮Draft待审，不合并或发布。[探索合同](docs/design/m13-explore-01.md) · [Mac验证与已知退出问题](docs/VALIDATION.md#m13-explore-01mac)。新增数值为PROJECT_TEMP，正式生产门禁BLOCKED。以下保留历史阶段说明。
 

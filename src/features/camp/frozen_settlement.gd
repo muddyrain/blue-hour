@@ -15,7 +15,10 @@ const REPORT_KEYS: Array[String] = ["contract_version", "sortie_id", "participan
 
 static func compute(input: Dictionary) -> Dictionary:
 	var stamp: int = FreezeProfile.enter("settlement.compute")
-	var result: Dictionary = _profiled_compute(input)
+	var proof: Dictionary=ValueProofCache.lookup("settlement-compute",input)
+	var result: Dictionary = proof.result if proof.hit else _profiled_compute(input)
+	if not proof.hit and result.error.is_empty():
+		ValueProofCache.remember(proof,result)
 	FreezeProfile.leave("settlement.compute", stamp)
 	return result
 
@@ -466,6 +469,16 @@ static func interruption_candidates(receipt: Dictionary) -> Dictionary:
 
 
 static func _rules_problem(rules: Dictionary) -> String:
+	var proof: Dictionary=ValueProofCache.lookup("settlement-rules-problem",rules)
+	if proof.hit:
+		return ""
+	var issue: String=_uncached_rules_problem(rules)
+	if issue.is_empty():
+		ValueProofCache.remember(proof,"")
+	return issue
+
+
+static func _uncached_rules_problem(rules: Dictionary) -> String:
 	if not rules.get("scope") is String:
 		return "RULES_SCOPE_TYPE"
 	if rules.get("scope")==RescuePoolState.SCOPE:

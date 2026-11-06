@@ -1603,6 +1603,13 @@ func _make_world_buildings() -> void:
 		var definition: Dictionary = WorldgenArt.definition(entity) if layout.world_data.get("version")==5 else NeighborhoodArt.definition(entity.archetype) if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4) else BuildingLibrary.definition(entity.archetype)
 		var building: FieldProp = FieldProp.new()
 		building.facade = definition.texture
+		if definition.has("native_size"):
+			building.native_size=definition.native_size
+			building.render_anchor=definition.origin
+			building.reference_width=definition.reference_width
+			building.street_sign=definition.get("street_sign","")
+			building.sign_rect=definition.get("sign_rect",Rect2())
+		building.soft_contact=layout.world_data.get("art_revision")==3
 		if layout.world_data.get("version")==5:
 			building.modulate=[Color.WHITE,Color(0.92,0.97,1.0),Color(1.0,0.97,0.9),Color.WHITE][int(entity.variant)]
 		building.world_asset = true

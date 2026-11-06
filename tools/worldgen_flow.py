@@ -23,6 +23,7 @@ def main():
     parser.add_argument('--reference', help='Prior junction x,y; capture its closest corresponding real road junction')
     parser.add_argument('--size', choices=['small','medium','large'], default='medium')
     parser.add_argument('--movie', action='store_true')
+    parser.add_argument('--street-sample', action='store_true', help='Walk and search the R2 modules through a normal commercial action')
     parser.add_argument('--kill-after-suspend', action='store_true', help='Kill first process after its completed SUSPEND_READY report, before normal cleanup')
     args = parser.parse_args()
     assert not sys.flags.optimize and (not args.movie or args.native)
@@ -31,31 +32,30 @@ def main():
     assert subprocess.check_output([args.godot, '--version'], text=True).strip() == (ROOT / '.godot-version').read_text().strip()
     out.mkdir(parents=True)
     env = dict(os.environ, HOME=str(out / 'home'), APPDATA=str(out / 'user'), XDG_DATA_HOME=str(out / 'user'))
-    if args.native:
-        assert sys.platform == 'darwin'
+    if args.native and sys.platform == 'darwin':
         guard = out / 'background_guard.dylib'
         subprocess.run(['clang', '-dynamiclib', '-framework', 'AppKit', '-framework', 'Foundation', '-o', str(guard), str(ROOT / 'tools/macos_background.m')], check=True, capture_output=True)
         env['DYLD_INSERT_LIBRARIES'] = str(guard)
     if args.legacy:
-        legacy = ROOT / ".local/m14-worldgen-01/input/m13_main.gd"
+        legacy = out / "m13_main.gd"
         legacy.parent.mkdir(parents=True, exist_ok=True)
         content = subprocess.check_output(["git", "show", "51aafbbaecca95799b40ada6088c84260724e43e:src/app/main.gd"], cwd=ROOT)
         if legacy.exists(): assert legacy.read_bytes()==content
         else: legacy.write_bytes(content)
     rows = []
-    for phase in (['first', 'resume'] if (args.size=='medium' or args.legacy) and not args.preview else ['first']):
-        flags = ['--flow-output=' + str(out / phase), '--bh-rescue-seed='+args.seed, '--flow-size='+args.size]
+    for phase in (['first', 'resume'] if (args.size=='medium' or args.legacy or args.street_sample) and not args.preview else ['first']):
+        flags = ['--flow-output=' + (out / phase).as_posix(), '--bh-rescue-seed='+args.seed, '--flow-size='+args.size]
         if args.preview: flags.append('--flow-preview')
         if args.reference:
             assert args.preview and re.fullmatch(r'-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?',args.reference)
             flags.append('--flow-reference='+args.reference)
         if args.legacy:
             flags.append('--flow-legacy-worldgen')
-            if phase == 'first': flags.append('--flow-bootstrap-m13')
+            if phase == 'first': flags.append('--flow-bootstrap-main=res://' + legacy.relative_to(ROOT).as_posix())
         if phase == 'resume':
             flags.append('--flow-resume')
         cmd = [args.godot, '--path', str(ROOT), '--rendering-method', 'gl_compatibility', '--audio-driver', 'Dummy']
-        cmd += ['--position', '-16000,-16000'] if args.native else ['--headless']
+        cmd += (['--position', '-16000,-16000'] if sys.platform == 'darwin' else []) if args.native else ['--headless']
         encoder = None
         if args.movie:
             with socket.socket() as sock:
@@ -66,11 +66,15 @@ def main():
             cmd += ['--fixed-fps', '30', '--max-fps', '30', '--disable-vsync']
             flags.append('--flow-stream=' + str(port))
             time.sleep(.3)
-        cmd += ['--script', 'res://tests/worldgen_flow.gd', '--', *flags]
+        cmd += ['--script', 'res://tests/r2_street_flow.gd' if args.street_sample else 'res://tests/worldgen_flow.gd', '--', *flags]
         start = time.monotonic()
         killed = False
         with (out / (phase + '.txt')).open('w') as log:
-            process = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=log, stderr=log)
+            if args.native and sys.platform == 'win32':
+                from windows_test_process import DesktopProcess
+                process = DesktopProcess(cmd, ROOT, env, log, log)
+            else:
+                process = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=log, stderr=log)
             while process.poll() is None:
                 if time.monotonic() - start > 300:
                     process.kill()
@@ -80,12 +84,12 @@ def main():
                     killed = True
                     break
                 time.sleep(.02)
-            code = process.wait(timeout=15)
+            code = process.wait() if args.native and sys.platform == 'win32' else process.wait(timeout=15)
         if encoder:
             assert encoder.wait(timeout=30) == 0
-        text = (out / (phase + '.txt')).read_text()
+        text = (out / (phase + '.txt')).read_text(encoding='utf-8')
         assert code == (-9 if killed else 0) and not re.search(r'(?m)^(SCRIPT ERROR|ERROR):', text), phase
-        report = json.loads((out / phase / 'report.json').read_text())
+        report = json.loads((out / phase / 'report.json').read_text(encoding='utf-8'))
         assert report['failures'] == 0, phase
         rows.append(dict(phase=phase, pid=report['pid'], checks=len(report['checks']), seconds=round(time.monotonic()-start, 2), frames=report['video_frames'], killed_after_durable_suspend=killed))
         print(rows[-1], flush=True)

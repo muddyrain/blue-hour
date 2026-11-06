@@ -8,8 +8,15 @@ static func freeze(data: Dictionary) -> void:
 	for entity: Dictionary in data.entities: occupied.append(WorldLayout.rect(entity.rect).grow(22))
 	for wall: Array in data.barriers: occupied.append(WorldLayout.rect(wall).grow(20))
 	var reserved: Array[Rect2]=ExplorationLayout._reserved(data)
+	var edge_placed: bool=false
 	for parcel: Dictionary in data.parcels:
 		parcel.dressing=[]
+	var ordered: Array=data.parcels.duplicate()
+	var bus_point: Vector2=WorldLayout.point(data.bus.door)
+	ordered.sort_custom(func(a: Dictionary,b: Dictionary) -> bool: return WorldLayout.point(a.entrance).distance_squared_to(bus_point)<WorldLayout.point(b.entrance).distance_squared_to(bus_point))
+	for parcel: Dictionary in ordered:
+		if data.get("art_revision")==3 and not edge_placed:
+			edge_placed=_courtyard_edge(data,parcel,occupied,reserved)
 		var count: int=0
 		for court: Dictionary in parcel.courtyards:
 			if count>=4:break
@@ -28,3 +35,30 @@ static func freeze(data: Dictionary) -> void:
 				parcel.dressing.append({"kind":kind,"point":[point.x,point.y],"width":width,"collision":[block.position.x,block.position.y,block.size.x,block.size.y]})
 				occupied.append(block.grow(20));count+=1
 				break
+
+static func _courtyard_edge(data: Dictionary, parcel: Dictionary, occupied: Array[Rect2], reserved: Array[Rect2]) -> bool:
+	for court: Dictionary in parcel.courtyards:
+		if court.kind not in ["garden","court"]:
+			continue
+		var area: Rect2=WorldLayout.rect(court.rect)
+		var width: float=180.0
+		if area.size.x<width+64 or area.size.y<136:
+			continue
+		var point: Vector2=Vector2(area.position.x+48,area.end.y-12)
+		var collisions: Array=StreetModuleArt.courtyard_collisions(point,width)
+		var clear: bool=true
+		for value: Array in collisions:
+			var block: Rect2=WorldLayout.rect(value)
+			clear=clear and area.encloses(block)
+			for other: Rect2 in occupied+reserved:
+				clear=clear and not block.grow(22).intersects(other)
+			for walk: Array in parcel.walks:
+				clear=clear and not block.grow(16).intersects(WorldLayout.rect(walk))
+			clear=clear and not block.grow(48).has_point(WorldLayout.point(court.entrance))
+		if not clear:
+			continue
+		parcel.dressing.append({"kind":"courtyard_edge","point":[point.x,point.y],"width":width,"collisions":collisions})
+		for value: Array in collisions:
+			occupied.append(WorldLayout.rect(value).grow(22))
+		return true
+	return false

@@ -201,16 +201,33 @@ static func fingerprint(value: Dictionary) -> String:
 static func _profiled_fingerprint(value: Dictionary) -> String:
 	# Historical business hashes (world/token/migration/training) are a persisted contract.
 	# Keep this algorithm; new journal transport preserves the exact input binary64 values.
+	var proof: Dictionary=ValueProofCache.lookup("business-fingerprint",value)
+	if proof.hit:
+		return proof.result
 	if not json_value(value):
 		return ""
 	# JSON readers normalize integers to floats; normalize before hashing on either side.
 	var normalized: Variant = JSON.parse_string(JSON.stringify(value, "", true, true))
 	if not normalized is Dictionary:
 		return ""
-	return JSON.stringify(normalized, "", true, true).sha256_text()
+	var digest: String=JSON.stringify(normalized, "", true, true).sha256_text()
+	ValueProofCache.remember(proof,digest)
+	return digest
 
 
 static func json_value(value: Variant, depth: int = 0) -> bool:
+	if value is Dictionary:
+		var proof: Dictionary=ValueProofCache.lookup("json-value:"+str(depth),value)
+		if proof.hit:
+			return true
+		var valid: bool=_json_value(value,depth)
+		if valid:
+			ValueProofCache.remember(proof,"")
+		return valid
+	return _json_value(value,depth)
+
+
+static func _json_value(value: Variant, depth: int) -> bool:
 	if depth > 64:
 		return false
 	if value == null or value is String or value is StringName or value is bool:
@@ -221,13 +238,13 @@ static func json_value(value: Variant, depth: int = 0) -> bool:
 		return is_finite(value)
 	if value is Array:
 		for item: Variant in value:
-			if not json_value(item,depth+1):
+			if not _json_value(item,depth+1):
 				return false
 		return true
 	if value is Dictionary:
 		var names: Array[String] = []
 		for key: Variant in value:
-			if not (key is String or key is StringName) or String(key) in names or not json_value(value[key],depth+1):
+			if not (key is String or key is StringName) or String(key) in names or not _json_value(value[key],depth+1):
 				return false
 			names.append(String(key))
 		return true

@@ -113,6 +113,11 @@ func _run() -> void:
 	viewport.gui_embed_subwindows = true
 	root.add_child(viewport)
 	app = load("res://src/app/main.tscn").instantiate()
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--flow-bootstrap-main="):
+			var bootstrap: String=arg.trim_prefix("--flow-bootstrap-main=")
+			assert(bootstrap.begins_with("res://.local/") and ".." not in bootstrap)
+			app.set_script(load(bootstrap))
 	if "--flow-bootstrap-m13" in OS.get_cmdline_user_args(): app.set_script(load("res://.local/m14-worldgen-01/input/m13_main.gd"))
 	if "--flow-bootstrap-m12" in OS.get_cmdline_user_args(): app.set_script(load("res://.local/m13-explore-01/input/m12_main.gd"))
 	if "--flow-bootstrap-m11" in OS.get_cmdline_user_args(): app.set_script(load("res://.local/m12-survivor-01/input/m11_main.gd"))

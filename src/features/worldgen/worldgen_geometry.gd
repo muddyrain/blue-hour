@@ -74,6 +74,7 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 	var walls: Dictionary = _walls(parcels,entities,roads,bus)
 	var arrivals: Array = [[door[0]-48,door[1]+24],[door[0],door[1]+24],[door[0]+48,door[1]+24],[door[0],door[1]+56]]
 	var data: Dictionary = {"version":5,"seed":seed,"size":size,"topology":topology,"attempt":attempt,"fallback":fallback,"bounds":[0,0,width,height],"entities":entities,"roads":roads,"barriers":walls.barriers,"gates":walls.gates,"bus":bus,"arrivals":arrivals,"enemy_points":[[24,main_y+24],[width-24,main_y+24]],"rescue":rescue,"objects":[],"parcels":parcels,"graph":WorldgenStructure.graph(segments)}
+	data.art_revision = 3
 	data.id = "worldgen_v1_"+RecordEncoding.fingerprint(data).substr(0,32)
 	return data
 
@@ -151,6 +152,10 @@ static func _populate(parcel: Dictionary, topology: String, random: RandomNumber
 			if pool.is_empty():break
 			var gap: float=24.0 if row==0 and parcel.kind=="shopfront" else 32.0 if topology=="commercial" else 40.0
 			var types: Array[String]=_fill_frontage(pool,group_width,gap,random)
+			var paired: bool = row==0 and topology=="commercial" and parcel.kind in ["shopfront","courtyard"] and group_width>=560 and headroom>=248
+			if paired:
+				gap=16.0
+				types.assign(["convenience_store","eatery"] if random.randi_range(0,1)==0 else ["eatery","convenience_store"])
 			if types.is_empty():break
 			var used: float=gap*maxi(0,types.size()-1)
 			for type: String in types:used+=float(WorldgenScale.WIDTH[type])
@@ -160,13 +165,16 @@ static func _populate(parcel: Dictionary, topology: String, random: RandomNumber
 			var row_depth: float=0.0
 			for type: String in types:
 				var variant: int=3 if type=="detached_home" and (headroom<WorldgenScale.visible_height(type) or random.randi_range(0,1)==0) else random.randi_range(0,2)
-				row_height=maxf(row_height,WorldgenScale.visible_height(type,variant))
+				var art: String = StreetModuleArt.for_archetype(type) if paired else ""
+				row_height=maxf(row_height,WorldgenScale.visible_height(type,variant,art))
 				row_depth=maxf(row_depth,float(WorldgenScale.DEPTH[type]))
-				if _add_building(type,variant,x,foot,parcel,entities,roads,bus):occupied+=float(WorldgenScale.WIDTH[type])
+				if _add_building(type,variant,x,foot,parcel,entities,roads,bus,art):occupied+=float(WorldgenScale.WIDTH[type])
 				x+=float(WorldgenScale.WIDTH[type])+gap
 			# At least 24 world units separate visible roofs and rear feet. The
 			# physical gap also leaves the rear door +48 and its 48-wide walk clear.
 			var spacing: float=ceil(maxf(208.0,maxf(row_height+24.0,row_depth+112.0))/16.0)*16.0
+			if paired:
+				spacing=ceil((row_height+192.0)/16.0)*16.0
 			if row_height<=240.0:spacing+=16.0*random.randi_range(0,1)
 			var roof_top: float=foot-row_height
 			if occupied>0:rear_roof=minf(rear_roof,roof_top)
@@ -249,12 +257,12 @@ static func _add_court(parcel: Dictionary, area: Rect2, kind: String, entrance: 
 	if area.intersects(WorldLayout.rect(bus.rect)):return
 	parcel.courtyards.append({"rect":[area.position.x,area.position.y,area.size.x,area.size.y],"kind":kind,"entrance":[entrance.x,entrance.y]})
 
-static func _add_building(type: String, variant: int, x: float, foot: float, parcel: Dictionary, entities: Array, roads: Array, bus: Dictionary) -> bool:
+static func _add_building(type: String, variant: int, x: float, foot: float, parcel: Dictionary, entities: Array, roads: Array, bus: Dictionary, art: String = "") -> bool:
 	var width: float = float(WorldgenScale.WIDTH[type]);var depth: float=float(WorldgenScale.DEPTH[type])
 	var block: Rect2 = Rect2(x,foot-depth,width,depth)
 	var plot: Rect2 = WorldLayout.rect(parcel.rect)
 	if not plot.grow(-32).encloses(block):return false
-	if foot-WorldgenScale.visible_height(type,variant)<plot.position.y+16:return false
+	if foot-WorldgenScale.visible_height(type,variant,art)<plot.position.y+16:return false
 	# Keep all boarding/arrival positions and the full sweep free before props are added.
 	if block.grow(32).intersects(WorldLayout.rect(bus.sweep)) or block.grow(20).intersects(Rect2(WorldLayout.point(bus.door)-Vector2(128,128),Vector2(256,256))):return false
 	for value: Array in roads:
@@ -263,7 +271,11 @@ static func _add_building(type: String, variant: int, x: float, foot: float, par
 		if block.grow(16).intersects(WorldLayout.rect(entity.rect)):return false
 	var id: String = "b%02d"%entities.size()
 	var door_x: float = x+width/2.0+(WorldgenScale.door_x(type,variant)-256.0)*width/448.0
+	if not art.is_empty():
+		door_x=x+width/2.0+StreetModuleArt.door_offset(art,width)
 	entities.append({"id":id,"archetype":type,"rect":[x,foot-depth,width,depth],"door":[door_x,foot+48],"variant":variant,"parcel":parcel.id})
+	if not art.is_empty():
+		entities[-1].art=art
 	parcel.buildings.append(id)
 	return true
 
@@ -326,6 +338,7 @@ static func _ensure_categories(entities: Array, parcels: Array, roads: Array, bu
 				if WorldLayout.point(entity.door).distance_squared_to(bus_door)>=farthest*0.36:other_away+=1
 		for entity: Dictionary in ranked:
 			if count>=2 and away:break
+			if entity.has("art"):continue
 			var distant: bool=WorldLayout.point(entity.door).distance_squared_to(bus_door)>=farthest*0.36
 			if entity.archetype in category or (entity.archetype in opposite and (other_count<=2 or (distant and other_away<=1))):continue
 			var type: String="eatery" if category==TaskActions.FOOD_TYPES else "garage"

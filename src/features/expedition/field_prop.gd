@@ -8,6 +8,12 @@ var calibrated: bool = false
 var roof_cut: int = 512
 var body_depth: float = 112
 var door_offset: float = 0
+var native_size: Vector2 = Vector2(512,640)
+var render_anchor: Vector2 = Vector2(256,608)
+var reference_width: float = 448.0
+var street_sign: String = ""
+var sign_rect: Rect2
+var soft_contact: bool = false
 var _alpha: Image
 var world_asset: bool = false
 var facade: Texture2D = ShopTexture
@@ -26,9 +32,13 @@ var _wall: Sprite2D
 
 
 func _ready() -> void:
-	var factor: float = front_width / 448.0
-	_roof = _part(Rect2(0,0,512,roof_cut) if world_asset else Rect2(0,0,512,320),Vector2(-256,-608 if world_asset else -416)*factor,factor)
-	_wall = _part(Rect2(0,roof_cut,512,640-roof_cut) if world_asset else Rect2(0,320,512,128),Vector2(-256,roof_cut-608 if calibrated else -96)*factor,factor)
+	var factor: float = front_width / reference_width
+	_roof = _part(Rect2(0,0,native_size.x,roof_cut) if world_asset else Rect2(0,0,512,320),(-render_anchor if world_asset else Vector2(-256,-416))*factor,factor)
+	_wall = _part(Rect2(0,roof_cut,native_size.x,native_size.y-roof_cut) if world_asset else Rect2(0,320,512,128),(Vector2(0,roof_cut)-render_anchor if calibrated else Vector2(-256,-96))*factor,factor)
+	if not street_sign.is_empty():
+		var sign_label: Label = _label(street_sign,(sign_rect.position-render_anchor)*factor,12,sign_rect.size.x*factor)
+		sign_label.add_theme_color_override("font_color",Color("e2d7b9"))
+		sign_label.add_theme_constant_override("outline_size",1)
 	if not world_asset and not is_market and not is_residence:
 		var props: ShopFurniture = ShopFurniture.new()
 		props.scale = Vector2.ONE * front_width / 368.0
@@ -76,7 +86,7 @@ func _draw() -> void:
 	if primary_target:
 		draw_arc(Vector2(door_offset,20),18,0,TAU,24,Color("a8ebd4") if searched else Color("ffd385"),3,true)
 		draw_colored_polygon(PackedVector2Array([Vector2(door_offset,-9),Vector2(door_offset-6,-19),Vector2(door_offset+6,-19)]),Color("ffd385"))
-	if calibrated:
+	if calibrated and not soft_contact:
 		var shadow: PackedVector2Array=PackedVector2Array([Vector2(-front_width/2,-body_depth),Vector2(front_width/2,-body_depth),Vector2(front_width/2+26,8),Vector2(-front_width/2+16,10)])
 		draw_colored_polygon(shadow,Color(0.08,0.14,0.17,0.23))
 		draw_rect(Rect2(-front_width/2,-5,front_width,9),Color(0.06,0.12,0.15,0.35))
@@ -93,8 +103,8 @@ func obscures(world_point: Vector2) -> bool:
 		if world_point.y>=global_position.y-16: return false
 		# A roof can cover legs while the head is already above its silhouette.
 		for height: float in [0.0,32.0,64.0]:
-			var pixel: Vector2=(world_point-global_position-Vector2(0,height))/(front_width/448.0)+Vector2(256,608)
-			if pixel.x>=0 and pixel.x<512 and pixel.y>=0 and pixel.y<roof_cut and _alpha!=null and _alpha.get_pixel(int(pixel.x),int(pixel.y)).a>0.15:return true
+			var pixel: Vector2=(world_point-global_position-Vector2(0,height))/(front_width/reference_width)+render_anchor
+			if pixel.x>=0 and pixel.x<native_size.x and pixel.y>=0 and pixel.y<roof_cut and _alpha!=null and _alpha.get_pixel(int(pixel.x),int(pixel.y)).a>0.15:return true
 		return false
 	var factor: float = front_width / 448.0
 	return Rect2(global_position + Vector2(-front_width / 2, (-576 if world_asset else -384) * factor), Vector2(front_width, (480 if world_asset else 288) * factor)).has_point(world_point)
@@ -105,16 +115,16 @@ func show_behind_roof(friend_behind: bool) -> void:
 
 
 func scaled_hit_bounds() -> Rect2:
-	var factor: float=front_width/448.0
+	var factor: float=front_width/reference_width
 	var pixels: Rect2=Rect2(_alpha.get_used_rect())
-	var visible_body: Rect2=Rect2(global_position+(pixels.position-Vector2(256,608))*factor,pixels.size*factor)
+	var visible_body: Rect2=Rect2(global_position+(pixels.position-render_anchor)*factor,pixels.size*factor)
 	return visible_body.merge(Rect2(global_position+Vector2(door_offset-28,0),Vector2(56,64)))
 
 
 func scaled_hit_contains(point: Vector2) -> bool:
 	# New compact buildings use visible pixels and their real entrance, not an old tall box.
 	if Rect2(global_position+Vector2(door_offset-28,0),Vector2(56,64)).has_point(point): return true
-	var pixel: Vector2=(point-global_position)/(front_width/448.0)+Vector2(256,608)
+	var pixel: Vector2=(point-global_position)/(front_width/reference_width)+render_anchor
 	return pixel.x>=0 and pixel.y>=0 and pixel.x<_alpha.get_width() and pixel.y<_alpha.get_height() and _alpha.get_pixel(int(pixel.x),int(pixel.y)).a>0.15
 
 

@@ -1,4 +1,10 @@
-# M14-WORLDGEN-01-R1 当前候选
+# M14-WORLDGEN-01-R2 当前候选
+
+沿用受审R1 dc89baf、唯一目录、codex/m14-worldgen-01及Draft PR #19，base仍为main 85bf39c。新商业首排按合法地块组合真实画布便利店/小食店，连续铺装接侧巷及可走内院；相同外观、对象与薄墙脚随行动冻结。原人数、人物尺度/125移速/0.82镜头、奖励、工作、支援、四次准备终局保持。旧build5/layout4/world15继续原路径，未发布R1隔离档不静默重造。
+
+同一47栋合成输入的完整Main同步回调：暂存三次168.664–178.950ms，归航445.879–471.385ms；原请求与最终收据hash一致。保存仍重读完整真实文件、严格认证、持久ACK，唯一本局结果owner不变。当前仅Windows；[本轮验证](VALIDATION.md#m14-worldgen-01-r2windows)区分公开、源码原生、物理输入和未验平台。正式生产门禁仍BLOCKED。下一步审阅同一Draft与私有样板媒体，不自动合并/发布或开始M15。
+
+# M14-WORLDGEN-01-R1 历史候选
 
 PR #18 精确已审 `51aafbbaecca95799b40ada6088c84260724e43e` 已普通合入 main `85bf39cbe81820bdebef192bf0dc7efa32d11d21`；唯一目录分支 `codex/m14-worldgen-01`，同一 Draft PR #19 base main，保持未合并等待审阅。
 

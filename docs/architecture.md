@@ -39,3 +39,5 @@ SpecialPowers只提供严格请求/激活事实与模拟时间派生；PowerActi
 M12-SURVIVOR-01 在原新旅程 owner 增加独立 persona1 事实（build4），PersonaActions 仅在完整原 PowerActions 描述上追加严格目录与来源认证；五个配方不授予入队资格。World14 绑定新目录与身份，旧 World13/营地保持原格式/指纹。Actor 从不可变武器/主特长/本人配方/道具派生，疾行仍单独临时因子；PersonaViewModel 缓存不变显示来源并只读投影实时数值。共享站点进度可接力，新工作下界从当时真实参与者的最快合法因子推导，保留旧版下界和 cash/food 类别上限。参见[合同](design/m12-survivor-01.md)。
 
 M13-EXPLORE-01 的 ExplorationLayout/Sites 只生成冻结布局、对象、预算、实际路径度量和目标定义；ExplorationActions 把原完整任务来源保留为可重建的 canonical 原任务，不以删新几何字段冒充旧地图认证。新 build5 显式持有 exploration1 标识，非终局 generated9/rules10/world15 严格相互绑定；旧build4/world14及新旅程终局仍走原分支。后道具碰撞的不可变导航证书按完整布局指纹缓存，live事实不入缓存。Expedition/SearchAssignments/WorldSites继续拥有工作与携带，原事务独占暂存/支援整世界重建/归航确认；ExplorationProp/Objectives只读。车和树干只加移动障碍，不增加LOS墙。参见[探索合同](design/m13-explore-01.md)。
+
+M14-WORLDGEN-01 的 WorldgenGeometry 先定义道路连接及地块，WorldgenScale 集中新尺度，WorldgenLayout 只认证冻结值并复用后道具导航证书。build6/worldgen1 与 generated9 的严格 worldgen 扩展绑定，布局为5；原rules10/world15字段未变，不为编号升级人物/战斗/支援。旧build5/layout4及更旧分支原样认证，旧成长记录不接受新地图前缀。WorldgenGround/精细树/HUD只读，新建筑点击区从同一等比alpha和门锚点推导并按脚点选择；原Expedition/事务/结算owner不变。详见[合同](design/m14-worldgen-01.md)。

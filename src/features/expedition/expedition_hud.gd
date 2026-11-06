@@ -71,6 +71,7 @@ func refresh(state: Dictionary) -> void:
 		"exploration_objectives":state.get("exploration_objectives",[]),
 		"time":{"label":time_label,
 			"text":("+" if night else "") + "%02d:%02d" % [display_seconds / 60, display_seconds % 60],
+			"compact_hint":"威胁 %d" % int(threat.get("stage",0)) if threat.get("enabled", false) else "",
 			"hint":threat.get("hint", "") if threat.get("enabled", false) else ""},
 		"bus_status_text":"交火练习" if practice else ("巴士就绪" if enabled else bus_text),
 		"bus_action_label":action, "bus_action_enabled":enabled or gathering,

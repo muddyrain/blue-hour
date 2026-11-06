@@ -2,7 +2,7 @@ class_name PowerState
 extends RefCounted
 ## Camp inventory facts are published only by CampEdit / FrozenSettlement.
 static func enabled(camp: Dictionary) -> bool:
-	return camp.get("journey") is Dictionary and camp.journey.get("build") is Dictionary and (camp.journey.build.get("version")==3 or camp.journey.build.get("version")==4 or camp.journey.build.get("version")==5)
+	return camp.get("journey") is Dictionary and camp.journey.get("build") is Dictionary and (camp.journey.build.get("version")==3 or camp.journey.build.get("version")==4 or camp.journey.build.get("version")==5 or camp.journey.build.get("version")==6)
 
 static func initial_build() -> Dictionary:
 	var build: Dictionary=CombatActions.initial()
@@ -64,5 +64,6 @@ static func _source_problem(camp: Dictionary, generated: Variant) -> String:
 	if not PersonaState.enabled(camp): return PowerActions.problem(generated)
 	var issue: String=ExplorationActions.problem(generated) if ExplorationState.enabled(camp) else PersonaActions.problem(generated)
 	if not issue.is_empty(): return issue
+	if ExplorationState.enabled(camp) and WorldgenState.enabled(camp)!=generated.has("worldgen"): return "WORLDGEN_POWER_SOURCE_MODE"
 	if not camp.journey.build.get("persona") is Dictionary or not TransactionReceipt.same(generated.persona.facts,camp.journey.build.persona): return "PERSONA_POWER_SOURCE"
 	return ""

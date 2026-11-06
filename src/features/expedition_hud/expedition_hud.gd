@@ -94,7 +94,8 @@ func refresh(state: Dictionary) -> void:
 	_exploration_objectives.visible=not rows.is_empty() and _objective_expanded
 	_objective.text=_text(state,"objective")
 	_objective.visible=_objective_expanded and not _objective.text.is_empty()
-	_objective_toggle.text = "收起目标 −" if _objective_expanded else "展开目标 +"
+	_objective_toggle.text = "−" if _objective_expanded else "+"
+	_progress.visible = not _has_exploration_rows
 	_currency.text = "货币 %s" % _text(state, "currency_text", "—")
 	var delta: String = _text(state, "currency_delta_text")
 	if not delta.is_empty():
@@ -109,7 +110,8 @@ func refresh(state: Dictionary) -> void:
 	_time_box.visible = time_data.get("visible", true) == true and not _text(time_data, "text").is_empty()
 	_time_label.text = _text(time_data, "label", "出击时间")
 	_time_text.text = _text(time_data, "text")
-	_time_hint.text = _text(time_data, "hint")
+	_time_hint.text = _text(time_data, "compact_hint", _text(time_data, "hint").trim_prefix("威胁 · "))
+	_time_hint.tooltip_text = _text(time_data, "hint")
 	_time_hint.visible = not _time_hint.text.is_empty()
 	_time_text.add_theme_color_override("font_color", _tone(time_data))
 	_threat_content.text = _text(time_data,"explanation",_text(time_data,"hint")) + "\n威胁随行动时间推进；不会阻止巴士归航。\n打开此说明不暂停行动。"
@@ -130,7 +132,7 @@ func refresh(state: Dictionary) -> void:
 	if _bus_button.disabled: _bus_button.release_focus()
 	_bus_button.focus_mode=Control.FOCUS_NONE if _bus_button.disabled else Control.FOCUS_ALL
 	var persona_mode: bool=not members.is_empty() and members[0].has("persona")
-	_members_panel.offset_left=-280 if persona_mode else -224
+	_members_panel.offset_left=-188 if persona_mode else -224
 	# Old HUD rows retain their reviewed direct VBox layout. Only new cards
 	# need a bounded scrolling client; otherwise ScrollContainer shrinks labels.
 	if persona_mode and _members_parent.get_parent()!=_member_scroll:
@@ -155,6 +157,7 @@ func refresh(state: Dictionary) -> void:
 				var model: Dictionary=members[index].persona
 				_persona_models[int(model.id)]=model
 				_persona_cards[index].present(model,true)
+				_compact_persona_card(_persona_cards[index])
 		if _persona_id>0 and _persona_models.has(_persona_id): persona_details.present(_persona_models[_persona_id])
 		_fit_persona_members()
 		# Font/theme minimum sizes settle after compact cards are populated.
@@ -191,20 +194,21 @@ func place_help_above_lane() -> void:
 func _build_top() -> void:
 	var panel: PanelContainer = _panel(self, "MissionPanel")
 	panel.position = Vector2(16,16)
-	panel.custom_minimum_size.x = 296
-	panel.size.x = 296
+	panel.custom_minimum_size.x = 264
+	panel.size.x = 264
 	var mission_box: VBoxContainer = _column(panel)
 	mission_box.add_theme_constant_override("separation",4)
 	var heading: HBoxContainer = HBoxContainer.new()
 	heading.add_theme_constant_override("separation",8)
 	_passive(heading)
 	mission_box.add_child(heading)
-	_mission = _label(heading, "MissionTitle", 18)
+	_mission = _label(heading, "MissionTitle", 16)
 	_mission.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_mission.clip_text = true
 	_mission.mouse_filter = Control.MOUSE_FILTER_PASS
-	_objective_toggle = _button(heading,"ObjectiveToggle","收起目标 −",_toggle_objective)
-	_objective_toggle.custom_minimum_size = Vector2(86,28)
+	_objective_toggle = _button(heading,"ObjectiveToggle","−",_toggle_objective)
+	_objective_toggle.custom_minimum_size = Vector2(28,24)
+	_objective_toggle.tooltip_text = "展开 / 收起目标"
 	_objective_toggle.add_theme_font_size_override("font_size",13)
 	_progress = _label(mission_box, "Progress", 14)
 	_objective = _label(mission_box,"Objective",15)
@@ -215,59 +219,69 @@ func _build_top() -> void:
 	_exploration_objectives.hide()
 	var time_panel: PanelContainer = _panel(self,"TimePanel")
 	time_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	time_panel.offset_left = -104
-	time_panel.offset_right = 104
+	time_panel.offset_left = -152
+	time_panel.offset_right = 152
 	time_panel.offset_top = 16
 	_time_box = _column(time_panel)
-	_time_box.add_theme_constant_override("separation",1)
+	_time_box.add_theme_constant_override("separation",3)
 	_time_box.mouse_filter = Control.MOUSE_FILTER_PASS
-	_day = _label(_time_box,"Day",14)
-	_day.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var time_row: HBoxContainer = HBoxContainer.new()
+	time_row.add_theme_constant_override("separation",12)
+	_passive(time_row)
+	_time_box.add_child(time_row)
+	_day = _label(time_row,"Day",14)
+	_day.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_time_label = _label(_time_box, "TimeLabel", 13)
-	_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_time_text = _label(_time_box, "TimeText", 26)
+	_time_label.hide()
+	_time_text = _label(time_row, "TimeText", 25)
+	_time_text.custom_minimum_size.x = 78
 	_time_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_time_hint = _label(_time_box, "TimeHint", 14)
-	_time_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var explanation: Button = _button(self,"ThreatExplanation","威胁说明",_toggle_threat)
+	_time_hint = _label(time_row, "TimeHint", 13)
+	_time_hint.custom_minimum_size.x = 58
+	_time_hint.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_time_hint.clip_text = true
+	var explanation: Button = _button(self,"ThreatExplanation","?",_toggle_threat)
 	explanation.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	explanation.offset_left=-55
-	explanation.offset_right=55
-	explanation.offset_top=130
-	explanation.offset_bottom=158
-	explanation.custom_minimum_size.y=28
+	explanation.offset_left=116
+	explanation.offset_right=144
+	explanation.offset_top=24
+	explanation.offset_bottom=50
+	explanation.custom_minimum_size=Vector2(28,26)
 	explanation.add_theme_font_size_override("font_size",13)
-	explanation.tooltip_text="查看当前攻势；不暂停行动。"
+	explanation.tooltip_text="查看当前威胁；不暂停行动。"
 	_threat_details = _panel(self,"ThreatDetails")
 	_threat_details.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_threat_details.offset_left=-160
 	_threat_details.offset_right=160
-	_threat_details.offset_top=164
+	_threat_details.offset_top=76
 	_threat_content = _label(_threat_details,"ThreatText",15)
 	_wrap(_threat_content)
-	_threat_details.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	_threat_details.mouse_filter=Control.MOUSE_FILTER_STOP
 	_threat_details.hide()
 	var resource_panel: PanelContainer = _panel(self,"ResourcesPanel")
 	resource_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	resource_panel.offset_left=-240
+	resource_panel.offset_left=-264
 	resource_panel.offset_right=-16
 	resource_panel.offset_top=16
-	var resources: VBoxContainer = _column(resource_panel)
-	resources.add_theme_constant_override("separation",4)
-	_currency = _label(resources,"Currency",14)
+	var resources: HBoxContainer = HBoxContainer.new()
+	resources.add_theme_constant_override("separation",8)
+	_passive(resources)
+	resource_panel.add_child(resources)
+	_currency = _label(resources,"Currency",13)
 	_wrap(_currency)
 	_currency.mouse_filter=Control.MOUSE_FILTER_PASS
 	_pause_button = _button(resources,"PauseButton","暂停",_request_pause)
-	_pause_button.custom_minimum_size.y=30
+	_pause_button.custom_minimum_size=Vector2(44,32)
+	_pause_button.size_flags_vertical=Control.SIZE_SHRINK_CENTER
 	_pause_button.add_theme_font_size_override("font_size",14)
 	var members_panel: PanelContainer = _panel(self,"MembersPanel")
 	_members_panel=members_panel
 	members_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	members_panel.offset_left=-224
 	members_panel.offset_right=-16
-	members_panel.offset_top=128
+	members_panel.offset_top=88
 	var list: VBoxContainer = _column(members_panel)
-	_label(list,"TeamTitle",13).text="行动小队"
+	_label(list,"TeamTitle",12).text="行动小队"
 	_members_parent = VBoxContainer.new()
 	_members_parent.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	_members_parent.add_theme_constant_override("separation",4)
@@ -286,17 +300,17 @@ func _build_top() -> void:
 	_member_details_panel.offset_left=-532
 	_member_details_panel.offset_right=-232
 	_member_details_panel.offset_top=180
-	_member_details_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	_member_details_panel.mouse_filter=Control.MOUSE_FILTER_STOP
 	_member_details = _label(_member_details_panel,"MemberText",15)
 	_wrap(_member_details)
 	_member_details_panel.hide()
 	persona_details=PersonaDetails.new()
 	add_child(persona_details)
 	persona_details.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	persona_details.offset_left=-720
-	persona_details.offset_right=-292
-	persona_details.offset_top=168
-	persona_details.offset_bottom=-144
+	persona_details.offset_left=-620
+	persona_details.offset_right=-200
+	persona_details.offset_top=88
+	persona_details.offset_bottom=-72
 	persona_details.anchor_bottom=1.0
 	persona_details.closed.connect(func() -> void: _persona_id=0)
 	persona_details.hide()
@@ -347,9 +361,9 @@ func _build_member(parent: Control, index: int) -> void:
 func _build_actions() -> void:
 	var panel: PanelContainer = _panel(self, "ActionsPanel")
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	panel.offset_left = -206
-	panel.offset_right = 206
-	panel.offset_top = -84
+	panel.offset_left = -144
+	panel.offset_right = 144
+	panel.offset_top = -68
 	panel.offset_bottom = -16
 	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	var column: VBoxContainer = _column(panel)
@@ -361,18 +375,19 @@ func _build_actions() -> void:
 	var status: VBoxContainer = _column(row)
 	status.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	_pause_state = _label(status, "PauseState", 12)
-	_bus_status = _label(status, "BusStatus", 14)
+	_pause_state.hide()
+	_bus_status = _label(status, "BusStatus", 12)
 	_wrap(_bus_status)
 	_bus_button = _button(row, "BusButton", "发动巴士", _request_bus)
-	_bus_button.custom_minimum_size=Vector2(150,36)
-	_bus_button.add_theme_font_size_override("font_size",15)
+	_bus_button.custom_minimum_size=Vector2(124,32)
+	_bus_button.add_theme_font_size_override("font_size",14)
 	_bus_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_hint = _label(self, "StatusHint", 14)
 	_hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	_hint.offset_left=-260
 	_hint.offset_right=260
-	_hint.offset_top=-124
-	_hint.offset_bottom=-92
+	_hint.offset_top=-104
+	_hint.offset_bottom=-72
 	_hint.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	_hint.clip_text=true
 	_hint.mouse_filter=Control.MOUSE_FILTER_PASS
@@ -381,11 +396,12 @@ func _build_actions() -> void:
 
 
 func _build_help() -> void:
-	_help_button = _button(self, "HelpButton", "操作帮助", _toggle_help)
+	_help_button = _button(self, "HelpButton", "?", _toggle_help)
+	_help_button.tooltip_text="操作帮助"
 	_help_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	_help_button.offset_left = 16
 	_help_button.offset_top = -48
-	_help_button.offset_right = 120
+	_help_button.offset_right = 48
 	_help_button.offset_bottom = -16
 	_help_button.custom_minimum_size.y=32
 	_help_button.add_theme_font_size_override("font_size",14)
@@ -396,7 +412,7 @@ func _build_help() -> void:
 	_help.offset_top = -266
 	_help.offset_bottom = -96
 	_help.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_help.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	_help.mouse_filter=Control.MOUSE_FILTER_STOP
 	var content: Label = _label(_help, "HelpText", 15)
 	content.text = "左键地面：移动 / 改目标\n左键建筑：派遣；再点同栋只取消该任务\n空格：暂停 / 继续；Esc：菜单\nWASD 镜头；滚轮缩放\nTab 切换按钮，Space / Enter 确认\nQ 治疗；E 瞄准空袭；3 释放装备的特殊能力"
 	_wrap(content)
@@ -454,7 +470,7 @@ func _request_bus() -> void:
 func _toggle_objective() -> void:
 	_objective_expanded=not _objective_expanded
 	_objective.visible=_objective_expanded and not _objective.text.is_empty()
-	_objective_toggle.text="收起目标 −" if _objective_expanded else "展开目标 +"
+	_objective_toggle.text="−" if _objective_expanded else "+"
 	_exploration_objectives.visible=_objective_expanded and _has_exploration_rows
 
 
@@ -477,7 +493,7 @@ func _toggle_member(index: int) -> void:
 
 func _toggle_help() -> void:
 	_help.visible = not _help.visible
-	_help_button.text = "收起帮助" if _help.visible else "操作帮助"
+	_help_button.text = "×" if _help.visible else "?"
 
 
 func _on_visibility_changed() -> void:
@@ -485,7 +501,7 @@ func _on_visibility_changed() -> void:
 		_help.hide()
 		_threat_details.hide()
 		_member_details_panel.hide()
-		_help_button.text = "操作帮助"
+		_help_button.text = "?"
 		for button: Button in [_pause_button, _bus_button, _help_button]:
 			button.release_focus()
 
@@ -497,10 +513,10 @@ func _panel(parent: Control, node_name: String) -> PanelContainer:
 	# Wheel events must not escape an opaque panel into the camera behind it.
 	panel.mouse_force_pass_scroll_events = false
 	var style: StyleBoxFlat = get_theme_stylebox("panel","PanelContainer").duplicate() as StyleBoxFlat
-	style.content_margin_left=12
-	style.content_margin_right=12
-	style.content_margin_top=10
-	style.content_margin_bottom=10
+	style.content_margin_left=8
+	style.content_margin_right=8
+	style.content_margin_top=6
+	style.content_margin_bottom=6
 	panel.add_theme_stylebox_override("panel",style)
 	parent.add_child(panel)
 	return panel
@@ -577,6 +593,32 @@ func _fit_persona_members() -> void:
 			height+=card.get_combined_minimum_size().y
 			count+=1
 	height+=4.0*maxi(0,count-1)
-	var client_height: float=maxf(40.0,get_viewport_rect().size.y-128.0-16.0-40.0)
+	var client_height: float=maxf(40.0,get_viewport_rect().size.y-88.0-16.0-40.0)
 	_member_scroll.custom_minimum_size.y=minf(height,client_height)
 	_members_panel.reset_size()
+
+
+func _compact_persona_card(card: PersonaCard) -> void:
+	# Only field presentation changes. The shared card retains its complete model
+	# and the same details for camp, rescue and field selection.
+	card.custom_minimum_size.x=148
+	card.portrait_button.custom_minimum_size=Vector2(40,40)
+	card.info_button.custom_minimum_size=Vector2(22,24)
+	card.primary_label.add_theme_font_size_override("font_size",13)
+	card.name_label.hide()
+	card.health_label.hide()
+	card.ammo_label.hide()
+	card.positive_label.get_parent().hide()
+	card.health_bar.custom_minimum_size.y=4
+	card.health_bar.tooltip_text=card.health_label.text
+	card.status_label.add_theme_font_size_override("font_size",12)
+	card.status_label.text=_short_activity(card.status_label.text)
+	card.reset_size()
+
+
+func _short_activity(value: String) -> String:
+	# The complete destination stays on the tooltip and in the selected detail.
+	if value.begins_with("搜寻") or value.begins_with("搜刮"): return "搜刮中"
+	if value.begins_with("前往"): return "前往目标"
+	if value.contains("阵亡"): return "阵亡"
+	return value

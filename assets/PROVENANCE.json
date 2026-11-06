@@ -560,6 +560,18 @@
       "sha256": "5a1b80484d59d1cacd4bfd7d1dae4016df985a12f4dd2961ebce7bc6707cd14f",
       "origin": "original hand-authored lightweight SVG for M13 exploration; no external assets",
       "license": "No additional license granted"
+    },
+    {
+      "path": "assets/worldgen/apple_tree.png",
+      "sha256": "6e8969fe46a6f72814b9afd6b11a0c3b72c5b7c05252fb591f23516d09d7eaf2",
+      "origin": "AI-assisted original project art; built-in image generation; M14 tree and picked-empty variant; resized with preserved alpha",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/worldgen/apple_tree_empty.png",
+      "sha256": "eacc8d643477482a7fb13154ae9e1eee4a2078fdce5917e8ef7f73ab49b2bbda",
+      "origin": "AI-assisted original project art; built-in image generation; M14 tree and picked-empty variant; resized with preserved alpha",
+      "license": "No additional license granted"
     }
   ]
 }

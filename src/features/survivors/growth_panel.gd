@@ -128,7 +128,7 @@ func refresh(data: Dictionary) -> void:
 		action_summary.text = "尚无本版本行动明细"
 		_label(records,"每次真实个人击退+10 XP，归航且存活才生效；没有分享以前的经验。" if GrowthState.is_family(_data) else "旧战绩完整保留；从本版本的实际出击开始记录。\n没有回填历史经验或升级。",18)
 		return
-	var map_name: String = "生成街区" if (RogueLayout.is_map_id(action.map_id) or WorldLayout.is_map_id(action.map_id) or NeighborhoodLayout.is_map_id(action.map_id) or ExplorationLayout.is_map_id(action.map_id)) else "旧街修理巷" if action.map_id == "repair_lane" else "青禾市场环路"
+	var map_name: String = "生成街区" if (RogueLayout.is_map_id(action.map_id) or WorldLayout.is_map_id(action.map_id) or NeighborhoodLayout.is_map_id(action.map_id) or (ExplorationLayout.is_map_id(action.map_id) or WorldgenLayout.is_map_id(action.map_id))) else "旧街修理巷" if action.map_id == "repair_lane" else "青禾市场环路"
 	action_summary.text = "最近行动 · %s · %s\n确认击退 %d · 显示最近 %d 条" % [map_name,
 		"已撤离" if action.evacuated else "行动结束",int(action.total),action.recent.size()]
 	if action.recent.is_empty():

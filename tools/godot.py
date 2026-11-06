@@ -56,7 +56,7 @@ def main():
  execute('task-data',['--script','res://tests/task_data.gd'],[])
  execute('task-contracts',['--script','res://tests/task_contracts.gd'],[])
  execute('weapon-magazine',['--script','res://tests/weapon_magazine.gd'],[])
- for name in ['campaign_rules','boss_behavior','campaign_contracts','encounter_termination','build_items','basic_support','build_contracts','combat_patterns_v1','toxic_v1','combat_integration','search_assignments','search_work_view','special_powers','power_boundaries','persona_rules','persona_runtime','persona_ui','exploration_generation','exploration_contracts','exploration_presentation','exploration_boundaries']:
+ for name in ['campaign_rules','boss_behavior','campaign_contracts','encounter_termination','build_items','basic_support','build_contracts','combat_patterns_v1','toxic_v1','combat_integration','search_assignments','search_work_view','special_powers','power_boundaries','persona_rules','persona_runtime','persona_ui','exploration_generation','exploration_contracts','exploration_presentation','exploration_boundaries','worldgen_generation','worldgen_contracts','worldgen_hud','worldgen_boundaries','worldgen_picking']:
   execute(name.replace('_','-'),['--script','res://tests/'+name+'.gd'],[])
  execute('known-hash-cycle',['--script','res://tests/known_hash_cycle.gd'])
  execute('record-hash',['--script','res://tests/record_hash.gd'])

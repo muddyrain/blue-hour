@@ -104,6 +104,20 @@ func show_behind_roof(friend_behind: bool) -> void:
 	_roof.modulate.a = 0.40 if friend_behind else 1.0
 
 
+func scaled_hit_bounds() -> Rect2:
+	var factor: float=front_width/448.0
+	var pixels: Rect2=Rect2(_alpha.get_used_rect())
+	var visible_body: Rect2=Rect2(global_position+(pixels.position-Vector2(256,608))*factor,pixels.size*factor)
+	return visible_body.merge(Rect2(global_position+Vector2(door_offset-28,0),Vector2(56,64)))
+
+
+func scaled_hit_contains(point: Vector2) -> bool:
+	# New compact buildings use visible pixels and their real entrance, not an old tall box.
+	if Rect2(global_position+Vector2(door_offset-28,0),Vector2(56,64)).has_point(point): return true
+	var pixel: Vector2=(point-global_position)/(front_width/448.0)+Vector2(256,608)
+	return pixel.x>=0 and pixel.y>=0 and pixel.x<_alpha.get_width() and pixel.y<_alpha.get_height() and _alpha.get_pixel(int(pixel.x),int(pixel.y)).a>0.15
+
+
 func update_work(actor_id: int, fraction: float, inside: bool, call_sign: String = "", work_text: String = "") -> void:
 	if _work != null:
 		_work.visible = searchable

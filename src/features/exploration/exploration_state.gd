@@ -3,7 +3,7 @@ extends RefCounted
 ## Explicit new-journey capability; the existing camp/transaction remains the owner.
 const POLICY_ID: String = "BH_EXPLORATION_V1"
 static func enabled(camp: Dictionary) -> bool:
-	return camp.get("journey") is Dictionary and camp.journey.get("build") is Dictionary and camp.journey.build.get("version")==5
+	return camp.get("journey") is Dictionary and camp.journey.get("build") is Dictionary and (camp.journey.build.get("version")==5 or camp.journey.build.get("version")==6)
 
 static func initial_build(seed: String) -> Dictionary:
 	var value: Dictionary=PersonaState.initial_build(seed)

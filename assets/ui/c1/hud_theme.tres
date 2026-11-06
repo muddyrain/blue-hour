@@ -1,7 +1,7 @@
 [gd_resource type="Theme" load_steps=9 format=3]
 
 [sub_resource type="SystemFont" id="Font"]
-font_names = PackedStringArray("Microsoft YaHei", "Noto Sans CJK SC", "PingFang SC")
+font_names = PackedStringArray("Microsoft YaHei", "Noto Sans CJK SC", "Hiragino Sans GB", "Heiti SC", "PingFang SC")
 
 [sub_resource type="StyleBoxFlat" id="Panel"]
 bg_color = Color(0.045, 0.095, 0.13, 0.97)

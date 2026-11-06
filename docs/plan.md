@@ -1,3 +1,11 @@
+# M12-SURVIVOR-01 当前候选
+
+PR #16 精确已审 `ef4c0afb1d72dcf266eb6551b4649e25da9e24bf` 已普通合入 main `662ae1754b96eeb1bee9a4177059d050f5722787`；唯一目录开发分支 `codex/m12-survivor-01`，新 Draft PR base main。
+
+[幸存者组合与人物详情](design/m12-survivor-01.md)仅新旅程启用 build4/persona1/world14，旧 build3/world13 保持严格模式与指纹。稳定五身份组合不授予入队资格；本人枪伤、近战、移动、换弹、工作从原基础派生，三个只读入口沿原训练、配装、救援和结算。当前 Mac 定向验收；本轮不合并、不发布。正式生产门禁仍 BLOCKED。
+
+下一步由审阅结果决定，本轮不自动启动后续。以下保留历史阶段范围。
+
 # M11-POWER-01 当前候选
 
 PR #15 的精确已审 `03e48952d7bf3ce7ab25d8c2ecf283f87844cadd` 已按普通 merge 合入 main `664f8a553c5a1d265d365d19f0035861de71e486`，本轮独立 `codex/m11-power-01`，新 Draft PR base main。

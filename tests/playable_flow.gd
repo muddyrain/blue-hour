@@ -113,6 +113,7 @@ func _run() -> void:
 	viewport.gui_embed_subwindows = true
 	root.add_child(viewport)
 	app = load("res://src/app/main.tscn").instantiate()
+	if "--flow-bootstrap-m11" in OS.get_cmdline_user_args(): app.set_script(load("res://.local/m12-survivor-01/input/m11_main.gd"))
 	if "--flow-bootstrap-m10" in OS.get_cmdline_user_args(): app.set_script(load("res://.local/m11-power-01/input/m10_main.gd"))
 	if "--flow-bootstrap-m8" in OS.get_cmdline_user_args(): app.set_script(load("res://.local/m9_m8_main.gd"))
 	viewport.add_child(app)

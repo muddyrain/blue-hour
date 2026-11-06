@@ -87,6 +87,28 @@ static func inputs_problem(value: Variant, token: Dictionary, report: Dictionary
 			return "TRAIT_SEARCH_IDENTITY"
 		var minimum_ms: int = floori(TaskActions.PARAMETERS.airdrop_seconds*700.0) if (task.get("version")==4 or (task.get("version")==5 or (task.get("version")==6 or (task.get("version")==7 or task.get("version")==8)))) and task.get("type")=="airdrop" and row.site=="cash" else 21000
 		if (task.get("version")==7 or task.get("version")==8): minimum_ms=floori(minimum_ms*BuildItems.factors(task.build.slots).work)
+		if task.has("persona"):
+			if not task.get("sites") is Array or not report.get("site_facts") is Dictionary: return "TRAIT_SEARCH_SITE_SOURCE"
+			var base_seconds: float=INF
+			# The receipt records categories. Bind their lower bound to an actually
+			# completed site of that category, never an unsearched faster airdrop.
+			for definition: Variant in task.sites:
+				if not definition is Dictionary or not definition.get("id") is String or not definition.get("kind") is String or not SurvivalContracts.number(definition.get("seconds")) or definition.seconds<=0.0: return "TRAIT_SEARCH_SITE_SOURCE"
+				var state: Variant=report.site_facts.get(definition.id)
+				if not state is Dictionary or not state.get("searched") is bool: return "TRAIT_SEARCH_SITE_SOURCE"
+				if definition.kind==row.site and state.searched: base_seconds=minf(base_seconds,float(definition.seconds))
+			if not is_finite(base_seconds): return "TRAIT_SEARCH_SITE_SOURCE"
+			var fastest: float=INF
+			# Shared site progress survives cancellation. A faster real participant may
+			# have done earlier work; the final worker alone is not a causal lower bound.
+			for participant: Dictionary in report.participants:
+				var id: int=int(participant.id)
+				if report.field_joins.any(func(join: Dictionary) -> bool: return join.member_id==id and join.at_ms>row.at_ms): continue
+				var member: Dictionary=SurvivorRoster.member(context.crew,id)
+				if member.is_empty(): return "TRAIT_SEARCH_SOURCE"
+				fastest=minf(fastest,factor(member,"search")*PersonaState.factor(task,id,"work"))
+			if not is_finite(fastest) or fastest<=0.0: return "TRAIT_SEARCH_SOURCE"
+			minimum_ms=floori(base_seconds*fastest*BuildItems.factors(task.build.slots).work*1000.0)
 		if SurvivorRoster.member(report.get("participants",[]),int(row.member_id)).is_empty() or SurvivorRoster.member(context.crew,int(row.member_id)).is_empty() or not SurvivalContracts.integer(row.at_ms,minimum_ms,int(report.get("growth_inputs",{}).get("duration_ms",-1))) or row.at_ms < previous:
 			return "TRAIT_SEARCH_SOURCE"
 		if not report.get("field_joins",[]).is_empty() and row.member_id == report.field_joins[0].member_id and row.at_ms < report.field_joins[0].at_ms:

@@ -2,7 +2,7 @@ class_name PowerState
 extends RefCounted
 ## Camp inventory facts are published only by CampEdit / FrozenSettlement.
 static func enabled(camp: Dictionary) -> bool:
-	return camp.get("journey") is Dictionary and camp.journey.get("build") is Dictionary and camp.journey.build.get("version")==3
+	return camp.get("journey") is Dictionary and camp.journey.get("build") is Dictionary and (camp.journey.build.get("version")==3 or camp.journey.build.get("version")==4)
 
 static func initial_build() -> Dictionary:
 	var build: Dictionary=CombatActions.initial()
@@ -25,7 +25,7 @@ static func problem(camp: Dictionary) -> String:
 	var prior: Array=[]
 	var ordinal: int=0
 	for source: Variant in value.sources:
-		if not source is Dictionary or source.size()!=3 or not source.has_all(["ability_id","transaction_id","generated"]) or not source.transaction_id is String or source.ability_id!=value.owned[prior.size()] or not PowerActions.problem(source.generated).is_empty(): return "POWER_SOURCE_FIELDS"
+		if not source is Dictionary or source.size()!=3 or not source.has_all(["ability_id","transaction_id","generated"]) or not source.transaction_id is String or source.ability_id!=value.owned[prior.size()] or not _source_problem(camp,source.generated).is_empty(): return "POWER_SOURCE_FIELDS"
 		var number: int=int(source.transaction_id.get_slice(":",1))
 		var generated: Dictionary=source.generated
 		if number<=ordinal or number>camp.settled_sorties or source.transaction_id!="%s:%d"%[camp.profile_id,number] or generated.campaign.run_id!=camp.profile_id or generated.seed!=camp.journey.seed or generated.day!=number+1 or generated.powers.sample!=source.ability_id or not TransactionReceipt.same({"v":prior},{"v":generated.powers.owned}): return "POWER_SOURCE_BINDING"
@@ -58,3 +58,11 @@ static func settled(before: Dictionary, report: Dictionary, generated: Dictionar
 	for event: Dictionary in report.powers.accepted:
 		value.uses.append({"day":before.day,"binding":report.powers.binding.duplicate(true),"event":event.duplicate(true)})
 	return value
+
+
+static func _source_problem(camp: Dictionary, generated: Variant) -> String:
+	if not PersonaState.enabled(camp): return PowerActions.problem(generated)
+	var issue: String=PersonaActions.problem(generated)
+	if not issue.is_empty(): return issue
+	if not camp.journey.build.get("persona") is Dictionary or not TransactionReceipt.same(generated.persona.facts,camp.journey.build.persona): return "PERSONA_POWER_SOURCE"
+	return ""

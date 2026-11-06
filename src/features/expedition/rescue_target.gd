@@ -11,6 +11,7 @@ var worker: int = 0
 var npc: FieldActor
 var button: C1HudButton
 var _joined_at_ms: int = -1
+var persona_card: PersonaCard
 var label: Label
 
 
@@ -38,6 +39,21 @@ func _ready() -> void:
 		button.offset_bottom = 256
 	button.pressed.connect(request)
 	world._hud.view.add_child(button)
+	if world.persona_mode():
+		button.offset_top=548
+		button.offset_bottom=588
+		button.offset_right=264
+		persona_card=PersonaCard.new()
+		world._hud.view.add_child(persona_card)
+		persona_card.position=Vector2(16,410)
+		persona_card.size.x=248
+		var model: Dictionary=PersonaViewModel.camp(world.field_departure,world.candidate_id(),"candidate")
+		persona_card.present(model,true)
+		persona_card.selected.connect(func(_id: int) -> void:
+			world._hud.view._persona_id=0
+			world._hud.view.persona_details.present(model)
+			world._hud.view.persona_details.grab_focus()
+		)
 	refresh()
 
 
@@ -145,6 +161,7 @@ func delivered() -> bool:
 
 
 func refresh() -> void:
+	if persona_card!=null: persona_card.visible=status in ["AVAILABLE","IN_PROGRESS"]
 	label.visible = not (world.field_join_mode and status == "IN_FIELD_JOINED")
 	label.position = npc.position + Vector2(-100,-132)
 	label.text = candidate_name()+" · 等待援救\n左键 / 10秒援救" if status == "AVAILABLE" else ("援救 %.1f / 10秒" % progress if status == "IN_PROGRESS" else ("已上车 · 归航后加入" if delivered() else "已获救 · 前往巴士"))

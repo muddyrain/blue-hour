@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://src/app/main.gd" id="1_main"]
 
 [sub_resource type="SystemFont" id="SystemFont_cjk"]
-font_names = PackedStringArray("Microsoft YaHei", "Noto Sans CJK SC", "PingFang SC")
+font_names = PackedStringArray("Microsoft YaHei", "Noto Sans CJK SC", "Hiragino Sans GB", "Heiti SC", "PingFang SC")
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_normal"]
 bg_color = Color(0.11, 0.23, 0.30, 1)

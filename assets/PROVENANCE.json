@@ -387,7 +387,7 @@
     },
     {
       "path": "assets/ui/c1/hud_theme.tres",
-      "sha256": "f3e5fc33d60853f06d2341b5143fd79d8a02de514a9beb70730454df5d971dbc",
+      "sha256": "9b2e4a94901f9a7e47bdc92d7a1f975c814cb53ebf8161ba411bbe5c55b90359",
       "origin": "original project vector/resource",
       "license": "No additional license granted"
     },
@@ -499,6 +499,36 @@
       "path": "assets/powers/speed_boost_v1.svg",
       "sha256": "a31fb858c05d8e9db02595e12fdd5e9e35a14127b06f167330f97f4759395ded",
       "origin": "Original Blue Hour vector icon, authored for M11-POWER-01; no reference-image pixels",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/persona/negative.svg",
+      "sha256": "27760d4d5a08674fad16510b0ae29a9aa116b3b1e8bee7593ee1af5f0e8c8416",
+      "origin": "original project-authored vector icon for M12 survivor information",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/persona/positive.svg",
+      "sha256": "d4aa6d5a75966e9a1d5b17de04b6343b38597c2176db2160f3d84929d331f173",
+      "origin": "original project-authored vector icon for M12 survivor information",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/persona/trait_aim.svg",
+      "sha256": "5a2f604bf473b18f2bae2b563e6ad73feafa4931ad30a3480c02c1361c80c535",
+      "origin": "original project-authored vector icon for M12 survivor information",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/persona/trait_move.svg",
+      "sha256": "d5ff2d46f8a76d9d14b4ed36560e885878a056865f709f6eeebc8530ccebfb3a",
+      "origin": "original project-authored vector icon for M12 survivor information",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/persona/trait_supply.svg",
+      "sha256": "aec0440e03d87a9be9a520e8ac058c585cd9d1295d5247c8c739f0bb3c62880b",
+      "origin": "original project-authored vector icon for M12 survivor information",
       "license": "No additional license granted"
     }
   ]

@@ -22,6 +22,7 @@ var motion_locked: bool = false
 var cooldown: float = 0.0
 var trait_shot_factor: float = 1.0
 var trait_search_factor: float = 1.0
+var persona_work_factor: float = 1.0
 var weapon_instance_id: String = ""
 var toxic_carrier: ToxicCarrierVisualV1
 var combat_view: CombatWeaponVisualV1

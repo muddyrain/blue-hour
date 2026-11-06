@@ -484,3 +484,16 @@ func accept_support(before: Dictionary, request: Dictionary) -> Dictionary:
 	elif receipt.phase!="RESUME_CLAIMED": return _blocked("SUPPORT_ACK_PHASE")
 	accepted.world=world
 	return accepted
+
+func accept_power(before: Dictionary, request: Dictionary) -> Dictionary:
+	if not suspend_enabled or _transaction==null or token.is_empty() or not PowerAuthority.mode(_active_rules): return _blocked("POWER_MODE_REQUIRED")
+	var accepted: Dictionary=_transaction.accept_power(token,before,request)
+	if accepted.error!=OK: return accepted
+	var receipt: Dictionary=accepted.receipt
+	var world: Dictionary=receipt.envelope.world.duplicate(true)
+	if receipt.phase=="SUSPEND_READY":
+		accepted=_transaction.claim_suspend(token,receipt.envelope.world_hash,receipt.envelope.previous_head)
+		if accepted.error!=OK: return accepted
+	elif receipt.phase!="RESUME_CLAIMED": return _blocked("POWER_ACK_PHASE")
+	accepted.world=world
+	return accepted

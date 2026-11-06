@@ -17,6 +17,8 @@ var is_enemy: bool = false
 var health: float = 200.0
 var max_health: float = 200.0
 var speed: float = 125.0
+var power_move_factor: float = 1.0
+var motion_locked: bool = false
 var cooldown: float = 0.0
 var trait_shot_factor: float = 1.0
 var trait_search_factor: float = 1.0
@@ -101,7 +103,7 @@ func advance(delta: float, move_path: bool = true, animate: bool = true) -> void
 		return
 	cooldown = maxf(cooldown - delta, 0.0)
 	var previous: Vector2 = position
-	var remaining: float = speed * delta
+	var remaining: float = effective_speed() * delta
 	while move_path and activity == Activity.MOVING and remaining > 0.0:
 		if _path_index >= path.size():
 			activity = Activity.IDLE
@@ -191,3 +193,6 @@ func sync_enemy_visual() -> void:
 	if _enemy_tag!=null:
 		_enemy_tag.visible = health>0
 		_enemy_tag.text = EnemyRules.name_for(enemy_behavior.kind)+(" 预备%.1fs" % enemy_behavior.windup_remaining if visual.enemy_windup else " 冲刺" if enemy_behavior.state=="rush" else "")
+
+func effective_speed() -> float:
+	return speed * power_move_factor

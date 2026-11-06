@@ -17,7 +17,7 @@ func check(value:bool,label:String) -> void:
 
 func run() -> void:
 	assert("/.local/" in OS.get_user_data_dir().replace("\\","/"))
-	for mode:String in ["zero","partial","retry"]:await scenario(mode)
+	for mode:String in ["zero","partial","retry","freeze"]:await scenario(mode)
 	for arg:String in OS.get_cmdline_user_args():
 		if arg.begins_with("--termination-output="):
 			var path:String=arg.trim_prefix("--termination-output=")
@@ -67,6 +67,10 @@ func scenario(mode:String) -> void:
 	var before:Dictionary=runtime.snapshot()
 	var health_before:Array=world.survivors.map(func(member:FieldActor)->float:return member.health)
 	world.toggle_pause()
+	if mode=="freeze":
+		world.power_frozen=true
+		runtime.advance(3.0)
+		check(TransactionReceipt.same(before,runtime.snapshot()),"frozen live boss retains original pending/windup/handling without applying damage")
 	if mode=="retry":
 		runtime.advance(0.0);runtime.advance(0.0)
 		check(world.survivors.all(func(member:FieldActor)->bool:return member.health==200.0-BossDefinition.POLICY.slam_damage),"live retry hits each target exactly once")
@@ -79,6 +83,12 @@ func scenario(mode:String) -> void:
 			for member:FieldActor in world.survivors:
 				member.advance(1.0,false,false);member.magazine.advance(1.0)
 			world._update_combat()
+			if mode=="freeze" and boss.health>0:
+				var action_before:Dictionary=runtime.behavior.snapshot()
+				runtime.observe_frozen_health()
+				var observed:Dictionary=runtime.behavior.snapshot()
+				check(observed.remaining==action_before.remaining and observed.melee_cooldown==action_before.melee_cooldown and observed.slam_cooldown==action_before.slam_cooldown and observed.state==action_before.state,"nonlethal frozen boss damage records health without advancing actions")
+				check(EncounterRuntime.facts_problem(runtime.snapshot(),{"encounter":runtime.definition},world.xp_inputs.snapshot(world)).is_empty(),"nonlethal frozen boss remains strictly authenticatable before thaw/death")
 		check(boss.health==0 and not runtime.defeat.is_empty(),"original shots and XP owner confirm real defeat: "+mode)
 		check(runtime.behavior.snapshot().pending.is_empty(),"death terminates pending requests: "+mode)
 		check(runtime.handling.is_empty(),"death terminates handling alongside pending: "+mode)

@@ -101,6 +101,13 @@ var threat: ThreatDirector = ThreatDirector.new()
 var threat_rehearsal: bool = false
 var combat: CombatRuntime=CombatRuntime.new()
 var combat_delta: float=0.0
+var powers: Dictionary = {}
+var power_commit: Callable
+var pending_power: Dictionary = {}
+var power_frozen: bool = false
+var _power_effect_visible: bool = false
+var power_panel: PowerSlotPanel
+var power_view: PowerEffectView
 var basic_support: BasicSupport = BasicSupport.new()
 var support_commit: Callable
 var support_aiming: bool = false
@@ -164,6 +171,7 @@ func _ready() -> void:
 	if growth_mode:
 		xp_inputs.configure(growth_binding)
 	if build_mode(): basic_support.configure(growth_binding)
+	if power_mode(): powers=SpecialPowers.initial(growth_binding,supply.generated.powers.slot)
 	if combat_mode(): combat.setup(self)
 	if trait_mode:
 		trait_inputs.configure(growth_binding)
@@ -366,6 +374,13 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func step(delta: float) -> void:
+	if power_mode() and not is_paused and not suspend_sealed and phase!=Phase.FINISHED and not (bus_view!=null and bus_view.running()):
+		var remaining: float=SpecialPowers.remaining(powers,elapsed)
+		if remaining>0.0 and delta>remaining:
+			step(remaining)
+			step(delta-remaining)
+			return
+	refresh_power_factors()
 	combat_delta=delta
 	if bus_view != null and bus_view.running():
 		if not is_paused: bus_view.advance(delta)
@@ -401,7 +416,7 @@ func step(delta: float) -> void:
 		# No while-loop or accumulated debt, including when full or all points are visible.
 		_spawn_clock = tuning.spawn_seconds if is_practice else threat.interval
 	if _ai_clock <= 0.0:
-		_update_enemy_paths()
+		if not power_frozen: _update_enemy_paths()
 		_ai_clock = 0.7
 	var working_before: Dictionary={}
 	for actor: FieldActor in survivors:working_before[actor.member_id]=actor.activity in [FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING]
@@ -414,8 +429,8 @@ func step(delta: float) -> void:
 	_update_enemy_behaviors(delta)
 	_update_enemy_paths(true)
 	for enemy: FieldActor in enemies:
-		enemy.advance(delta,false,false)
-	var enemy_motion: Dictionary = FieldContacts.move(enemies,occupants,navigation,delta,false,_hold_enemy_approach)
+		enemy.advance(0.0 if power_frozen else delta,false,false)
+	var enemy_motion: Dictionary = FieldContacts.move(enemies,occupants,navigation,0.0 if power_frozen else delta,false,_hold_enemy_approach)
 	last_contact_metrics.enemy_substeps = enemy_motion.substeps
 	last_contact_metrics.motion_deviation_max = maxf(last_contact_metrics.motion_deviation_max,enemy_motion.motion_deviation_max)
 	for actor: FieldActor in occupants: actor.present_motion(delta,previous[actor])
@@ -444,7 +459,9 @@ func step(delta: float) -> void:
 	if combat_mode() and not is_paused: combat.advance_toxic(self,delta)
 	if combat_mode():
 		for actor: FieldActor in survivors: combat.present(actor)
-	if encounter!=null and not is_paused: encounter.advance(delta)
+	if encounter!=null and not is_paused:
+		if power_frozen: encounter.observe_frozen_health()
+		else: encounter.advance(delta)
 	if is_paused:
 		_update_ui()
 		return
@@ -459,6 +476,7 @@ func step(delta: float) -> void:
 		if _engine_clock <= 0.0:
 			phase = Phase.BOARDING
 			_show_notice("引擎已发动 · 点击「集合至巴士」，或左键黄色区域。")
+	refresh_power_factors()
 	_update_ui()
 	queue_redraw()
 	last_simulation_usec = Time.get_ticks_usec() - started_usec
@@ -524,6 +542,9 @@ func promote_target(event: Dictionary, restoring: bool = false) -> void:
 
 
 func toggle_pause() -> void:
+	if not pending_power.is_empty():
+		_accept_power(pending_power.before,pending_power.request)
+		return
 	if combat_mode(): combat.cancel_unavailable(self)
 	support_aiming=false
 	if not pending_support.is_empty():
@@ -827,6 +848,7 @@ func _make_actor(enemy: bool, index: int, point: Vector2, profile: Dictionary = 
 	if enemy:
 		actor.visual_contact = _visual_contact.bind(actor)
 	actor.speed = tuning.enemy_speed if enemy else tuning.survivor_speed
+	actor.motion_locked=power_frozen if enemy else false
 	actor.max_health = tuning.enemy_health if enemy else tuning.survivor_health
 	if growth_mode and not enemy and not profile.is_empty():
 		actor.max_health = GrowthRules.maximum(profile)
@@ -979,6 +1001,7 @@ func _spawn_practice_enemy() -> void:
 
 
 func _update_enemy_paths(idle_only: bool = false) -> void:
+	if power_frozen: return
 	for enemy: FieldActor in enemies:
 		if (combat_mode() and combat.holds(enemy)) or (encounter!=null and encounter.holds(enemy)) or (enemy.enemy_behavior!=null and enemy.enemy_behavior.state=="windup"):
 			continue
@@ -1071,7 +1094,7 @@ func _update_combat() -> void:
 		else:
 			actor.aim = Vector2.ZERO
 	for enemy: FieldActor in enemies:
-		if enemy.activity == FieldActor.Activity.DOWN or (encounter!=null and encounter.is_boss(enemy)):
+		if power_frozen or enemy.activity == FieldActor.Activity.DOWN or (encounter!=null and encounter.is_boss(enemy)):
 			continue
 		if combat_mode() and combat.holds(enemy): continue
 		var target: FieldActor = _nearest_target(enemy, survivors, 28.0)
@@ -1120,7 +1143,7 @@ func _update_combat() -> void:
 
 
 func _update_enemy_behaviors(delta: float) -> void:
-	if not enemy_mode:
+	if not enemy_mode or power_frozen:
 		return
 	for enemy: FieldActor in enemies:
 		if enemy.enemy_behavior!=null and not (encounter!=null and encounter.is_boss(enemy)):
@@ -1237,6 +1260,8 @@ func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
 	if site.kind == &"cash" and not is_practice and (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
 		_show_notice("获得损坏%s · 回营后入库维修"%WeaponInventory.definition(weapon_loot.back().weapon_id).display_name)
 		print("BH_WEAPON_FOUND %s" % JSON.stringify(weapon_loot.back()))
+	if power_mode() and site.id==&"cash" and supply.generated.type=="equipment":
+		_show_notice("已携带能力样本：%s · 归航确认后入库"%SpecialPowers.POLICY[supply.generated.powers.sample].name if not supply.generated.powers.sample.is_empty() else "特殊能力已集齐。")
 	if build_mode() and site.id==&"cash" and not supply.generated.build.drops.is_empty():
 		var names: PackedStringArray=[]
 		for item: String in supply.generated.build.drops: names.append(BuildItems.definitions()[item].name)
@@ -1283,6 +1308,7 @@ func _finish(evacuated: bool) -> void:
 	if not layout.world_data.is_empty(): report.site_facts = WorldSites.facts(self)
 	if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or supply.generated.get("version")==8))): report.task_event=task_event.duplicate(true)
 	if build_mode(): report.support=basic_support.snapshot()
+	if power_mode(): report.powers=powers.duplicate(true)
 	if not is_practice and not loadout_snapshot.is_empty():
 		report.growth_inputs = growth_inputs.snapshot(sortie_id,layout.id,elapsed)
 	if rescue_mode:
@@ -1357,12 +1383,19 @@ func _make_ui() -> void:
 		drill_panel.visible = not player_mode
 	if build_mode():
 		support_panel=BasicSupportPanel.new()
-		support_panel.position=Vector2(320,166)
+		support_panel.position=Vector2(16,164)
 		support_panel.heal_requested.connect(request_heal)
 		support_panel.airstrike_requested.connect(toggle_support_aim)
 		_hud.view.add_child(support_panel)
 		support_aim=BasicSupportAim.new()
 		_effects.add_child(support_aim)
+	if power_mode():
+		power_panel=PowerSlotPanel.new()
+		power_panel.position=Vector2(16,316)
+		power_panel.activation_requested.connect(request_power)
+		_hud.view.add_child(power_panel)
+		power_view=PowerEffectView.new()
+		_effects.add_child(power_view)
 	_update_ui()
 
 
@@ -1373,6 +1406,7 @@ func _show_notice(message: String) -> void:
 
 func _update_ui() -> void:
 	_present_support()
+	_present_power()
 	if _hud == null:
 		return
 	if _readouts != null:
@@ -1400,7 +1434,7 @@ func _update_ui() -> void:
 		if assigned_site != null:
 			status = SearchWorkView.actor_status(search_assignments.phase_for(actor.member_id),site_label(assigned_site),TaskActions.outdoor_site(supply.generated,assigned_site.id))
 		members.append({"id":actor.member_id,"label":"%s · %s" % [actor.call_sign, "阵亡" if actor.permanent_death else status],
-			"call_sign":actor.call_sign,"status":_weapon_status(actor,status),"ammo":_ammo_text(actor),
+			"call_sign":actor.call_sign,"status":_weapon_status(actor,status),"ammo":_ammo_text(actor),"detail":("%s · %s"%[status,assigned_site.prop.title] if assigned_site!=null else status),
 			"colour":SurvivorRoster.definition_by_id(String(actor.definition_id)).colour,
 			"hp":actor.health,"max_hp":actor.max_health})
 	if growth_mode:
@@ -1427,7 +1461,7 @@ func _update_ui() -> void:
 		"enemy_mode":enemy_mode,
 		"weapon_loot":weapon_loot.size(),
 		"searched": searched, "kills": kills, "engine": engine_text,
-		"notice": (xp_text+"\n"+_notice_text if _notice_clock > 0 else xp_text) if growth_mode else _notice_text, "notice_visible": growth_mode or _notice_clock > 0.0,
+		"notice": _notice_text, "notice_visible": _notice_clock > 0.0,
 		"practice": is_practice,
 		"threat":threat_status(),
 	})
@@ -1616,6 +1650,7 @@ func apply_build(actor: FieldActor) -> void:
 	# Definitions are freshly derived from immutable inventory once per actor setup.
 	if not CombatEquipment.melee(String(actor.weapon_definition.id)): actor.weapon_definition.damage*=factors.damage
 	actor.speed*=factors.move
+	actor.power_move_factor=SpecialPowers.move_factor(powers,elapsed) if power_mode() else 1.0
 	if actor.magazine!=null: actor.magazine.reload_factor=factors.reload
 
 func support_available() -> bool:
@@ -1679,6 +1714,9 @@ func toggle_support_aim() -> void:
 
 func _support_input(event: InputEvent) -> bool:
 	if not build_mode(): return false
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode==KEY_3 and power_mode():
+		if get_viewport().gui_get_focus_owner()==null: request_power()
+		return true
 	if event is InputEventKey and event.pressed and not event.echo and get_viewport().gui_get_focus_owner()==null:
 		if support_aiming and event.keycode in [KEY_ESCAPE,KEY_E]: support_aiming=false; return true
 		if event.keycode==KEY_Q: request_heal(); return true
@@ -1717,3 +1755,52 @@ func support_plan_airstrike(point: Vector2) -> Dictionary:
 	for enemy: FieldActor in enemies:
 		view.enemies.append({"state":{"actor_id":enemy.actor_id,"health":enemy.health,"position":[enemy.position.x,enemy.position.y]}})
 	return BuildAuthority.plan_airstrike(view,point,layout)
+
+func power_mode() -> bool:
+	return supply.generated.has("powers")
+
+func refresh_power_factors() -> void:
+	var factor: float=SpecialPowers.move_factor(powers,elapsed) if power_mode() else 1.0
+	power_frozen=SpecialPowers.frozen(powers,elapsed) if power_mode() else false
+	for actor: FieldActor in survivors: actor.power_move_factor=factor
+	for actor: FieldActor in enemies: actor.motion_locked=power_frozen
+
+func request_power() -> bool:
+	if not power_mode() or not support_available() or not pending_power.is_empty() or not survivors.any(func(actor:FieldActor)->bool:return actor.health>0): return false
+	var request: Dictionary=SpecialPowers.request(powers)
+	if request.is_empty(): return false
+	return _accept_power(support_world(),request)
+
+func _accept_power(before: Dictionary, request: Dictionary) -> bool:
+	if not power_commit.is_valid(): return false
+	var result: Dictionary=power_commit.call(before,request)
+	if result.get("error",ERR_UNAVAILABLE)!=OK:
+		pending_power={"before":before,"request":request}
+		print("BH_POWER "+JSON.stringify({"status":"PENDING","reason":result.get("reason",""),"at":elapsed}))
+		is_paused=true
+		support_aiming=false
+		_show_notice("能力尚未确认，已暂停；解除故障后继续重试。"+String(result.get("reason","")))
+		_update_ui()
+		return false
+	pending_power={}
+	powers=result.world.powers.duplicate(true)
+	is_paused=false
+	refresh_power_factors()
+	_show_notice("%s已生效 · 今日一次已保存"%SpecialPowers.POLICY[request.ability_id].name)
+	print("BH_POWER "+JSON.stringify({"status":"ACCEPTED","event":powers.accepted[0],"elapsed":elapsed}))
+	_update_ui()
+	return true
+
+func _present_power() -> void:
+	if not power_mode() or power_panel==null: return
+	var id: String=supply.generated.powers.slot
+	var remaining: float=SpecialPowers.remaining(powers,elapsed)
+	if _power_effect_visible and remaining==0.0: _show_notice("特殊能力效果结束 · 今日已用")
+	_power_effect_visible=remaining>0.0
+	var status: String="营地装配 · 每日一次" if id.is_empty() else "持续 %.1f 秒"%remaining if remaining>0 else "今日已用" if not powers.accepted.is_empty() else "就绪 · 每日一次"
+	power_panel.present("特殊能力空槽" if id.is_empty() else SpecialPowers.POLICY[id].name,status,remaining,float(SpecialPowers.POLICY[id].duration) if not id.is_empty() else 1.0,support_available() and not SpecialPowers.request(powers).is_empty(),id)
+	var members: Array[Dictionary]=[]
+	var foes: Array[Dictionary]=[]
+	for actor: FieldActor in survivors: members.append({"position":actor.position,"moving":actor.activity==FieldActor.Activity.MOVING,"alive":actor.health>0 and actor.visible})
+	for actor: FieldActor in enemies: foes.append({"position":actor.position,"moving":actor.activity==FieldActor.Activity.MOVING,"alive":actor.health>0 and actor.visible})
+	power_view.present(members,foes,id=="speed_boost_v1" and remaining>0,id=="map_freeze_v1" and remaining>0,elapsed)

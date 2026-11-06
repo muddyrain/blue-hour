@@ -158,12 +158,12 @@ func advance_toxic(world: Expedition,delta: float) -> void:
 		var actor: FieldActor=_enemy(world,int(row.id))
 		if actor.enemy_behavior!=null and actor.enemy_behavior.kind==CombatEnemyRules.TOXIC: casters.append(row)
 	var prior_sequence: int=int(toxic.sequence)
-	var plan: Dictionary=ToxicV1.plan(toxic,delta,casters,rows(world.survivors),world.shot_obstacles)
+	var plan: Dictionary=ToxicV1.plan(toxic,delta,casters,rows(world.survivors),world.shot_obstacles,not world.power_frozen)
 	toxic=plan.state
 	if int(toxic.sequence)>prior_sequence: world._show_notice("毒气预警 · 离开危险区域。")
 	for actor: FieldActor in world.enemies:
 		if actor.toxic_carrier!=null: actor.toxic_carrier.present(actor.visual._facing,holds(actor),1.0-float(toxic.casters.get(str(actor.actor_id),{}).get("remaining",0.0))/float(ToxicV1.POLICY.windup))
-		if holds(actor):
+		if holds(actor) and not world.power_frozen:
 			actor.clear_order()
 			var point: Array=toxic.casters[str(actor.actor_id)].point
 			actor.aim=actor.position.direction_to(Vector2(point[0],point[1]))

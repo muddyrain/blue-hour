@@ -470,6 +470,36 @@
       "path": "assets/world_v2/row_house.png",
       "sha256": "b0456f48497c15656af8ff84b96993c4f04030ea6fccae5ff9011ace960307a5",
       "source": "Original built-in image_gen; source and normalization hashes in assets/world_v2/manifest.json"
+    },
+    {
+      "path": "assets/powers/airstrike.svg",
+      "sha256": "53db8255cb5c6b408f6c5bf35b1f4f2814f16a0f92f4536131c245f90f13001d",
+      "origin": "Original Blue Hour vector icon, authored for M11-POWER-01; no reference-image pixels",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/powers/empty.svg",
+      "sha256": "e94a7a30e86114150597aa47e389763274fa20b9b660901f59995cc74938be6e",
+      "origin": "Original Blue Hour vector icon, authored for M11-POWER-01; no reference-image pixels",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/powers/heal.svg",
+      "sha256": "d83afaadb3a8452349a9741860e7ae6ccba8de692785c79ee6abcff10416467a",
+      "origin": "Original Blue Hour vector icon, authored for M11-POWER-01; no reference-image pixels",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/powers/map_freeze_v1.svg",
+      "sha256": "09682b9898bfd3da68639d6852a1635eca65d9f319a07f431188c302aac2581c",
+      "origin": "Original Blue Hour vector icon, authored for M11-POWER-01; no reference-image pixels",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/powers/speed_boost_v1.svg",
+      "sha256": "a31fb858c05d8e9db02595e12fdd5e9e35a14127b06f167330f97f4759395ded",
+      "origin": "Original Blue Hour vector icon, authored for M11-POWER-01; no reference-image pixels",
+      "license": "No additional license granted"
     }
   ]
 }

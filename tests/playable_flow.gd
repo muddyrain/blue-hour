@@ -113,6 +113,7 @@ func _run() -> void:
 	viewport.gui_embed_subwindows = true
 	root.add_child(viewport)
 	app = load("res://src/app/main.tscn").instantiate()
+	if "--flow-bootstrap-m10" in OS.get_cmdline_user_args(): app.set_script(load("res://.local/m11-power-01/input/m10_main.gd"))
 	if "--flow-bootstrap-m8" in OS.get_cmdline_user_args(): app.set_script(load("res://.local/m9_m8_main.gd"))
 	viewport.add_child(app)
 	if movie != null:
@@ -144,7 +145,7 @@ func _run() -> void:
 	for path: String in legacy_hashes:
 		_check(FileAccess.get_sha256(path)==legacy_hashes[path],"old entry file remains byte-identical: "+path)
 	if DisplayServer.get_name() != "headless": _check(OS.has_feature("windows") or not focus_observations.has(true),"background renderer; Windows must use isolated desktop launcher")
-	_write("report.json",{"checks":rows,"failures":failures,"stages":stages,"events":events,"training_effects":training_effects,"camp":app.camp_snapshot(),"pid":OS.get_process_id(),"path":app.progress_path,"legacy_hashes":legacy_hashes,"root_visible":root.visible,"root_focused":root.has_focus(),"native_focus_observations":focus_observations.size(),"video_frames":frames,"input":"viewport Enter + existing search/rescue/bus intentions; 6 simulation ticks per captured frame","physical_input":"NOT_TESTED","display_FPS":"NOT_MEASURED"})
+	_write("report.json",{"checks":rows,"failures":failures,"stages":stages,"events":events,"training_effects":training_effects,"camp":app.camp_snapshot(),"pid":OS.get_process_id(),"path":app.progress_path,"legacy_hashes":legacy_hashes,"root_visible":root.visible,"root_focused":root.has_focus(),"native_focus_observations":focus_observations.size(),"video_frames":frames,"input":flow_input_description(),"physical_input":"NOT_TESTED","display_FPS":"NOT_MEASURED"})
 	if movie != null: movie.disconnect_from_host()
 	app.audio.shutdown()
 	# Allow the native audio mixer to release stopped one-shot playback references.
@@ -238,3 +239,6 @@ func _journey() -> void:
 		_check(digest==FileAccess.get_sha256(app.progress_path) and TransactionReceipt.same(saved,app.camp_snapshot()),"repeated settlement confirmation cannot claim twice")
 		await _mark("camp-%d" % round_number)
 	_check(app.settled_sorties==3 and app.day==5 and app.crew.size()==3,"three consecutive real outings, both maps, rescue and training")
+
+func flow_input_description() -> String:
+	return "viewport Enter + existing search/rescue/bus intentions; 6 simulation ticks per captured frame"

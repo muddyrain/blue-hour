@@ -62,6 +62,7 @@ func refresh(state: Dictionary) -> void:
 		action = "集合至巴士"
 		bus_text = "%s · %d / %d 已到 · %d 工作" % ["集合中" if boarding.ordered else "等待集合", boarding.arrived, boarding.required, boarding.working]
 	view.refresh({
+		"resource_text":"货币 %d  ·  食物 %d\n携带：钱%d · 粮%d · 武器%d"%[state["cash"],state["food"],state["loot"],state["food_loot"],int(state.get("weapon_loot",0))],
 		"objective":state.get("objective",""), "mission_title":state["mission_title"], "day_text":"第 %d 天" % state["day"],
 		"search_progress_text":"%d / %d" % [state["sites_searched"],state["sites_total"]],
 		"defeated_text":str(state["kills"]), "currency_text":str(state["cash"]),

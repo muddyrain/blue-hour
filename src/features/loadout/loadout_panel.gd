@@ -5,8 +5,10 @@ extends Control
 signal equip_requested(member_id: int, instance_id: String)
 signal repair_requested(instance_id: String)
 signal build_requested(slot: int, item_id: String)
+signal power_requested(ability_id: String)
 signal closed
 
+var power_panel: PowerLoadoutPanel
 var build_panel: BuildItemsPanel
 var player_mode: bool = false
 
@@ -44,7 +46,11 @@ func _ready() -> void:
 	add_child(margins)
 	var column: VBoxContainer = VBoxContainer.new()
 	column.add_theme_constant_override("separation", 8)
-	margins.add_child(column)
+	var scroll: ScrollContainer=ScrollContainer.new()
+	scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+	margins.add_child(scroll)
+	column.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	scroll.add_child(column)
 	var heading: Label = Label.new()
 	heading.text = "武器整备 / 装备仓"
 	heading.add_theme_font_size_override("font_size", 32)
@@ -94,6 +100,9 @@ func _ready() -> void:
 	build_panel=BuildItemsPanel.new()
 	build_panel.requested.connect(func(slot:int,item:String)->void: build_requested.emit(slot,item))
 	column.add_child(build_panel)
+	power_panel=PowerLoadoutPanel.new()
+	power_panel.requested.connect(func(id:String)->void:power_requested.emit(id))
+	column.add_child(power_panel)
 	var actions: HBoxContainer = HBoxContainer.new()
 	actions.add_theme_constant_override("separation", 16)
 	column.add_child(actions)
@@ -128,6 +137,7 @@ func _ready() -> void:
 
 func refresh(data: Dictionary, feedback: String = "") -> void:
 	_data = data.duplicate(true)
+	power_panel.present(data,not CampaignState.ended(data))
 	build_panel.visible=BuildState.enabled(data)
 	if build_panel.visible: build_panel.present(data.journey.build.owned,data.journey.build.slots,true,not CampaignState.ended(data))
 	items.max_text_lines = 3 if WeaponState.is_family(_data) else 1

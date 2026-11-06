@@ -41,7 +41,7 @@ static func move(movers: Array[FieldActor], occupants: Array[FieldActor], naviga
 	var ordered: Array[FieldActor] = _ordered(movers)
 	var fastest: float = 1.0
 	for actor: FieldActor in ordered:
-		if actor.activity == FieldActor.Activity.MOVING: fastest = maxf(fastest,actor.speed)
+		if actor.activity == FieldActor.Activity.MOVING: fastest = maxf(fastest,actor.effective_speed())
 	# A very large caller delta cannot create an unbounded solve or a tunnelling leap.
 	var motion_time: float = minf(delta,STEP_DISTANCE * MAX_STEPS / fastest)
 	var steps: int = clampi(ceili(fastest * motion_time / STEP_DISTANCE),1,MAX_STEPS)
@@ -52,7 +52,7 @@ static func move(movers: Array[FieldActor], occupants: Array[FieldActor], naviga
 	for step: int in range(steps):
 		if recover: _recover(bodies,navigation,recovery,stats)
 		for actor: FieldActor in ordered:
-			var remaining: float = actor.speed * slice
+			var remaining: float = actor.effective_speed() * slice
 			# Reaching a waypoint must not discard the rest of this motion budget.
 			# Every piece is still swept; steering/blocked motion ends this microstep.
 			for part: int in range(MAX_PATH_PARTS):
@@ -158,6 +158,7 @@ static func _recover(bodies: Array[FieldActor], navigation: FieldNavigation, bud
 				for entry: Array in [[first,normal],[second,-normal]]:
 					var actor: FieldActor = entry[0]
 					var key: int = identity(actor)
+					if actor.motion_locked: continue
 					var amount: float = minf(missing*0.5,minf(2.0,float(budgets[key])))
 					if amount <= 0.00001: continue
 					var correction: Vector2 = _recovery_offset(actor,Vector2(entry[1]),amount,bodies,navigation)

@@ -41,6 +41,7 @@ func record_defeat(value: FieldActor, receipt: Dictionary) -> void:
 
 func advance(delta: float) -> void:
 	if definition.is_empty(): return
+	if world.power_frozen: present();return
 	if not is_instance_valid(actor) or health()<=0:
 		present();return
 	var targets: Array[Dictionary]=[]
@@ -76,6 +77,12 @@ func advance(delta: float) -> void:
 				world.combat_feedback.emit({"kind":"hit","enemy_id":0,"enemy_type":"breacher_v1","member_id":member.member_id,"health":member.health,"applied_damage":before-member.health,"attack_id":request.id,"elapsed":world.elapsed})
 			behavior.acknowledge(request.id,{"hits":handling.hits.duplicate()});handling={}
 	present()
+
+func observe_frozen_health() -> void:
+	if not definition.is_empty() and is_instance_valid(actor) and actor.health>0:
+		behavior.observe_frozen_health(actor.health/float(BossDefinition.POLICY.health),actor.position)
+	present()
+
 
 func legal(member: FieldActor, distance: float) -> bool:
 	return member.health>0 and AttackRules.evaluate(world._combatant(actor),world._combatant(member),actor.position+Vector2.UP*AttackRules.HIT_HEIGHT,distance,0.0,world.shot_obstacles).targetable

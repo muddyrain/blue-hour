@@ -40,12 +40,7 @@ func step(delta: float, health_ratio: float, alive: bool, targets: Array[Diction
 	# A normally acknowledges in this same simulation step. An outstanding effect
 	# must remain identical if the owner pauses/saves before acknowledgement.
 	var waiting: bool = not _value.pending.is_empty()
-	for threshold: Dictionary in _value.thresholds:
-		if not threshold.issued and health_ratio<=float(threshold.threshold)/100.0:
-			threshold.issued = true
-			_value.pending.append({"id":_summon_id(_value.identity,int(threshold.threshold)),
-				"kind":"summon","target_id":0,"position":[position.x,position.y],
-				"sequence":0,"threshold":threshold.threshold,"count":BossDefinition.POLICY.summon_count})
+	_record_health_thresholds(health_ratio,position)
 	if waiting: return _requests()
 	_value.melee_cooldown = maxf(0.0,_value.melee_cooldown-delta)
 	_value.slam_cooldown = maxf(0.0,_value.slam_cooldown-delta)
@@ -77,6 +72,22 @@ func step(delta: float, health_ratio: float, alive: bool, targets: Array[Diction
 		_value.point = [target.position.x,target.position.y]
 		_value.remaining = BossDefinition.POLICY[kind+"_windup"]
 	return _requests()
+
+
+func observe_frozen_health(health_ratio: float, position: Vector2) -> void:
+	assert(not _value.is_empty() and is_finite(health_ratio) and health_ratio>0.0 and health_ratio<=1.0)
+	if _value.state=="dead": return
+	# Record causal health facts only; no action clock, lock, or request execution.
+	_value.min_health_ratio=minf(_value.min_health_ratio,health_ratio)
+	_record_health_thresholds(health_ratio,position)
+
+func _record_health_thresholds(health_ratio: float, position: Vector2) -> void:
+	for threshold: Dictionary in _value.thresholds:
+		if not threshold.issued and health_ratio<=float(threshold.threshold)/100.0:
+			threshold.issued = true
+			_value.pending.append({"id":_summon_id(_value.identity,int(threshold.threshold)),
+				"kind":"summon","target_id":0,"position":[position.x,position.y],
+				"sequence":0,"threshold":threshold.threshold,"count":BossDefinition.POLICY.summon_count})
 
 
 func acknowledge(request_id: String, result: Dictionary) -> void:

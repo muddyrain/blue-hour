@@ -5,19 +5,27 @@ var bench_phase: String
 var expected_world: Dictionary
 var original_result: Dictionary
 var setup_started: int
+var fixture_buildings: int = 47
+var result_generation: int = 8
+var resume_generation: int = 5
+var complete_site: StringName
 
 func _run() -> void:
 	setup_started=Time.get_ticks_usec()
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--bench-source="): fixture=arg.trim_prefix("--bench-source=")
 		if arg.begins_with("--bench-phase="): bench_phase=arg.trim_prefix("--bench-phase=")
+		if arg.begins_with("--bench-buildings="): fixture_buildings=int(arg.trim_prefix("--bench-buildings="))
+		if arg.begins_with("--bench-result-generation="): result_generation=int(arg.trim_prefix("--bench-result-generation="))
+		if arg.begins_with("--bench-resume-generation="): resume_generation=int(arg.trim_prefix("--bench-resume-generation="))
+		if arg.begins_with("--bench-complete-site="): complete_site=StringName(arg.trim_prefix("--bench-complete-site="))
 	assert("/.local/" in fixture and "/.local/" in OS.get_user_data_dir().replace("\\","/"))
 	var source_journal: String=fixture.path_join("user/Godot/app_userdata/Blue Hour - 蓝时归航/playable-v1/run.enemy-v1.json.txn/journal")
-	var count: int=3 if bench_phase=="suspend" else 5
+	var count: int=3 if bench_phase=="suspend" else resume_generation
 	var receipt: Dictionary=decode(source_journal.path_join("%08d/record.json"%count))
-	original_result=decode(source_journal.path_join("00000008/record.json"))
+	original_result=decode(source_journal.path_join("%08d/record.json"%result_generation))
 	expected_world=receipt.envelope.world.duplicate(true)
-	assert(expected_world.generated.layout.entities.size()==47)
+	assert(expected_world.generated.layout.entities.size()==fixture_buildings)
 	var path: String=PlayableEntry.progress_path()
 	var journal: String=path+".txn/journal"
 	assert(not FileAccess.file_exists(path))
@@ -37,19 +45,28 @@ func _run() -> void:
 	await super._run()
 
 func _resume() -> void:
+	var restore_started: int=Time.get_ticks_usec()
 	await _tap(app._continue_button)
 	if app._hunger_confirmation.visible:
 		await _tap(app._hunger_confirmation.get_ok_button())
 	var world: Expedition=app.expedition
-	_check(world!=null,"normal Continue reconstructs the original 47-building world")
+	_check(world!=null,"normal Continue reconstructs the original fixed world")
 	if world==null:
 		return
 	world.set_process(false)
 	world.set_physics_process(false)
 	var actual: Dictionary=SortieSnapshot.capture(world)
 	_check(RecordEncoding.fingerprint(actual)==RecordEncoding.fingerprint(expected_world),"normal Continue restores exact frozen world before timed request")
+	var restore_usec: int=Time.get_ticks_usec()-restore_started
+	var prepare_started: int=Time.get_ticks_usec()
+	if bench_phase=="return" and not complete_site.is_empty():
+		await _tap(app.pause_menu.buttons[0])
+		if world.is_paused:
+			world.toggle_pause()
+		var site: Expedition.SearchSite=world.search_site(complete_site)
+		await _until(world,func()->bool:return site.searched)
 	var head: Dictionary=app.progress_session._transaction.recover()
-	_check(head.error==OK and int(head.receipt.revision)==(4 if bench_phase=="suspend" else 6),"normal Continue claims exactly one original generation")
+	_check(head.error==OK and int(head.receipt.revision)==(4 if bench_phase=="suspend" else resume_generation+1),"normal Continue claims exactly one original generation")
 	var report: Dictionary=original_result.envelope.result.battle
 	var carried: Dictionary={"loot":world.loot,"food":world.food_loot,"weapons":world.weapon_loot.duplicate(true)}
 	if bench_phase=="return":
@@ -57,7 +74,9 @@ func _resume() -> void:
 	var request: Dictionary={"world":actual} if bench_phase=="suspend" else {"report":report,"carried":carried}
 	var input_hash: String=RecordEncoding.fingerprint(request)
 	FreezeProfile.enabled=true
-	FreezeProfile.start({"phase":bench_phase,"buildings":47,"pid":OS.get_process_id(),"request_hash":input_hash,"start_generations":head.receipt.revision,"setup_and_restore_usec":Time.get_ticks_usec()-setup_started})
+	FreezeProfile.start({"phase":bench_phase,"buildings":fixture_buildings,"pid":OS.get_process_id(),"request_hash":input_hash,
+		"start_generations":head.receipt.revision,"start_hash":head.hash,"start_phase":head.receipt.phase,
+		"startup_usec":restore_started-setup_started,"restore_usec":restore_usec,"prepare_usec":Time.get_ticks_usec()-prepare_started})
 	var started: int=Time.get_ticks_usec()
 	if bench_phase=="suspend":
 		app.suspend_sortie()

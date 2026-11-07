@@ -62,5 +62,13 @@ func run() -> void:
 	expect(not text.contains("安全剩余") and not text.contains("难度"), "card never invents a safety countdown or difficulty tier")
 	var rescue: Dictionary = LevelSummary.freeze(layout, content.sites, {"site_ids":[]}, "rescue")
 	expect(not rescue.is_empty() and rescue.primary == ["rescue"] and rescue.work_seconds.rescue == RescueTarget.SECONDS, "rescue uses its real frozen point and original ten second work")
+	var reviewed: Dictionary = {"primary":["cash"], "assumptions":{"speed":125.0}, "two_worker":{"team_return_seconds":67.819},
+		"optional":{"site_id":"optional_b29", "work_seconds":18.0, "added_team_seconds":48.605,
+			"routes":{"bus>optional_b29":{"length":3500.0}, "optional_b29>bus":{"length":3519.375}}}}
+	expect(is_equal_approx(LevelSummary.extra_return_seconds(reviewed), 6.336), "later optional worker sets extra team return time from the reviewed round trip")
+	expect(ceili(LevelSummary.extra_return_seconds(reviewed)) == 7, "reviewed equipment card rounds the independent delay to seven seconds")
+	reviewed.optional.routes["optional_b29>bus"].length = 2000.0
+	expect(LevelSummary.extra_return_seconds(reviewed) == 0.0, "optional worker can return before the main worker without adding time")
+	expect(LevelSummary.extra_return_seconds(value) == value.optional.added_team_seconds, "two food sites retain the existing best same-worker detour")
 	print(JSON.stringify({"suite":"level_summary", "checks":checks, "failures":failures, "scope":"PURE_FINAL_NAV_ROUTE_ESTIMATES"}))
 	quit(1 if failures else 0)

@@ -109,7 +109,7 @@ static func _freeze(layout: Dictionary, sites: Array, objective: Dictionary, typ
 		"work_seconds":work, "routes":routes, "single":single, "two_worker":parallel, "optional":optional}
 
 
-static func description(value: Dictionary) -> String:
+static func description(value: Dictionary, for_card: bool = false) -> String:
 	var level: Dictionary = value.get("exploration", {}).get("level", {})
 	if level.is_empty():
 		return ""
@@ -129,8 +129,23 @@ static func description(value: Dictionary) -> String:
 		"airdrop":
 			text = "户外回收12秒，可受击；一次性增援。"
 	var source_name: String = {"optional_building":"可选建筑", "vehicle":"停放车辆", "fruit_tree":"果树"}[level.optional.source]
+	if for_card:
+		var assignment: String = "另派一人搜" if level.primary.size() == 1 else "其中一人再搜"
+		var extra: int = ceili(extra_return_seconds(level))
+		var wait: String = "回车无需多等" if extra == 0 else "回车多约%d秒" % extra
+		return text + "\n%s%s，%s。\n两人从巴士分头出发，按基础移速和工时估算。\n实战时间另计，带回确认后生效。" % [assignment, source_name, wait]
 	text += "\n追加%s，双人回车约多%d秒。" % [source_name, ceili(float(level.optional.added_team_seconds))]
 	return text + "\n125移速/工作因子1，战斗与个人差异另计。\n带回确认后生效。"
+
+
+static func extra_return_seconds(level: Dictionary) -> float:
+	if level.primary.size() == 2:
+		return float(level.optional.added_team_seconds)
+	var site: String = level.optional.site_id
+	var routes: Dictionary = level.optional.routes
+	var distance: float = float(routes[_key("bus", site)].length) + float(routes[_key(site, "bus")].length)
+	var optional_return: float = distance / float(level.assumptions.speed) + float(level.optional.work_seconds)
+	return maxf(0.0, optional_return - float(level.two_worker.team_return_seconds))
 
 
 static func _key(from: String, to: String) -> String:

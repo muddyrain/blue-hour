@@ -155,8 +155,11 @@ func _profiled_append(next: Dictionary, expected_hash: String) -> Dictionary:
 	var issue: String = TransactionReceipt.transition(prior.receipt, receipt)
 	if not issue.is_empty():
 		return _error(ERR_INVALID_DATA, issue)
-	var digest: String = TransactionReceipt.fingerprint(receipt)
-	var serialized: String = RecordEncoding.stringify(receipt)
+	var packet: Dictionary = RecordEncoding.pack(receipt)
+	if packet.is_empty():
+		return _error(ERR_INVALID_DATA, "RECORD_ENCODING_VALUE")
+	var digest: String = packet.hash
+	var serialized: String = packet.text
 	var capacity: String = capacity_problem(int(receipt.revision), receipt.phase, serialized.to_utf8_buffer().size(), int(prior.bytes), prior.unpublished.size())
 	if not capacity.is_empty():
 		return _error(ERR_OUT_OF_MEMORY, capacity)

@@ -12,6 +12,12 @@ func _menu(_count: int=0) -> void:
 	for button: Button in app.mission_select.choices:
 		visible=visible and viewport.get_visible_rect().encloses(button.get_global_rect())
 	_check(visible,"normal task descriptions keep all departure and cancel controls inside the viewport")
+	for index: int in range(app.mission_select.daily_offers.size()):
+		var offer: Dictionary=app.mission_select.daily_offers[index]
+		if offer.get("exploration",{}).has("level"):
+			var text: String=app.mission_select._descriptions[index].text
+			var wording: String="其中一人再搜" if offer.exploration.level.primary.size()==2 else "另派一人搜"
+			_check(text.contains(wording) and text.contains("从巴士分头出发"),"visible task card explains the frozen assignment for "+offer.type)
 
 func _journey() -> void:
 	FreezeProfile.enabled = true
@@ -46,6 +52,9 @@ func _journey() -> void:
 	await _shot(task_kind)
 	if preview_only:
 		_write("acceptance.json", acceptance)
+		return
+	if "--level-parallel" in OS.get_cmdline_user_args():
+		await _parallel_equipment(world, generated.exploration.level)
 		return
 	var primary: Array = generated.objective.site_ids
 	var started: float = world.elapsed
@@ -118,6 +127,8 @@ func _journey() -> void:
 
 func _resume() -> void:
 	FreezeProfile.enabled = true
+	if capture_caption != null:
+		capture_caption.text = "新进程恢复与归航 · 自动输入 · 1×原速片段"
 	var prior: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(output.get_base_dir().path_join("first/checkpoint.json")))
 	acceptance = JSON.parse_string(FileAccess.get_file_as_string(output.get_base_dir().path_join("first/acceptance.json")))
 	_before = acceptance.departure
@@ -164,6 +175,51 @@ func _resume() -> void:
 	acceptance.optional_threat = world.threat.snapshot()
 	world.camera.pan_by(optional.door - Vector2(0, 120) - world.camera.position)
 	await _shot("equipment-continued")
+	await _finish_level(world)
+
+func _parallel_equipment(world: Expedition, level: Dictionary) -> void:
+	var primary: Expedition.SearchSite=world.search_site(&"cash")
+	var optional: Expedition.SearchSite=world.search_site(StringName(level.optional.site_id))
+	var assignments: Array[Dictionary]=[]
+	for site: Expedition.SearchSite in [primary,optional]:
+		world.request_search(site.id)
+		var member: int=world.search_assignments.member_for(String(site.id))
+		_check(member>0,"real search intention selects a worker for "+String(site.id))
+		if member==0:
+			return
+		var actor: FieldActor=world.search_member(member)
+		assignments.append({"site":String(site.id),"member":member,"assigned":world.elapsed,
+			"speed":actor.effective_speed(),"work_factor":actor.trait_search_factor*actor.persona_work_factor*BuildItems.factors(world.supply.generated.build.slots).work})
+	_check(assignments[0].member!=assignments[1].member and assignments[0].assigned==assignments[1].assigned,"two original jobs assigned to distinct members on the same simulation tick")
+	world.command_move(world.layout.bus_door)
+	var observe: Callable=func() -> bool:
+		for job: Dictionary in assignments:
+			var site: Expedition.SearchSite=world.search_site(StringName(job.site))
+			var actor: FieldActor=world.search_member(job.member)
+			if site.progress>0 and not job.has("work_started"):
+				job.work_started=world.elapsed
+			if site.searched and not job.has("work_completed"):
+				job.work_completed=world.elapsed
+			if site.searched and actor.health>0 and not job.has("returned") and actor.position.distance_to(world.layout.bus_door)<=world.tuning.boarding_radius:
+				job.returned=world.elapsed
+		return assignments.all(func(job: Dictionary) -> bool: return job.has("returned"))
+	if capture_caption!=null:
+		capture_caption.text="两人同刻分工 · 自动输入 · 1×原速"
+	segment_frames=0
+	segment_limit=180
+	follow_actor=true
+	recording=true
+	await _until(world,func() -> bool:
+		observe.call()
+		return primary.progress>0 and optional.progress>0 and not primary.searched and not optional.searched)
+	recording=false
+	follow_actor=false
+	_check(world.search_assignments.ordered().size()==2,"both actual searches are in progress together")
+	await _shot("parallel-work")
+	await _until(world,observe)
+	acceptance.parallel=assignments
+	acceptance.parallel_estimate_extra=LevelSummary.extra_return_seconds(level)
+	_check(world.weapon_loot.size()==1,"only the original weapon source creates one weapon instance")
 	await _finish_level(world)
 
 func _finish_level(world: Expedition) -> void:

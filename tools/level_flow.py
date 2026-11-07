@@ -23,15 +23,17 @@ def main():
     parser.add_argument('--preview', action='store_true')
     parser.add_argument('--movie', action='store_true')
     parser.add_argument('--direct', action='store_true')
+    parser.add_argument('--parallel', action='store_true', help='Assign equipment and its displayed optional site before advancing time')
     args = parser.parse_args()
     assert not sys.flags.optimize and (not args.movie or args.native)
+    assert not args.parallel or (args.type == 'equipment' and not args.preview and not args.direct)
     assert subprocess.check_output([args.godot, '--version'], text=True).strip() == (ROOT / '.godot-version').read_text().strip()
     out = args.output.resolve()
     assert out.is_relative_to(ROOT / '.local') and not out.exists()
     out.mkdir(parents=True)
     env = dict(os.environ, HOME=str(out / 'home'), APPDATA=str(out / 'user'), XDG_DATA_HOME=str(out / 'user'))
     rows = []
-    phases = ['first', 'resume'] if args.type in ['equipment','airdrop'] and not args.preview and not args.direct else ['first']
+    phases = ['first', 'resume'] if args.type in ['equipment','airdrop'] and not args.preview and not args.direct and not args.parallel else ['first']
     for phase in phases:
         cmd = [args.godot, '--path', str(ROOT), '--rendering-method', 'gl_compatibility', '--audio-driver', 'Dummy']
         if not args.native:
@@ -42,6 +44,8 @@ def main():
             flags.append('--flow-preview')
         if args.direct:
             flags.append('--level-direct')
+        if args.parallel:
+            flags.append('--level-parallel')
         if phase == 'resume':
             flags.append('--flow-resume')
         encoder = None

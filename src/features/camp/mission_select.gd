@@ -125,6 +125,9 @@ func refresh_daily(base: Dictionary) -> void:
 		_descriptions[index].text = supply.description
 		_pictures[index].custom_minimum_size.y = 88
 		if supply.generated.get("worldgen",{}).get("version")==2:
+			# The original resource description participates in existing in-flight world compatibility hashes.
+			var frozen_description: String = LevelSummary.description(supply.generated)
+			_descriptions[index].text = supply.description.trim_suffix(frozen_description) + LevelSummary.description(supply.generated, true)
 			_pictures[index].custom_minimum_size.y = 56
 			_descriptions[index].add_theme_font_size_override("font_size",16)
 		var outdoor: bool=TaskActions.outdoor_site(supply.generated,&"cash")

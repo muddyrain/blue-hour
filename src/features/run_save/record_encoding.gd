@@ -24,20 +24,26 @@ static func _profiled_fingerprint(value: Dictionary) -> String:
 
 
 static func stringify(value: Dictionary) -> String:
+	return pack(value).get("text", "")
+
+
+static func pack(value: Dictionary) -> Dictionary:
 	var stamp: int = FreezeProfile.enter("exact.stringify")
-	var result: String = _profiled_stringify(value)
+	var result: Dictionary = _profiled_pack(value)
 	FreezeProfile.leave("exact.stringify", stamp)
 	return result
 
 
-static func _profiled_stringify(value: Dictionary) -> String:
+static func _profiled_pack(value: Dictionary) -> Dictionary:
 	var proof: Dictionary=ValueProofCache.lookup("exact-stringify",value)
 	if proof.hit:
 		return proof.result
 	if not SurvivalContracts.json_value(value, -2):
-		return ""
-	var encoded: Array = _encode(value)
-	var result: String=JSON.stringify({"record_encoding":VERSION, "payload":encoded, "sha256":_digest(encoded)}, "", true, true) + "\n"
+		return {}
+	var payload: String = JSON.stringify(_encode(value), "", true, true)
+	var digest: String = (VERSION + "\n" + payload).sha256_text()
+	# Preserve the existing sorted envelope while using the same canonical payload for both outputs.
+	var result: Dictionary = {"hash":digest, "text":"{\"payload\":%s,\"record_encoding\":\"%s\",\"sha256\":\"%s\"}\n" % [payload, VERSION, digest]}
 	ValueProofCache.remember(proof,result)
 	return result
 

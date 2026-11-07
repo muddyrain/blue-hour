@@ -803,7 +803,7 @@ func _new_game() -> void:
 	_migration_notice = ""
 	profile_id = RunSave.new_profile_id()
 	if playable_entry:
-		_battle_meta.campaign=CampaignRules.initial(profile_id)
+		_battle_meta.campaign=CampaignRules.initial_investigation(profile_id)
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true)
 	_initialize_weapons("initial")
 	last_settlement_id = ""
@@ -2239,9 +2239,14 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 		text += "\n%02d %s · %s · 生命%.0f/%.0f\nLv%d · %d XP（本次+%d）\n" % [member.id,member.call_sign,fate,member.health,GrowthRules.maximum(member),member.growth.level,member.growth.xp_total,awarded.get("xp_gained",0)]
 	text += "\n营地：第%d天 · 货币%d · 食物%d · 存活%d人\n" % [snapshot.day,snapshot.cash,snapshot.food,snapshot.journey.active_member_ids.size()]
 	if CampaignState.is_short(snapshot):
-		var display: Dictionary=CampaignRules.display(snapshot.journey.campaign)
+		var campaign: Dictionary = snapshot.journey.campaign
+		var display: Dictionary=CampaignRules.display(campaign)
+		if CampaignRules.is_investigation(campaign) and not campaign.clues.is_empty():
+			var clue: Dictionary = campaign.clues.back()
+			if clue.transaction_id == snapshot.last_settlement_id:
+				text += "调查线索：%s（%s）\n" % [CampaignRules.CLUE_NAMES[clue.id], "已登记" if durable else "确认后登记"]
 		text+=display.title+" · "+display.progress+"\n"
-		if snapshot.journey.campaign.outcome=="VICTORY": text+="首领真实击败、存活者巴士撤离；"+("旅程胜利已保存。" if durable else "胜利仅为预览，确认保存成功才结束旅程。")+"\n"
+		if campaign.outcome=="VICTORY": text+="首领真实击败、存活者巴士撤离；"+("旅程胜利已保存。" if durable else "胜利仅为预览，确认保存成功才结束旅程。")+"\n"
 	text += "旅程已结束，不能再次出击。" if snapshot.journey.state=="FAILED" or CampaignState.ended(snapshot) else "确认结算后可回营整备，再次出击。"
 	return text
 

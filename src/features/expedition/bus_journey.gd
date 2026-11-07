@@ -14,7 +14,10 @@ var route: Dictionary
 var stop: Vector2
 var starts: Array[Vector2] = []
 var boarding_starts: Array[Vector2] = []
+var final_boarding: Vector2i = Vector2i.ZERO
 var skip_button: Button
+var _boarding_panel: PanelContainer
+var _boarding_label: Label
 
 func configure(owner_world: Expedition, bus: Sprite2D, data: Dictionary) -> void:
 	world=owner_world; sprite=bus; route=data.duplicate(true); stop=world.layout.bus_foot()
@@ -29,6 +32,22 @@ func _ready() -> void:
 	skip_button=Button.new(); skip_button.position=Vector2(20,158); skip_button.size=Vector2(240,40)
 	skip_button.text="巴士驶入 · 跳过演出"; skip_button.pressed.connect(skip)
 	layer.add_child(skip_button)
+	_boarding_panel = PanelContainer.new()
+	_boarding_panel.theme = world._hud.view.theme
+	_boarding_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(_boarding_panel)
+	_boarding_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_boarding_panel.offset_left = -168
+	_boarding_panel.offset_right = 168
+	_boarding_panel.offset_top = -62
+	_boarding_panel.offset_bottom = -16
+	_boarding_label = Label.new()
+	_boarding_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boarding_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_boarding_label.add_theme_font_size_override("font_size", 16)
+	_boarding_label.add_theme_color_override("font_color", C1ExpeditionHud.TONES["info"])
+	_boarding_panel.add_child(_boarding_label)
+	_boarding_panel.hide()
 
 func running() -> bool:
 	return stage in ["arriving","disembarking","embarking","departing"]
@@ -55,6 +74,7 @@ func advance(delta: float) -> void:
 				for actor: FieldActor in world.survivors:
 					if actor.health>0: actor.hide()
 				stage="departing"; clock=0; skip_button.text="巴士驶离 · 跳过演出"
+				_show_boarding("巴士驶离")
 		"departing":
 			sprite.position=stop.lerp(WorldLayout.point(route.exit),smoothstep(0,1,minf(clock/DRIVE_OUT,1)))
 			if clock>=DRIVE_OUT: skip()
@@ -70,6 +90,7 @@ func skip() -> void:
 		for actor: FieldActor in world.survivors:
 			if actor.health>0: actor.hide()
 		stage="done"
+		_boarding_panel.hide()
 		departed.emit()
 	if skip_button!=null: skip_button.hide()
 	if world.rescue_target!=null: world.rescue_target.refresh()
@@ -78,3 +99,10 @@ func departure() -> void:
 	if stage!="exploring" or world.phase!=Expedition.Phase.FINISHED: return
 	for actor: FieldActor in world.survivors: boarding_starts.append(actor.position)
 	stage="embarking"; clock=0; skip_button.text="队员登车 · 跳过演出"; skip_button.show()
+	_show_boarding("正在登车")
+
+
+func _show_boarding(status: String) -> void:
+	if final_boarding.y > 0:
+		_boarding_label.text = "已集合 %d/%d · %s" % [final_boarding.x, final_boarding.y, status]
+		_boarding_panel.show()

@@ -26,6 +26,7 @@ var _time_hint: Label
 var _time_box: VBoxContainer
 var _pause_state: Label
 var _bus_status: Label
+var _bus_waiting: Label
 var _hint: Label
 var _pause_button: Button
 var _bus_button: Button
@@ -116,7 +117,11 @@ func refresh(state: Dictionary) -> void:
 	_time_text.add_theme_color_override("font_color", _tone(time_data))
 	_threat_content.text = _text(time_data,"explanation",_text(time_data,"hint")) + "\n威胁随行动时间推进；不会阻止巴士归航。\n打开此说明不暂停行动。"
 	_bus_status.text = _text(state, "bus_status_text", "巴士状态未提供")
-	_bus_status.add_theme_color_override("font_color", _tone(_dictionary(state.get("bus", {}))))
+	var show_count: bool = state.get("bus_count_visible", false)
+	_bus_status.add_theme_font_size_override("font_size", 16 if show_count else 12)
+	_bus_status.add_theme_color_override("font_color", TONES["info"] if show_count else _tone(_dictionary(state.get("bus", {}))))
+	_bus_waiting.text = _text(state, "bus_waiting_text")
+	_bus_waiting.visible = not _bus_waiting.text.is_empty()
 	_bus_button.text = _text(state, "bus_action_label", "发动巴士")
 	_bus_button.disabled = state.get("bus_action_enabled", false) != true
 	_hint.text = _text(state, "status_hint")
@@ -361,8 +366,8 @@ func _build_member(parent: Control, index: int) -> void:
 func _build_actions() -> void:
 	var panel: PanelContainer = _panel(self, "ActionsPanel")
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	panel.offset_left = -144
-	panel.offset_right = 144
+	panel.offset_left = -168
+	panel.offset_right = 168
 	panel.offset_top = -68
 	panel.offset_bottom = -16
 	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
@@ -378,21 +383,29 @@ func _build_actions() -> void:
 	_pause_state.hide()
 	_bus_status = _label(status, "BusStatus", 12)
 	_wrap(_bus_status)
+	_bus_waiting = _label(status, "BusWaiting", 13)
+	_wrap(_bus_waiting)
 	_bus_button = _button(row, "BusButton", "发动巴士", _request_bus)
 	_bus_button.custom_minimum_size=Vector2(124,32)
+	_bus_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_bus_button.add_theme_font_size_override("font_size",14)
 	_bus_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_hint = _label(self, "StatusHint", 14)
 	_hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	_hint.offset_left=-260
 	_hint.offset_right=260
-	_hint.offset_top=-104
-	_hint.offset_bottom=-72
 	_hint.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	_hint.clip_text=true
 	_hint.mouse_filter=Control.MOUSE_FILTER_PASS
 	_hint.add_theme_color_override("font_outline_color",Color("10232b"))
 	_hint.add_theme_constant_override("outline_size",3)
+	panel.resized.connect(_place_bus_hint.bind(panel))
+	_place_bus_hint(panel)
+
+
+func _place_bus_hint(panel: PanelContainer) -> void:
+	_hint.offset_bottom = panel.offset_bottom - panel.size.y - 4.0
+	_hint.offset_top = _hint.offset_bottom - 32.0
 
 
 func _build_help() -> void:

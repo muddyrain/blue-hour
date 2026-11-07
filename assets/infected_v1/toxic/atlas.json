@@ -1,0 +1,66 @@
+{
+  "task": "M23-ART-TOXIC-01",
+  "origin": "AI-assisted original Blue Hour art, OpenAI built-in image_gen, model identifier not exposed",
+  "references": "Task-supplied concept for character design, project normal infected for style and proportions",
+  "path": "carrier.png",
+  "sha256": "5c04573a58a6216394170f2fa41c849c7d412cf059afb5dea731fde5ee03b5ac",
+  "master_source_sha256": "195ee6ef7cbbc8d7a7225223f840a811f315e199670dcb322590540a72ce00c1",
+  "motion_source_sha256": {
+    "e": "2fe7fdcff78e0edbcf137fa6cc3fee2ae893049dcd8fcd45e2457fe764b3587a",
+    "se": "0a0d742762fd7d688fce79c4a9fed98be321b0fd079c336d0fb19bea2de4286a",
+    "s": "612583d4c60280992936567429365faceff28e2f127103cc8d584370b78b7e85",
+    "ne": "02f2408c8a80e5334363a11f2cf722d85eb526b3da4b470a6dd76336da5e37ef",
+    "n": "ce368cf2b4c3fe1fed372b89c3d1c0c82554229e6acec5fd4c71bf5c160e200c"
+  },
+  "source_directions": [
+    "E",
+    "SE",
+    "S",
+    "NE",
+    "N"
+  ],
+  "runtime_octants": [
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW",
+    "N",
+    "NE"
+  ],
+  "mirror_octants": [
+    "SW",
+    "W",
+    "NW"
+  ],
+  "grid": [
+    5,
+    12
+  ],
+  "cell_px": [
+    160,
+    160
+  ],
+  "foot_anchor_px": [
+    80,
+    144
+  ],
+  "display_scale": 0.58,
+  "rows": [
+    "idle",
+    "walk_left_contact",
+    "walk_left_passing",
+    "walk_right_contact",
+    "walk_right_passing",
+    "contact_reach",
+    "contact_recovery",
+    "cast_compress",
+    "cast_strain",
+    "hit_recoil",
+    "defeat_buckle",
+    "defeat_prone"
+  ],
+  "processing": "Transparent source cleanup and cropping, one motion scale per source direction, fixed registered foot anchor, Lanczos downsample. No game camera or reference pixels composited.",
+  "license": "No additional license granted"
+}

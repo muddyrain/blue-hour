@@ -48,6 +48,9 @@ var contact_vector: Vector2 = Vector2.INF
 var _walk_rest: float = 0.0
 var _contact_display: Vector2 = Vector2.ZERO
 var _contact_initialized: bool = false
+var _toxic_casting: bool = false
+var _toxic_heading: Vector2 = Vector2.RIGHT
+var _toxic_progress: float = 0.0
 
 
 func _ready() -> void:
@@ -127,6 +130,20 @@ func advance(delta: float, movement: Vector2, aim: Vector2) -> void:
 
 func _normal_enemy() -> bool:
 	return is_enemy and enemy_kind == EnemyRules.NORMAL
+
+
+func _toxic_enemy() -> bool:
+	return is_enemy and enemy_kind == CombatEnemyRules.TOXIC
+
+
+func present_toxic_cast(heading: Vector2, casting: bool, progress: float) -> void:
+	if not casting and not _toxic_casting:
+		return
+	_toxic_casting = casting
+	if heading.is_finite() and heading.length_squared() > 0.001:
+		_toxic_heading = heading.normalized()
+	_toxic_progress = clampf(progress, 0.0, 1.0)
+	_apply_pose()
 
 
 func _face(direction: Vector2) -> void:
@@ -261,12 +278,18 @@ func _apply_pose() -> void:
 		motion_state = &"windup"
 		action = 4
 		_body.position -= _facing * 3.0
+	if _toxic_casting and not _is_defeated:
+		motion_state = &"windup"
+		legs = _toxic_heading
+		_body.position = Vector2.ZERO
 	_pose_body(legs, action)
 	_body.scale = Vector2.ONE * BODY_SCALE
 	if is_enemy:
 		_body.scale *= Vector2(1.25, 1.18) if enemy_kind == EnemyRules.HEAVY else Vector2(0.90, 1.03) if enemy_kind == EnemyRules.RUSH else Vector2.ONE
 		if _normal_enemy() and NormalInfectedV1.enabled():
 			_body.scale = Vector2.ONE * NormalInfectedV1.DISPLAY_SCALE
+		elif _toxic_enemy():
+			_body.scale = Vector2.ONE * ToxicCarrierVisualV1.DISPLAY_SCALE
 		# Presentation spacing only. Logical feet, navigation, LOS and melee range stay put.
 		_body.position += _contact_offset()
 	_body.self_modulate = tint
@@ -281,7 +304,10 @@ func _apply_pose() -> void:
 
 
 func _pose_body(direction: Vector2, action: int) -> void:
-	if _normal_enemy() and NormalInfectedV1.enabled():
+	if _toxic_enemy():
+		ToxicCarrierVisualV1.pose(_body, direction, motion_state, _walk_clock,
+			_attack_clock, _defeat_clock, _toxic_progress)
+	elif _normal_enemy() and NormalInfectedV1.enabled():
 		NormalInfectedV1.pose(_body, direction, motion_state, _walk_clock, _attack_clock, _hit_clock, _defeat_clock)
 	else:
 		MotionAtlas.pose(_body, is_enemy, enemy_kind, variant, direction, action)

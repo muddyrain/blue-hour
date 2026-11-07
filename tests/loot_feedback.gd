@@ -62,7 +62,9 @@ func _journey() -> void:
 			_check(not on_screen[left].intersects(on_screen[right]), "near badges have distinct screen bounds")
 	acceptance["arrival"] = opening
 	await _shot("arrival")
-	_pan_to(world, primary)
+	world.locate_objective("primary")
+	_check(world._locate_ring != null and world._locate_ring.global_position.is_equal_approx(primary.door),
+		"objective locator ring is centered on the actual entrance")
 	await _shot("main-site")
 	_check(viewport.get_visible_rect().encloses(_screen_badge(primary)) and primary.prop._work.text.contains("主目标"),
 		"the actual equipment site has a readable main-objective badge")
@@ -150,9 +152,10 @@ func _complete_and_return(world: Expedition, first: Expedition.SearchSite, secon
 	acceptance["completed_near"] = [_describe_site(world, first), _describe_site(world, second)]
 	await _shot("near-completed")
 	var primary: Expedition.SearchSite = world.search_site(&"cash")
-	_pan_to(world, primary)
-	await _click_site(world, primary)
-	_check(_assigned(world, primary) > 0, "clicking the actual main building starts the original job")
+	world.locate_objective("primary")
+	await _hold(2)
+	await _click_world_point(world, world._locate_ring.global_position)
+	_check(_assigned(world, primary) > 0, "clicking the locator ring center starts the original main job")
 	await _until(world, func() -> bool: return primary.searched)
 	_check(not primary.prop._work.text.contains("可搜") and world.weapon_loot.size() == 1,
 		"completing the main job removes its available text and grants one real weapon")
@@ -198,10 +201,6 @@ func _describe_site(world: Expedition, site: Expedition.SearchSite) -> Dictionar
 	}
 
 
-func _pan_to(world: Expedition, site: Expedition.SearchSite) -> void:
-	world.camera.pan_by(site.door - world.camera.position)
-
-
 func _click_site(world: Expedition, site: Expedition.SearchSite) -> void:
 	await _hold(2)
 	var point: Vector2 = site.prop._work.get_global_rect().get_center()
@@ -209,6 +208,10 @@ func _click_site(world: Expedition, site: Expedition.SearchSite) -> void:
 	_check(badge_over_hit, "building badge center shares its original entrance hit")
 	if not badge_over_hit:
 		point = site.door
+	await _click_world_point(world, point)
+
+
+func _click_world_point(world: Expedition, point: Vector2) -> void:
 	var screen: Vector2 = world.get_global_transform_with_canvas() * point
 	_check(viewport.get_visible_rect().has_point(screen), "original target click is inside the viewport")
 	for down: bool in [true, false]:

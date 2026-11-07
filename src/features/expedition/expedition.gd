@@ -1690,7 +1690,7 @@ func _make_world_buildings() -> void:
 		if build_mode() and site.id==&"cash" and supply.generated.type=="equipment": site.prop.reward_hint+=" / 道具%d件"%supply.generated.build.drops.size() if not supply.generated.build.drops.is_empty() else " / 道具已集齐"
 		if exploration_mode() and not crate:
 			var category: String = "果树" if def.source == "fruit_tree" else "车辆" if object_site else "建筑"
-			var anchor: Vector2 = Vector2(0, 5) if object_site else Vector2(site.prop.door_offset, 43)
+			var anchor: Vector2 = Vector2(0, 5) if object_site else Vector2(site.prop.door_offset, 28)
 			site.prop.configure_loot_badge(category, anchor)
 		sites.append(site)
 		if site.id==&"cash": _cash_site=site; _shop=site.prop
@@ -1966,8 +1966,10 @@ func locate_objective(id: String) -> void:
 		_locate_marker.add_child(_locate_label)
 	var has_badge: bool = target_prop != null and not target_prop.loot_category.is_empty()
 	_locate_label.visible = not has_badge
-	# Keep the pulse at the entrance without painting across its two-line badge.
-	_locate_ring.position.y = 38.0 if has_badge and not target_prop is ExplorationProp else 0.0
+	# Shrink the pulse around the clickable entrance to clear the building badge.
+	var ring_scale: float = 0.5 if has_badge and not target_prop is ExplorationProp else 1.0
+	_locate_ring.scale = Vector2.ONE * ring_scale
+	_locate_ring.width = 3.0 / ring_scale
 	if _locate_tween!=null: _locate_tween.kill()
 	_locate_marker.position=target
 	_locate_marker.modulate.a=1.0

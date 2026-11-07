@@ -70,7 +70,7 @@ func _draw() -> void:
 		draw_rect(road, Color("263748") if blue_hour else Color("34434b"))
 		draw_texture_rect(StreetBlock.AsphaltTexture, road, true, Color(0.63, 0.74, 0.95, 0.43) if blue_hour else Color(0.73, 0.8, 0.82, 0.45))
 	if blue_hour:
-		_bus_bay()
+		_bus_curb_paint()
 	for road: Rect2 in layout.roads:
 		var horizontal: bool=road.size.x>road.size.y
 		var length: int=int(road.size.x if horizontal else road.size.y)
@@ -135,19 +135,18 @@ func _curb(point: Vector2, tangent: Vector2, side: int, road: Rect2, drain: bool
 			draw_line(start - outside * 1.4, start + outside * 1.4, Color("556874"), 1)
 
 
-func _bus_bay() -> void:
-	var bay: Rect2 = layout.bus_block.grow_individual(29, 8, 29, 14)
-	draw_rect(bay, Color(0.10, 0.16, 0.22, 0.42))
-	var corners: PackedVector2Array = PackedVector2Array([
-		bay.position, Vector2(bay.end.x, bay.position.y),
-		bay.end, Vector2(bay.position.x, bay.end.y),
-	])
-	for corner: Vector2 in corners:
-		var inward: Vector2 = (bay.get_center() - corner).sign()
-		draw_line(corner, corner + Vector2(inward.x * 34, 0), Color("c2af85"), 2)
-		draw_line(corner, corner + Vector2(0, inward.y * 16), Color("c2af85"), 2)
-	var door: Vector2 = layout.bus_door
-	draw_arc(door, 17, 0, TAU, 32, Color(0.54, 0.79, 0.75, 0.52), 1.8, true)
+func _bus_curb_paint() -> void:
+	var stop: Rect2 = layout.bus_block
+	for road: Rect2 in layout.roads:
+		if road.size.y != WorldgenScale.MAIN_WIDTH or not road.has_point(stop.get_center()):
+			continue
+		var curb_y: float = road.end.y - 12.0 if layout.bus_door.y > road.get_center().y else road.position.y + 12.0
+		for offset: float in [26.0, 104.0, 182.0]:
+			var start: Vector2 = Vector2(stop.position.x + offset, curb_y)
+			var end: Vector2 = start + Vector2(32, 0)
+			if road.has_point(start) and road.has_point(end) and not _junction(start, road) and not _junction(end, road):
+				draw_line(start, end, Color(0.52, 0.58, 0.62, 0.46), 2.0, true)
+		return
 
 
 func _supply_lights() -> void:

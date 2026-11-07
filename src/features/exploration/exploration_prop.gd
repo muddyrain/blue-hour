@@ -85,7 +85,8 @@ func present(state: Dictionary, worker_id: int = 0, worker_name: String = "", oc
 		_working = false
 	_occluded = occluded
 	_refresh_art()
-	_refresh_text()
+	if loot_category.is_empty():
+		_refresh_text()
 	queue_redraw()
 
 
@@ -117,7 +118,7 @@ func show_behind_roof(friend_behind: bool) -> void:
 
 
 func _draw() -> void:
-	if not searchable:
+	if not searchable or not loot_category.is_empty():
 		return
 	var colour: Color = Color("9adfc8") if searched else Color("f2cf91")
 	if searched:

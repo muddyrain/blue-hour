@@ -70,6 +70,8 @@ var crew_snapshot: Array[Dictionary] = []
 var exploration_props: Dictionary = {}
 var _objective_cursors: Dictionary = {}
 var _locate_marker: Node2D
+var _locate_ring: Line2D
+var _locate_label: Label
 var _locate_tween: Tween
 var persona_views: Dictionary = {} # Derived immutable presentation cache; never serialized.
 var participants_snapshot: Array[Dictionary] = []
@@ -1505,16 +1507,19 @@ func _update_ui() -> void:
 	if drill_panel != null:
 		drill_panel.refresh()
 	for site: SearchSite in sites:
-		if site.prop is ExplorationProp:
-			var owner: FieldActor=search_member(search_assignments.member_for(String(site.id)))
-			var faded: bool=survivors.any(func(actor: FieldActor) -> bool: return actor.visible and actor.health>0 and actor.position.y<site.prop.position.y and actor.position.distance_to(site.prop.position)<105.0)
-			(site.prop as ExplorationProp).present({"searched":site.searched,"progress":site.progress},owner.member_id if owner!=null else 0,owner.call_sign if owner!=null else "",faded)
-		site.prop.searched = site.searched
 		var worker: FieldActor = search_member(search_assignments.member_for(String(site.id)))
-		var text: String = SearchWorkView.building_text(worker.member_id,worker.call_sign,search_assignments.phase_for(worker.member_id),TaskActions.outdoor_site(supply.generated,site.id)) if worker != null else ""
-		site.prop.update_work(worker.actor_id if worker != null else -1,
-			site.progress / _site_seconds(site),worker != null and work_state_matches(worker,site),
-			worker.call_sign if worker != null else "",text)
+		if site.prop is ExplorationProp:
+			var faded: bool=survivors.any(func(actor: FieldActor) -> bool: return actor.visible and actor.health>0 and actor.position.y<site.prop.position.y and actor.position.distance_to(site.prop.position)<105.0)
+			(site.prop as ExplorationProp).present({"searched":site.searched,"progress":site.progress},worker.member_id if worker!=null else 0,worker.call_sign if worker!=null else "",faded)
+		site.prop.searched = site.searched
+		var work_phase: String = search_assignments.phase_for(worker.member_id) if worker != null else ""
+		var fraction: float = site.progress / _site_seconds(site)
+		if not site.prop.loot_category.is_empty():
+			site.prop.present_loot(worker.member_id if worker != null else 0, worker.call_sign if worker != null else "", work_phase, fraction)
+		else:
+			var text: String = SearchWorkView.building_text(worker.member_id, worker.call_sign, work_phase, TaskActions.outdoor_site(supply.generated,site.id)) if worker != null else ""
+			site.prop.update_work(worker.actor_id if worker != null else -1,
+				fraction, worker != null and work_state_matches(worker,site), worker.call_sign if worker != null else "", text)
 
 
 func _update_member_display() -> void:
@@ -1683,6 +1688,10 @@ func _make_world_buildings() -> void:
 			site.prop.primary_target=supply.generated.objective.site_ids.has(def.id)
 			site.prop.reward_hint=("货币" if site.kind==&"cash" else "食物")+" +%d"%site.reward
 		if build_mode() and site.id==&"cash" and supply.generated.type=="equipment": site.prop.reward_hint+=" / 道具%d件"%supply.generated.build.drops.size() if not supply.generated.build.drops.is_empty() else " / 道具已集齐"
+		if exploration_mode() and not crate:
+			var category: String = "果树" if def.source == "fruit_tree" else "车辆" if object_site else "建筑"
+			var anchor: Vector2 = Vector2(0, 5) if object_site else Vector2(site.prop.door_offset, 43)
+			site.prop.configure_loot_badge(category, anchor)
 		sites.append(site)
 		if site.id==&"cash": _cash_site=site; _shop=site.prop
 		if site.id==&"food": _food_site=site
@@ -1922,6 +1931,7 @@ func locate_objective(id: String) -> void:
 	if not exploration_mode(): return
 	var rows: Array[Dictionary]=ExplorationSites.objective_rows({"type":supply.generated.type,"objective":supply.generated.objective,"optional_objectives":supply.generated.exploration.optional_objectives},WorldSites.facts(self),rescue_target!=null and rescue_target.status=="IN_FIELD_JOINED" and rescue_target.npc.health>0)
 	var target: Vector2=Vector2.INF
+	var target_prop: FieldProp
 	for row: Dictionary in rows:
 		if row.id!=id: continue
 		var pending: Array[String]=[]
@@ -1933,7 +1943,9 @@ func locate_objective(id: String) -> void:
 			target=layout.rescue_point
 		else:
 			var index: int=int(_objective_cursors.get(id,0))%pending.size()
-			target=search_site(StringName(pending[index])).door
+			var site: SearchSite = search_site(StringName(pending[index]))
+			target = site.door
+			target_prop = site.prop
 			_objective_cursors[id]=index+1
 		break
 	if not target.is_finite(): return
@@ -1943,15 +1955,19 @@ func locate_objective(id: String) -> void:
 	if _locate_marker==null:
 		_locate_marker=Node2D.new()
 		_effects.add_child(_locate_marker)
-		var ring: Line2D=Line2D.new()
-		ring.width=3.0; ring.default_color=Color("f2c47c")
-		for i: int in range(33):ring.add_point(Vector2.from_angle(TAU*i/32.0)*34.0)
-		_locate_marker.add_child(ring)
-		var label: Label=Label.new()
-		label.text="目标位置"; label.position=Vector2(-30,-60); label.mouse_filter=Control.MOUSE_FILTER_IGNORE
-		label.add_theme_font_size_override("font_size",16)
-		label.add_theme_color_override("font_color",Color("ffe5a7"))
-		_locate_marker.add_child(label)
+		_locate_ring = Line2D.new()
+		_locate_ring.width=3.0; _locate_ring.default_color=Color("f2c47c")
+		for i: int in range(33):_locate_ring.add_point(Vector2.from_angle(TAU*i/32.0)*34.0)
+		_locate_marker.add_child(_locate_ring)
+		_locate_label = Label.new()
+		_locate_label.text="目标位置"; _locate_label.position=Vector2(-30,-60); _locate_label.mouse_filter=Control.MOUSE_FILTER_IGNORE
+		_locate_label.add_theme_font_size_override("font_size",16)
+		_locate_label.add_theme_color_override("font_color",Color("ffe5a7"))
+		_locate_marker.add_child(_locate_label)
+	var has_badge: bool = target_prop != null and not target_prop.loot_category.is_empty()
+	_locate_label.visible = not has_badge
+	# Keep the pulse at the entrance without painting across its two-line badge.
+	_locate_ring.position.y = 38.0 if has_badge and not target_prop is ExplorationProp else 0.0
 	if _locate_tween!=null: _locate_tween.kill()
 	_locate_marker.position=target
 	_locate_marker.modulate.a=1.0

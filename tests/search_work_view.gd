@@ -19,6 +19,7 @@ func expect(value: bool, label: String) -> void:
 func run() -> void:
 	_test_sites()
 	_test_members()
+	_test_loot_badges()
 	_test_notices()
 	print("SEARCH_WORK_VIEW checks=%d failures=%d" % [checks, failures])
 	quit(0 if failures == 0 else 1)
@@ -69,6 +70,21 @@ func _test_members() -> void:
 	for phase: String in ["", "cancelled", "completed", "idle", "queue"]:
 		expect(SearchWorkView.actor_status(phase, "超市01", false).is_empty(), "inactive or unknown phase never claims HUD work: " + phase)
 		expect(SearchWorkView.building_text(1, "许澄", phase, false).is_empty(), "inactive or unknown phase never claims building occupancy: " + phase)
+
+
+func _test_loot_badges() -> void:
+	expect(SearchWorkView.loot_badge_text("建筑", true, false, "货币 +3 / 道具2件", 0, "", "") ==
+		"主目标 · 可搜建筑\n货币 +3 / 道具2件", "primary uses an explicit heading and preserves the reward")
+	expect(SearchWorkView.loot_badge_text("车辆", false, false, "货币 +1", 0, "", "") ==
+		"可搜车辆 · 货币 +1", "optional vehicle has a compact available label")
+	expect(SearchWorkView.loot_badge_text("建筑", false, false, "食物 +2", 2, "夏之遥", "approach") ==
+		"02 夏之遥 · 前往\n再点取消", "claimed building shows stable identity and the real approach phase")
+	expect(SearchWorkView.loot_badge_text("果树", false, false, "食物 +1", 1, "顾予安", "working") ==
+		"01 顾予安 · 采集中\n再点取消", "claimed tree uses its actual kind of work")
+	expect(SearchWorkView.loot_badge_text("建筑", true, false, "货币 +3", 2, "夏\n之遥", "working") ==
+		"02 夏之遥 · 搜集中\n主目标 · 再点取消", "primary remains explicit during work and names cannot insert lines")
+	expect(SearchWorkView.loot_badge_text("果树", false, true, "食物 +1", 1, "顾予安", "working") ==
+		"果树 · 已采空", "completed facts take precedence over a stale worker and reward")
 
 
 func _test_notices() -> void:

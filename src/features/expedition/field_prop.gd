@@ -3,6 +3,7 @@ extends Node2D
 ## Front edge is the sort anchor. Only the roof fades for a friend behind it.
 
 const ShopTexture: Texture2D = preload("res://assets/candidates/shop_02.png")
+const LootTheme: Theme = preload("res://assets/ui/c1/hud_theme.tres")
 var primary_target: bool = false
 var calibrated: bool = false
 var roof_cut: int = 512
@@ -25,6 +26,8 @@ var searchable: bool = true
 var title: String = "旧街补给店"
 var reward_hint: String = "货币 +4"
 var ui_theme: Theme
+var loot_category: String = ""
+var _loot_anchor: Vector2
 var _work: Label
 var _bar: ProgressBar
 var _roof: Sprite2D
@@ -83,7 +86,7 @@ func _part(region: Rect2, point: Vector2, factor: float) -> Sprite2D:
 
 
 func _draw() -> void:
-	if primary_target:
+	if primary_target and loot_category.is_empty():
 		draw_arc(Vector2(door_offset,20),18,0,TAU,24,Color("a8ebd4") if searched else Color("ffd385"),3,true)
 		draw_colored_polygon(PackedVector2Array([Vector2(door_offset,-9),Vector2(door_offset-6,-19),Vector2(door_offset+6,-19)]),Color("ffd385"))
 	if calibrated and not soft_contact:
@@ -141,6 +144,39 @@ func update_work(actor_id: int, fraction: float, inside: bool, call_sign: String
 	if _bar != null:
 		_bar.visible = searchable and not searched and fraction > 0.0
 		_bar.value = fraction * 100.0
+
+
+func configure_loot_badge(category: String, anchor: Vector2) -> void:
+	loot_category = category
+	_loot_anchor = anchor
+	_work.theme = LootTheme
+	_work.clip_text = false
+	_work.add_theme_font_size_override("font_size", 15)
+	_work.add_theme_constant_override("outline_size", 0)
+	var panel: StyleBoxFlat = LootTheme.get_stylebox("panel", "PanelContainer").duplicate() as StyleBoxFlat
+	panel.content_margin_left = 6.0
+	panel.content_margin_right = 6.0
+	panel.content_margin_top = 2.0
+	panel.content_margin_bottom = 2.0
+	_work.add_theme_stylebox_override("normal", panel)
+	_work.tooltip_text = title + "\n" + reward_hint
+	_bar.position = anchor + Vector2(-36, 3)
+	_bar.size = Vector2(72, 5)
+	present_loot(0, "", "", 0.0)
+	queue_redraw()
+
+
+func present_loot(member_id: int, call_sign: String, phase: String, fraction: float) -> void:
+	var text: String = SearchWorkView.loot_badge_text(loot_category, primary_target, searched, reward_hint, member_id, call_sign, phase)
+	if text != _work.text:
+		_work.text = text
+		_work.reset_size()
+		_work.position = _loot_anchor - Vector2(_work.size.x * 0.5, _work.size.y)
+		_work.add_theme_color_override("font_color", C1ExpeditionHud.TONES["info"] if searched else
+			C1ExpeditionHud.TONES["warning"] if primary_target else C1ExpeditionHud.TONES["normal"])
+	_work.visible = searchable
+	_bar.visible = searchable and not searched and fraction > 0.0
+	_bar.value = fraction * 100.0
 
 
 func _label(value: String, point: Vector2, size: int, width: float) -> Label:

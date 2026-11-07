@@ -30,6 +30,20 @@ static func building_text(member_id: int, call_sign: String, phase: String, outd
 	return "%02d %s·%s·再点取消" % [member_id, short_call_sign(call_sign), action]
 
 
+static func loot_badge_text(category: String, primary: bool, searched: bool, reward: String,
+		member_id: int, call_sign: String, phase: String) -> String:
+	var heading: String = "主目标 · " if primary else ""
+	if searched:
+		var completion: String = "已采空" if category == "果树" else "已清空" if category == "车辆" else "已搜集"
+		return heading + category + " · " + completion
+	if member_id > 0 and phase in ["approach", "working"]:
+		var action: String = "前往" if phase == "approach" else "采集中" if category == "果树" else "搜集中"
+		return "%02d %s · %s\n%s再点取消" % [member_id, short_call_sign(call_sign), action, heading]
+	if primary:
+		return heading + "可搜" + category + "\n" + reward
+	return "可搜%s · %s" % [category, reward]
+
+
 static func notice(code: String, site_label: String, member_label: String = "") -> String:
 	var site: String = _site_label(site_label)
 	var member: String = _brief(member_label, MEMBER_LABEL_LIMIT, "队员")

@@ -61,7 +61,7 @@ def main():
   execute(name.replace('_','-'),['--script','res://tests/'+name+'.gd'],[])
  execute('known-hash-cycle',['--script','res://tests/known_hash_cycle.gd'])
  execute('record-hash',['--script','res://tests/record_hash.gd'])
- for name in ['r2_art','r2_save_cache','r2_save_failure']:
+ for name in ['r2_art','r2_save_cache','r2_save_failure','level_policy','level_summary','level_generation']:
   execute(name.replace('_','-'),['--script','res://tests/'+name+'.gd'],[])
  z=subprocess.run([sys.executable,'tools/validate_assets.py'],cwd=ROOT,capture_output=True);(job/'assets.txt').write_bytes(z.stdout+z.stderr);assert z.returncode==0,z.stderr
  result={'status':'PASS_PUBLIC_SUBSET_WITH_EXACT_RECORD_TRANSPORT','legacy_engine_json_cycle':'REPRODUCED','production_gate':'BLOCKED','cases':rows,'private_archive_matrix':'NOT_INCLUDED','physical_os':'NOT_VERIFIED'}

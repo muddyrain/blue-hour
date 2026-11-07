@@ -804,7 +804,7 @@ func _new_game() -> void:
 	profile_id = RunSave.new_profile_id()
 	if playable_entry:
 		_battle_meta.campaign=CampaignRules.initial(profile_id)
-		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed)
+		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true)
 	_initialize_weapons("initial")
 	last_settlement_id = ""
 	_pending_save.clear()

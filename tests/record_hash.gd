@@ -29,6 +29,10 @@ func _run() -> void:
 	for index: int in range(values.size()):
 		var value: Dictionary = {"nested":[null, true, "中文", {"x":values[index]}]}
 		var hash: String = TransactionReceipt.fingerprint(value)
+		var encoded: Array = RecordEncoding._encode(value)
+		var previous_bytes: String = JSON.stringify({"payload":encoded, "record_encoding":RecordEncoding.VERSION, "sha256":hash}, "", true, true) + "\n"
+		var packed: Dictionary = RecordEncoding.pack(value)
+		_expect(packed.hash == hash and packed.text == previous_bytes, "shared encoding preserves original receipt bytes and digest " + str(index))
 		var stable: bool = not hash.is_empty()
 		for turn: int in range(10):
 			var path: String = _output.path_join("numbers/%02d-%02d.json" % [index,turn])

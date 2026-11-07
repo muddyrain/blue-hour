@@ -4,27 +4,35 @@ extends RefCounted
 const PREFIX: String="worldgen_v1_"
 const KEYS: Array[String]=["version","seed","size","topology","attempt","fallback","bounds","entities","roads","barriers","gates","bus","arrivals","enemy_points","rescue","id","objects","graph","parcels","art_revision"]
 
-static func policy() -> Dictionary:
-	return {"version":1,"revision":3,"policy_id":"BH_WORLDGEN_V1","status":"PROJECT_TEMP","layout_version":5,"attempts":3,"fallback":"same_size_theme_bounded_partition","base_walk_speed":125,"scale":WorldgenScale.WIDTH}
+static func policy(level: bool = false) -> Dictionary:
+	var value: Dictionary = {"version":1,"revision":3,"policy_id":"BH_WORLDGEN_V1","status":"PROJECT_TEMP","layout_version":5,"attempts":3,"fallback":"same_size_theme_bounded_partition","base_walk_speed":125,"scale":WorldgenScale.WIDTH}
 
-static func generate(seed: String, size: String, topology: String) -> Dictionary:
-	if seed.is_empty() or seed.length()>128 or size not in NeighborhoodLayout.SIZES or topology not in NeighborhoodLayout.TOPOLOGIES: return {}
+	if level:
+		value.version=2
+		value.revision=1
+		value.policy_id="BH_LEVEL_V1"
+	return value
+
+static func generate(seed: String, size: String, topology: String, task: String = "") -> Dictionary:
+	if (not task.is_empty() and task not in TaskActions.TYPES) or seed.is_empty() or seed.length()>128 or size not in NeighborhoodLayout.SIZES or topology not in NeighborhoodLayout.TOPOLOGIES: return {}
 	for attempt: int in range(3):
-		var data: Dictionary=_assemble(seed,size,topology,attempt,false)
+		var data: Dictionary=_assemble(seed,size,topology,attempt,false,task)
 		if not data.is_empty(): return data
-	return _assemble(seed,size,topology,0,true)
+	return _assemble(seed,size,topology,0,true,task)
 
-static func _assemble(seed: String,size: String,topology: String,attempt: int,fallback: bool) -> Dictionary:
-	var data: Dictionary=WorldgenGeometry.assemble(seed,size,topology,attempt,fallback)
+static func _assemble(seed: String,size: String,topology: String,attempt: int,fallback: bool,task: String = "") -> Dictionary:
+	var data: Dictionary=WorldgenGeometry.assemble(seed,size,topology,attempt,fallback,task)
 	if not data.is_empty(): WorldgenDressing.freeze(data)
 	return ExplorationLayout.complete(data) if not data.is_empty() else {}
 
 static func validate(value: Variant,cached: bool=true) -> String:
-	if not value is Dictionary or value.size()!=KEYS.size() or not value.has_all(KEYS) or not SurvivalContracts.json_value(value): return "WORLDGEN_LAYOUT_FIELDS"
+	if not value is Dictionary or value.size()!=KEYS.size()+int(value.has("level_task")) or not value.has_all(KEYS) or not SurvivalContracts.json_value(value): return "WORLDGEN_LAYOUT_FIELDS"
 	if value.version!=5 or not value.seed is String or value.seed.is_empty() or value.seed.length()>128 or value["size"] not in NeighborhoodLayout.SIZES or value.topology not in NeighborhoodLayout.TOPOLOGIES or not SurvivalContracts.integer(value.attempt,0,2) or not value.fallback is bool or not is_map_id(value.id): return "WORLDGEN_LAYOUT_IDENTITY"
+	if value.has("level_task") and value.level_task not in TaskActions.TYPES:
+		return "LEVEL_TASK_IDENTITY"
 	var signature: String=RecordEncoding.fingerprint(value)
 	if cached and ExplorationLayout._checked.has(signature): return ""
-	var expected: Dictionary=_assemble(value.seed,value["size"],value.topology,int(value.attempt),value.fallback)
+	var expected: Dictionary=_assemble(value.seed,value["size"],value.topology,int(value.attempt),value.fallback,value.get("level_task",""))
 	return "" if not expected.is_empty() and RecordEncoding.fingerprint(expected)==signature else "WORLDGEN_LAYOUT_CANONICAL"
 
 static func is_map_id(value: Variant) -> bool:

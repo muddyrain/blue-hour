@@ -12,6 +12,10 @@ static func short_site(title: String, number: int) -> String:
 	return "%s%02d" % [_brief(title, TITLE_LIMIT, "站点"), number]
 
 
+static func short_call_sign(call_sign: String) -> String:
+	return _brief(call_sign, CALL_SIGN_LIMIT, "队员")
+
+
 static func actor_status(phase: String, site_label: String, outdoor: bool) -> String:
 	var action: String = _phase(phase, outdoor)
 	if action.is_empty():
@@ -23,7 +27,7 @@ static func building_text(member_id: int, call_sign: String, phase: String, outd
 	var action: String = _phase(phase, outdoor)
 	if member_id <= 0 or action.is_empty():
 		return ""
-	return "%02d %s·%s·再点取消" % [member_id, _brief(call_sign, CALL_SIGN_LIMIT, "队员"), action]
+	return "%02d %s·%s·再点取消" % [member_id, short_call_sign(call_sign), action]
 
 
 static func notice(code: String, site_label: String, member_label: String = "") -> String:

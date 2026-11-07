@@ -7,6 +7,10 @@ signal extraction_requested
 signal help_changed(expanded: bool)
 
 const HudScene: PackedScene = preload("res://src/features/expedition_hud/expedition_hud.tscn")
+const BUS_ACTIVITY: Dictionary[String, String] = {
+	"approaching_search":"前往搜集点", "searching":"搜集中",
+	"recovering":"回收中", "gathering":"前往巴士",
+}
 
 var ui_theme: Theme
 var player_mode: bool = false
@@ -56,11 +60,19 @@ func refresh(state: Dictionary) -> void:
 	var time_label: String = "夜间经过" if night else "出击时间"
 	if not player_mode and threat.get("enabled",false): time_label += " · 候选"
 	var action: String = "结束交火练习" if practice else "发动巴士"
+	var bus_waiting: PackedStringArray = []
 	if not enabled:
 		action = bus_text
 	if gathering:
 		action = "集合至巴士"
-		bus_text = "%s · %d / %d 已到 · %d 工作" % ["集合中" if boarding.ordered else "等待集合", boarding.arrived, boarding.required, boarding.working]
+		bus_text = "已集合 %d/%d" % [boarding.arrived, boarding.required]
+		for member: Dictionary in boarding.get("waiting", []):
+			var activity: String = BUS_ACTIVITY.get(member.activity, "未集合")
+			bus_waiting.append("等待%s · %s" % [SearchWorkView.short_call_sign(member.call_sign), activity])
+		if boarding.get("rescue_waiting", false):
+			bus_waiting.append("等待救援对象")
+	elif state.get("engine_running", false):
+		bus_waiting.append("请前往巴士旁集合")
 	view.refresh({
 		"resource_text":"货币 %d  ·  食物 %d\n携带：钱%d · 粮%d · 武器%d"%[state["cash"],state["food"],state["loot"],state["food_loot"],int(state.get("weapon_loot",0))],
 		"objective":state.get("objective",""), "mission_title":state["mission_title"], "day_text":"第 %d 天" % state["day"],
@@ -74,6 +86,7 @@ func refresh(state: Dictionary) -> void:
 			"compact_hint":"威胁 %d" % int(threat.get("stage",0)) if threat.get("enabled", false) else "",
 			"hint":threat.get("hint", "") if threat.get("enabled", false) else ""},
 		"bus_status_text":"交火练习" if practice else ("巴士就绪" if enabled else bus_text),
+		"bus_waiting_text":"\n".join(bus_waiting), "bus_count_visible":gathering,
 		"bus_action_label":action, "bus_action_enabled":enabled or gathering,
 		"status_hint":state["notice"] if state["notice_visible"] else "",
 	})

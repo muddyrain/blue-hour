@@ -11,6 +11,7 @@ var rows: Array[Dictionary] = []
 var checks: Array[Dictionary] = []
 var failures: int = 0
 var pause_requests: int = 0
+var gather_requests: int = 0
 
 
 func _initialize() -> void:
@@ -70,6 +71,7 @@ func scenario(size: Vector2i, count: int) -> void:
 	adapter.ui_theme = theme
 	adapter.player_mode = true
 	adapter.pause_requested.connect(func() -> void: pause_requests += 1)
+	adapter.extraction_requested.connect(func() -> void: gather_requests += 1)
 	viewport.add_child(adapter)
 	var hud: C1ExpeditionHud = adapter.view
 	var support: BasicSupportPanel = BasicSupportPanel.new()
@@ -86,7 +88,13 @@ func scenario(size: Vector2i, count: int) -> void:
 	var director: ThreatDirector = ThreatDirector.new()
 	var threat: Dictionary = director.snapshot()
 	threat.enabled = true
-	adapter.refresh({"seconds":105, "engine":"巴士准备 20 秒", "can_extract":false, "can_gather":false, "practice":false, "threat":threat, "objective":"主目标：食品站点 0/2", "mission_title":"贯通商业街", "day":3, "sites_searched":0, "sites_total":4, "kills":0, "cash":57, "food":2, "loot":4, "food_loot":3, "weapon_loot":1, "paused":false, "members":members, "notice":"已派遣队员；其他任务继续。", "notice_visible":true, "time_fraction":0.75, "enemy_mode":true, "route_hint":"食品站点与装备站点分别派遣。"})
+	var waiting: Array[Dictionary] = []
+	var activities: Array[String] = ["searching", "gathering", "pending"]
+	for index: int in range(1, count):
+		waiting.append({"id":index + 1, "call_sign":names[index], "activity":activities[index - 1]})
+	var state: Dictionary = {"seconds":105, "engine":"等待幸存者", "can_extract":false, "can_gather":true, "practice":false, "threat":threat, "objective":"主目标：食品站点 0/2", "mission_title":"贯通商业街", "day":3, "sites_searched":0, "sites_total":4, "kills":0, "cash":57, "food":2, "loot":4, "food_loot":3, "weapon_loot":1, "paused":false, "members":members, "notice":"已下令集合 · 搜集中的队员完成后归队。", "notice_visible":true, "time_fraction":0.75, "enemy_mode":true, "route_hint":"食品站点与装备站点分别派遣。",
+		"boarding":{"arrived":1, "required":count, "working":1, "ordered":true, "waiting":waiting, "rescue_waiting":true}}
+	adapter.refresh(state)
 	support.present("Q 治疗 · 无受伤存活者", "E 空袭 · 就绪", false, true)
 	var ability_id: String = "speed_boost_v1" if count == 2 else "map_freeze_v1"
 	var duration: float = float(SpecialPowers.POLICY[ability_id].duration)
@@ -123,6 +131,23 @@ func scenario(size: Vector2i, count: int) -> void:
 		skill_metrics.append(control_metrics(control, bounds))
 	check(disjoint(skill_controls) and skill_metrics.all(func(value: Dictionary) -> bool: return value.fits), label + " Q/E/3 controls stay separate and inside viewport")
 	check(support.heal_button.icon != null and support.airstrike_button.icon != null and power.activation_button.icon != null and support.size.x <= 200.0 and power.size.x <= 200.0, label + " actual original skill icons retain compact column width")
+	var bus_labels: Array[Dictionary] = [label_metrics(hud._bus_status, bounds), label_metrics(hud._bus_waiting, bounds)]
+	var bus_controls: Array[Control] = [hud._bus_status, hud._bus_waiting, hud._bus_button, hud._hint]
+	check(bus_controls.all(func(control: Control) -> bool: return control.is_visible_in_tree() and bounds.encloses(control.get_global_rect())) and disjoint(bus_controls), label + " collection count, waiting rows, notice and button have separate visible bounds")
+	check(bus_labels.all(func(metrics: Dictionary) -> bool: return metrics.glyphs_fit and metrics.lines_fit), label + " collection count and each waiting line fit at full font size")
+	check(hud._bus_status.text == "已集合 1/%d" % count and bus_labels[0].one_line, label + " one-line count reflects supplied membership")
+	var expected: PackedStringArray = ["等待夏之遥 · 搜集中", "等待救援对象"]
+	if count >= 3:
+		expected.insert(1, "等待林知秋 · 前往巴士")
+	if count >= 4:
+		expected.insert(2, "等待沈听澜 · 未集合")
+	check(hud._bus_waiting.text.split("\n") == expected, label + " waiting names, states and rescue object remain distinct")
+	check(hud._bus_status.mouse_filter == Control.MOUSE_FILTER_IGNORE and hud._bus_waiting.mouse_filter == Control.MOUSE_FILTER_IGNORE and hud._bus_status.focus_mode == Control.FOCUS_NONE and hud._bus_waiting.focus_mode == Control.FOCUS_NONE, label + " count and names are passive HUD labels")
+	var before_gather: int = gather_requests
+	await click_at(viewport, hud._bus_waiting.get_global_rect().get_center())
+	check(gather_requests == before_gather, label + " waiting text has no collection action")
+	await click_at(viewport, hud._bus_button.get_global_rect().get_center())
+	check(gather_requests == before_gather + 1 and hud._bus_button.focus_mode == Control.FOCUS_ALL, label + " viewport click activates original collection button once")
 	var before_pause: int = pause_requests
 	var visible_before: bool = hud._objective.visible
 	hud._objective_toggle.pressed.emit()
@@ -138,7 +163,7 @@ func scenario(size: Vector2i, count: int) -> void:
 	var help_fit: bool = bounds.encloses(hud._help.get_global_rect())
 	hud._help_button.pressed.emit()
 	check(visible_before and collapsed and hud._objective.visible and details_fit and help_fit and pause_requests == before_pause, label + " objective and explanation controls are bounded and do not request pause")
-	var row: Dictionary = {"size":[size.x, size.y], "count":count, "panels":panel_metrics, "members":member_metrics, "skills":skill_metrics, "resource_lines":hud._currency.get_line_count(), "scope":"supplied UI rows only; no journey or gameplay mutations"}
+	var row: Dictionary = {"size":[size.x, size.y], "count":count, "panels":panel_metrics, "members":member_metrics, "skills":skill_metrics, "bus_labels":bus_labels, "resource_lines":hud._currency.get_line_count(), "scope":"supplied UI rows only; no journey or gameplay mutations"}
 	if not output.is_empty() and count == 4:
 		var caption: Label = Label.new()
 		caption.theme = theme
@@ -154,6 +179,12 @@ func scenario(size: Vector2i, count: int) -> void:
 		var file_name: String = "hud-%dx%d-4p.png" % [size.x, size.y]
 		check(not image.is_empty() and image.save_png(output.path_join(file_name)) == OK, label + " native renderer writes controlled HUD PNG")
 		row.screenshot = file_name
+	state.can_gather = false
+	state.engine_running = true
+	state.engine = "发动引擎 2"
+	adapter.refresh(state)
+	await settle()
+	check(hud._bus_status.text == "发动引擎 2" and "前往巴士" in hud._bus_waiting.text and hud._bus_button.disabled and hud._bus_button.focus_mode == Control.FOCUS_NONE, label + " engine countdown and approach hint retain disabled focus rule")
 	rows.append(row)
 	viewport.queue_free()
 	await process_frame
@@ -161,6 +192,18 @@ func scenario(size: Vector2i, count: int) -> void:
 
 func settle() -> void:
 	for tick: int in range(4):
+		await process_frame
+
+
+func click_at(viewport: SubViewport, point: Vector2) -> void:
+	for down: bool in [true, false]:
+		var event: InputEventMouseButton = InputEventMouseButton.new()
+		event.button_index = MOUSE_BUTTON_LEFT
+		event.button_mask = MOUSE_BUTTON_MASK_LEFT if down else 0
+		event.pressed = down
+		event.position = point
+		event.global_position = point
+		viewport.push_input(event, true)
 		await process_frame
 
 
@@ -189,11 +232,15 @@ func label_metrics(label: Label, bounds: Rect2) -> Dictionary:
 	var font: Font = label.get_theme_font("font")
 	var font_size: int = label.get_theme_font_size("font_size")
 	var outline: int = label.get_theme_constant("outline_size")
-	var width: float = font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
+	var width: float = 0.0
+	var lines: PackedStringArray = label.text.split("\n")
+	for line: String in lines:
+		width = maxf(width, font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x)
 	result.text = label.text
 	result.font_size = font_size
 	result.glyph_width = width
 	result.control_width = label.size.x
 	result.one_line = label.get_line_count() == 1
 	result.glyphs_fit = width + 2.0 * float(outline) <= label.size.x + 0.5
+	result.lines_fit = label.get_line_count() == lines.size() and label.get_visible_line_count() == lines.size()
 	return result

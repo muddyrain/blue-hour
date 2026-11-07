@@ -475,8 +475,8 @@ func step(delta: float) -> void:
 		_finish(false)
 	elif phase == Phase.BOARDING:
 		var boarding: Dictionary = boarding_status()
-		if boarding.arrived == boarding.required and (rescue_target == null or rescue_target.status != "RESCUED" or rescue_target.delivered()):
-			_finish(true)
+		if boarding.arrived == boarding.required and not _rescue_waiting_for_bus():
+			_finish(true, Vector2i(boarding.arrived, boarding.required))
 	elif phase == Phase.ENGINE:
 		_engine_clock -= delta
 		if _engine_clock <= 0.0:
@@ -698,20 +698,41 @@ func request_bus_action() -> void:
 		request_extraction()
 
 
-func boarding_status() -> Dictionary:
+func boarding_status(with_feedback: bool = false) -> Dictionary:
 	var required: int = 0
 	var arrived: int = 0
 	var working: int = 0
+	var ordered: bool = goal == layout.bus_door
+	var waiting: Array[Dictionary] = []
 	for actor: FieldActor in survivors:
 		if actor.activity == FieldActor.Activity.DOWN:
 			continue
 		required += 1
-		if has_search_job(actor.member_id):
+		var search_phase: String = search_assignments.phase_for(actor.member_id)
+		if not search_phase.is_empty():
 			working += 1
 		elif actor.position.distance_to(layout.bus_door) <= tuning.boarding_radius:
 			arrived += 1
-	return {"arrived":arrived, "required":required, "working":working,
-		"ordered":goal == layout.bus_door}
+			continue
+		if with_feedback:
+			var activity: String = "pending"
+			if search_phase == "approach":
+				activity = "approaching_search"
+			elif search_phase == "working":
+				activity = "recovering" if actor.activity == FieldActor.Activity.RECOVERING else "searching"
+			elif ordered and actor.activity == FieldActor.Activity.MOVING and not actor.path.is_empty():
+				if actor.path[-1].distance_to(layout.bus_door) <= tuning.boarding_radius:
+					activity = "gathering"
+			waiting.append({"id":actor.member_id, "call_sign":actor.call_sign, "activity":activity})
+	var status: Dictionary = {"arrived":arrived, "required":required, "working":working, "ordered":ordered}
+	if with_feedback:
+		status["waiting"] = waiting
+		status["rescue_waiting"] = _rescue_waiting_for_bus()
+	return status
+
+
+func _rescue_waiting_for_bus() -> bool:
+	return rescue_target != null and rescue_target.status == "RESCUED" and not rescue_target.delivered()
 
 
 func request_bus_gather() -> void:
@@ -1280,7 +1301,7 @@ func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
 	return true
 
 
-func _finish(evacuated: bool) -> void:
+func _finish(evacuated: bool, boarding: Vector2i = Vector2i.ZERO) -> void:
 	if phase == Phase.FINISHED:
 		return
 	FreezeProfile.start({"day":day,"size":layout.world_data.get("size","legacy"),"buildings":_buildings.size(),"sites":sites.size(),"survivors":survivors.size(),"enemies":enemies.size(),"elapsed":elapsed})
@@ -1293,6 +1314,8 @@ func _finish(evacuated: bool) -> void:
 	set_physics_process(false)
 	set_process_unhandled_input(false)
 	_effects.process_mode = Node.PROCESS_MODE_DISABLED
+	if bus_view != null:
+		bus_view.final_boarding = boarding
 	_hud.hide_screen()
 	_readouts.hide()
 	camera.set_process(false)
@@ -1425,7 +1448,7 @@ func _update_ui() -> void:
 			_update_member_display()
 			_readouts.update_members(survivors, get_global_transform_with_canvas(), get_viewport_rect().size)
 	var timing: Dictionary = time_status()
-	var boarding: Dictionary = boarding_status()
+	var boarding: Dictionary = boarding_status(phase == Phase.BOARDING)
 	var engine_text: String = "发动引擎 →"
 	if phase == Phase.ENGINE:
 		engine_text = "发动引擎 %d" % timing["engine_seconds"]
@@ -1464,6 +1487,7 @@ func _update_ui() -> void:
 		"mission_title":("交火练习" if is_practice else mission_title) if los_setup == null else mission_title, "members":members,
 		"can_extract":phase != Phase.FINISHED if is_practice else phase == Phase.ACTIVE and elapsed >= tuning.bus_ready_seconds,
 		"boarding":boarding,
+		"engine_running":not is_practice and phase == Phase.ENGINE,
 		"can_gather":not is_practice and phase == Phase.BOARDING and boarding.required > 0,
 		"day": day, "seconds": timing["sortie_seconds"], "time_fraction": timing["sortie_fraction"],
 		"paused": is_paused, "cash": initial_cash, "loot": loot,

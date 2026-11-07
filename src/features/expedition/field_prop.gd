@@ -15,6 +15,8 @@ var reference_width: float = 448.0
 var street_sign: String = ""
 var sign_rect: Rect2
 var soft_contact: bool = false
+var roof_tint: Color = Color.WHITE
+var facade_tint: Color = Color.WHITE
 var _alpha: Image
 var world_asset: bool = false
 var facade: Texture2D = ShopTexture
@@ -27,6 +29,7 @@ var title: String = "旧街补给店"
 var reward_hint: String = "货币 +4"
 var ui_theme: Theme
 var loot_category: String = ""
+var loot_landmark: String = ""
 var _loot_anchor: Vector2
 var _work: Label
 var _bar: ProgressBar
@@ -38,6 +41,8 @@ func _ready() -> void:
 	var factor: float = front_width / reference_width
 	_roof = _part(Rect2(0,0,native_size.x,roof_cut) if world_asset else Rect2(0,0,512,320),(-render_anchor if world_asset else Vector2(-256,-416))*factor,factor)
 	_wall = _part(Rect2(0,roof_cut,native_size.x,native_size.y-roof_cut) if world_asset else Rect2(0,320,512,128),(Vector2(0,roof_cut)-render_anchor if calibrated else Vector2(-256,-96))*factor,factor)
+	_roof.self_modulate = roof_tint
+	_wall.self_modulate = facade_tint
 	if not street_sign.is_empty():
 		var sign_label: Label = _label(street_sign,(sign_rect.position-render_anchor)*factor,12,sign_rect.size.x*factor)
 		sign_label.add_theme_color_override("font_color",Color("e2d7b9"))
@@ -167,7 +172,7 @@ func configure_loot_badge(category: String, anchor: Vector2) -> void:
 
 
 func present_loot(member_id: int, call_sign: String, phase: String, fraction: float) -> void:
-	var text: String = SearchWorkView.loot_badge_text(loot_category, primary_target, searched, reward_hint, member_id, call_sign, phase)
+	var text: String = SearchWorkView.loot_badge_text(loot_category, primary_target, searched, reward_hint, member_id, call_sign, phase, loot_landmark)
 	if text != _work.text:
 		_work.text = text
 		_work.reset_size()

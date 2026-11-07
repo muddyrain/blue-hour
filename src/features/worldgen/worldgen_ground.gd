@@ -2,15 +2,33 @@ class_name WorldgenGround
 extends Node2D
 ## Flat materials read the frozen roads/parcels; no independent collision geometry.
 var layout: StreetLayout
+var supply_entrances: Array[Vector2] = []
+var _light_pool: GradientTexture2D
+
+
+func _ready() -> void:
+	if supply_entrances.is_empty():
+		return
+	var falloff: Gradient = Gradient.new()
+	falloff.offsets = PackedFloat32Array([0.0, 0.42, 1.0])
+	falloff.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0.36), Color(1, 1, 1, 0)])
+	_light_pool = GradientTexture2D.new()
+	_light_pool.gradient = falloff
+	_light_pool.fill = GradientTexture2D.FILL_RADIAL
+	_light_pool.fill_from = Vector2(0.5, 0.5)
+	_light_pool.fill_to = Vector2(1.0, 0.5)
+
 
 func _draw() -> void:
 	var street_material: bool = int(layout.world_data.get("art_revision", 0)) == 3
-	draw_rect(layout.world_bounds, Color("59634c") if street_material else Color("586b60"))
-	draw_texture_rect(StreetBlock.GrassTexture, layout.world_bounds, true, Color(0.93, 0.94, 0.81, 0.58) if street_material else Color(0.77,0.88,0.76,0.42))
+	var blue_hour: bool = not supply_entrances.is_empty()
+	var grass: Color = Color(0.59, 0.72, 0.76, 0.56) if blue_hour else Color(0.93, 0.94, 0.81, 0.58) if street_material else Color(0.77, 0.88, 0.76, 0.42)
+	draw_rect(layout.world_bounds, Color("344846") if blue_hour else Color("59634c") if street_material else Color("586b60"))
+	draw_texture_rect(StreetBlock.GrassTexture, layout.world_bounds, true, grass)
 	for parcel: Dictionary in layout.world_data.parcels:
 		var area: Rect2=WorldLayout.rect(parcel.rect)
-		draw_rect(area, Color("62694f") if street_material else Color("56664e"))
-		draw_texture_rect(StreetBlock.GrassTexture, area, true, Color(0.93, 0.94, 0.8, 0.60) if street_material else Color(0.7,0.84,0.66,0.5))
+		draw_rect(area, Color("3c514b") if blue_hour else Color("62694f") if street_material else Color("56664e"))
+		draw_texture_rect(StreetBlock.GrassTexture, area, true, grass if blue_hour else Color(0.93, 0.94, 0.8, 0.60) if street_material else Color(0.7, 0.84, 0.66, 0.5))
 		for court: Dictionary in parcel.courtyards:
 			_court(court)
 		# Authored orthogonal shared paths join frontages and courts; no nav debug lines.
@@ -18,6 +36,8 @@ func _draw() -> void:
 			var paving: Rect2=WorldLayout.rect(walk).intersection(area)
 			if street_material:
 				_paving(paving)
+				if blue_hour and paving.size.y > paving.size.x and paving.has_area():
+					_walk_edges(paving)
 			else:
 				draw_rect(paving.grow(3).intersection(area),Color("676e62"))
 				draw_rect(paving,Color("909384"))
@@ -37,9 +57,9 @@ func _draw() -> void:
 		if street_material:
 			# Adjacent facades share the same material coordinates and foundation line.
 			_paving(apron)
-			draw_rect(Rect2(block.position.x-4,block.end.y-3,block.size.x+8,5),Color("68665d"))
-			draw_rect(Rect2(door-Vector2(29,48),Vector2(58,5)),Color("bbb2a1"))
-			draw_rect(Rect2(door-Vector2(31,43),Vector2(62,4)),Color("898376"))
+			draw_rect(Rect2(block.position.x-4,block.end.y-3,block.size.x+8,5),Color("4c5660") if blue_hour else Color("68665d"))
+			draw_rect(Rect2(door-Vector2(29,48),Vector2(58,5)),Color("90969b") if blue_hour else Color("bbb2a1"))
+			draw_rect(Rect2(door-Vector2(31,43),Vector2(62,4)),Color("596473") if blue_hour else Color("898376"))
 		else:
 			draw_rect(apron,Color("969b8c"))
 			draw_texture_rect(StreetBlock.PavingTexture,apron,true,Color(0.9,0.94,0.87,0.56))
@@ -47,28 +67,99 @@ func _draw() -> void:
 			draw_rect(Rect2(door-Vector2(29,48),Vector2(58,8)),Color("c1bdac"))
 			draw_rect(Rect2(door-Vector2(32,40),Vector2(64,7)),Color("7a8177"))
 	for road: Rect2 in layout.roads:
-		draw_rect(road,Color("34434b"))
-		draw_texture_rect(StreetBlock.AsphaltTexture,road,true,Color(0.73,0.8,0.82,0.45))
+		draw_rect(road, Color("263748") if blue_hour else Color("34434b"))
+		draw_texture_rect(StreetBlock.AsphaltTexture, road, true, Color(0.63, 0.74, 0.95, 0.43) if blue_hour else Color(0.73, 0.8, 0.82, 0.45))
+	if blue_hour:
+		_bus_curb_paint()
 	for road: Rect2 in layout.roads:
 		var horizontal: bool=road.size.x>road.size.y
 		var length: int=int(road.size.x if horizontal else road.size.y)
+		var tangent: Vector2 = Vector2.RIGHT if horizontal else Vector2.DOWN
 		for step: int in range(12,length-12,32):
 			for side: int in [-1,1]:
 				var p: Vector2=road.position+(Vector2(step,-3 if side<0 else road.size.y+1) if horizontal else Vector2(-3 if side<0 else road.size.x+1,step))
 				if _junction(p,road): continue
-				draw_line(p,p+(Vector2(26,0) if horizontal else Vector2(0,26)),Color("b6b6a4"),3)
-				if step%160==12: draw_rect(Rect2(p+Vector2(1,5),Vector2(18,4)),Color("28363a"))
+				if blue_hour:
+					_curb(p, tangent, side, road, step % 160 == 12)
+				else:
+					draw_line(p, p + tangent * 26.0, Color("b6b6a4"), 3)
+					if step % 160 == 12:
+						draw_rect(Rect2(p+Vector2(1,5),Vector2(18,4)),Color("28363a"))
 		for step: int in range(32,length-32,88):
 			var p: Vector2=Vector2(road.position.x+step,road.get_center().y) if horizontal else Vector2(road.get_center().x,road.position.y+step)
-			if not _junction(p,road): draw_line(p,p+(Vector2(32,0) if horizontal else Vector2(0,32)),Color("c3b27d"),2)
+			var center_line: Color = Color("aa956d") if minf(road.size.x, road.size.y) == WorldgenScale.MAIN_WIDTH else Color("727879")
+			if not _junction(p,road) and (not blue_hour or not layout.bus_block.grow(40).has_point(p)):
+				draw_line(p, p + tangent * 32.0, center_line if blue_hour else Color("c3b27d"), 2)
 	# Crossings mark the actual perpendicular road connections, never a collision.
 	for a: Rect2 in layout.roads:
 		if a.size.x<=a.size.y: continue
 		for b: Rect2 in layout.roads:
 			if b.size.x>=b.size.y or not a.intersects(b): continue
+			var y: float = a.position.y - 25 if b.position.y < a.position.y else a.end.y + 8
 			for stripe: int in range(8,int(b.size.x)-8,17):
-				var y: float=a.position.y-25 if b.position.y<a.position.y else a.end.y+8
-				draw_rect(Rect2(b.position.x+stripe,y,9,18),Color("b9bca9"))
+				draw_rect(Rect2(b.position.x+stripe,y,9,18),Color("939e9e") if blue_hour else Color("b9bca9"))
+			if blue_hour:
+				_crossing_landings(b, y)
+	if blue_hour:
+		_supply_lights()
+
+
+func _walk_edges(walk: Rect2) -> void:
+	draw_line(walk.position, Vector2(walk.position.x, walk.end.y), Color("667684"), 1)
+	draw_line(Vector2(walk.end.x, walk.position.y), walk.end, Color("293d46"), 2)
+
+
+func _crossing_landings(road: Rect2, y: float) -> void:
+	for x: float in [road.position.x - 15, road.end.x + 4]:
+		var landing: Rect2 = Rect2(x, y - 1, 11, 20)
+		draw_rect(landing, Color("857963"))
+		for rib: int in range(3, 19, 4):
+			var start: Vector2 = landing.position + Vector2(2, rib)
+			draw_line(start, start + Vector2(7, 0), Color("b5a484"), 1)
+
+
+func _curb(point: Vector2, tangent: Vector2, side: int, road: Rect2, drain: bool) -> void:
+	var end: Vector2 = point + tangent * 32.0
+	if _junction(end, road):
+		return
+	var outside: Vector2 = (Vector2.DOWN if tangent == Vector2.RIGHT else Vector2.RIGHT) * side
+	draw_line(point - outside * 2.0, end - outside * 2.0, Color("192a38"), 5)
+	draw_line(point + outside, end + outside, Color("798794"), 2)
+	draw_line(point + outside * 4.0, end + outside * 4.0, Color("5a6977"), 1)
+	draw_line(point, point + outside * 5.0, Color("354655"), 1)
+	if drain:
+		var inset: Vector2 = point - outside * 6.0
+		draw_line(inset, inset + tangent * 19.0, Color("172633"), 5)
+		for rung: int in range(2, 18, 4):
+			var start: Vector2 = inset + tangent * rung
+			draw_line(start - outside * 1.4, start + outside * 1.4, Color("556874"), 1)
+
+
+func _bus_curb_paint() -> void:
+	var stop: Rect2 = layout.bus_block
+	for road: Rect2 in layout.roads:
+		if road.size.y != WorldgenScale.MAIN_WIDTH or not road.has_point(stop.get_center()):
+			continue
+		var curb_y: float = road.end.y - 12.0 if layout.bus_door.y > road.get_center().y else road.position.y + 12.0
+		for offset: float in [26.0, 104.0, 182.0]:
+			var start: Vector2 = Vector2(stop.position.x + offset, curb_y)
+			var end: Vector2 = start + Vector2(32, 0)
+			if road.has_point(start) and road.has_point(end) and not _junction(start, road) and not _junction(end, road):
+				draw_line(start, end, Color(0.52, 0.58, 0.62, 0.46), 2.0, true)
+		return
+
+
+func _supply_lights() -> void:
+	for index: int in range(supply_entrances.size()):
+		var door: Vector2 = supply_entrances[index]
+		var color: Color = Color(1.0, 0.68, 0.32, 0.37) if index == 0 else Color(1.0, 0.76, 0.48, 0.30)
+		draw_texture_rect(_light_pool, Rect2(door - Vector2(77, 58), Vector2(154, 99)), false, color)
+		draw_texture_rect(_light_pool, Rect2(door - Vector2(32, 45), Vector2(64, 42)), false, Color(1.0, 0.78, 0.50, 0.35))
+		draw_line(door + Vector2(-20, -30), door + Vector2(20, -30), Color(0.86, 0.67, 0.42, 0.65), 2)
+	for detail: Dictionary in NeighborhoodDecor.placements(layout):
+		if detail.kind == "lamp":
+			var origin: Vector2 = detail.position + Vector2(-35, -35)
+			draw_texture_rect(_light_pool, Rect2(origin, Vector2(140, 74)), false, Color(1.0, 0.68, 0.32, 0.28))
 
 func _court(court: Dictionary) -> void:
 	var area: Rect2=WorldLayout.rect(court.rect)
@@ -76,13 +167,14 @@ func _court(court: Dictionary) -> void:
 	var parking: bool=court.kind=="parking"
 	var loading: bool=court.kind=="loading"
 	var street_material: bool = int(layout.world_data.get("art_revision", 0)) == 3
+	var blue_hour: bool = not supply_entrances.is_empty()
 	if street_material:
 		if garden:
-			draw_rect(area, Color("5d684a"))
-			draw_texture_rect(StreetBlock.GrassTexture, area, true, Color(0.94, 0.96, 0.81, 0.67))
+			draw_rect(area, Color("3b5049") if blue_hour else Color("5d684a"))
+			draw_texture_rect(StreetBlock.GrassTexture, area, true, Color(0.58, 0.70, 0.73, 0.55) if blue_hour else Color(0.94, 0.96, 0.81, 0.67))
 		elif parking or loading:
-			draw_rect(area, Color("6d7069"))
-			draw_texture_rect(StreetBlock.ConcreteTexture, area, true, Color(0.92, 0.91, 0.84, 0.55))
+			draw_rect(area, Color("4a5560") if blue_hour else Color("6d7069"))
+			draw_texture_rect(StreetBlock.ConcreteTexture, area, true, Color(0.66, 0.73, 0.85, 0.53) if blue_hour else Color(0.92, 0.91, 0.84, 0.55))
 		else:
 			_paving(area)
 	else:
@@ -92,19 +184,20 @@ func _court(court: Dictionary) -> void:
 	if garden:
 		# Low planting and soil remain traversable; raised hedges have frozen collisions.
 		var bed: Rect2=Rect2(area.position+Vector2(8,8),Vector2(maxf(8,area.size.x-16),minf(38,area.size.y*0.22)))
-		draw_rect(bed,Color("4c5440"))
+		draw_rect(bed,Color("33463e") if blue_hour else Color("4c5440"))
 		for x: int in range(int(bed.position.x)+8,int(bed.end.x)-4,19):
 			draw_circle(Vector2(x,bed.get_center().y),5,Color("79945b"))
 			if x%3==0:draw_circle(Vector2(x-2,bed.get_center().y-2),1.8,Color("cec277"))
 	elif parking or loading:
+		var stripe: Color = Color("929487") if blue_hour else Color("c2c1a5")
 		for x: int in range(int(area.position.x)+20,int(area.end.x)-132,164):
 			var y: float=area.position.y+8
 			var depth: float=minf(86,area.size.y-16)
-			draw_line(Vector2(x,y),Vector2(x,y+depth),Color("c2c1a5"),2)
-			draw_line(Vector2(x,y+depth),Vector2(x+132,y+depth),Color("c2c1a5"),2)
+			draw_line(Vector2(x,y),Vector2(x,y+depth),stripe,2)
+			draw_line(Vector2(x,y+depth),Vector2(x+132,y+depth),stripe,2)
 		if loading:
 			for x: int in range(int(area.position.x)+12,int(area.end.x)-16,24):
-				draw_line(Vector2(x,area.end.y-8),Vector2(x+12,area.end.y-20),Color("b8a877"),3)
+				draw_line(Vector2(x,area.end.y-8),Vector2(x+12,area.end.y-20),Color("95866b") if blue_hour else Color("b8a877"),3)
 
 func _junction(point: Vector2,current: Rect2) -> bool:
 	for other: Rect2 in layout.roads:
@@ -120,13 +213,16 @@ func _paving(area: Rect2) -> void:
 	var top: int = int(floor(area.position.y / patch))
 	var right: int = int(ceil(area.end.x / patch))
 	var bottom: int = int(ceil(area.end.y / patch))
+	var blue_hour: bool = not supply_entrances.is_empty()
+	var material: Color = Color(0.64, 0.72, 0.85) if blue_hour else Color(1.0, 0.97, 0.89)
+	var joint: Color = Color(0.16, 0.24, 0.32, 0.48) if blue_hour else Color(0.37, 0.36, 0.33, 0.48)
 	for y: int in range(top, bottom):
 		for x: int in range(left, right):
 			var origin: Vector2 = Vector2(x, y) * patch
 			var panel: Rect2 = Rect2(origin, Vector2.ONE * patch).intersection(area)
 			var source: Rect2 = Rect2((panel.position - origin) * ratio, panel.size * ratio)
-			draw_texture_rect_region(WorldgenArt.PAVING, panel, source, Color(1.0, 0.97, 0.89))
+			draw_texture_rect_region(WorldgenArt.PAVING, panel, source, material)
 	for x: int in range(left + 1, right):
-		draw_line(Vector2(x * patch, area.position.y), Vector2(x * patch, area.end.y), Color(0.37, 0.36, 0.33, 0.48), 1.1)
+		draw_line(Vector2(x * patch, area.position.y), Vector2(x * patch, area.end.y), joint, 1.1)
 	for y: int in range(top + 1, bottom):
-		draw_line(Vector2(area.position.x, y * patch), Vector2(area.end.x, y * patch), Color(0.37, 0.36, 0.33, 0.48), 1.1)
+		draw_line(Vector2(area.position.x, y * patch), Vector2(area.end.x, y * patch), joint, 1.1)

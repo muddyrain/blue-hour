@@ -626,6 +626,18 @@
       "sha256": "d264e64e249a4b3a3d98d071d41637167da03a4f7654975736fb5a2df518a26c",
       "origin": "Original Blue Hour artwork generated with built-in image generation; supplied PNG bytes preserved without resizing or pixel rewriting",
       "license": "No additional license granted"
+    },
+    {
+      "path": "assets/ui/m20/title-blue-hour.png",
+      "sha256": "4fdcb13d1fcddbe6e906078288f077e66cf5968780fe8fbb02e7ee6d67b4404c",
+      "origin": "M20 project-authored AI-assisted title art, text-free approved handoff",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/ui/m20/camp-blue-hour.png",
+      "sha256": "f0b0140f705329f2781ff1285495c178e66bc61b8229f501042389d34c41e614",
+      "origin": "M20 project-authored AI-assisted camp art, text-free approved handoff",
+      "license": "No additional license granted"
     }
   ]
 }

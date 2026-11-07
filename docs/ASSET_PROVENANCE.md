@@ -1,5 +1,7 @@
 # 素材来源与使用边界
 
+M20 使用 `assets/ui/m20/title-blue-hour.png` 和 `assets/ui/m20/camp-blue-hour.png`。两张 1672×941 的无字底图来自本项目原创蓝调街巷交接。标题图保留右侧巴士和暖灯，营地图以同一风格绘制驿站侧院。按原 PNG 字节导入，标题、控件与进度由 Godot 实时渲染。原字节 SHA 登记在 `assets/PROVENANCE.json`。参考稿和实机截图保留在本地。
+
 M6-ROGUE-02的空投箱、信标和主目标入口圈由 `airdrop_prop.gd` 与 `field_prop.gd` 原创向量绘制实现；没有新增外部位图或引用原作素材。其余素材沿用已有来源记录。
 
 运行美术为Blue Hour项目原创参考的AI辅助生成图像、原创SVG或代码绘制；音效为项目数学合成。没有使用Deadly Days图像、录屏、声音、原作包或研究截图作为运行素材。

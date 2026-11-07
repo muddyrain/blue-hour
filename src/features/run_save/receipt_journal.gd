@@ -106,7 +106,7 @@ func _profiled_read_all() -> Dictionary:
 			return entries
 		if not entries.directories.is_empty() or not entries.links.is_empty() or entries.files != ["record.json"]:
 			return _error(ERR_FILE_CORRUPT, "GENERATION_FILES")
-		var result: Dictionary = _read_record(folder.path_join("record.json"))
+		var result: Dictionary = _read_record(folder.path_join("record.json"),false)
 		if result.error != OK:
 			return result
 		total += int(result.bytes)
@@ -127,7 +127,9 @@ func _profiled_read_all() -> Dictionary:
 		digest = result.hash
 		hashes[int(receipt.revision)] = digest
 	FreezeProfile.scale("journal_total_bytes",total)
-	return {"error":OK, "receipt":previous, "hash":digest, "hashes":hashes, "identities":identities, "unpublished":stages, "bytes":total}
+	# Intermediate chain proofs only read the cached values. Isolate the one receipt
+	# that actually leaves the journal instead of cloning every historical generation.
+	return {"error":OK, "receipt":previous.duplicate(true), "hash":digest, "hashes":hashes, "identities":identities, "unpublished":stages, "bytes":total}
 
 
 func append(next: Dictionary, expected_hash: String) -> Dictionary:
@@ -222,14 +224,14 @@ func registration_problem(base: Dictionary, root_id: String) -> String:
 	return ""
 
 
-func _read_record(source: String) -> Dictionary:
+func _read_record(source: String, isolate: bool=true) -> Dictionary:
 	var stamp: int = FreezeProfile.enter("journal.read_record")
-	var result: Dictionary = _profiled_read_record(source)
+	var result: Dictionary = _profiled_read_record(source,isolate)
 	FreezeProfile.leave("journal.read_record", stamp)
 	return result
 
 
-func _profiled_read_record(source: String) -> Dictionary:
+func _profiled_read_record(source: String, isolate: bool=true) -> Dictionary:
 	var io_stamp: int = Time.get_ticks_usec()
 	var file: FileAccess = FileAccess.open(source, FileAccess.READ)
 	if file == null:
@@ -244,16 +246,21 @@ func _profiled_read_record(source: String) -> Dictionary:
 	FreezeProfile.scale("largest_record_bytes",length)
 	if bytes.size() != length or read_error != OK:
 		return _error(ERR_FILE_CORRUPT, "RECORD_INCOMPLETE_READ")
+	# Every lookup follows a fresh file read and complete UTF-8 byte identity.
+	# Claimed record hashes, paths, timestamps and mutable object references are insufficient.
+	for cached_identity: String in _record_cache:
+		var cached: Dictionary=_record_cache[cached_identity]
+		if cached.raw.size()==length and cached.raw==bytes:
+			FreezeProfile.count("record_cache_hits")
+			return cached.result.duplicate(true) if isolate else cached.result
+	var digest_context: HashingContext=HashingContext.new()
+	digest_context.start(HashingContext.HASH_SHA256)
+	digest_context.update(bytes)
+	var identity: String=digest_context.finish().hex_encode()
+	FreezeProfile.count("record_cache_misses")
 	var content: String = bytes.get_string_from_utf8()
 	if content.to_utf8_buffer() != bytes:
 		return _error(ERR_FILE_CORRUPT, "RECORD_UTF8")
-	# Every lookup follows a fresh file read and complete UTF-8 byte identity.
-	# Claimed record hashes, paths, timestamps and mutable object references are insufficient.
-	var identity: String = content.sha256_text()
-	if _record_cache.has(identity) and _record_cache[identity].raw == content:
-		FreezeProfile.count("record_cache_hits")
-		return _record_cache[identity].result.duplicate(true)
-	FreezeProfile.count("record_cache_misses")
 	var parser: JSON = JSON.new()
 	if parser.parse(content) != OK or not parser.data is Dictionary:
 		return _error(ERR_FILE_CORRUPT, "RECORD_JSON")
@@ -282,7 +289,7 @@ func _profiled_read_record(source: String) -> Dictionary:
 		if _record_cache.size() >= MAX_CACHED_RECORDS or _cached_bytes + length > MAX_CACHED_BYTES:
 			_record_cache.clear()
 			_cached_bytes = 0
-		_record_cache[identity] = {"raw":content, "result":result.duplicate(true)}
+		_record_cache[identity] = {"raw":bytes, "result":result.duplicate(true)}
 		_cached_bytes += length
 	return result
 

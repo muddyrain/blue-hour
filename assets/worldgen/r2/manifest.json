@@ -1,0 +1,120 @@
+{
+  "status": "PROJECT_TEMP",
+  "revision": 3,
+  "source": "Project-original artwork generated with built-in image generation; original PNG bytes preserved.",
+  "runtime_qa": "Measured metadata is not a visual signoff. Runtime evidence is recorded separately.",
+  "assets": [
+    {
+      "path": "assets/worldgen/r2/street_shop.png",
+      "sha256": "e32d6be56bce6661c453c48b4d176ba9e7e65d9ce17252a28af81fb5c29cdcad",
+      "native_size": [
+        1122,
+        1402
+      ],
+      "alpha32_content_bbox": [
+        52,
+        363,
+        1075,
+        1266
+      ],
+      "render_anchor_px": [
+        563.5,
+        1265
+      ],
+      "reference_visible_width_px": 1023,
+      "world_width": 280,
+      "door_x_px": 560,
+      "roof_split_y_px": 936,
+      "sign_rect_px": [
+        290,
+        688,
+        510,
+        72
+      ],
+      "street_sign": "便利店"
+    },
+    {
+      "path": "assets/worldgen/r2/street_eatery.png",
+      "sha256": "a887518c714aa7a49f642470359d74f2273bf6ecfffbe7ec7f01fe174c31aa37",
+      "native_size": [
+        1122,
+        1402
+      ],
+      "alpha32_content_bbox": [
+        48,
+        435,
+        1095,
+        1294
+      ],
+      "render_anchor_px": [
+        571.5,
+        1293
+      ],
+      "reference_visible_width_px": 1047,
+      "world_width": 264,
+      "door_x_px": 560,
+      "roof_split_y_px": 958,
+      "sign_rect_px": [
+        308,
+        750,
+        438,
+        66
+      ],
+      "street_sign": "晨光小食"
+    },
+    {
+      "path": "assets/worldgen/r2/paving_material.png",
+      "sha256": "2dab5c8f2e3de683e6e6cf14cb9d118ec46ef7469f8da078733937b664b38b13",
+      "native_size": [
+        1254,
+        1254
+      ],
+      "alpha32_content_bbox": [
+        0,
+        0,
+        1254,
+        1254
+      ],
+      "world_patch": [
+        256,
+        256
+      ],
+      "repeat": "World-aligned cropped panels with explicit joints; raw texture is not certified seamless."
+    },
+    {
+      "path": "assets/worldgen/r2/courtyard_edge.png",
+      "sha256": "d264e64e249a4b3a3d98d071d41637167da03a4f7654975736fb5a2df518a26c",
+      "native_size": [
+        1448,
+        1086
+      ],
+      "alpha32_content_bbox": [
+        142,
+        154,
+        1307,
+        925
+      ],
+      "render_anchor_px": [
+        142,
+        924
+      ],
+      "reference_visible_width_px": 1165,
+      "world_width": 180,
+      "solid_feet_px": [
+        [
+          142,
+          897,
+          1165,
+          28
+        ],
+        [
+          175,
+          360,
+          100,
+          537
+        ]
+      ],
+      "opening": "upper and right interior; no bounding-box collision"
+    }
+  ]
+}

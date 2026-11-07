@@ -299,5 +299,6 @@ func _exit_tree() -> void:
 
 
 func _fit_viewport() -> void:
-	# Keep the regular 720px composition; reclaim the title gap in shorter views.
-	offset_top=64.0 if PersonaState.enabled(_data) and get_viewport_rect().size.y<700.0 else 104.0
+	# Compact views need 420px for the shared detail body, including its 140px
+	# scroll area with the Windows font metrics. Reclaim the unused title gap.
+	offset_top=48.0 if PersonaState.enabled(_data) and get_viewport_rect().size.y<700.0 else 104.0

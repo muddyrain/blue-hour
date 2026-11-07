@@ -13,9 +13,14 @@ static func fingerprint(value: Dictionary) -> String:
 
 
 static func _profiled_fingerprint(value: Dictionary) -> String:
+	var proof: Dictionary=ValueProofCache.lookup("exact-fingerprint",value)
+	if proof.hit:
+		return proof.result
 	if not SurvivalContracts.json_value(value, -2):
 		return ""
-	return _digest(_encode(value))
+	var digest: String=_digest(_encode(value))
+	ValueProofCache.remember(proof,digest)
+	return digest
 
 
 static func stringify(value: Dictionary) -> String:
@@ -26,10 +31,15 @@ static func stringify(value: Dictionary) -> String:
 
 
 static func _profiled_stringify(value: Dictionary) -> String:
+	var proof: Dictionary=ValueProofCache.lookup("exact-stringify",value)
+	if proof.hit:
+		return proof.result
 	if not SurvivalContracts.json_value(value, -2):
 		return ""
 	var encoded: Array = _encode(value)
-	return JSON.stringify({"record_encoding":VERSION, "payload":encoded, "sha256":_digest(encoded)}, "", true, true) + "\n"
+	var result: String=JSON.stringify({"record_encoding":VERSION, "payload":encoded, "sha256":_digest(encoded)}, "", true, true) + "\n"
+	ValueProofCache.remember(proof,result)
+	return result
 
 
 static func unpack(record: Dictionary) -> Dictionary:

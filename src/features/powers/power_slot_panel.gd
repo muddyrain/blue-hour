@@ -20,7 +20,7 @@ func _ready() -> void:
 
 func present(title: String, status: String, remaining: float, duration: float, enabled: bool, ability_id: String) -> void:
 	_build()
-	activation_button.text = "3  " + title + "\n" + status
+	activation_button.text = "3  " + ("空槽" if ability_id.is_empty() else "%.1fs" % remaining if remaining > 0.0 else "已用" if status.contains("已用") else "就绪" if enabled else "—")
 	activation_button.icon = ICONS.get(ability_id, ICONS[""])
 	var effect: String = "空槽：先完成装备行动并归航确认，再到营地装配。"
 	if ability_id == "speed_boost_v1":
@@ -41,17 +41,18 @@ func _build() -> void:
 		return
 	name = "PowerSlotPanel"
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	custom_minimum_size.x = 184
+	custom_minimum_size.x = 72
 	add_theme_constant_override("separation", 3)
 	activation_button = C1HudButton.new()
 	activation_button.name = "ActivatePower"
-	activation_button.custom_minimum_size = Vector2(184, 74)
+	activation_button.custom_minimum_size = Vector2(72, 62)
 	activation_button.icon = ICONS[""]
 	activation_button.expand_icon = true
-	activation_button.add_theme_constant_override("icon_max_width",32)
-	activation_button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	activation_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	activation_button.add_theme_font_size_override("font_size", 14)
+	activation_button.add_theme_constant_override("icon_max_width",28)
+	activation_button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	activation_button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+	activation_button.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	activation_button.add_theme_font_size_override("font_size", 12)
 	activation_button.add_theme_color_override("font_disabled_color", Color("b8cbd2"))
 	activation_button.add_theme_color_override("icon_disabled_color", Color("bddfe8"))
 	activation_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -59,10 +60,10 @@ func _build() -> void:
 	activation_button.mouse_force_pass_scroll_events = false
 	for state: String in ["normal", "hover", "pressed", "disabled"]:
 		var style: StyleBox = get_theme_stylebox(state, "Button").duplicate() as StyleBox
-		style.content_margin_left = 8
-		style.content_margin_right = 8
-		style.content_margin_top = 6
-		style.content_margin_bottom = 6
+		style.content_margin_left = 4
+		style.content_margin_right = 4
+		style.content_margin_top = 4
+		style.content_margin_bottom = 4
 		activation_button.add_theme_stylebox_override(state, style)
 	activation_button.pressed.connect(func() -> void: activation_requested.emit())
 	add_child(activation_button)

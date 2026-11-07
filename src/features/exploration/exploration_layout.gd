@@ -40,6 +40,7 @@ static func generate(seed: String, size: String, topology: String) -> Dictionary
 
 
 static func validate(value: Variant, cached: bool = true) -> String:
+	if value is Dictionary and value.get("version")==5: return WorldgenLayout.validate(value,cached)
 	if not value is Dictionary or value.size() != KEYS.size() or not value.has_all(KEYS) or not SurvivalContracts.json_value(value):
 		return "EXPLORATION_LAYOUT_FIELDS"
 	if not SurvivalContracts.integer(value.version, VERSION, VERSION) or not value.seed is String or value.seed.is_empty() or value.seed.length() > 128 or not value["size"] is String or not SIZES.has(value["size"]) or not value.topology is String or value.topology not in NeighborhoodLayout.TOPOLOGIES or not SurvivalContracts.integer(value.attempt, 0, 2) or not value.fallback is bool or not is_map_id(value.id):
@@ -61,6 +62,11 @@ static func resource(data: Dictionary) -> StreetLayout:
 static func _assemble(seed: String, size: String, topology: String, attempt: int, fallback: bool) -> Dictionary:
 	var data: Dictionary = NeighborhoodLayout._assemble(seed, size, topology, attempt, fallback, true)
 	data.objects = []
+	return complete(data)
+
+
+static func complete(data: Dictionary) -> Dictionary:
+	var size: String = data["size"]
 	# Complete original geometry and policy form the cache identity, including all collisions.
 	var origin_key: String = RecordEncoding.fingerprint({"geometry":data, "policy":policy()})
 	if _built.has(origin_key):
@@ -93,11 +99,13 @@ static func _assemble(seed: String, size: String, topology: String, attempt: int
 	var certificate: Dictionary = _door_routes(data, nav)
 	if certificate.is_empty() or not _all_routes(data, nav):
 		return {}
+	if data.version==5 and not WorldgenLayout.content_reachable(data,certificate):
+		return {}
 	data.enemy_points = _spawn_points(data, nav)
 	if data.enemy_points.size() < data.entities.size():
 		return {}
 	data.erase("id")
-	data.id = PREFIX + RecordEncoding.fingerprint(data).substr(0, 32)
+	data.id = (WorldgenLayout.PREFIX if data.version==5 else PREFIX) + RecordEncoding.fingerprint(data).substr(0, 32)
 	var signature: String = RecordEncoding.fingerprint(data)
 	if _certificates.size() >= MAX_CACHE:
 		_certificates.clear()
@@ -112,7 +120,7 @@ static func _assemble(seed: String, size: String, topology: String, attempt: int
 
 static func _geometry_problem(data: Dictionary) -> String:
 	var bounds: Rect2 = WorldLayout.rect(data.bounds)
-	if data.entities.size() != SIZES[data["size"]].buildings or not TransactionReceipt.same({"v":data.bounds}, {"v":SIZES[data["size"]].bounds}):
+	if (data.version==4 and data.entities.size() != SIZES[data["size"]].buildings) or not TransactionReceipt.same({"v":data.bounds}, {"v":SIZES[data["size"]].bounds}):
 		return "EXPLORATION_DIMENSIONS"
 	var blocks: Array[Rect2] = []
 	var sweep: Rect2 = WorldLayout.rect(data.bus.sweep)
@@ -149,6 +157,11 @@ static func _reserved(data: Dictionary) -> Array[Rect2]:
 		zones.append(Rect2(WorldLayout.point(value) - Vector2(40, 40), Vector2(80, 80)))
 	for value: Array in data.gates:
 		zones.append(Rect2(WorldLayout.point(value) - Vector2(56, 56), Vector2(112, 112)))
+	if data.version==5:
+		for parcel: Dictionary in data.parcels:
+			zones.append(Rect2(WorldLayout.point(parcel.entrance)-Vector2(44,44),Vector2(88,88)))
+			for court: Dictionary in parcel.courtyards:
+				zones.append(Rect2(WorldLayout.point(court.entrance)-Vector2(36,36),Vector2(72,72)))
 	for entity: Dictionary in data.entities:
 		zones.append(Rect2(WorldLayout.point(entity.door) - Vector2(28, 28), Vector2(56, 56)))
 	zones.append(Rect2(WorldLayout.point(data.rescue) - Vector2(52, 52), Vector2(104, 104)))
@@ -228,6 +241,10 @@ static func _all_routes(data: Dictionary, nav: FieldNavigation) -> bool:
 	var start: Vector2 = WorldLayout.point(data.bus.door)
 	var goals: Array = data.arrivals.duplicate(true)
 	goals.append(data.rescue)
+	if data.version==5:
+		for parcel: Dictionary in data.parcels:
+			goals.append(parcel.entrance)
+			for court: Dictionary in parcel.courtyards:goals.append(court.entrance)
 	goals.append_array(data.enemy_points)
 	for object: Dictionary in data.objects:
 		goals.append(object.work_point)

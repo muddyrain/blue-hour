@@ -27,13 +27,29 @@ static func legacy_fingerprint(value: Dictionary) -> String:
 
 static func _profiled_legacy_fingerprint(value: Dictionary) -> String:
 	# The receipt/envelope add two levels; the public result itself still has its full 64.
+	var proof: Dictionary=ValueProofCache.lookup("legacy-fingerprint",value)
+	if proof.hit:
+		return proof.result
 	if not SurvivalContracts.json_value(value, -2):
 		return ""
 	var normalized: Variant = JSON.parse_string(JSON.stringify(value, "", true, true))
-	return JSON.stringify(normalized, "", true, true).sha256_text() if normalized is Dictionary else ""
+	var digest: String=JSON.stringify(normalized, "", true, true).sha256_text() if normalized is Dictionary else ""
+	if not digest.is_empty():
+		ValueProofCache.remember(proof,digest)
+	return digest
 
 
 static func camp_problem(data: Dictionary) -> String:
+	var proof: Dictionary=ValueProofCache.lookup("receipt-camp-problem",data)
+	if proof.hit:
+		return ""
+	var issue: String=_camp_problem(data)
+	if issue.is_empty():
+		ValueProofCache.remember(proof,"")
+	return issue
+
+
+static func _camp_problem(data: Dictionary) -> String:
 	if SurvivalState.is_extended(data):
 		return SurvivalState.extended_problem(data)
 	return RunSave.validate(data) if SurvivalContracts.integer(data.get("schema_version"),5,5) else "CAMP_FORMAT"
@@ -73,7 +89,11 @@ static func camp(receipt: Dictionary) -> Dictionary:
 
 static func problem(value: Variant) -> String:
 	var stamp: int = FreezeProfile.enter("receipt.problem")
-	var result: String = _profiled_problem(value)
+	# Successful shape/source proofs are pure. Invalid inputs never populate the cache.
+	var proof: Dictionary=ValueProofCache.lookup("receipt-problem",value) if value is Dictionary else {"hit":false}
+	var result: String = "" if proof.hit else _profiled_problem(value)
+	if result.is_empty() and proof.has("input"):
+		ValueProofCache.remember(proof,"")
 	FreezeProfile.leave("receipt.problem", stamp)
 	return result
 

@@ -112,14 +112,6 @@ static func _steer(actor: FieldActor, wish: Vector2, bodies: Array[FieldActor], 
 
 static func _limited(actor: FieldActor, offset: Vector2, bodies: Array[FieldActor], navigation: FieldNavigation, recovering: bool = false) -> Vector2:
 	var fraction: float = 1.0
-	if not navigation._segment_is_clear(actor.position,actor.position+offset):
-		var low: float = 0.0
-		var high: float = 1.0
-		for iteration: int in range(8):
-			var middle: float = (low+high)*0.5
-			if navigation._segment_is_clear(actor.position,actor.position+offset*middle): low = middle
-			else: high = middle
-		fraction = low
 	for other: FieldActor in bodies:
 		if other == actor: continue
 		# Bounded position projections must propagate through an already bad pile;
@@ -127,6 +119,16 @@ static func _limited(actor: FieldActor, offset: Vector2, bodies: Array[FieldActo
 		# Normal path motion always uses the full sweep, including during recovery.
 		if recovering: continue
 		fraction = minf(fraction,_sweep(actor.position-other.position,offset))
+	# A body can shorten a sampled-clear step to an endpoint inside a static
+	# corner. Validate the final displacement, without exceeding the body limit.
+	if not navigation._segment_is_clear(actor.position,actor.position+offset*fraction):
+		var low: float = 0.0
+		var high: float = fraction
+		for iteration: int in range(8):
+			var middle: float = (low+high)*0.5
+			if navigation._segment_is_clear(actor.position,actor.position+offset*middle): low = middle
+			else: high = middle
+		fraction = low
 	return offset * fraction
 
 

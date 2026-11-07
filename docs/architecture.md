@@ -8,6 +8,8 @@ WorldActions/WorldLayout/WorldSites提供V2有限街区、站点预算与事实�
 
 # 架构与所有权
 
+M14 R2 的 StreetModuleArt 只定义新画布/门/墙脚元数据，WorldgenGeometry/Dressing 冻结art_revision3、局部门面和两条院墙脚，FieldProp/WorldgenGround/Furniture读取同一几何。旧layout4不走新路径。ValueProofCache按完整当前值与私有深拷贝的原生递归精确比较复用纯计算结果；ReceiptJournal每次重读原文件字节，命中后仅省解析与历史深拷贝，对外仍隔离返回。FrozenSettlement仍是唯一结果owner；没有新保存格式、异步写者或提前ACK。
+
 CampaignRules只提供纯阶段/显示，CampaignActions在原V5之上冻结V6阶段及导航验证首领定义。BossBehavior只产生稳定请求，BossWarning只读绘图；EncounterRuntime在Expedition内调用原攻击、伤害、刷怪与击败/XP owner。FrozenSettlement在原结果内推演journey.campaign，ProductionProgress确认提交后才成为持久结果；世界9保存同一首领和请求事实，没有另一个存档或归航结算器。旧111无campaign字段时保持原模式，历史指纹分支保留。见[短局合同](design/m8-run-01.md)。
 
 WeaponActions只在原TaskActions描述上冻结V5站点枪型，WeaponInventory新增显式站点奖励分支并保留历史固定reward；WorldSites/FrozenSettlement继续拥有实际携带与唯一入库。FieldActor持有按实例绑定的WeaponMagazine，Expedition按活跃模拟推进并在原成功攻击提交后扣弹，HUD只读。世界8扩展原快照，不增加战斗/保存/奖励owner；见[弹匣与掉落合同](design/m7-weapon-01.md)。
@@ -39,3 +41,5 @@ SpecialPowers只提供严格请求/激活事实与模拟时间派生；PowerActi
 M12-SURVIVOR-01 在原新旅程 owner 增加独立 persona1 事实（build4），PersonaActions 仅在完整原 PowerActions 描述上追加严格目录与来源认证；五个配方不授予入队资格。World14 绑定新目录与身份，旧 World13/营地保持原格式/指纹。Actor 从不可变武器/主特长/本人配方/道具派生，疾行仍单独临时因子；PersonaViewModel 缓存不变显示来源并只读投影实时数值。共享站点进度可接力，新工作下界从当时真实参与者的最快合法因子推导，保留旧版下界和 cash/food 类别上限。参见[合同](design/m12-survivor-01.md)。
 
 M13-EXPLORE-01 的 ExplorationLayout/Sites 只生成冻结布局、对象、预算、实际路径度量和目标定义；ExplorationActions 把原完整任务来源保留为可重建的 canonical 原任务，不以删新几何字段冒充旧地图认证。新 build5 显式持有 exploration1 标识，非终局 generated9/rules10/world15 严格相互绑定；旧build4/world14及新旅程终局仍走原分支。后道具碰撞的不可变导航证书按完整布局指纹缓存，live事实不入缓存。Expedition/SearchAssignments/WorldSites继续拥有工作与携带，原事务独占暂存/支援整世界重建/归航确认；ExplorationProp/Objectives只读。车和树干只加移动障碍，不增加LOS墙。参见[探索合同](design/m13-explore-01.md)。
+
+M14-WORLDGEN-01 的 WorldgenGeometry 先定义道路连接及地块，WorldgenScale 集中新尺度，WorldgenLayout 只认证冻结值并复用后道具导航证书。build6/worldgen1 与 generated9 的严格 worldgen 扩展绑定，布局为5；原rules10/world15字段未变，不为编号升级人物/战斗/支援。旧build5/layout4及更旧分支原样认证，旧成长记录不接受新地图前缀。R1 WorldgenDressing 在互动道具和最终导航证书之前冻结静态环境碰撞，policy revision2 拒绝未发布的R0扩展；旧layout4保持。WorldgenGround/WorldgenFurniture/精细树/HUD只读，新建筑点击区从同一等比alpha和门锚点推导并按脚点选择；原Expedition/事务/结算owner不变。详见[合同](design/m14-worldgen-01.md)。

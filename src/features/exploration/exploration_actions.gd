@@ -20,10 +20,10 @@ static func origin(value: Dictionary) -> Dictionary:
 	_origins[key]=source.duplicate(true)
 	return source
 
-static func upgrade(source: Dictionary) -> Dictionary:
+static func upgrade(source: Dictionary, worldgen: bool = false) -> Dictionary:
 	var value: Dictionary=source.duplicate(true)
 	value.version=9
-	value.layout=ExplorationLayout.generate("BH_EXPLORATION_V1:"+source.id,source.layout["size"],source.layout.topology)
+	value.layout=WorldgenLayout.generate("BH_WORLDGEN_V1:"+source.id,source.layout["size"],source.layout.topology) if worldgen else ExplorationLayout.generate("BH_EXPLORATION_V1:"+source.id,source.layout["size"],source.layout.topology)
 	if value.layout.is_empty(): return {}
 	var content: Dictionary=ExplorationSites.generate(value.layout,value.type,int(source.cash),int(source.food),int(source.weapons),value.id)
 	if content.is_empty(): return {}
@@ -41,22 +41,25 @@ static func upgrade(source: Dictionary) -> Dictionary:
 	value.route_length=0
 	for metric: Dictionary in content.metrics.routes.values(): value.route_length=maxi(value.route_length,int(metric.length))
 	value.exploration={"version":1,"policy":ExplorationLayout.policy(),"primary":{"cash":source.cash,"food":source.food,"weapons":source.weapons},"optional_objectives":content.optional_objectives,"metrics":content.metrics}
+	if worldgen: value.worldgen=WorldgenLayout.policy()
 	return value
 
 static func offers(base: Dictionary) -> Array[Dictionary]:
 	var result: Array[Dictionary]=[]
 	for source: Dictionary in PersonaActions.offers(base):
-		result.append(source if source.campaign.is_finale else upgrade(source))
+		result.append(source if source.campaign.is_finale else upgrade(source,WorldgenState.enabled(base)))
 	return result
 
 static func problem(value: Variant) -> String:
-	if not value is Dictionary or not SurvivalContracts.json_value(value) or value.size()!=23 or value.get("version")!=9 or not value.get("layout") is Dictionary or not value.get("exploration") is Dictionary or not value.get("build") is Dictionary or not value.get("powers") is Dictionary or not value.get("persona") is Dictionary or not value.get("campaign") is Dictionary: return "EXPLORATION_ACTION_FIELDS"
+	var worldgen: bool=value is Dictionary and value.has("worldgen")
+	if worldgen and (not value.worldgen is Dictionary or not TransactionReceipt.same(value.worldgen,WorldgenLayout.policy())): return "WORLDGEN_ACTION_POLICY"
+	if not value is Dictionary or not SurvivalContracts.json_value(value) or value.size()!=(24 if worldgen else 23) or value.get("version")!=9 or not value.get("layout") is Dictionary or not value.get("exploration") is Dictionary or not value.get("build") is Dictionary or not value.get("powers") is Dictionary or not value.get("persona") is Dictionary or not value.get("campaign") is Dictionary: return "EXPLORATION_ACTION_FIELDS"
 	if not value.get("seed") is String or value.seed.length()!=32 or value.seed.to_lower()!=value.seed or not value.seed.is_valid_hex_number(false) or not SurvivalContracts.integer(value.get("day"),2,RunSave.MAX_COUNTER) or not SurvivalContracts.integer(value.get("slot"),0,2) or value.get("type") not in TaskActions.TYPES or value.layout.get("size") not in NeighborhoodLayout.SIZES or value.layout.get("topology") not in NeighborhoodLayout.TOPOLOGIES or not SurvivalContracts.integer(value.get("recruit"),0,5) or not value.build.get("owned") is Array or not value.build.get("slots") is Array or not value.powers.get("owned") is Array or not value.powers.get("slot") is String or not value.persona.get("facts") is Dictionary or not value.campaign.get("run_id") is String or value.campaign.run_id.length()!=32 or not value.campaign.run_id.is_valid_hex_number(false) or not SurvivalContracts.integer(value.campaign.get("preparations"),0,3): return "EXPLORATION_ACTION_CONTEXT"
 	var signature: String=SurvivalContracts.fingerprint(value)
 	if _checked.has(signature): return ""
 	var source: Dictionary=origin(value)
 	if source.is_empty(): return "EXPLORATION_ORIGINAL_SOURCE"
-	var expected: Dictionary=upgrade(source)
+	var expected: Dictionary=upgrade(source,worldgen)
 	if expected.is_empty() or not TransactionReceipt.same(value,expected): return "EXPLORATION_ACTION_CANONICAL"
 	if _checked.size()>=64: _checked.clear()
 	_checked[signature]=true

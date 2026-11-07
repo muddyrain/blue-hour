@@ -560,6 +560,72 @@
       "sha256": "5a1b80484d59d1cacd4bfd7d1dae4016df985a12f4dd2961ebce7bc6707cd14f",
       "origin": "original hand-authored lightweight SVG for M13 exploration; no external assets",
       "license": "No additional license granted"
+    },
+    {
+      "path": "assets/worldgen/apple_tree.png",
+      "sha256": "6e8969fe46a6f72814b9afd6b11a0c3b72c5b7c05252fb591f23516d09d7eaf2",
+      "origin": "AI-assisted original project art; built-in image generation; M14 tree and picked-empty variant; resized with preserved alpha",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/worldgen/apple_tree_empty.png",
+      "sha256": "eacc8d643477482a7fb13154ae9e1eee4a2078fdce5917e8ef7f73ab49b2bbda",
+      "origin": "AI-assisted original project art; built-in image generation; M14 tree and picked-empty variant; resized with preserved alpha",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/worldgen/hedge.png",
+      "sha256": "e02ddae64324ef88e798df640202b6af1de77912fa9cd3b6dac6331457c320f8",
+      "origin": "original_ai_assisted",
+      "source": "Original built-in image_gen for M14 R1; transparent sprite crop/resize. Source SHA256 c8bda9f413e6679c0409eb3a1892a22e09f82a41b72165ba9eb9b9f096e4b243"
+    },
+    {
+      "path": "assets/worldgen/courtyard_wall.png",
+      "sha256": "696bca9c8f529af48bf0c60a1ab3087a062f372a868d4ed1d6a2ca236bd20c5b",
+      "origin": "original_ai_assisted",
+      "source": "Original built-in image_gen for M14 R1; transparent sprite crop/resize. Source SHA256 c8bda9f413e6679c0409eb3a1892a22e09f82a41b72165ba9eb9b9f096e4b243"
+    },
+    {
+      "path": "assets/worldgen/loading_cargo.png",
+      "sha256": "ebf726dea69d4a561668981f14f1ac752eb897304defb85d1b0b31cbda3bc884",
+      "origin": "original_ai_assisted",
+      "source": "Original built-in image_gen for M14 R1; transparent sprite crop/resize. Source SHA256 c8bda9f413e6679c0409eb3a1892a22e09f82a41b72165ba9eb9b9f096e4b243"
+    },
+    {
+      "path": "assets/worldgen/scrap_car.png",
+      "sha256": "03c3df2df574b86b62160b2250b71204239cb8ed4bfa763d7249b03dc1eebdc9",
+      "origin": "original_ai_assisted",
+      "source": "Original built-in image_gen for M14 R1; transparent sprite crop/resize. Source SHA256 c8bda9f413e6679c0409eb3a1892a22e09f82a41b72165ba9eb9b9f096e4b243"
+    },
+    {
+      "path": "assets/worldgen/courtyard_home.png",
+      "sha256": "e2ca67f88e9bba8b6706b91b8981be6625f44b299471e1a2a5f96069a4ea78c1",
+      "origin": "original_ai_assisted",
+      "source": "Original built-in image_gen for M14 R1; transparent sprite crop/resize. Source SHA256 03440f3d9255eadec947be6e1de1eec7679805d43a8e8141de8305008b974d37"
+    },
+    {
+      "path": "assets/worldgen/r2/street_shop.png",
+      "sha256": "e32d6be56bce6661c453c48b4d176ba9e7e65d9ce17252a28af81fb5c29cdcad",
+      "origin": "Original Blue Hour artwork generated with built-in image generation; supplied PNG bytes preserved without resizing or pixel rewriting",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/worldgen/r2/street_eatery.png",
+      "sha256": "a887518c714aa7a49f642470359d74f2273bf6ecfffbe7ec7f01fe174c31aa37",
+      "origin": "Original Blue Hour artwork generated with built-in image generation; supplied PNG bytes preserved without resizing or pixel rewriting",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/worldgen/r2/paving_material.png",
+      "sha256": "2dab5c8f2e3de683e6e6cf14cb9d118ec46ef7469f8da078733937b664b38b13",
+      "origin": "Original Blue Hour artwork generated with built-in image generation; supplied PNG bytes preserved without resizing or pixel rewriting",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/worldgen/r2/courtyard_edge.png",
+      "sha256": "d264e64e249a4b3a3d98d071d41637167da03a4f7654975736fb5a2df518a26c",
+      "origin": "Original Blue Hour artwork generated with built-in image generation; supplied PNG bytes preserved without resizing or pixel rewriting",
+      "license": "No additional license granted"
     }
   ]
 }

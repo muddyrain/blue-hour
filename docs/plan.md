@@ -1,4 +1,18 @@
-# M13-EXPLORE-01 当前候选
+# M14-WORLDGEN-01-R2 当前候选
+
+沿用受审R1 dc89baf、唯一目录、codex/m14-worldgen-01及Draft PR #19，base仍为main 85bf39c。新商业首排按合法地块组合真实画布便利店/小食店，连续铺装接侧巷及可走内院；相同外观、对象与薄墙脚随行动冻结。原人数、人物尺度/125移速/0.82镜头、奖励、工作、支援、四次准备终局保持。旧build5/layout4/world15继续原路径，未发布R1隔离档不静默重造。
+
+同一47栋合成输入的完整Main同步回调：暂存三次168.664–178.950ms，归航445.879–471.385ms；原请求与最终收据hash一致。保存仍重读完整真实文件、严格认证、持久ACK，唯一本局结果owner不变。当前仅Windows；[本轮验证](VALIDATION.md#m14-worldgen-01-r2windows)区分公开、源码原生、物理输入和未验平台。正式生产门禁仍BLOCKED。下一步审阅同一Draft与私有样板媒体，不自动合并/发布或开始M15。
+
+# M14-WORLDGEN-01-R1 历史候选
+
+PR #18 精确已审 `51aafbbaecca95799b40ada6088c84260724e43e` 已普通合入 main `85bf39cbe81820bdebef192bf0dc7efa32d11d21`；唯一目录分支 `codex/m14-worldgen-01`，同一 Draft PR #19 base main，保持未合并等待审阅。
+
+[随机街区合同](design/m14-worldgen-01.md)在新旅程普通行动启用 build6/worldgen1/layout5。道路先行，按种子划分街区和用途，再生成店面、住宅/庭院、停车与装卸组合。原角色、125移速、0.82镜头、三规模边界及M13互动预算保持；旧build5/layout4/world15、战斗/工作/人物/支援和终局合同保留。原事务与唯一结算继续拥有恢复和收益，HUD只读。
+
+R1 按地块宽深补齐连续门面与后排，收紧主街至176并冻结有用途的院落、步道和静态环境；policy revision2 的隔离入口使用新旅程。当前Mac源码与后台原生验收见[验证记录](VALIDATION.md#m14-worldgen-01-r1mac)。正式生产门禁仍BLOCKED；不导出、不验另一平台、不操作用户桌面。下一步等待本轮Draft及私有实机媒体审阅，不自动启动后续。
+
+# M13-EXPLORE-01 历史阶段
 
 PR #17 精确已审 `153094f130918c37a6d8b9e6faa18e0ffc6b5f25` 已正常合入 main `890bff3097a34bafbc6c37df8dedf370e921ae1f`；当前唯一目录分支 `codex/m13-explore-01`，本轮新 Draft PR base main，等待审阅。
 

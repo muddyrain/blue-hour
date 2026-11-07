@@ -8,6 +8,10 @@ const TREE: Texture2D = preload("res://assets/exploration/apple_tree.svg")
 const EMPTY_TREE: Texture2D = preload("res://assets/exploration/apple_tree_empty.svg")
 const TRUNK: Texture2D = preload("res://assets/exploration/tree_trunk.svg")
 
+const REFINED_TREE: Texture2D = preload("res://assets/worldgen/apple_tree.png")
+const REFINED_EMPTY_TREE: Texture2D = preload("res://assets/worldgen/apple_tree_empty.png")
+var refined_art: bool = false
+
 var object_id: String = ""
 var kind: String = "vehicle"
 var variant: String = "sedan"
@@ -46,7 +50,7 @@ func configure(definition: Dictionary) -> void:
 func _ready() -> void:
 	# Deliberately replace FieldProp's building slices/furniture with the object art.
 	_wall = _sprite(TRUNK, Vector2(-80, -180))
-	_wall.visible = kind == "fruit_tree"
+	_wall.visible = kind == "fruit_tree" and not refined_art
 	_roof = _sprite(TREE if kind == "fruit_tree" else VAN if variant == "van" else SEDAN, Vector2(-80, -180) if kind == "fruit_tree" else Vector2(-80, -96))
 	_work = _label("", Vector2.ZERO, 12, 232)
 	_work.size.y = 24
@@ -150,10 +154,11 @@ func _refresh_art() -> void:
 	if _roof == null:
 		return
 	if _wall != null:
-		_wall.visible = kind == "fruit_tree"
+		_wall.visible = kind == "fruit_tree" and not refined_art
 	if kind == "fruit_tree":
 		_roof.position = Vector2(-80, -180)
-		_roof.texture = EMPTY_TREE if searched else TREE
+		_roof.texture = (REFINED_EMPTY_TREE if searched else REFINED_TREE) if refined_art else (EMPTY_TREE if searched else TREE)
+		_roof.scale = Vector2.ONE * (0.5 if refined_art else 1.0)
 		_roof.modulate = Color(1.0, 1.0, 1.0, 0.38 if _occluded else 1.0)
 	else:
 		_roof.position = Vector2(-80, -96)

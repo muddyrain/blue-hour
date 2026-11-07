@@ -10,14 +10,17 @@ static func initial() -> Dictionary:
 static func problem(camp: Dictionary) -> String:
 	if not enabled(camp): return ""
 	if ExplorationState.enabled(camp):
-		if camp.journey.build.size()!=9: return "EXPLORATION_BUILD_FIELDS"
-		var issue: String=ExplorationState.problem(camp)
+		if camp.journey.build.size()!=(10 if WorldgenState.enabled(camp) else 9): return "EXPLORATION_BUILD_FIELDS"
+		var issue: String=WorldgenState.problem(camp) if WorldgenState.enabled(camp) else ""
+		if not issue.is_empty(): return issue
+		issue=ExplorationState.problem(camp)
 		if not issue.is_empty(): return issue
 		issue=PowerState.problem(camp)
 		if not issue.is_empty(): return issue
 		var old: Dictionary=camp.duplicate(true)
 		old.journey.build.version=4
 		old.journey.build.erase("exploration")
+		old.journey.build.erase("worldgen")
 		for source: Dictionary in old.journey.build.powers.sources: source.generated=ExplorationActions.origin(source.generated)
 		return problem(old)
 	if PersonaState.enabled(camp):

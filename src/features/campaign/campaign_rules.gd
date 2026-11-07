@@ -9,6 +9,8 @@ const BREAKOUT_INTERVAL: float = 0.90
 const KEYS: Array[String] = ["version","mode","run_id","preparations","outcome","result_transaction"]
 const INVESTIGATION_VERSION: int = 2
 const INVESTIGATION_MODE: String = "investigation_v1"
+const MISSION_VERSION: int = 3
+const MISSION_MODE: String = "mission_v1"
 const CLUE_IDS: Array[String] = ["dispatch_log", "checkpoint_pass"]
 const CLUE_NAMES: Dictionary[String, String] = {"dispatch_log":"线路调度记录", "checkpoint_pass":"封锁通行记录"}
 const INVESTIGATION_KEYS: Array[String] = ["version","mode","run_id","clues","outcome","result_transaction"]
@@ -25,8 +27,19 @@ static func initial_investigation(run_id: String) -> Dictionary:
 		"clues":[], "outcome":"ACTIVE", "result_transaction":""}
 
 
+static func initial_mission(run_id: String) -> Dictionary:
+	var value: Dictionary = initial_investigation(run_id)
+	value.version = MISSION_VERSION
+	value.mode = MISSION_MODE
+	return value
+
+
+static func is_mission(value: Variant) -> bool:
+	return value is Dictionary and value.get("version") == MISSION_VERSION and value.get("mode") == MISSION_MODE
+
+
 static func is_investigation(value: Variant) -> bool:
-	return value is Dictionary and value.get("version") == INVESTIGATION_VERSION and value.get("mode") == INVESTIGATION_MODE
+	return is_mission(value) or (value is Dictionary and value.get("version") == INVESTIGATION_VERSION and value.get("mode") == INVESTIGATION_MODE)
 
 
 static func next_clue(value: Dictionary) -> String:
@@ -56,7 +69,8 @@ static func problem(value: Variant, run_id: String = "") -> String:
 
 
 static func _investigation_problem(value: Dictionary, run_id: String) -> String:
-	if value.size() != INVESTIGATION_KEYS.size() or not value.has_all(INVESTIGATION_KEYS) or not SurvivalContracts.integer(value.version,INVESTIGATION_VERSION,INVESTIGATION_VERSION):
+	var version: int = MISSION_VERSION if is_mission(value) else INVESTIGATION_VERSION
+	if value.size() != INVESTIGATION_KEYS.size() or not value.has_all(INVESTIGATION_KEYS) or not SurvivalContracts.integer(value.version,version,version):
 		return "INVESTIGATION_FIELDS"
 	if not value.run_id is String or not _identity(value.run_id) or (not run_id.is_empty() and run_id != value.run_id):
 		return "INVESTIGATION_IDENTITY"
@@ -94,7 +108,7 @@ static func context(value: Dictionary) -> Dictionary:
 	assert(problem(value).is_empty())
 	if is_investigation(value):
 		var finale: bool = next_clue(value).is_empty()
-		return {"version":INVESTIGATION_VERSION,"stage":"finale" if finale else "investigation","is_finale":finale,"pressure":1.0}
+		return {"version":int(value.version),"stage":"finale" if finale else "investigation","is_finale":finale,"pressure":1.0}
 	var count: int = int(value.preparations)
 	var stage: String = "finale" if count==PREPARATIONS else "breakout" if count>=2 else "preparation"
 	return {"version":VERSION,"stage":stage,"is_finale":stage=="finale","pressure":BREAKOUT_INTERVAL if stage=="breakout" else 1.0}

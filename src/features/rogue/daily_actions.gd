@@ -19,7 +19,7 @@ static func problem(value: Variant) -> String:
 static func matches(base: Dictionary, value: Variant) -> bool:
 	if CampaignRules.is_investigation(base.get("journey", {}).get("campaign")):
 		return InvestigationActions.matches(base,value)
-	if value is Dictionary and value.has("investigation"):
+	if value is Dictionary and (value.has("investigation") or value.has("mission_policy")):
 		return false
 	if ExplorationState.enabled(base): return ExplorationActions.matches(base,value)
 	if PersonaState.enabled(base): return PersonaActions.matches(base,value)

@@ -4,6 +4,8 @@ extends RefCounted
 
 const HOME_TYPES: Array[String] = ["detached_home", "row_house", "small_apartment"]
 const FOOD_PAIR_LIMIT: float = 960.0
+const MISSION_SUPPLY_LIMIT: float = 1125.0
+const MISSION_INVESTIGATION_DEPTH: float = 0.55
 
 
 static func prepare(parcels: Array, type: String, seed: String) -> void:
@@ -55,6 +57,46 @@ static func choose(candidates: Array[Dictionary], routing: Dictionary, type: Str
 		return String(a.id) < String(b.id)
 	)
 	return ranked[0]
+
+
+static func mission_supply_pair(candidates: Array[Dictionary], routing: Dictionary) -> Array[Dictionary]:
+	var limit: float = minf(MISSION_SUPPLY_LIMIT, float(routing.dmax) * 0.45)
+	var near: Array[Dictionary] = candidates.filter(func(entity: Dictionary) -> bool:
+		return float(routing.doors[entity.id].length) <= limit)
+	near.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var a_length: float = float(routing.doors[a.id].length)
+		var b_length: float = float(routing.doors[b.id].length)
+		return a_length < b_length if a_length != b_length else String(a.id) < String(b.id))
+	var result: Array[Dictionary] = []
+	var best_cost: float = INF
+	var nav: FieldNavigation = routing.nav
+	for index: int in range(near.size()):
+		var first: Dictionary = near[index]
+		var a: Vector2 = WorldLayout.point(first.door)
+		for next_index: int in range(index + 1, near.size()):
+			var second: Dictionary = near[next_index]
+			var b: Vector2 = WorldLayout.point(second.door)
+			if a.distance_to(b) > FOOD_PAIR_LIMIT:
+				continue
+			var between: float = _distance(nav, a, b)
+			if between > FOOD_PAIR_LIMIT:
+				continue
+			var cost: float = float(routing.doors[second.id].length) + between * 0.25
+			if cost < best_cost:
+				best_cost = cost
+				result = [first, second]
+	return result
+
+
+static func mission_investigation_target(candidates: Array[Dictionary], routing: Dictionary) -> Dictionary:
+	var target: Dictionary = {}
+	var longest: float = float(routing.dmax) * MISSION_INVESTIGATION_DEPTH
+	for candidate: Dictionary in candidates:
+		var length: float = float(routing.doors[candidate.id].length)
+		if length > longest or (length == longest and (target.is_empty() or String(candidate.id) < String(target.id))):
+			longest = length
+			target = candidate
+	return target
 
 
 static func rescue_point(data: Dictionary) -> Array:

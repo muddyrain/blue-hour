@@ -25,16 +25,22 @@ static func source_from_task(task: Dictionary, context: Dictionary) -> Dictionar
 	source = PowerActions.upgrade(source, context.powers.owned, context.powers.slot)
 	return PersonaActions.upgrade(source, context.persona.facts)
 
-static func upgrade(source: Dictionary, worldgen: bool = false, level: bool = false) -> Dictionary:
+static func upgrade(source: Dictionary, worldgen: bool = false, level: bool = false, mission_policy: int = 0) -> Dictionary:
+	if mission_policy != 0 and (mission_policy != 1 or not worldgen or not level):
+		return {}
 	var value: Dictionary=source.duplicate(true)
 	value.version=9
+	if mission_policy == 1:
+		value.mission_policy = mission_policy
+		if value.type == "equipment":
+			value.weapons = 0
 	var content: Dictionary = {}
 	if level:
 		for attempt: int in range(4):
 			value.layout=WorldgenLayout._assemble("BH_LEVEL_V1:"+source.id,source.layout["size"],source.layout.topology,mini(attempt,2),attempt==3,source.type)
 			if value.layout.is_empty():
 				continue
-			content=ExplorationSites.generate(value.layout,value.type,int(source.cash),int(source.food),int(source.weapons),value.id)
+			content=ExplorationSites.generate(value.layout,value.type,int(source.cash),int(source.food),int(source.weapons),value.id,mission_policy)
 			if not content.is_empty():
 				content.level=LevelSummary.freeze(value.layout,content.sites,content.objective,value.type)
 				if not content.level.is_empty():
@@ -59,7 +65,7 @@ static func upgrade(source: Dictionary, worldgen: bool = false, level: bool = fa
 		else: value.food+=int(site.amount)
 	value.route_length=0
 	for metric: Dictionary in content.metrics.routes.values(): value.route_length=maxi(value.route_length,int(metric.length))
-	value.exploration={"version":1,"policy":ExplorationLayout.policy(),"primary":{"cash":source.cash,"food":source.food,"weapons":source.weapons},"optional_objectives":content.optional_objectives,"metrics":content.metrics}
+	value.exploration={"version":1,"policy":ExplorationLayout.policy(),"primary":{"cash":source.cash,"food":source.food,"weapons":value.weapons},"optional_objectives":content.optional_objectives,"metrics":content.metrics}
 	if level:
 		value.exploration.level=content.level
 	if worldgen: value.worldgen=WorldgenLayout.policy(level)
@@ -71,31 +77,43 @@ static func offers(base: Dictionary) -> Array[Dictionary]:
 		result.append(source if source.campaign.is_finale else upgrade(source,WorldgenState.enabled(base),WorldgenState.level_enabled(base)))
 	return result
 
-static func problem(value: Variant) -> String:
+static func problem(value: Variant, camp_source: bool = false) -> String:
 	if value is Dictionary and value.has("investigation"):
 		var issue: String = InvestigationActions.marker_problem(value.investigation)
 		if not issue.is_empty():
 			return issue
 		var projected: Dictionary = value.duplicate(false)
 		projected.erase("investigation")
-		issue = _problem(projected)
+		issue = _problem(projected, camp_source)
 		return InvestigationActions.site_problem(value) if issue.is_empty() else issue
-	return _problem(value)
+	if value is Dictionary and value.has("mission_policy") and value.get("type") == "equipment":
+		return "MISSION_INVESTIGATION_REQUIRED"
+	return _problem(value, camp_source)
 
-static func _problem(value: Variant) -> String:
+static func _problem(value: Variant, camp_source: bool) -> String:
 	var worldgen: bool=value is Dictionary and value.has("worldgen")
 	var level: bool=worldgen and value.worldgen is Dictionary and value.worldgen.get("version")==2
+	var mission: bool = value is Dictionary and value.has("mission_policy")
 	if worldgen and (not value.worldgen is Dictionary or not TransactionReceipt.same(value.worldgen,WorldgenLayout.policy(level))): return "WORLDGEN_ACTION_POLICY"
-	if not value is Dictionary or not SurvivalContracts.json_value(value) or value.size()!=(24 if worldgen else 23) or value.get("version")!=9 or not value.get("layout") is Dictionary or not value.get("exploration") is Dictionary or not value.get("build") is Dictionary or not value.get("powers") is Dictionary or not value.get("persona") is Dictionary or not value.get("campaign") is Dictionary: return "EXPLORATION_ACTION_FIELDS"
+	if mission and (not level or not SurvivalContracts.integer(value.mission_policy, 1, 1)): return "MISSION_ACTION_POLICY"
+	if not value is Dictionary or not SurvivalContracts.json_value(value) or value.size()!=23+int(worldgen)+int(mission) or value.get("version")!=9 or not value.get("layout") is Dictionary or not value.get("exploration") is Dictionary or not value.get("build") is Dictionary or not value.get("powers") is Dictionary or not value.get("persona") is Dictionary or not value.get("campaign") is Dictionary: return "EXPLORATION_ACTION_FIELDS"
 	if not value.get("seed") is String or value.seed.length()!=32 or value.seed.to_lower()!=value.seed or not value.seed.is_valid_hex_number(false) or not SurvivalContracts.integer(value.get("day"),2,RunSave.MAX_COUNTER) or not SurvivalContracts.integer(value.get("slot"),0,2) or value.get("type") not in TaskActions.TYPES or value.layout.get("size") not in NeighborhoodLayout.SIZES or value.layout.get("topology") not in NeighborhoodLayout.TOPOLOGIES or not SurvivalContracts.integer(value.get("recruit"),0,5) or not value.build.get("owned") is Array or not value.build.get("slots") is Array or not value.powers.get("owned") is Array or not value.powers.get("slot") is String or not value.persona.get("facts") is Dictionary or not value.campaign.get("run_id") is String or value.campaign.run_id.length()!=32 or not value.campaign.run_id.is_valid_hex_number(false) or not SurvivalContracts.integer(value.campaign.get("preparations"),0,3): return "EXPLORATION_ACTION_CONTEXT"
-	var signature: String=SurvivalContracts.fingerprint(value)
-	if _checked.has(signature): return ""
+	var signature: String=RecordEncoding.fingerprint(value) if mission else SurvivalContracts.fingerprint(value)
+	var proof_key: String = "camp-source:" + signature if mission and camp_source else signature
+	if _checked.has(proof_key): return ""
 	var source: Dictionary=origin(value)
 	if source.is_empty(): return "EXPLORATION_ORIGINAL_SOURCE"
-	var expected: Dictionary=upgrade(source,worldgen,level)
-	if expected.is_empty() or not TransactionReceipt.same(value,expected): return "EXPLORATION_ACTION_CANONICAL"
+	var expected: Dictionary=upgrade(source,worldgen,level,int(mission))
+	if expected.is_empty(): return "EXPLORATION_ACTION_CANONICAL"
+	var matches: bool = signature == RecordEncoding.fingerprint(expected) if mission else TransactionReceipt.same(value,expected)
+	if not matches and mission and camp_source:
+		# RunSave keeps its historical JSON camp projection. A stored ability source
+		# must match that precise projection, without accepting it in receipt proof.
+		var projected: Dictionary = JSON.parse_string(JSON.stringify(expected, "", true, true))
+		matches = signature == RecordEncoding.fingerprint(projected)
+	if not matches: return "EXPLORATION_ACTION_CANONICAL"
 	if _checked.size()>=64: _checked.clear()
-	_checked[signature]=true
+	_checked[proof_key]=true
 	return ""
 
 static func matches(base: Dictionary,value: Variant) -> bool:
@@ -122,6 +140,7 @@ static func supply(value: Dictionary) -> MissionSupply:
 	result.layout=ExplorationLayout.resource(value.layout)
 	result.cash_reward=int(value.cash)
 	result.food_reward=int(value.food)
+	result.has_weapon_sample = value.weapons == 1
 	var optional_cash: int=int(value.cash-source.cash)
 	var optional_food: int=int(value.food-source.food)
 	result.description="%s · %s · %d栋 / %d互动点\n主目标收益：钱%d / 粮%d / 武器%d\n可选收益上限：钱%d / 粮%d（无额外目标奖金）\n主目标位于中远区域；附近留有补给。\n按路线分工，随时可按原条件归航；夜间时钟不延长。"%[{"small":"小型","medium":"中型","large":"大型"}[value.layout["size"]],result.layout.display_name,value.layout.entities.size(),value.sites.size(),source.cash,source.food,source.weapons,optional_cash,optional_food]

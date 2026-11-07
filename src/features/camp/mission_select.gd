@@ -20,6 +20,7 @@ class CrateThumbnail extends Node2D:
 var _crates: Array[Node2D] = []
 var _pictures: Array[TextureRect] = []
 var _heading: Label
+var _subtitle: Label
 var rescue_enabled: bool = false
 var player_mode: bool = false
 var field_join_mode: bool = false
@@ -46,7 +47,8 @@ func _ready() -> void:
 	margins.add_child(column)
 	_heading = CampStyle.label("行动地图 / 旧街", 32)
 	column.add_child(_heading)
-	column.add_child(CampStyle.label("选择此行的补给方向，准备好后出发。", 18, CampStyle.MUTED))
+	_subtitle = CampStyle.label("选择此行的补给方向，准备好后出发。", 18, CampStyle.MUTED)
+	column.add_child(_subtitle)
 	var row: HBoxContainer = HBoxContainer.new()
 	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	row.add_theme_constant_override("separation", 24)
@@ -112,6 +114,8 @@ func refresh_rescue(completed: bool, reason: String = "") -> void:
 
 func refresh_daily(base: Dictionary) -> void:
 	daily_offers = DailyActions.offers(base)
+	var has_mission_cards: bool = daily_offers.any(func(offer: Dictionary) -> bool: return offer.get("mission_policy") == 1)
+	_subtitle.text = "比较主收益、路线与风险。物资和线索随生还归航确认。" if has_mission_cards else "选择此行的补给方向，准备好后出发。"
 	_heading.text = "第%d天 · 选择一项行动" % int(base.day)
 	if CampaignState.is_short(base):
 		var display: Dictionary=CampaignRules.display(base.journey.campaign)
@@ -123,22 +127,63 @@ func refresh_daily(base: Dictionary) -> void:
 		_active[index] = supply
 		_titles[index].text = "%02d / %s" % [index+1,supply.display_name]
 		_descriptions[index].text = supply.description
+		_descriptions[index].custom_minimum_size.y = 52
+		if _descriptions[index].has_theme_constant_override("line_spacing"):
+			_descriptions[index].remove_theme_constant_override("line_spacing")
 		_pictures[index].custom_minimum_size.y = 88
-		if supply.generated.get("worldgen",{}).get("version")==2:
+		var mission_card: bool = supply.generated.get("mission_policy") == 1
+		if mission_card:
+			var title: String = {"supply":"补给", "airdrop":"装备", "equipment":"调查", "rescue":"救援"}[supply.generated.type]
+			_titles[index].text = "%02d / %s" % [index + 1, title]
+			_descriptions[index].text = LevelSummary.mission_card_text(supply.generated)
+			_descriptions[index].custom_minimum_size.y = 100
+			_descriptions[index].add_theme_font_size_override("font_size", 16)
+			_descriptions[index].add_theme_constant_override("line_spacing", 8)
+		elif supply.generated.get("worldgen",{}).get("version")==2:
 			# The original resource description participates in existing in-flight world compatibility hashes.
 			var frozen_description: String = LevelSummary.description(supply.generated)
 			_descriptions[index].text = supply.description.trim_suffix(frozen_description) + LevelSummary.description(supply.generated, true)
 			_pictures[index].custom_minimum_size.y = 56
 			_descriptions[index].add_theme_font_size_override("font_size",16)
+		else:
+			_descriptions[index].add_theme_font_size_override("font_size", 17)
 		var investigation: Dictionary = supply.generated.get("investigation", {})
-		if not investigation.is_empty():
+		if not mission_card and not investigation.is_empty():
 			var clue_name: String = CampaignRules.CLUE_NAMES[investigation.clue_id]
 			_titles[index].text = "%02d / 调查 · %s" % [index+1, clue_name]
 			_descriptions[index].text = "搜索标记建筑：%s\n" % clue_name + _descriptions[index].text
 			_pictures[index].custom_minimum_size.y = 40
 		var outdoor: bool=TaskActions.outdoor_site(supply.generated,&"cash")
-		_pictures[index].texture = null if outdoor else MARKET if supply.id==&"supermarket" else SHOP
+		var picture: Texture2D = MARKET if supply.id == &"supermarket" else SHOP
+		if mission_card:
+			picture = _mission_picture(supply.generated, picture)
+		elif outdoor:
+			picture = null
+		_pictures[index].texture = picture
 		_crates[index].visible=outdoor
 		choices[index].disabled = false
 		choices[index].text = "选择此行动 →"
 		choices[index].tooltip_text = "只有真实搜集并成功撤离，确认结算才入账。"
+
+
+static func _mission_picture(generated: Dictionary, fallback: Texture2D) -> Texture2D:
+	var primary: String = generated.exploration.level.primary[0]
+	var building: String = ""
+	for site: Dictionary in generated.sites:
+		if site.id == primary:
+			building = site.object_id
+			break
+	for entity: Dictionary in generated.layout.entities:
+		if entity.id == building or (primary == "rescue" and entity.door == generated.layout.rescue):
+			# World sprites reserve transparent room above the facade for their foot anchor.
+			var art: Dictionary = WorldgenArt.definition(entity)
+			var texture: Texture2D = art.texture
+			var height: float = WorldgenScale.visible_height(entity.archetype, int(entity.variant), entity.get("art", ""))
+			var source_height: float = height * float(art.get("reference_width", 448.0)) / float(WorldgenScale.WIDTH[entity.archetype])
+			var top: float = maxf(0.0, floorf(art.origin.y - source_height) - 16.0)
+			var bottom: float = minf(texture.get_height(), ceilf(art.origin.y) + 16.0)
+			var crop: AtlasTexture = AtlasTexture.new()
+			crop.atlas = texture
+			crop.region = Rect2(0, top, texture.get_width(), bottom - top)
+			return crop
+	return fallback

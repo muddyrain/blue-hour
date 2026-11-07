@@ -35,6 +35,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var projected: Dictionary = base.duplicate(false)
 	projected.journey = base.journey.duplicate(false)
 	projected.journey.campaign = CampaignRules.initial(base.profile_id)
+	var mission: bool = CampaignRules.is_mission(base.journey.campaign)
 	var clue: String = CampaignRules.next_clue(base.journey.campaign)
 	var result: Array[Dictionary] = []
 	if clue.is_empty():
@@ -42,9 +43,9 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 		var finale: Array[Dictionary] = ExplorationActions.offers(projected)
 		projected.journey.campaign.preparations = 0
 		if not finale.is_empty():
-			result = _day(projected, clue, finale[0])
+			result = _day(projected, clue, mission, finale[0])
 	else:
-		result = _day(projected, clue)
+		result = _day(projected, clue, mission)
 	if result.is_empty():
 		return {}
 	var fingerprints: Dictionary[String, String] = {}
@@ -60,7 +61,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 static func marker_problem(value: Variant) -> String:
 	if not value is Dictionary or value.size() != 3 or not value.has_all(["version", "clue_id", "site_id"]):
 		return "INVESTIGATION_ACTION_FIELDS"
-	if not SurvivalContracts.integer(value.version, CampaignRules.INVESTIGATION_VERSION, CampaignRules.INVESTIGATION_VERSION):
+	if not SurvivalContracts.integer(value.version, CampaignRules.INVESTIGATION_VERSION, CampaignRules.MISSION_VERSION):
 		return "INVESTIGATION_ACTION_VERSION"
 	if not value.clue_id is String or value.clue_id not in CampaignRules.CLUE_IDS or value.site_id != SITE_ID:
 		return "INVESTIGATION_ACTION_CLUE"
@@ -70,6 +71,9 @@ static func marker_problem(value: Variant) -> String:
 static func site_problem(value: Dictionary) -> String:
 	if value.slot != INVESTIGATION_SLOT or value.type != "equipment" or value.campaign.preparations != 0 or value.get("worldgen", {}).get("version") != 2:
 		return "INVESTIGATION_ACTION_CONTEXT"
+	var version: int = CampaignRules.MISSION_VERSION if value.get("mission_policy") == 1 else CampaignRules.INVESTIGATION_VERSION
+	if value.investigation.version != version:
+		return "INVESTIGATION_ACTION_POLICY"
 	if value.objective.site_ids != [SITE_ID]:
 		return "INVESTIGATION_ACTION_OBJECTIVE"
 	for site: Dictionary in value.sites:
@@ -78,7 +82,7 @@ static func site_problem(value: Dictionary) -> String:
 	return "INVESTIGATION_ACTION_SITE"
 
 
-static func _day(projected: Dictionary, clue: String, finale: Dictionary = {}) -> Array[Dictionary]:
+static func _day(projected: Dictionary, clue: String, mission: bool, finale: Dictionary = {}) -> Array[Dictionary]:
 	var original: Array[Dictionary] = PersonaActions.offers(projected)
 	if original.size() != 3:
 		return []
@@ -88,34 +92,61 @@ static func _day(projected: Dictionary, clue: String, finale: Dictionary = {}) -
 			recruit = int(action.recruit)
 			break
 	var slots: Array[int] = [0, INVESTIGATION_SLOT, 2]
+	if mission and not clue.is_empty():
+		# Display supplies, outdoor gear, then investigation. Its signed slot stays 1.
+		slots = [0, 2, INVESTIGATION_SLOT]
 	var result: Array[Dictionary] = []
 	if not finale.is_empty():
 		slots.erase(int(finale.slot))
 		result.append(finale)
 	var extra: Dictionary = original[slots.back()]
 	var optional_type: String = "rescue" if recruit > 0 else String(extra.type)
+	if mission:
+		optional_type = "rescue" if recruit > 0 and projected.day > 2 else "airdrop"
 	if optional_type == "supply":
 		optional_type = "airdrop"
 	for slot: int in slots:
 		var investigation: bool = not clue.is_empty() and slot == INVESTIGATION_SLOT
 		var task_type: String = "supply" if slot == slots[0] else "equipment" if investigation else optional_type
-		var source: Dictionary = _with_type(original[slot], task_type, recruit if task_type == "rescue" else 0)
-		if source.is_empty():
-			return []
-		var offer: Dictionary = ExplorationActions.upgrade(source, true, true)
+		var offer: Dictionary = _offer(original[slot], task_type, recruit if task_type == "rescue" else 0, mission)
 		if offer.is_empty():
 			return []
 		if investigation:
+			var version: int = CampaignRules.MISSION_VERSION if mission else CampaignRules.INVESTIGATION_VERSION
+			offer.investigation = {"version":version, "clue_id":clue, "site_id":SITE_ID}
 			if not site_problem(offer).is_empty():
 				return []
-			offer.investigation = {"version":CampaignRules.INVESTIGATION_VERSION, "clue_id":clue, "site_id":SITE_ID}
 		result.append(offer)
 	return result
 
 
-static func _with_type(source: Dictionary, type: String, recruit: int) -> Dictionary:
-	if source.type == type:
-		return source
+static func _offer(source: Dictionary, type: String, recruit: int, mission: bool) -> Dictionary:
 	var topology: String = "industrial" if type == "equipment" and source.layout.topology == "residential" else source.layout.topology
-	var task: Dictionary = TaskActions._make(source.seed, int(source.day), int(source.slot), type, topology, source.layout["size"], recruit)
+	var size: String = source.layout["size"]
+	var candidate: Dictionary = _with_type(source, type, recruit, topology, size)
+	var offer: Dictionary = ExplorationActions.upgrade(candidate, true, true, int(mission)) if not candidate.is_empty() else {}
+	if not mission or not offer.is_empty():
+		return offer
+	# Keep the day and reward identity. Only retry the existing layout themes and sizes
+	# when the preferred layout cannot certify all of the required work entrances.
+	var sizes: Array[String] = NeighborhoodLayout.SIZES.duplicate()
+	sizes.erase(size)
+	sizes.push_front(size)
+	for alternate_size: String in sizes:
+		for alternate_theme: String in NeighborhoodLayout.TOPOLOGIES:
+			if (alternate_size == size and alternate_theme == topology) or (type == "equipment" and alternate_theme == "residential"):
+				continue
+			candidate = _with_type(source, type, recruit, alternate_theme, alternate_size)
+			if candidate.is_empty():
+				continue
+			offer = ExplorationActions.upgrade(candidate, true, true, 1)
+			if not offer.is_empty():
+				return offer
+	return {}
+
+
+static func _with_type(source: Dictionary, type: String, recruit: int, topology: String, size: String) -> Dictionary:
+	if source.type == type and source.layout.topology == topology and source.layout["size"] == size:
+		return source
+	var task: Dictionary = TaskActions._make(source.seed, int(source.day), int(source.slot), type, topology, size, recruit)
 	return ExplorationActions.source_from_task(task, source)

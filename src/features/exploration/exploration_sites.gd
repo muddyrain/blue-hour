@@ -7,13 +7,15 @@ const OPTIONAL_TITLES: Dictionary = {"optional_buildings_all":"搜完可选建�
 static var _generated: Dictionary = {}
 
 
-static func generate(layout: Dictionary, type: String, cash: int, food: int, weapons: int, action_id: String) -> Dictionary:
+static func generate(layout: Dictionary, type: String, cash: int, food: int, weapons: int, action_id: String, mission_policy: int = 0) -> Dictionary:
 	if not ExplorationLayout.validate(layout).is_empty() or type not in TaskActions.TYPES or not _action_id(action_id):
+		return {}
+	if mission_policy != 0 and (mission_policy != 1 or layout.get("level_task") != type):
 		return {}
 	var config: Dictionary = TaskActions.CONFIG[type]
 	if cash < int(config.cash[0]) or cash > int(config.cash[1]) or food < int(config.food[0]) or food > int(config.food[1]) or weapons < int(config.weapons[0]) or weapons > int(config.weapons[1]):
 		return {}
-	var key: String = RecordEncoding.fingerprint({"layout":layout, "type":type, "cash":cash, "food":food, "weapons":weapons, "action_id":action_id, "policy":ExplorationLayout.policy()})
+	var key: String = RecordEncoding.fingerprint({"layout":layout, "type":type, "cash":cash, "food":food, "weapons":weapons, "action_id":action_id, "policy":ExplorationLayout.policy(), "mission_policy":mission_policy})
 	if _generated.has(key):
 		return _generated[key].duplicate(true)
 	var routing: Dictionary = ExplorationLayout._routing(layout)
@@ -33,6 +35,11 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 	var sites: Array[Dictionary] = []
 	var used: Array[String] = []
 	var chosen: Array[Dictionary] = []
+	var supply_pair: Array[Dictionary] = []
+	if mission_policy == 1 and type == "supply":
+		supply_pair = LevelPolicy.mission_supply_pair(_candidates(layout, used, TaskActions.FOOD_TYPES), routing)
+		if supply_pair.size() != 2:
+			return {}
 	for kind: String in ["food", "cash"]:
 		var budget: int = food if kind == "food" else cash
 		var count: int = mini(budget, 2)
@@ -42,13 +49,17 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 			if candidates.is_empty():
 				return {}
 			var entity: Dictionary = _choose(candidates, routing, "far" if index == 0 else "near", action_id + ":primary:" + kind)
-			if layout.has("level_task") and type!="airdrop":
+			if not supply_pair.is_empty() and kind == "food":
+				entity = supply_pair[index]
+			elif mission_policy == 1 and type == "equipment" and kind == "cash" and index == 0:
+				entity = LevelPolicy.mission_investigation_target(candidates, routing)
+			elif layout.has("level_task") and type!="airdrop":
 				entity=LevelPolicy.choose(candidates,routing,type,kind,index,chosen,layout)
-				if entity.is_empty():
-					return {}
+			if entity.is_empty():
+				return {}
 			chosen.append(entity)
 			var site: Dictionary = {"id":kind if index == 0 else kind + "_%d" % (index + 1), "building":entity.id,
-				"kind":kind, "amount":budget / count + int(index < budget % count), "weapon":kind == "cash" and index == 0 and weapons == 1,
+				"kind":kind, "amount":budget / count + int(index < budget % count), "weapon":kind == "cash" and index == 0 and weapons == 1 and not (mission_policy == 1 and type == "equipment"),
 				"seconds":30.0, "source":"primary", "object_id":entity.id, "work_mode":"indoor"}
 			if type == "airdrop" and kind == "cash" and index == 0:
 				var point: Array = _airdrop_point(layout, entity, nav)
@@ -97,7 +108,7 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 	if type == "rescue":
 		var rescue_route: Dictionary = _route(layout, WorldLayout.point(layout.rescue), nav, float(routing.dmax))
 		primary_away = not rescue_route.is_empty() and rescue_route.zone != "near"
-	if not primary_away:
+	if not primary_away and (mission_policy != 1 or type != "supply"):
 		return {}
 	var pool: Array[String] = OPTIONAL_IDS.duplicate()
 	pool.sort_custom(func(a: String, b: String) -> bool:

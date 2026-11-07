@@ -16,6 +16,8 @@ CampaignRules只提供纯阶段/显示，CampaignActions在原V5之上冻结V6�
 
 M18 普通新旅程使用 `journey.campaign` V2 `investigation_v1`。InvestigationActions 选取现有行动预算，给调查装备行动增加显式版本、线索和真实主站点绑定。既有世界与报告只记录站点是否完成，冻结结算验证本日行动和站点事实，再推演有来源的营地线索。原持久确认使进度生效。两份线索齐备后由原生成器提供原终局描述；`short_v1` 的四次准备继续独立认证。
 
+M19 新旅程显式选择 V3 `mission_v1`。普通任务用冻结 `mission_policy:1` 认证成对近点、露天装备或深入调查，候选按原身份确定性生成。选卡从实际站点、可达路径和原事件读取主收益、路线与风险。调查主点结算使用真实完成事实，沿用 M18 的线索事务。新能力来源在旧营地 JSON 中可按精确的序列化投影校验，冻结行动和收据继续使用完整精确证明。V2 `investigation_v1` 与 `short_v1` 各自认证历史。
+
 WeaponActions只在原TaskActions描述上冻结V5站点枪型，WeaponInventory新增显式站点奖励分支并保留历史固定reward；WorldSites/FrozenSettlement继续拥有实际携带与唯一入库。FieldActor持有按实例绑定的WeaponMagazine，Expedition按活跃模拟推进并在原成功攻击提交后扣弹，HUD只读。世界8扩展原快照，不增加战斗/保存/奖励owner；见[弹匣与掉落合同](design/m7-weapon-01.md)。
 
 TaskActions只生成/校验V4任务描述并投影真实目标进度；DailyActions保留V1/V2/V3认证分支。Expedition沿原站点/刷怪owner推进空投工作和有界一次性压力，SortieSnapshot世界6保存同一task_event及原敌人事实；FrozenSettlement从报告计算任务摘要，EnemyState只对111开放经校验的last_day.task。没有新保存或收益owner；见[任务合同](design/m6-rogue-02.md)。

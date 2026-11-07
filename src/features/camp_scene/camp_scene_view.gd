@@ -11,6 +11,7 @@ const CAPTIONS: Dictionary[StringName, String] = {
 	&"supplies": "物资堆场\n查看钱粮与今日口粮",
 	&"training": "篝火休憩\n训练尚未开放",
 }
+const BLUE_HOUR_YARD: Texture2D = preload("res://assets/ui/m20/camp-blue-hour.png")
 
 var input_allowed: Callable
 var player_mode: bool = false
@@ -28,6 +29,11 @@ var _info_body: Label
 var _data: Dictionary = {}
 var _daily: Dictionary = {}
 var _last_focus: String = "bus"
+var _shortage_text: Label
+var _return_summary: PanelContainer
+var _return_text: Label
+var _team_scroll: ScrollContainer
+var _team_count: Label
 
 
 func _ready() -> void:
@@ -36,6 +42,10 @@ func _ready() -> void:
 	add_child(world)
 	resized.connect(_resize_world)
 	_resize_world()
+	if player_mode:
+		world.hide()
+		_build_blue_hour()
+		return
 	var header: PanelContainer = PanelContainer.new()
 	header.name = "CampHud"
 	header.add_theme_stylebox_override("panel", CampStyle.box(Color("102730"), Color("638983"), 12))
@@ -89,6 +99,178 @@ func _ready() -> void:
 	clear()
 
 
+func _build_blue_hour() -> void:
+	var background: TextureRect = CampStyle.blue_hour_background(BLUE_HOUR_YARD)
+	add_child(background)
+	move_child(background, 0)
+	_build_blue_hour_header()
+	_build_blue_hour_team()
+	_build_blue_hour_footer()
+	_build_info()
+	visibility_changed.connect(_shown)
+	clear()
+
+
+func _build_blue_hour_header() -> void:
+	var header: PanelContainer = _blue_hour_panel("CampHud", Rect2(42, 32, 1196, 77), Color(0.045, 0.10, 0.14, 0.94))
+	var row: HBoxContainer = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 20)
+	header.add_child(row)
+	var title: VBoxContainer = VBoxContainer.new()
+	title.custom_minimum_size.x = 224
+	title.add_theme_constant_override("separation", 1)
+	row.add_child(title)
+	title.add_child(CampStyle.label("蓝时驿站", 26))
+	title.add_child(CampStyle.label("河岸停靠院", 14, CampStyle.TEAL))
+	var stores: VBoxContainer = VBoxContainer.new()
+	stores.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stores.add_theme_constant_override("separation", 2)
+	row.add_child(stores)
+	resource_text = CampStyle.label("", 21)
+	stores.add_child(resource_text)
+	_shortage_text = CampStyle.label("", 15, CampStyle.MUTED)
+	stores.add_child(_shortage_text)
+	var investigation: VBoxContainer = VBoxContainer.new()
+	investigation.custom_minimum_size.x = 218
+	investigation.add_theme_constant_override("separation", 2)
+	row.add_child(investigation)
+	investigation.add_child(CampStyle.label("旅程进度", 14, CampStyle.MUTED))
+	eligibility_text = CampStyle.label("", 17, CampStyle.TEAL)
+	eligibility_text.clip_text = true
+	eligibility_text.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	investigation.add_child(eligibility_text)
+	_return_summary = _blue_hour_panel("ReturnSummary", Rect2(42, 529, 700, 54), Color(0.045, 0.10, 0.14, 0.93))
+	var return_row: HBoxContainer = HBoxContainer.new()
+	return_row.add_theme_constant_override("separation", 16)
+	_return_summary.add_child(return_row)
+	return_row.add_child(CampStyle.label("上次归航", 17, CampStyle.TEAL))
+	_return_text = CampStyle.label("", 17)
+	_return_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_return_text.clip_text = true
+	_return_text.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	return_row.add_child(_return_text)
+
+
+func _build_blue_hour_team() -> void:
+	var panel: PanelContainer = _blue_hour_panel("TeamPanel", Rect2(794, 130, 444, 453), Color(0.045, 0.10, 0.14, 0.94))
+	var column: VBoxContainer = VBoxContainer.new()
+	column.add_theme_constant_override("separation", 6)
+	panel.add_child(column)
+	column.add_child(CampStyle.label("行动小队", 25))
+	_team_count = CampStyle.label("", 15, CampStyle.MUTED)
+	column.add_child(_team_count)
+	_team_scroll = ScrollContainer.new()
+	_team_scroll.name = "TeamScroll"
+	_team_scroll.follow_focus = true
+	_team_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_team_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(_team_scroll)
+	_team_scroll.get_v_scroll_bar().focus_mode = Control.FOCUS_NONE
+	var roster: VBoxContainer = VBoxContainer.new()
+	roster.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	roster.add_theme_constant_override("separation", 8)
+	_team_scroll.add_child(roster)
+	for id: int in [1, 2, 3, 4, 5]:
+		var button: Button = _blue_hour_button(roster, StringName("member%d" % id), "")
+		button.set_meta("member_id", id)
+		button.custom_minimum_size.y = 77
+		member_buttons[id] = button
+		var padding: MarginContainer = MarginContainer.new()
+		padding.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		for edge: String in ["left", "right"]:
+			padding.add_theme_constant_override("margin_" + edge, 11)
+		button.add_child(padding)
+		padding.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		var row: HBoxContainer = HBoxContainer.new()
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_theme_constant_override("separation", 12)
+		padding.add_child(row)
+		var portrait: TextureRect = TextureRect.new()
+		portrait.name = "Portrait"
+		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		portrait.custom_minimum_size = Vector2(52, 56)
+		row.add_child(portrait)
+		var labels: VBoxContainer = VBoxContainer.new()
+		labels.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		labels.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		labels.alignment = BoxContainer.ALIGNMENT_CENTER
+		labels.add_theme_constant_override("separation", 1)
+		row.add_child(labels)
+		var specialty: Label = CampStyle.label("", 20)
+		specialty.name = "Trait"
+		labels.add_child(specialty)
+		var stats: HBoxContainer = HBoxContainer.new()
+		stats.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		stats.add_theme_constant_override("separation", 9)
+		labels.add_child(stats)
+		var call_sign: Label = CampStyle.label("", 15, CampStyle.MUTED)
+		call_sign.name = "CallSign"
+		call_sign.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		call_sign.clip_text = true
+		call_sign.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		stats.add_child(call_sign)
+		var health: Label = CampStyle.label("", 15)
+		health.name = "Health"
+		stats.add_child(health)
+		var weapon: Label = CampStyle.label("", 15, CampStyle.MUTED)
+		weapon.name = "Weapon"
+		stats.add_child(weapon)
+
+
+func _build_blue_hour_footer() -> void:
+	var panel: PanelContainer = _blue_hour_panel("CampActions", Rect2(42, 598, 1196, 88), Color(0.045, 0.10, 0.14, 0.96))
+	var column: VBoxContainer = VBoxContainer.new()
+	column.add_theme_constant_override("separation", 3)
+	panel.add_child(column)
+	var row: HBoxContainer = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 9)
+	column.add_child(row)
+	var labels: Dictionary[StringName, String] = {&"home":"返回主菜单", &"crew":"队伍档案", &"weapons":"武器整备",
+		&"supplies":"物资口粮", &"training":"篝火训练", &"sound":"声音", &"quit":"退出"}
+	for action: StringName in labels:
+		var button: Button = _blue_hour_button(row, action, labels[action])
+		if action in [&"crew", &"weapons", &"supplies", &"training"]:
+			hotspots[action] = button
+		else:
+			footer_buttons[action] = button
+	var spacer: Control = Control.new()
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(spacer)
+	var depart: Button = _blue_hour_button(row, &"bus", "选择行动 →")
+	depart.custom_minimum_size = Vector2(216, 44)
+	CampStyle.blue_hour_primary(depart)
+	hotspots[&"bus"] = depart
+	notice = CampStyle.label("", 13, CampStyle.MUTED)
+	notice.clip_text = true
+	notice.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	column.add_child(notice)
+
+
+func _blue_hour_panel(node_name: String, rect: Rect2, colour: Color) -> PanelContainer:
+	var panel: PanelContainer = PanelContainer.new()
+	panel.name = node_name
+	panel.add_theme_stylebox_override("panel", CampStyle.box(colour, Color("48646d"), 10))
+	add_child(panel)
+	CampStyle.place(panel, rect)
+	return panel
+
+
+func _blue_hour_button(parent: Container, action: StringName, caption: String) -> Button:
+	var button: Button = Button.new()
+	button.name = String(action)
+	button.text = caption
+	button.add_theme_font_size_override("font_size", 17)
+	button.custom_minimum_size.y = 42
+	parent.add_child(button)
+	button.pressed.connect(func() -> void: _request(action, int(button.get_meta("member_id", 0))))
+	button.mouse_entered.connect(_announce.bind(button, caption))
+	button.focus_entered.connect(_announce.bind(button, caption))
+	return button
+
+
 func _input(event: InputEvent) -> void:
 	if not is_visible_in_tree() or not event is InputEventKey or (input_allowed.is_valid() and not input_allowed.call()):
 		return
@@ -113,6 +295,9 @@ func refresh(data: Dictionary, daily: Dictionary, can_depart: bool, reason: Stri
 	_data = data.duplicate(true)
 	_daily = daily.duplicate(true)
 	world.refresh(data.crew)
+	if player_mode:
+		_refresh_blue_hour(data, daily, can_depart, reason, feedback)
+		return
 	resource_text.text = "第%d天   货币%d   食物%d   在营%d人" % [data.day, data.cash, data.food, world.visible_member_ids.size()]
 	eligibility_text.text = "%s · 今日需%d粮%s" % [reason, daily.required, " / 缺口%d" % int(daily.shortage) if daily.shortage > 0 else " / 库存足够"]
 	if data.last_day.has("task"):
@@ -148,12 +333,69 @@ func refresh(data: Dictionary, daily: Dictionary, can_depart: bool, reason: Stri
 	_link_focus()
 
 
+func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, reason: String, feedback: String) -> void:
+	resource_text.text = "第 %d 天     货币 %d     食物 %d     今日需粮 %d" % [data.day, data.cash, data.food, daily.required]
+	_shortage_text.text = "口粮缺口 %d · 可考虑先补给" % daily.shortage if daily.shortage > 0 else "口粮缺口 0 · 库存充足"
+	_shortage_text.add_theme_color_override("font_color", CampStyle.AMBER if daily.shortage > 0 else CampStyle.MUTED)
+	var last: Dictionary = data.last_day
+	_return_summary.visible = not last.is_empty()
+	if not last.is_empty():
+		var found: int = data.weapons.filter(func(item: Dictionary) -> bool:
+			return item.get("acquired_sortie") == data.last_settlement_id).size()
+		_return_text.text = "实得 %d 币 / %d 粮 / %d 件武器 · 已用口粮 %d" % [last.cash_gained, last.food_found, found, last.food_consumed]
+		_return_summary.tooltip_text = _return_text.text
+	eligibility_text.text = reason
+	eligibility_text.tooltip_text = reason
+	if CampaignState.is_short(data):
+		var progress: Dictionary = CampaignRules.display(data.journey.campaign)
+		eligibility_text.text = progress.progress
+		eligibility_text.tooltip_text = progress.title + " · " + progress.detail
+	elif last.has("task"):
+		eligibility_text.text = TaskActions.summary_text(last.task)
+		eligibility_text.tooltip_text = eligibility_text.text
+	notice.text = feedback if not feedback.is_empty() else "Tab 切换   ·   Enter 确认   ·   Esc 返回"
+	notice.tooltip_text = notice.text
+	hotspots[&"bus"].disabled = not can_depart
+	hotspots[&"bus"].tooltip_text = "选择出击目标" if can_depart else reason
+	var active: Array[int] = world.visible_member_ids
+	_team_count.text = "%d 人在营 · 选择队员查看详情" % active.size()
+	hotspots[&"crew"].set_meta("member_id", active[0] if not active.is_empty() else 0)
+	hotspots[&"training"].text = "篝火训练" if TrainingState.is_family(data) else "篝火休憩"
+	for id: int in member_buttons:
+		var button: Button = member_buttons[id]
+		button.visible = id in active
+		if button.visible:
+			_refresh_blue_hour_member(button, data, id)
+	_link_focus()
+
+
+func _refresh_blue_hour_member(button: Button, data: Dictionary, id: int) -> void:
+	var member: Dictionary = SurvivorRoster.member(data.crew, id)
+	var definition: SurvivorDefinition = SurvivorRoster.definition_for(member)
+	var portrait: TextureRect = button.find_child("Portrait", true, false) as TextureRect
+	portrait.texture = definition.portrait
+	var specialty: Label = button.find_child("Trait", true, false) as Label
+	var trait_id: int = TraitRules.IDS.find(member.get("growth", {}).get("trait", {}).get("id", ""))
+	specialty.text = TraitRules.NAMES[trait_id] if trait_id >= 0 else "同行队员"
+	specialty.add_theme_color_override("font_color", definition.colour)
+	var call_sign: Label = button.find_child("CallSign", true, false) as Label
+	call_sign.text = member.call_sign
+	var health: Label = button.find_child("Health", true, false) as Label
+	health.text = "生命 %.0f/%.0f" % [member.health, GrowthRules.maximum(member)]
+	var weapon: Label = button.find_child("Weapon", true, false) as Label
+	var equipped: Dictionary = WeaponInventory.for_member(data, id)
+	weapon.text = WeaponInventory.definition(equipped.weapon_id).display_name if not equipped.is_empty() else "未装备"
+	button.tooltip_text = "%s · %s\n%s · %s\n查看队员档案" % [specialty.text, call_sign.text, health.text, weapon.text]
+
+
 func clear() -> void:
 	if world == null:
 		return
 	world.refresh([])
 	for button: Button in member_buttons.values():
 		button.hide()
+	if is_instance_valid(_return_summary):
+		_return_summary.hide()
 	_info.hide()
 	_data.clear()
 	_daily.clear()
@@ -233,7 +475,7 @@ func _request(action: StringName, member_id: int) -> void:
 
 func _announce(button: Button, text: String) -> void:
 	_last_focus = String(button.name)
-	if notice != null:
+	if notice != null and not player_mode:
 		notice.text = text.replace("\n", " · ") if not text.is_empty() else button.tooltip_text.replace("\n", " · ")
 		notice.tooltip_text = notice.text
 

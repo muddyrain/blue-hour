@@ -12,6 +12,9 @@ enum Phase {
 
 const ValidationScene: PackedScene = preload("res://src/features/validation/validation.tscn")
 const ExpeditionScene: PackedScene = preload("res://src/features/expedition/expedition.tscn")
+const BLUE_HOUR_TITLE_ART: Texture2D = preload("res://assets/ui/m20/title-blue-hour.png")
+const BLUE_HOUR_CAMP_ART: Texture2D = preload("res://assets/ui/m20/camp-blue-hour.png")
+const SLOW_DEPARTURE_MS: int = 120
 
 var playable_entry: bool = false
 var phase: Phase = Phase.TITLE
@@ -81,6 +84,9 @@ var hunger_trial: bool = false
 var _hunger_consented: bool = false
 var _hunger_confirmation: ConfirmationDialog
 var _camp_backdrop: CampBackdrop
+var _blue_hour_title_art: TextureRect
+var _blue_hour_title_focus: Button
+var _departure_pending: bool = false
 var _battle_meta: Dictionary = {}
 var _survival_origin: Dictionary = {}
 var migration_panel: MigrationPanel
@@ -195,6 +201,9 @@ func _ready() -> void:
 	$Interface/Screen/Result/Continue.pressed.connect(return_to_title)
 	_back.pressed.connect(return_to_title)
 	_setup_presentation()
+	if playable_entry and not _developer_menu:
+		_setup_blue_hour_title()
+		mission_select.theme = CampStyle.blue_hour_theme(_screen.theme)
 	_setup_camp_scene()
 	pause_menu = SortiePauseMenu.new()
 	add_child(pause_menu)
@@ -600,13 +609,43 @@ func open_mission_select() -> void:
 func close_mission_select() -> void:
 	mission_select.hide()
 	_title.show()
+	if is_instance_valid(_blue_hour_title_art) and is_instance_valid(camp_scene) and camp_scene.is_visible_in_tree():
+		camp_scene.restore_focus()
 	_request_audio(&"ui_back")
 
 
 func _select_mission(supply: MissionSupply) -> void:
+	if _departure_pending or (is_instance_valid(_blue_hour_title_art) and phase != Phase.TITLE):
+		return
+	var from_menu: bool = is_instance_valid(_blue_hour_title_art) and mission_select.visible
+	var started: int = Time.get_ticks_msec()
+	_departure_pending = from_menu
 	selected_supply = supply
 	mission_select.hide()
 	open_expedition()
+	_departure_pending = false
+	if not from_menu:
+		return
+	if phase != Phase.EXPEDITION:
+		# The transaction owns the failure message and blocking policy. Restore its view.
+		if _progress_blocked:
+			_camp_open = false
+		_title.show()
+		_refresh_presentation()
+		if is_instance_valid(camp_scene) and camp_scene.is_visible_in_tree():
+			camp_scene.restore_focus()
+	elif Time.get_ticks_msec() - started >= SLOW_DEPARTURE_MS:
+		_fade_departure()
+
+
+func _fade_departure() -> void:
+	var cover: TextureRect = CampStyle.blue_hour_background(BLUE_HOUR_CAMP_ART)
+	cover.name = "BlueHourDepartureFade"
+	cover.modulate = Color(0.63, 0.76, 0.87, 0.84)
+	$Interface.add_child(cover)
+	var fade: Tween = cover.create_tween()
+	fade.tween_property(cover, "modulate:a", 0.0, 0.28).set_trans(Tween.TRANS_SINE)
+	fade.tween_callback(cover.queue_free)
 
 
 func open_expedition() -> void:
@@ -1143,6 +1182,8 @@ func open_sound_settings() -> void:
 		_screen.add_child(sound_settings)
 	sound_settings.show()
 	_title.hide()
+	if is_instance_valid(_blue_hour_title_art):
+		sound_settings.back_button.grab_focus()
 	_request_audio(&"ui_confirm")
 
 
@@ -2007,6 +2048,8 @@ func _refresh_presentation() -> void:
 		camp.text = "已保存：第 %d 天 · 货币 %d · 食物 %d\n旧版营地将在继续后读取，原件保留。" % [int(_pending_save.day),int(_pending_save.cash),int(_pending_save.food)]
 
 	if playable_entry: _refresh_playable_presentation()
+	if is_instance_valid(_blue_hour_title_art):
+		_refresh_blue_hour_title()
 	_sync_camp_scene()
 
 
@@ -2033,6 +2076,8 @@ func _setup_camp_scene() -> void:
 		return
 	camp_scene = candidate as CampSceneView
 	camp_scene.player_mode = playable_entry and not _developer_menu
+	if camp_scene.player_mode:
+		camp_scene.theme = CampStyle.blue_hour_theme(_screen.theme)
 	_title.add_child(camp_scene)
 	camp_scene.input_allowed = _camp_input_allowed
 	camp_scene.action_requested.connect(_camp_action)
@@ -2211,6 +2256,115 @@ func _refresh_playable_presentation() -> void:
 	$Interface/Screen/Title/Sound.text = "设置"
 	if _requires_continue and not _pending_save.is_empty():
 		$Interface/Screen/Title/Camp.text = "已保存：第%d天 · 货币%d · 食物%d\n继续同一旅程，或明确开始新的试玩。" % [_pending_save.day,_pending_save.cash,_pending_save.food]
+
+
+func _setup_blue_hour_title() -> void:
+	_title.theme = CampStyle.blue_hour_theme(_screen.theme)
+	_blue_hour_title_art = CampStyle.blue_hour_background(BLUE_HOUR_TITLE_ART)
+	_blue_hour_title_art.name = "BlueHourTitleArt"
+	_title.add_child(_blue_hour_title_art)
+	_title.move_child(_blue_hour_title_art, 0)
+	var title_font: SystemFont = SystemFont.new()
+	title_font.font_names = PackedStringArray(["STZhongsong", "SimSun", "Noto Serif CJK SC", "Microsoft YaHei"])
+	title_font.font_weight = 700
+	$Interface/Screen/Title/Heading.add_theme_font_override("font", title_font)
+	var english_font: FontVariation = FontVariation.new()
+	english_font.base_font = ThemeDB.fallback_font
+	english_font.spacing_glyph = 7
+	$Interface/Screen/Title/Eyebrow.add_theme_font_override("font", english_font)
+	for button: Button in _blue_hour_title_buttons():
+		_style_blue_hour_title_button(button)
+		button.focus_entered.connect(_remember_blue_hour_title_focus.bind(button))
+	_title.visibility_changed.connect(func() -> void: _restore_blue_hour_title_focus.call_deferred())
+	_new_game_confirmation.canceled.connect(func() -> void: _restore_blue_hour_title_focus.call_deferred())
+	_hunger_confirmation.canceled.connect(func() -> void: _restore_blue_hour_title_focus.call_deferred())
+
+
+func _refresh_blue_hour_title() -> void:
+	_blue_hour_title_art.visible = not _camp_open
+	_camp_backdrop.visible = _camp_open
+	$Interface/Screen/Brand.hide()
+	if _camp_open:
+		CampStyle.place(_status, Rect2(64, 646, 1152, 68))
+		return
+	var heading: Label = $Interface/Screen/Title/Heading
+	var english: Label = $Interface/Screen/Title/Eyebrow
+	var camp: Label = $Interface/Screen/Title/Camp
+	var reset: Button = $Interface/Screen/Title/Reset
+	var sound: Button = $Interface/Screen/Title/Sound
+	var exit: Button = $Interface/Screen/Title/Quit
+	heading.text = "蓝时归航"
+	heading.add_theme_font_size_override("font_size", 76)
+	heading.add_theme_color_override("font_color", Color("f3e7d1"))
+	CampStyle.place(heading, Rect2(90, 144, 426, 94))
+	english.text = "BLUE HOUR"
+	english.add_theme_color_override("font_color", Color("f3e7d1"))
+	CampStyle.place(english, Rect2(99, 242, 334, 28))
+	$Interface/Screen/Title/Description.hide()
+	var live_camp: bool = _home_button.visible and run_save.has_files()
+	_continue_button.visible = not live_camp
+	_continue_button.disabled = not _requires_continue or _progress_blocked
+	if _pending_save.get("journey", {}).get("state") != "FAILED" and not CampaignState.ended(_pending_save):
+		_continue_button.text = "继续出击" if _requires_continue and _pending_save.is_empty() else "继续旅程"
+	_home_button.text = "继续旅程" if live_camp else "新旅程"
+	reset.text = "新旅程"
+	reset.visible = not _home_button.visible or live_camp
+	sound.text = "设置"
+	exit.text = "退出游戏"
+	CampStyle.place(_continue_button, Rect2(91, 316, 276, 44))
+	CampStyle.place(_home_button, Rect2(91, 316 if live_camp else 367, 276, 44))
+	CampStyle.place(reset, Rect2(91, 367, 276, 44))
+	CampStyle.place(sound, Rect2(91, 418, 276, 44))
+	CampStyle.place(exit, Rect2(91, 469, 276, 44))
+	CampStyle.place(_backup_button, Rect2(91, 524, 365, 38))
+	CampStyle.place(_retry_button, Rect2(91, 569 if _backup_button.visible else 524, 365, 38))
+	camp.visible = _requires_continue and not _pending_save.is_empty() and not _progress_blocked
+	camp.add_theme_color_override("font_color", Color("cad7d6"))
+	CampStyle.place(camp, Rect2(103, 532, 426, 68))
+	CampStyle.place(_status, Rect2(103, 633, 490, 74))
+	_status.add_theme_color_override("font_color", CampStyle.AMBER if _progress_blocked else Color("c5d3d1"))
+	var focusable: Array[Button] = []
+	for button: Button in _blue_hour_title_buttons():
+		if button.visible and not button.disabled:
+			focusable.append(button)
+	for index: int in range(focusable.size()):
+		focusable[index].focus_next = focusable[(index + 1) % focusable.size()].get_path()
+		focusable[index].focus_previous = focusable[(index + focusable.size() - 1) % focusable.size()].get_path()
+	_restore_blue_hour_title_focus.call_deferred()
+
+
+func _blue_hour_title_buttons() -> Array[Button]:
+	return [_continue_button, _home_button, $Interface/Screen/Title/Reset, $Interface/Screen/Title/Sound,
+		$Interface/Screen/Title/Quit, _backup_button, _retry_button]
+
+
+func _style_blue_hour_title_button(button: Button) -> void:
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.add_theme_font_size_override("font_size", 22)
+	button.add_theme_stylebox_override("normal", CampStyle.box(Color(0.06, 0.14, 0.2, 0.40), Color.TRANSPARENT, 8))
+	button.add_theme_stylebox_override("hover", CampStyle.box(Color(0.10, 0.24, 0.33, 0.92), CampStyle.TEAL, 8))
+	button.add_theme_stylebox_override("pressed", CampStyle.box(Color(0.10, 0.17, 0.22, 0.96), CampStyle.AMBER, 8))
+	button.add_theme_stylebox_override("disabled", CampStyle.box(Color(0.06, 0.14, 0.2, 0.35), Color.TRANSPARENT, 8))
+	var focus: StyleBoxFlat = CampStyle.box(Color.TRANSPARENT, CampStyle.AMBER, 0)
+	focus.border_width_left = 4
+	button.add_theme_stylebox_override("focus", focus)
+
+
+func _remember_blue_hour_title_focus(button: Button) -> void:
+	if not _camp_open:
+		_blue_hour_title_focus = button
+
+
+func _restore_blue_hour_title_focus() -> void:
+	if _camp_open or phase != Phase.TITLE or not _title.is_visible_in_tree() or _settings_open():
+		return
+	if is_instance_valid(_blue_hour_title_focus) and _blue_hour_title_focus.is_visible_in_tree() and not _blue_hour_title_focus.disabled:
+		_blue_hour_title_focus.grab_focus()
+		return
+	for button: Button in _blue_hour_title_buttons():
+		if button.is_visible_in_tree() and not button.disabled:
+			button.grab_focus()
+			return
 
 
 func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:

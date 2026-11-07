@@ -32,6 +32,7 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 		routes[site.id] = route
 	var sites: Array[Dictionary] = []
 	var used: Array[String] = []
+	var chosen: Array[Dictionary] = []
 	for kind: String in ["food", "cash"]:
 		var budget: int = food if kind == "food" else cash
 		var count: int = mini(budget, 2)
@@ -41,6 +42,11 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 			if candidates.is_empty():
 				return {}
 			var entity: Dictionary = _choose(candidates, routing, "far" if index == 0 else "near", action_id + ":primary:" + kind)
+			if layout.has("level_task") and type!="airdrop":
+				entity=LevelPolicy.choose(candidates,routing,type,kind,index,chosen,layout)
+				if entity.is_empty():
+					return {}
+			chosen.append(entity)
 			var site: Dictionary = {"id":kind if index == 0 else kind + "_%d" % (index + 1), "building":entity.id,
 				"kind":kind, "amount":budget / count + int(index < budget % count), "weapon":kind == "cash" and index == 0 and weapons == 1,
 				"seconds":30.0, "source":"primary", "object_id":entity.id, "work_mode":"indoor"}

@@ -124,6 +124,9 @@ func refresh_daily(base: Dictionary) -> void:
 		_titles[index].text = "%02d / %s" % [index+1,supply.display_name]
 		_descriptions[index].text = supply.description
 		_pictures[index].custom_minimum_size.y = 88
+		if supply.generated.get("worldgen",{}).get("version")==2:
+			_pictures[index].custom_minimum_size.y = 56
+			_descriptions[index].add_theme_font_size_override("font_size",16)
 		var outdoor: bool=TaskActions.outdoor_site(supply.generated,&"cash")
 		_pictures[index].texture = null if outdoor else MARKET if supply.id==&"supermarket" else SHOP
 		_crates[index].visible=outdoor

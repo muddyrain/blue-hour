@@ -65,5 +65,6 @@ static func _source_problem(camp: Dictionary, generated: Variant) -> String:
 	var issue: String=ExplorationActions.problem(generated) if ExplorationState.enabled(camp) else PersonaActions.problem(generated)
 	if not issue.is_empty(): return issue
 	if ExplorationState.enabled(camp) and WorldgenState.enabled(camp)!=generated.has("worldgen"): return "WORLDGEN_POWER_SOURCE_MODE"
+	if WorldgenState.enabled(camp) and WorldgenState.level_enabled(camp)!=(generated.get("worldgen",{}).get("version")==2): return "LEVEL_POWER_SOURCE_MODE"
 	if not camp.journey.build.get("persona") is Dictionary or not TransactionReceipt.same(generated.persona.facts,camp.journey.build.persona): return "PERSONA_POWER_SOURCE"
 	return ""

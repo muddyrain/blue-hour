@@ -5,7 +5,7 @@ const DIMENSIONS: Dictionary = {"small":[2560,1920],"medium":[3584,2688],"large"
 const MIN_WIDTH: int = 736
 const MIN_HEIGHT: int = 464
 
-static func assemble(seed: String, size: String, topology: String, attempt: int, fallback: bool) -> Dictionary:
+static func assemble(seed: String, size: String, topology: String, attempt: int, fallback: bool, task: String = "") -> Dictionary:
 	var random: RandomNumberGenerator = RogueLayout.rng("worldgen-v1:" + ((size + ":" + topology + ":fallback") if fallback else seed + ":" + str(attempt)))
 	var dimensions: Array = DIMENSIONS[size]
 	var width: int = int(dimensions[0])
@@ -58,6 +58,8 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 	var foot_y: int = main_y+main_width-48
 	var door: Array = [stop_x+190,main_y+main_width+48]
 	var bus: Dictionary = {"rect":[stop_x,foot_y-80,240,80],"door":door,"passenger_door":[stop_x+190,foot_y-16],"entry":[-160,foot_y],"exit":[width+160,foot_y],"sweep":[0,foot_y-100,width,120],"facing":"right"}
+	if not task.is_empty():
+		LevelPolicy.prepare(parcels,task,seed)
 	var entities: Array = []
 	for parcel: Dictionary in parcels:
 		_populate(parcel,topology,random,entities,roads,bus)
@@ -74,6 +76,13 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 	var walls: Dictionary = _walls(parcels,entities,roads,bus)
 	var arrivals: Array = [[door[0]-48,door[1]+24],[door[0],door[1]+24],[door[0]+48,door[1]+24],[door[0],door[1]+56]]
 	var data: Dictionary = {"version":5,"seed":seed,"size":size,"topology":topology,"attempt":attempt,"fallback":fallback,"bounds":[0,0,width,height],"entities":entities,"roads":roads,"barriers":walls.barriers,"gates":walls.gates,"bus":bus,"arrivals":arrivals,"enemy_points":[[24,main_y+24],[width-24,main_y+24]],"rescue":rescue,"objects":[],"parcels":parcels,"graph":WorldgenStructure.graph(segments)}
+	if not task.is_empty():
+		data.level_task=task
+		if task=="rescue":
+			var target_point: Array=LevelPolicy.rescue_point(data)
+			if target_point.is_empty():
+				return {}
+			data.rescue=target_point
 	data.art_revision = 3
 	data.id = "worldgen_v1_"+RecordEncoding.fingerprint(data).substr(0,32)
 	return data

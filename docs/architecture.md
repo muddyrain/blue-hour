@@ -8,6 +8,8 @@ WorldActions/WorldLayout/WorldSites提供V2有限街区、站点预算与事实�
 
 # 架构与所有权
 
+M15 的 LevelPolicy/LevelSummary 只生成局部任务用途、最终导航路线及只读卡片事实。新旅程在 build6 的 worldgen 标识中显式选择 version2/BH_LEVEL_V1，原 marker1/policy3 与 layout4 独立保留。布局、站点和摘要一起有界重试；原保存、工作、伤害、救援与结算 owner 不变。新成功纯结果仅按完整输入复用原 ValueProofCache，见[任务关卡合同](design/m15-level-01.md)。
+
 M14 R2 的 StreetModuleArt 只定义新画布/门/墙脚元数据，WorldgenGeometry/Dressing 冻结art_revision3、局部门面和两条院墙脚，FieldProp/WorldgenGround/Furniture读取同一几何。旧layout4不走新路径。ValueProofCache按完整当前值与私有深拷贝的原生递归精确比较复用纯计算结果；ReceiptJournal每次重读原文件字节，命中后仅省解析与历史深拷贝，对外仍隔离返回。FrozenSettlement仍是唯一结果owner；没有新保存格式、异步写者或提前ACK。
 
 CampaignRules只提供纯阶段/显示，CampaignActions在原V5之上冻结V6阶段及导航验证首领定义。BossBehavior只产生稳定请求，BossWarning只读绘图；EncounterRuntime在Expedition内调用原攻击、伤害、刷怪与击败/XP owner。FrozenSettlement在原结果内推演journey.campaign，ProductionProgress确认提交后才成为持久结果；世界9保存同一首领和请求事实，没有另一个存档或归航结算器。旧111无campaign字段时保持原模式，历史指纹分支保留。见[短局合同](design/m8-run-01.md)。

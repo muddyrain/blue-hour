@@ -130,6 +130,12 @@ func refresh_daily(base: Dictionary) -> void:
 			_descriptions[index].text = supply.description.trim_suffix(frozen_description) + LevelSummary.description(supply.generated, true)
 			_pictures[index].custom_minimum_size.y = 56
 			_descriptions[index].add_theme_font_size_override("font_size",16)
+		var investigation: Dictionary = supply.generated.get("investigation", {})
+		if not investigation.is_empty():
+			var clue_name: String = CampaignRules.CLUE_NAMES[investigation.clue_id]
+			_titles[index].text = "%02d / 调查 · %s" % [index+1, clue_name]
+			_descriptions[index].text = "搜索标记建筑：%s\n" % clue_name + _descriptions[index].text
+			_pictures[index].custom_minimum_size.y = 40
 		var outdoor: bool=TaskActions.outdoor_site(supply.generated,&"cash")
 		_pictures[index].texture = null if outdoor else MARKET if supply.id==&"supermarket" else SHOP
 		_crates[index].visible=outdoor

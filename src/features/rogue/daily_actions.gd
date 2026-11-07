@@ -2,6 +2,8 @@ class_name DailyActions
 extends RefCounted
 ## Dispatch by explicit version; old receipt authentication never uses the new generator.
 static func offers(base: Dictionary) -> Array[Dictionary]:
+	if CampaignRules.is_investigation(base.get("journey", {}).get("campaign")):
+		return InvestigationActions.offers(base)
 	return ExplorationActions.offers(base) if ExplorationState.enabled(base) else PersonaActions.offers(base) if PersonaState.enabled(base) else PowerActions.offers(base) if PowerState.enabled(base) else CombatActions.offers(base) if CombatActions.enabled(base) else BuildActions.offers(base) if BuildState.enabled(base) else CampaignActions.offers(base) if CampaignState.is_short(base) else WeaponActions.offers(base)
 static func problem(value: Variant) -> String:
 	if value is Dictionary and value.get("version")==9: return ExplorationActions.problem(value)
@@ -15,6 +17,10 @@ static func problem(value: Variant) -> String:
 	if value is Dictionary and value.get("version")==3: return NeighborhoodActions.problem(value)
 	return WorldActions.problem(value) if value is Dictionary and value.get("version")==2 else RogueActions.problem(value)
 static func matches(base: Dictionary, value: Variant) -> bool:
+	if CampaignRules.is_investigation(base.get("journey", {}).get("campaign")):
+		return InvestigationActions.matches(base,value)
+	if value is Dictionary and value.has("investigation"):
+		return false
 	if ExplorationState.enabled(base): return ExplorationActions.matches(base,value)
 	if PersonaState.enabled(base): return PersonaActions.matches(base,value)
 	if PowerState.enabled(base): return PowerActions.matches(base,value)

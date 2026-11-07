@@ -7,6 +7,11 @@ const MODE: String = "short_v1"
 const PREPARATIONS: int = 4
 const BREAKOUT_INTERVAL: float = 0.90
 const KEYS: Array[String] = ["version","mode","run_id","preparations","outcome","result_transaction"]
+const INVESTIGATION_VERSION: int = 2
+const INVESTIGATION_MODE: String = "investigation_v1"
+const CLUE_IDS: Array[String] = ["dispatch_log", "checkpoint_pass"]
+const CLUE_NAMES: Dictionary[String, String] = {"dispatch_log":"线路调度记录", "checkpoint_pass":"封锁通行记录"}
+const INVESTIGATION_KEYS: Array[String] = ["version","mode","run_id","clues","outcome","result_transaction"]
 
 
 static func initial(run_id: String) -> Dictionary:
@@ -14,7 +19,24 @@ static func initial(run_id: String) -> Dictionary:
 	return {"version":VERSION,"mode":MODE,"run_id":run_id,"preparations":0,"outcome":"ACTIVE","result_transaction":""}
 
 
+static func initial_investigation(run_id: String) -> Dictionary:
+	assert(_identity(run_id))
+	return {"version":INVESTIGATION_VERSION, "mode":INVESTIGATION_MODE, "run_id":run_id,
+		"clues":[], "outcome":"ACTIVE", "result_transaction":""}
+
+
+static func is_investigation(value: Variant) -> bool:
+	return value is Dictionary and value.get("version") == INVESTIGATION_VERSION and value.get("mode") == INVESTIGATION_MODE
+
+
+static func next_clue(value: Dictionary) -> String:
+	var count: int = value.clues.size()
+	return CLUE_IDS[count] if count < CLUE_IDS.size() else ""
+
+
 static func problem(value: Variant, run_id: String = "") -> String:
+	if is_investigation(value):
+		return _investigation_problem(value, run_id)
 	if not value is Dictionary or value.size()!=KEYS.size() or not value.has_all(KEYS):
 		return "CAMPAIGN_FIELDS"
 	if not SurvivalContracts.integer(value.version,VERSION,VERSION) or value.mode!=MODE:
@@ -33,8 +55,46 @@ static func problem(value: Variant, run_id: String = "") -> String:
 	return ""
 
 
+static func _investigation_problem(value: Dictionary, run_id: String) -> String:
+	if value.size() != INVESTIGATION_KEYS.size() or not value.has_all(INVESTIGATION_KEYS) or not SurvivalContracts.integer(value.version,INVESTIGATION_VERSION,INVESTIGATION_VERSION):
+		return "INVESTIGATION_FIELDS"
+	if not value.run_id is String or not _identity(value.run_id) or (not run_id.is_empty() and run_id != value.run_id):
+		return "INVESTIGATION_IDENTITY"
+	if not value.clues is Array or value.clues.size() > CLUE_IDS.size() or value.outcome not in ["ACTIVE","VICTORY","DEFEAT"] or not value.result_transaction is String:
+		return "INVESTIGATION_VALUES"
+	var previous: int = 0
+	for index: int in range(value.clues.size()):
+		var clue: Variant = value.clues[index]
+		if not clue is Dictionary or clue.size() != 4 or not clue.has_all(["id","transaction_id","action_id","site_id"]):
+			return "INVESTIGATION_CLUE_FIELDS"
+		if clue.id != CLUE_IDS[index] or clue.site_id != "cash" or not clue.action_id is String or clue.action_id.length() != 64 or not clue.action_id.is_valid_hex_number(false):
+			return "INVESTIGATION_CLUE_IDENTITY"
+		var ordinal: int = _transaction_ordinal(clue.transaction_id, value.run_id)
+		if ordinal <= previous:
+			return "INVESTIGATION_CLUE_TRANSACTION"
+		previous = ordinal
+	if value.outcome == "ACTIVE":
+		return "" if value.result_transaction.is_empty() else "INVESTIGATION_ACTIVE_RESULT"
+	if _transaction_ordinal(value.result_transaction, value.run_id) <= previous:
+		return "INVESTIGATION_RESULT_BINDING"
+	return "INVESTIGATION_VICTORY_CLUES" if value.outcome == "VICTORY" and not next_clue(value).is_empty() else ""
+
+
+static func _transaction_ordinal(identity: Variant, run_id: String) -> int:
+	if not identity is String:
+		return 0
+	var parts: PackedStringArray = identity.split(":")
+	if parts.size() != 2 or parts[0] != run_id or not parts[1].is_valid_int():
+		return 0
+	var ordinal: int = int(parts[1])
+	return ordinal if parts[1] == str(ordinal) and ordinal > 0 else 0
+
+
 static func context(value: Dictionary) -> Dictionary:
 	assert(problem(value).is_empty())
+	if is_investigation(value):
+		var finale: bool = next_clue(value).is_empty()
+		return {"version":INVESTIGATION_VERSION,"stage":"finale" if finale else "investigation","is_finale":finale,"pressure":1.0}
 	var count: int = int(value.preparations)
 	var stage: String = "finale" if count==PREPARATIONS else "breakout" if count>=2 else "preparation"
 	return {"version":VERSION,"stage":stage,"is_finale":stage=="finale","pressure":BREAKOUT_INTERVAL if stage=="breakout" else 1.0}
@@ -46,6 +106,16 @@ static func can_depart(value: Dictionary) -> bool:
 
 static func display(value: Dictionary) -> Dictionary:
 	var action: Dictionary = context(value)
+	if is_investigation(value):
+		var clue_progress: String = "调查线索 %d/%d" % [value.clues.size(), CLUE_IDS.size()]
+		if value.outcome != "ACTIVE":
+			return {"title":"旅程胜利" if value.outcome == "VICTORY" else "旅程失败",
+				"detail":"本旅程已结束，可查看队伍与结果，或开始新旅程。","progress":clue_progress}
+		if action.is_finale:
+			return {"title":"终局 · 突破封锁","detail":"可继续补给。击败破阵者并确认归航才获胜，提前撤离后可重试。",
+				"progress":clue_progress + " · 终局已开放"}
+		return {"title":"街区调查","detail":"下一份线索：%s。搜索标记建筑并确认归航。" % CLUE_NAMES[next_clue(value)],
+			"progress":clue_progress}
 	var progress: String = "准备归航 %d/%d" % [int(value.preparations),PREPARATIONS]
 	if value.outcome!="ACTIVE":
 		return {"title":"旅程胜利" if value.outcome=="VICTORY" else "旅程失败","detail":"本旅程已结束，可查看队伍与结果，或开始新旅程。","progress":progress}

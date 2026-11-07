@@ -10,15 +10,20 @@ static func origin(value: Dictionary) -> Dictionary:
 	var key: String=SurvivalContracts.fingerprint({"seed":value.seed,"day":value.day,"slot":value.slot,"type":value.type,"size":value.layout["size"],"topology":value.layout.topology,"recruit":value.recruit,"campaign":value.campaign,"build":value.build,"powers":value.powers,"persona":value.persona})
 	if _origins.has(key): return _origins[key].duplicate(true)
 	var task: Dictionary=TaskActions._make(value.seed,int(value.day),int(value.slot),value.type,value.layout.topology,value.layout["size"],int(value.recruit))
-	if task.is_empty(): return {}
-	var source: Dictionary=CampaignActions._upgrade(WeaponActions._upgrade(task),value.campaign.run_id,int(value.campaign.preparations))
-	source=CombatActions.upgrade(BuildActions.upgrade(source,value.build.owned,value.build.slots))
-	source=PowerActions.upgrade(source,value.powers.owned,value.powers.slot)
-	source=PersonaActions.upgrade(source,value.persona.facts)
+	var source: Dictionary=source_from_task(task,value)
+	if source.is_empty(): return {}
 	if not PersonaActions.problem(source).is_empty(): return {}
 	if _origins.size()>=64: _origins.clear()
 	_origins[key]=source.duplicate(true)
 	return source
+
+static func source_from_task(task: Dictionary, context: Dictionary) -> Dictionary:
+	if task.is_empty():
+		return {}
+	var source: Dictionary = CampaignActions._upgrade(WeaponActions._upgrade(task), context.campaign.run_id, int(context.campaign.preparations))
+	source = CombatActions.upgrade(BuildActions.upgrade(source, context.build.owned, context.build.slots))
+	source = PowerActions.upgrade(source, context.powers.owned, context.powers.slot)
+	return PersonaActions.upgrade(source, context.persona.facts)
 
 static func upgrade(source: Dictionary, worldgen: bool = false, level: bool = false) -> Dictionary:
 	var value: Dictionary=source.duplicate(true)
@@ -67,6 +72,17 @@ static func offers(base: Dictionary) -> Array[Dictionary]:
 	return result
 
 static func problem(value: Variant) -> String:
+	if value is Dictionary and value.has("investigation"):
+		var issue: String = InvestigationActions.marker_problem(value.investigation)
+		if not issue.is_empty():
+			return issue
+		var projected: Dictionary = value.duplicate(false)
+		projected.erase("investigation")
+		issue = _problem(projected)
+		return InvestigationActions.site_problem(value) if issue.is_empty() else issue
+	return _problem(value)
+
+static func _problem(value: Variant) -> String:
 	var worldgen: bool=value is Dictionary and value.has("worldgen")
 	var level: bool=worldgen and value.worldgen is Dictionary and value.worldgen.get("version")==2
 	if worldgen and (not value.worldgen is Dictionary or not TransactionReceipt.same(value.worldgen,WorldgenLayout.policy(level))): return "WORLDGEN_ACTION_POLICY"

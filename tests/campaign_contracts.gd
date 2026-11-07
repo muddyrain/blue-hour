@@ -12,7 +12,26 @@ func run() -> void:
 	app._new_game()
 	var base: Dictionary=app.camp_snapshot()
 	check(TransactionReceipt.camp_problem(base).is_empty(),"normal new short camp strict")
-	for action:Dictionary in DailyActions.offers(base):
+	var daily: Array[Dictionary] = DailyActions.offers(base)
+	check(CampaignRules.is_investigation(base.journey.campaign) and daily.size() == 3,
+		"ordinary new entry issues three investigation-mode cards")
+	if daily.size() == 3:
+		check(daily[0].type == "supply" and daily[1].investigation.clue_id == "dispatch_log" and not daily[2].has("investigation"),
+			"ordinary supplies and exactly one first investigation remain selectable")
+		var old_mode: Dictionary = base.duplicate(true)
+		old_mode.journey.campaign = CampaignRules.initial(base.profile_id)
+		check(not DailyActions.matches(old_mode, daily[1]), "historical short mode cannot accept an investigation offer")
+		var altered: Dictionary = daily[1].duplicate(true)
+		altered.investigation.clue_id = "checkpoint_pass"
+		check(not DailyActions.matches(base, altered), "offer with the next clue cannot authorize departure early")
+		altered = daily[1].duplicate(true)
+		altered.investigation.site_id = "food"
+		check(not DailyActions.problem(altered).is_empty() and not DailyActions.matches(base, altered),
+			"wrong site rejects at both canonical and camp-bound checks")
+		altered = daily[1].duplicate(true)
+		altered.erase("investigation")
+		check(not DailyActions.matches(base, altered), "original task with its required investigation identity removed is not today's offer")
+	for action:Dictionary in daily:
 		var supply:MissionSupply=DailyActions.supply(action)
 		var rules:Dictionary=FrozenSettlement.pool_rules(base,supply)
 		var issue:String=FrozenSettlement._rules_problem(rules)
@@ -27,6 +46,7 @@ func run() -> void:
 	# Pure generator fixtures below do not count as a played or settled journey.
 	for preparations:int in range(5):
 		var fixture:Dictionary=base.duplicate(true)
+		fixture.journey.campaign = CampaignRules.initial(base.profile_id)
 		fixture.journey.campaign.preparations=preparations
 		fixture.day=preparations+2;fixture.settled_sorties=preparations
 		var offers:Array[Dictionary]=DailyActions.offers(fixture)

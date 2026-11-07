@@ -1484,7 +1484,7 @@ func _update_ui() -> void:
 	var xp_text: String = "本次经验（归航后生效）："+" / ".join(pending) if growth_mode else ""
 	if not weapon_loot.is_empty():xp_text+="\n携带："+WeaponInventory.loot_description(weapon_loot[0])
 	_hud.refresh({
-		"exploration_objectives":ExplorationSites.objective_rows({"type":supply.generated.type,"objective":supply.generated.objective,"optional_objectives":supply.generated.exploration.optional_objectives},WorldSites.facts(self),rescue_target!=null and rescue_target.status=="IN_FIELD_JOINED" and rescue_target.npc.health>0) if exploration_mode() else [],
+		"exploration_objectives":_exploration_objective_rows() if exploration_mode() else [],
 		"objective":TaskActions.hud(self),
 		"mission_title":("交火练习" if is_practice else mission_title) if los_setup == null else mission_title, "members":members,
 		"can_extract":phase != Phase.FINISHED if is_practice else phase == Phase.ACTIVE and elapsed >= tuning.bus_ready_seconds,
@@ -1927,9 +1927,21 @@ func _present_power() -> void:
 	power_view.present(members,foes,id=="speed_boost_v1" and remaining>0,id=="map_freeze_v1" and remaining>0,elapsed)
 
 
+func _exploration_objective_rows() -> Array[Dictionary]:
+	var generated: Dictionary = supply.generated
+	var rows: Array[Dictionary] = ExplorationSites.objective_rows(
+		{"type":generated.type,"objective":generated.objective,"optional_objectives":generated.exploration.optional_objectives},
+		WorldSites.facts(self),rescue_target!=null and rescue_target.status=="IN_FIELD_JOINED" and rescue_target.npc.health>0)
+	var investigation: Dictionary = generated.get("investigation", {})
+	if not investigation.is_empty():
+		rows[0].title = "%s · %s" % ["已携带" if rows[0].complete else "调查", CampaignRules.CLUE_NAMES[investigation.clue_id]]
+		rows[0].hint = "搜索标记建筑取得线索，生还撤离并确认归航后登记。"
+	return rows
+
+
 func locate_objective(id: String) -> void:
 	if not exploration_mode(): return
-	var rows: Array[Dictionary]=ExplorationSites.objective_rows({"type":supply.generated.type,"objective":supply.generated.objective,"optional_objectives":supply.generated.exploration.optional_objectives},WorldSites.facts(self),rescue_target!=null and rescue_target.status=="IN_FIELD_JOINED" and rescue_target.npc.health>0)
+	var rows: Array[Dictionary] = _exploration_objective_rows()
 	var target: Vector2=Vector2.INF
 	var target_prop: FieldProp
 	for row: Dictionary in rows:

@@ -6,7 +6,8 @@ const MAX_BYTES: int = 4_194_304
 const MAX_TOTAL_BYTES: int = 67_108_864
 const MAX_STAGES: int = 32
 const MAX_CACHED_RECORDS: int = 64
-const MAX_CACHED_BYTES: int = 4_194_304
+# Leave room for warm validation of a multi-sortie journal, including its final receipt.
+const MAX_CACHED_BYTES: int = 8_388_608
 const MAX_CACHED_TRANSITIONS: int = 128
 
 ## Pure proofs are shared across coordinator recreation; every caller still rereads its own files.

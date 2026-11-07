@@ -90,6 +90,7 @@ func run() -> void:
 	expect(not CampaignRules.problem(early_win).is_empty(),"victory cannot skip the fourth preparation")
 	expect(not CampaignRules.problem([]).is_empty(),"non-dictionary rejected")
 	expect(original==CampaignRules.initial(RUN),"all pure queries preserve original input")
+	_test_investigation()
 	print(JSON.stringify({"checks":checks,"failures":failures,"policy":"PROJECT_TEMP_SHORT_V1","owner_boundary":"A commits actual count, terminal evidence, and durable result"}))
 	quit(0 if failures==0 else 1)
 
@@ -98,3 +99,29 @@ func _state(count: int) -> Dictionary:
 	var value: Dictionary = CampaignRules.initial(RUN)
 	value.preparations=count
 	return value
+
+
+func _test_investigation() -> void:
+	var value: Dictionary = CampaignRules.initial_investigation(RUN)
+	expect(CampaignRules.problem(value, RUN).is_empty() and CampaignRules.next_clue(value) == "dispatch_log",
+		"new investigation begins with its own version and first clue")
+	var clue: Dictionary = {"id":"dispatch_log", "transaction_id":RUN + ":2", "action_id":"ab".repeat(32), "site_id":"cash"}
+	value.clues.append(clue)
+	expect(CampaignRules.problem(value, RUN).is_empty() and CampaignRules.next_clue(value) == "checkpoint_pass"
+		and not CampaignRules.context(value).is_finale, "first confirmed clue leaves the finale locked")
+	var early: Dictionary = value.duplicate(true)
+	early.outcome = "VICTORY"
+	early.result_transaction = RUN + ":3"
+	expect(not CampaignRules.problem(early).is_empty(), "one clue cannot produce victory")
+	value.clues.append({"id":"checkpoint_pass", "transaction_id":RUN + ":4", "action_id":"cd".repeat(32), "site_id":"cash"})
+	expect(CampaignRules.problem(value, RUN).is_empty() and CampaignRules.context(value).is_finale,
+		"two different bound clues open the original finale")
+	for field: String in ["id", "transaction_id", "site_id", "action_id"]:
+		var bad: Dictionary = value.duplicate(true)
+		bad.clues[1][field] = clue[field] if field in ["id","transaction_id"] else "invalid"
+		expect(not CampaignRules.problem(bad).is_empty(), "reject altered second-clue " + field)
+	value.outcome = "VICTORY"
+	value.result_transaction = RUN + ":4"
+	expect(not CampaignRules.problem(value).is_empty(), "finale result must follow both clue transactions")
+	value.result_transaction = RUN + ":6"
+	expect(CampaignRules.problem(value).is_empty() and not CampaignRules.can_depart(value), "later bound victory ends the investigation")

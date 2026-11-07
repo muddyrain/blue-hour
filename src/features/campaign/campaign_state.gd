@@ -39,6 +39,8 @@ static func settled(before: Dictionary, after: Dictionary, report: Dictionary, g
 					"action_id":generated.id, "site_id":source.site_id})
 	elif report.evacuated and not generated.campaign.is_finale: value.preparations+=1
 	if after.journey.state=="FAILED": value.outcome="DEFEAT"
-	elif report.evacuated and generated.campaign.is_finale and not report.encounter.defeat.is_empty(): value.outcome="VICTORY"
+	elif report.evacuated and generated.campaign.is_finale and not report.encounter.defeat.is_empty():
+		if not PumpStationAction.enabled(generated) or PumpStationAction.stopped(report.site_facts):
+			value.outcome = "VICTORY"
 	if value.outcome!="ACTIVE": value.result_transaction=report.sortie_id
 	return value

@@ -28,7 +28,8 @@ static func initial_investigation(run_id: String) -> Dictionary:
 		"clues":[], "outcome":"ACTIVE", "result_transaction":""}
 
 
-static func initial_mission(run_id: String, action_choices: bool = false, midgame: bool = false) -> Dictionary:
+static func initial_mission(run_id: String, action_choices: bool = false, midgame: bool = false,
+		pump_station: bool = false) -> Dictionary:
 	var value: Dictionary = initial_investigation(run_id)
 	value.version = MISSION_VERSION
 	value.mode = MISSION_MODE
@@ -36,6 +37,8 @@ static func initial_mission(run_id: String, action_choices: bool = false, midgam
 		value.action_policy = ACTION_POLICY_VERSION
 	if midgame:
 		value.midgame = CampFacilities.initial()
+	if midgame and pump_station:
+		value.finale_policy = 1
 	return value
 
 
@@ -49,6 +52,9 @@ static func action_choices_enabled(value: Variant) -> bool:
 
 static func midgame_enabled(value: Variant) -> bool:
 	return action_choices_enabled(value) and CampFacilities.marker_problem(value.get("midgame")).is_empty()
+
+static func pump_station_enabled(value: Variant) -> bool:
+	return midgame_enabled(value) and SurvivalContracts.integer(value.get("finale_policy"), 1, 1)
 
 
 static func is_investigation(value: Variant) -> bool:
@@ -85,12 +91,15 @@ static func _investigation_problem(value: Dictionary, run_id: String) -> String:
 	var version: int = MISSION_VERSION if is_mission(value) else INVESTIGATION_VERSION
 	var has_action_policy: bool = value.has("action_policy")
 	var has_midgame: bool = value.has("midgame")
-	if value.size() != INVESTIGATION_KEYS.size() + int(has_action_policy) + int(has_midgame) or not value.has_all(INVESTIGATION_KEYS) or not SurvivalContracts.integer(value.version,version,version):
+	var has_finale: bool = value.has("finale_policy")
+	if value.size() != INVESTIGATION_KEYS.size() + int(has_action_policy) + int(has_midgame) + int(has_finale) or not value.has_all(INVESTIGATION_KEYS) or not SurvivalContracts.integer(value.version,version,version):
 		return "INVESTIGATION_FIELDS"
 	if has_action_policy and not action_choices_enabled(value):
 		return "INVESTIGATION_ACTION_POLICY"
 	if has_midgame and not midgame_enabled(value):
 		return "MIDGAME_CAMPAIGN_POLICY"
+	if has_finale and not pump_station_enabled(value):
+		return "PUMP_CAMPAIGN_POLICY"
 	if not value.run_id is String or not _identity(value.run_id) or (not run_id.is_empty() and run_id != value.run_id):
 		return "INVESTIGATION_IDENTITY"
 	if not value.clues is Array or value.clues.size() > CLUE_IDS.size() or value.outcome not in ["ACTIVE","VICTORY","DEFEAT"] or not value.result_transaction is String:
@@ -145,6 +154,9 @@ static func display(value: Dictionary) -> Dictionary:
 			return {"title":"旅程胜利" if value.outcome == "VICTORY" else "旅程失败",
 				"detail":"本旅程已结束，可查看队伍与结果，或开始新旅程。","progress":clue_progress}
 		if action.is_finale:
+			if pump_station_enabled(value):
+				return {"title":"突破封锁 · 河堤泵站","detail":"停机后击败破阵者，再集合并确认归航。提前撤离会保留线索，可再次挑战。",
+					"progress":clue_progress + " · 泵站已开放"}
 			return {"title":"终局 · 突破封锁","detail":"可继续补给。击败破阵者并确认归航才获胜，提前撤离后可重试。",
 				"progress":clue_progress + " · 终局已开放"}
 		return {"title":"街区调查","detail":"下一份线索：%s。搜索标记建筑并确认归航。" % CLUE_NAMES[next_clue(value)],

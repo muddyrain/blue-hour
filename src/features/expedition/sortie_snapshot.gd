@@ -250,7 +250,7 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 	if value.threat.stage != director.stage or value.threat.interval != director.interval:
 		return "WORLD_THREAT_CLOCK"
 	if (value.version==CAMPAIGN_VERSION or (value.version==BUILD_VERSION or combat_version(value.version))):
-		var encounter_issue: String=EncounterRuntime.facts_problem(value.get("encounter"),value.generated,value.get("xp_inputs",{}))
+		var encounter_issue: String=EncounterRuntime.facts_problem(value.get("encounter"),value.generated,value.get("xp_inputs",{}),value.sites)
 		if not encounter_issue.is_empty(): return encounter_issue
 		var boss_rows: int=0
 		for row: Dictionary in value.enemies:
@@ -572,6 +572,13 @@ static func magazine_version(version: Variant) -> bool:
 static func _boss_actor_problem(row: Dictionary, value: Dictionary) -> String:
 	if not row.get("behavior") is Dictionary or row.behavior.size()!=5 or not row.behavior.has_all(["kind","spawn_stage","target_id","state","windup_remaining"]) or not SurvivalContracts.integer(row.behavior.spawn_stage,0,0): return "WORLD_BOSS_BEHAVIOR"
 	if not value.get("encounter") is Dictionary or row.state.max_health!=BossDefinition.POLICY.health or row.state.speed!=BossDefinition.POLICY.speed or row.state.health!=value.encounter.get("health") or row.behavior.kind!=EnemyRules.HEAVY or row.behavior.state!="chase" or row.behavior.windup_remaining!=0 or row.behavior.target_id!=0: return "WORLD_BOSS_ACTOR"
+	if PumpStationAction.enabled(value.generated):
+		var stopped: bool = PumpStationAction.stopped(value.sites)
+		var lane: Dictionary = value.encounter.pump.lane
+		if row.state.visible != stopped or (not stopped and _vec(row.state.position) != _vec(value.generated.encounter.position)):
+			return "WORLD_PUMP_BOSS_VISIBILITY"
+		if not lane.is_empty() and _vec(lane.from) != _vec(row.state.position):
+			return "WORLD_PUMP_BOSS_LOCK"
 	return ""
 
 

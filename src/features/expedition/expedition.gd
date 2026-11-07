@@ -153,6 +153,7 @@ var _bus_sprite: Sprite2D
 var bus_view: BusJourney
 var restoring_world: bool=false
 var encounter: EncounterRuntime
+var station_art: PumpStationArt
 var _active_site: SearchSite:
 	get:
 		return member_site(search_actor.member_id) if search_actor != null else null
@@ -194,17 +195,23 @@ func _ready() -> void:
 	_supply_entrances = _street_supply_entrances()
 	_cash_site.door = layout.cash_door
 	_food_site.door = layout.food_door
-	if exploration_mode(): navigation=ExplorationLayout._routing(layout.world_data).nav
+	if exploration_mode() and not pump_station_mode(): navigation=ExplorationLayout._routing(layout.world_data).nav
 	else: navigation.configure(layout.blockers(),layout.world_bounds)
 	shot_obstacles = layout.shot_obstacles()
 	if is_practice and los_practice:
 		los_setup = LosPracticeSetup.for_layout(layout, los_range_case)
-	var ground: StreetBlock = StreetBlock.new()
-	ground.layout = layout
-	ground.supply_entrances = _supply_entrances
-	ground.food_source_visible = supply.supports(&"food")
-	ground.z_index = -10
-	add_child(ground)
+	if pump_station_mode():
+		var station_ground: PumpStationGround = PumpStationGround.new()
+		station_ground.layout = layout
+		station_ground.z_index = -10
+		add_child(station_ground)
+	else:
+		var ground: StreetBlock = StreetBlock.new()
+		ground.layout = layout
+		ground.supply_entrances = _supply_entrances
+		ground.food_source_visible = supply.supports(&"food")
+		ground.z_index = -10
+		add_child(ground)
 	camera = FieldCamera.new()
 	camera.pan_speed = tuning.camera_pan_speed
 	camera.min_zoom = tuning.camera_min_zoom
@@ -226,7 +233,9 @@ func _ready() -> void:
 	bus.scale = Vector2.ONE * (240.0 / 448.0)
 	bus.position = layout.bus_foot()
 	_sort.add_child(bus)
-	if not layout.world_data.is_empty():
+	if pump_station_mode():
+		_make_pump_station()
+	elif not layout.world_data.is_empty():
 		_make_world_buildings()
 	else:
 		_shop = _make_building(layout.cash_block,layout.cash_title,FieldProp.ShopTexture,false,false)
@@ -602,7 +611,7 @@ func request_search(kind: StringName = &"cash") -> void:
 	if (bus_view != null and bus_view.running()) or not field_join_error.is_empty():
 		return
 	var site: SearchSite = search_site(kind)
-	if phase == Phase.FINISHED or site == null or site.searched or not supply.supports(site.kind):
+	if phase == Phase.FINISHED or site == null or site.searched or (not pump_station_mode() and not supply.supports(site.kind)):
 		return
 	var previous: int = search_assignments.member_for(String(site.id))
 	if previous > 0:
@@ -1237,6 +1246,8 @@ func _clear_dead_worker() -> void:
 			var site: SearchSite = search_site(StringName(job.site_id))
 			site.progress = 0.0
 			_release_searcher(actor.member_id)
+			if pump_station_mode():
+				_show_notice("操作员已阵亡 · 控制柜停机中断，可派其他存活者")
 			_search_log("worker_dead",site)
 
 
@@ -1297,6 +1308,13 @@ func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
 	_release_searcher(actor.member_id)
 	site.prop.searched = true
 	site.prop.queue_redraw()
+	if pump_station_mode():
+		station_art.set_stopped(true)
+		encounter.activate_pump()
+		_show_notice("停机完成 · 破阵者出现，留意地面冲锋预警")
+		search_completed.emit(0)
+		_search_log("completed",site)
+		return true
 	_show_notice("搜集完成 · 携带%s +%d（撤离后带回）" % ["货币" if site.kind == &"cash" else "食物",reward])
 	if site.kind == &"cash" and not is_practice and (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
 		_show_notice("获得损坏%s · 回营后入库维修"%WeaponInventory.definition(weapon_loot.back().weapon_id).display_name)
@@ -1511,7 +1529,19 @@ func _update_ui() -> void:
 	var xp_text: String = "本次经验（归航后生效）："+" / ".join(pending) if growth_mode else ""
 	if not weapon_loot.is_empty():xp_text+="\n携带："+WeaponInventory.loot_description(weapon_loot[0])
 	var objective: String = TaskActions.hud(self)
-	if encounter != null and not encounter.defeat.is_empty() and CampFacilities.enabled(field_departure):
+	if pump_station_mode():
+		if not station_stopped():
+			var worker: int = search_assignments.member_for(String(PumpStationAction.CONSOLE))
+			objective = "前往控制柜 · 点击派工停机"
+			if worker > 0:
+				objective = "正在停机 · 再点控制柜可取消" if search_assignments.phase_for(worker) == "working" else "操作员正前往控制柜"
+		elif encounter.defeat.is_empty():
+			objective = "破阵者蓄力 · 横移避开冲锋道" if not encounter.pump.state.lane.is_empty() else "停机完成 · 击败破阵者"
+		else:
+			objective = "破阵者已倒地 · 集合回车"
+		if phase in [Phase.ENGINE, Phase.BOARDING] and encounter.defeat.is_empty():
+			objective = "提前撤离 · 未达成胜利，可回营再战"
+	elif encounter != null and not encounter.defeat.is_empty() and CampFacilities.enabled(field_departure):
 		objective = "破阵者已倒地 · 集合回车"
 	_hud.refresh({
 		"exploration_objectives":_exploration_objective_rows() if exploration_mode() else [],
@@ -1524,7 +1554,7 @@ func _update_ui() -> void:
 		"day": day, "seconds": timing["sortie_seconds"], "time_fraction": timing["sortie_fraction"],
 		"paused": is_paused, "cash": initial_cash, "loot": loot,
 		"food":initial_food,"food_loot":food_loot,"sites_searched":_searched_count(),
-		"sites_total":sites.filter(func(site: SearchSite) -> bool: return supply.supports(site.kind)).size(),
+		"sites_total":1 if pump_station_mode() else sites.filter(func(site: SearchSite) -> bool: return supply.supports(site.kind)).size(),
 		"has_food_source":supply.supports(&"food"),
 		"route_hint":layout.route_hint,
 		"enemy_mode":enemy_mode,
@@ -1536,6 +1566,8 @@ func _update_ui() -> void:
 	})
 	if drill_panel != null:
 		drill_panel.refresh()
+	if station_art != null:
+		station_art.set_stopped(station_stopped())
 	for site: SearchSite in sites:
 		var worker: FieldActor = search_member(search_assignments.member_for(String(site.id)))
 		if site.prop is ExplorationProp:
@@ -1609,7 +1641,7 @@ func _kind_searched(kind: StringName) -> bool:
 func _street_supply_entrances() -> Array[Vector2]:
 	var doors: Array[Vector2] = []
 	var generated: Dictionary = supply.generated
-	if generated.get("mission_policy") != 1 or generated.get("type") != "supply" \
+	if pump_station_mode() or generated.get("mission_policy") != 1 or generated.get("type") != "supply" \
 			or layout.world_data.get("size") != "medium" or layout.world_data.get("art_revision") != 3:
 		return doors
 	for identity: String in generated.objective.site_ids:
@@ -1665,6 +1697,31 @@ func _clicked_site(point: Vector2) -> bool:
 			else: command_move(site.door)
 			return true
 	return false
+
+func _make_pump_station() -> void:
+	var station: Dictionary = layout.world_data.pump_station
+	station_art = PumpStationArt.new()
+	station_art.configure(WorldLayout.rect(station.power_house), WorldLayout.point(station.console))
+	_sort.add_child(station_art)
+	for block: Rect2 in layout.fences:
+		var wall: IndustrialYardWall = IndustrialYardWall.new()
+		wall.footprint = block
+		wall.position = Vector2(block.get_center().x, block.end.y)
+		_sort.add_child(wall)
+	var def: Dictionary = supply.generated.sites[0]
+	var site: SearchSite = SearchSite.new(&"cash", WorldLayout.point(def.point))
+	site.seconds = float(def.seconds)
+	site.hit = Rect2(site.door - Vector2(45, 72), Vector2(90, 96))
+	var cabinet: PumpConsoleProp = PumpConsoleProp.new()
+	cabinet.position = site.door
+	cabinet.title = "泵站控制柜"
+	cabinet.primary_target = true
+	cabinet.ui_theme = ui_theme
+	_sort.add_child(cabinet)
+	site.prop = cabinet
+	_cash_site = site
+	sites.assign([site])
+
 
 func _make_world_buildings() -> void:
 	if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4 or layout.world_data.get("version")==5):
@@ -1951,11 +2008,17 @@ func support_plan_airstrike(point: Vector2) -> Dictionary:
 	for actor: FieldActor in survivors:
 		view.survivors.append({"state":{"member_id":actor.member_id,"health":actor.health,"visible":actor.visible,"activity":actor.activity,"position":[actor.position.x,actor.position.y]}})
 	for enemy: FieldActor in enemies:
-		view.enemies.append({"state":{"actor_id":enemy.actor_id,"health":enemy.health,"position":[enemy.position.x,enemy.position.y]}})
+		view.enemies.append({"state":{"actor_id":enemy.actor_id,"health":enemy.health,"visible":enemy.visible,"position":[enemy.position.x,enemy.position.y]}})
 	return BuildAuthority.plan_airstrike(view,point,layout)
 
 func exploration_mode() -> bool:
 	return supply.generated.get("version")==9
+
+func pump_station_mode() -> bool:
+	return PumpStationAction.enabled(supply.generated)
+
+func station_stopped() -> bool:
+	return pump_station_mode() and _cash_site.searched
 
 func persona_mode() -> bool:
 	return supply.generated.has("persona")
@@ -2016,7 +2079,15 @@ func _exploration_objective_rows() -> Array[Dictionary]:
 		{"type":generated.type,"objective":generated.objective,"optional_objectives":generated.exploration.optional_objectives},
 		WorldSites.facts(self),rescue_target!=null and rescue_target.status=="IN_FIELD_JOINED" and rescue_target.npc.health>0)
 	var investigation: Dictionary = generated.get("investigation", {})
-	if not investigation.is_empty():
+	if pump_station_mode():
+		var stopped: bool = station_stopped()
+		rows[0].title = "停机完成 · 击败破阵者" if stopped else "控制柜 · 派工停机"
+		rows[0].complete = stopped and encounter != null and not encounter.defeat.is_empty()
+		if rows[0].complete:
+			rows[0].title = "破阵者已倒地 · 集合回车"
+		rows[0].done = int(rows[0].complete)
+		rows[0].hint = "右装卸道较近，左检修道有实墙。冲锋锁线后横移。"
+	elif not investigation.is_empty():
 		rows[0].title = "%s · %s" % ["已携带" if rows[0].complete else "调查", CampaignRules.CLUE_NAMES[investigation.clue_id]]
 		rows[0].hint = "搜索标记建筑取得线索，生还撤离并确认归航后登记。"
 	elif generated.get("mission_policy") == 1 and generated.type == "airdrop":

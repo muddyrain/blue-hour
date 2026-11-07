@@ -93,6 +93,8 @@ static func plan_airstrike(world: Dictionary, point: Vector2, supplied_layout: S
 	var radius: float=BasicSupport.POLICY.airstrike_radius*factor(world,"blast")
 	var targets: Array[int]=[]
 	for row: Dictionary in world.enemies:
+		if row.state.actor_id == 0 and PumpStationAction.enabled(world.generated) and not row.state.get("visible", false):
+			continue
 		if row.state.health>0 and SortieSnapshot._vec(row.state.position).distance_to(point)<=radius and line_clear(layout,point,SortieSnapshot._vec(row.state.position)): targets.append(int(row.state.actor_id))
 	targets.sort()
 	return {"member_id":callers[0].id,"point":[point.x,point.y],"radius":radius,"targets":targets}
@@ -146,6 +148,8 @@ static func propose(before: Dictionary, request: Dictionary) -> Dictionary:
 					behavior.step(0.0,0.0,false,[],SortieSnapshot._vec(row.state.position))
 					after.encounter.behavior=behavior.snapshot()
 					after.encounter.handling={}
+					if PumpStationAction.enabled(after.generated):
+						after.encounter.pump = PumpEncounter.initial()
 			elif id==0 and not after.generated.encounter.is_empty():
 				after.encounter.health=row.state.health
 				var behavior: BossBehavior=BossBehavior.new()
@@ -157,7 +161,7 @@ static func propose(before: Dictionary, request: Dictionary) -> Dictionary:
 					var distance: float=SortieSnapshot._vec(state.position).distance_to(SortieSnapshot._vec(row.state.position))
 					var legal: bool=state.health>0 and state.visible and int(state.activity) not in [2,3] and line_clear(layout,SortieSnapshot._vec(row.state.position),SortieSnapshot._vec(state.position))
 					targets.append({"member_id":int(state.member_id),"position":SortieSnapshot._vec(state.position),"melee_legal":legal and distance<BossDefinition.POLICY.melee_range,"slam_legal":legal and distance<BossDefinition.POLICY.slam_range})
-				if SortieSnapshot.power_version(after.get("version")) and SpecialPowers.frozen(after.powers,float(after.sim.elapsed)):
+				if PumpStationAction.enabled(after.generated) or (SortieSnapshot.power_version(after.get("version")) and SpecialPowers.frozen(after.powers,float(after.sim.elapsed))):
 					behavior.observe_frozen_health(row.state.health/float(BossDefinition.POLICY.health),SortieSnapshot._vec(row.state.position))
 				else: behavior.step(0.0,row.state.health/float(BossDefinition.POLICY.health),true,targets,SortieSnapshot._vec(row.state.position))
 				after.encounter.behavior=behavior.snapshot()

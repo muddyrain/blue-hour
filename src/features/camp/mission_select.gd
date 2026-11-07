@@ -145,14 +145,17 @@ func refresh_rescue(completed: bool, reason: String = "") -> void:
 		_link_choices()
 
 
-func refresh_daily(base: Dictionary) -> void:
+func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 	daily_offers = DailyActions.offers(base)
+	var action_choices: bool = CampaignRules.action_choices_enabled(base.get("journey", {}).get("campaign"))
 	var has_mission_cards: bool = daily_offers.any(func(offer: Dictionary) -> bool: return offer.get("mission_policy") == 1)
 	_subtitle.text = "比较主收益、路线与风险。物资和线索随生还归航确认。" if has_mission_cards else "选择此行的补给方向，准备好后出发。"
 	_heading.text = "选择行动 · 第 %d 天" % int(base.day) if player_mode else "第%d天 · 选择一项行动" % int(base.day)
 	if CampaignState.is_short(base):
 		var display: Dictionary=CampaignRules.display(base.journey.campaign)
 		_heading.text = ("选择行动" if player_mode else String(display.title)) + " · " + String(display.progress)
+		if action_choices and player_mode:
+			_heading.text = "选择行动 · 第 %d 天 · %s" % [int(base.day), display.progress]
 	for index: int in range(choices.size()):
 		var panel: PanelContainer = _card_panels[index]
 		panel.visible = index < daily_offers.size()
@@ -172,10 +175,10 @@ func refresh_daily(base: Dictionary) -> void:
 		if mission_card:
 			var title: String = {"supply":"补给", "airdrop":"装备", "equipment":"调查", "rescue":"救援"}[supply.generated.type]
 			_titles[index].text = "%02d / %s" % [index + 1, title]
-			_descriptions[index].text = LevelSummary.mission_card_text(supply.generated)
+			_descriptions[index].text = LevelSummary.mission_card_text(supply.generated, base if action_choices else {}, rations)
 			_descriptions[index].custom_minimum_size.y = 100
 			_descriptions[index].add_theme_font_size_override("font_size", 16)
-			_descriptions[index].add_theme_constant_override("line_spacing", 8)
+			_descriptions[index].add_theme_constant_override("line_spacing", 2 if action_choices else 8)
 		elif supply.generated.get("worldgen",{}).get("version")==2:
 			# The original resource description participates in existing in-flight world compatibility hashes.
 			var frozen_description: String = LevelSummary.description(supply.generated)

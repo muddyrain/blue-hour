@@ -138,11 +138,12 @@ static func description(value: Dictionary, for_card: bool = false) -> String:
 	return text + "\n125移速/工作因子1，战斗与个人差异另计。\n带回确认后生效。"
 
 
-static func mission_card_text(value: Dictionary) -> String:
+static func mission_card_text(value: Dictionary, base: Dictionary = {}, rations: Dictionary = {}) -> String:
 	var level: Dictionary = value.exploration.level
 	var first: String = level.primary[0]
 	var outbound: int = _mission_route_seconds(level, "bus", first)
 	var reward: String
+	var decision: String = ""
 	var route: String
 	var risk: String
 	match String(value.type):
@@ -152,18 +153,28 @@ static func mission_card_text(value: Dictionary) -> String:
 				if site.id in level.primary:
 					food.append(str(int(site.amount)))
 			reward = "食物 %s 份，按实搜入库" % " + ".join(food)
+			if not base.is_empty():
+				reward = "食物 %s 份，按实搜带回" % " + ".join(food)
+				if not rations.is_empty():
+					decision = "\n口粮 · 现有 %d 粮 / 需 %d 粮" % [int(base.food), int(rations.required)]
+					if rations.shortage > 0:
+						decision += " / 缺 %d 粮" % int(rations.shortage)
 			route = "巴士到食品点约 %d 秒" % outbound
 			if level.primary.size() > 1:
 				var second: int = _mission_route_seconds(level, "bus", level.primary[1])
 				route = "巴士到两点约 %d / %d 秒" % [outbound, second]
 			risk = "可只搜一处，多留会加重敌情"
 		"airdrop":
-			var weapon: String = "武器"
+			reward = "损坏武器 1 件，可回营维修"
 			for site: Dictionary in value.sites:
 				if site.id == first and site.weapon:
-					weapon = WeaponInventory.definition(site.drop.weapon_id).display_name
+					var weapon: String = WeaponInventory.definition(site.drop.weapon_id).display_name
+					reward = "损坏%s 1 件，可回营维修" % weapon
+					if not base.is_empty():
+						var sortie_id: String = "%s:%d" % [base.profile_id, int(base.settled_sorties) + 1]
+						var item: Dictionary = WeaponInventory.site_reward(sortie_id, value, site, false)
+						reward = "损坏%s ×1，先维修再配装" % weapon if item.condition == "damaged" else "%s ×1，可直接配装" % weapon
 					break
-			reward = "损坏%s 1 件，可回营维修" % weapon
 			route = "露天单程约 %d 秒，回收 %d 秒" % [outbound, int(level.work_seconds[first])]
 			if value.layout.has("loading_yard"):
 				route = "宽装卸口、折角维修道汇合，回收 %d 秒" % int(level.work_seconds[first])
@@ -173,10 +184,14 @@ static func mission_card_text(value: Dictionary) -> String:
 			route = "深入约 %d 秒，回车约 %d 秒" % [outbound, _mission_route_seconds(level, first, "bus")]
 			risk = "返程较远，额外搜刮会延后回车"
 		"rescue":
-			reward = "同行者 %s" % SurvivorRoster.definition(int(value.recruit)).default_display_name
+			var recruit: int = int(value.recruit)
+			reward = "同行者 %s" % SurvivorRoster.definition(recruit).default_display_name
 			route = "住宅簇单程约 %d 秒，援救 %d 秒" % [outbound, int(level.work_seconds[first])]
 			risk = "需要护送同行者生还归航"
-	return "主收益 · %s\n路线 · %s\n风险 · %s" % [reward, route, risk]
+			if not base.is_empty():
+				reward += "｜主特长 %s" % TraitRules.NAMES[TraitRules.role({"id": recruit}) - 1]
+				risk = "现场接纳，生还归航确认入队"
+	return "主收益 · %s%s\n路线 · %s\n风险 · %s" % [reward, decision, route, risk]
 
 
 static func _mission_route_seconds(level: Dictionary, from: String, to: String) -> int:

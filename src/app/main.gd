@@ -599,7 +599,9 @@ func open_mission_select() -> void:
 		_hunger_confirmation.popup_centered(Vector2i(700,260))
 		return
 	_title.hide()
-	if playable_entry: mission_select.refresh_daily(camp_snapshot())
+	if playable_entry:
+		var base: Dictionary = camp_snapshot()
+		mission_select.refresh_daily(base, CampEconomy.rations(int(base.day), base.crew, int(base.food), camp_rules))
 	else: mission_select.refresh_rescue(RescuePoolState.available(camp_snapshot()).is_empty() if pool_mode else not _recruits.is_empty(), RosterState.unavailable_reason(camp_snapshot()) if roster_mode else "四人历史编制已满" if pool_mode else "")
 	mission_select.show()
 	mission_select.choices[0].grab_focus()
@@ -842,7 +844,7 @@ func _new_game() -> void:
 	_migration_notice = ""
 	profile_id = RunSave.new_profile_id()
 	if playable_entry:
-		_battle_meta.campaign=CampaignRules.initial_mission(profile_id)
+		_battle_meta.campaign=CampaignRules.initial_mission(profile_id, true)
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true, true)
 	_initialize_weapons("initial")
 	last_settlement_id = ""

@@ -20,6 +20,8 @@ M19 新旅程显式选择 V3 `mission_v1`。普通任务用冻结 `mission_polic
 
 M20 的蓝调底图与局部主题只服务正常试玩的标题、营地和选卡。营地从原库存、口粮、队伍和收据结果投影界面，选卡直接读取原冻结行动及站点。Main 仍接收原出击意图并调用原事务；慢路径在出击已成立后淡出底图，失败回到可读的原错误和可用焦点。画面与焦点状态不进入行动、存档或世界指纹。
 
+M25 新旅程在 `mission_v1` 营地保存 `action_policy: 1`。InvestigationActions 用旅程种子与日期决定备选类型，复用原队伍资格、导航认证和任务来源。补给、调查和终局保留原行动所有者。旧标记和已冻结行动仍按原策略重建。选卡从同一营地口粮、冻结站点和角色定义读取收益与条件。
+
 WeaponActions只在原TaskActions描述上冻结V5站点枪型，WeaponInventory新增显式站点奖励分支并保留历史固定reward；WorldSites/FrozenSettlement继续拥有实际携带与唯一入库。FieldActor持有按实例绑定的WeaponMagazine，Expedition按活跃模拟推进并在原成功攻击提交后扣弹，HUD只读。世界8扩展原快照，不增加战斗/保存/奖励owner；见[弹匣与掉落合同](design/m7-weapon-01.md)。
 
 TaskActions只生成/校验V4任务描述并投影真实目标进度；DailyActions保留V1/V2/V3认证分支。Expedition沿原站点/刷怪owner推进空投工作和有界一次性压力，SortieSnapshot世界6保存同一task_event及原敌人事实；FrozenSettlement从报告计算任务摘要，EnemyState只对111开放经校验的last_day.task。没有新保存或收益owner；见[任务合同](design/m6-rogue-02.md)。

@@ -31,16 +31,18 @@ static func building_text(member_id: int, call_sign: String, phase: String, outd
 
 
 static func loot_badge_text(category: String, primary: bool, searched: bool, reward: String,
-		member_id: int, call_sign: String, phase: String) -> String:
+		member_id: int, call_sign: String, phase: String, landmark: String = "") -> String:
 	var heading: String = "主目标 · " if primary else ""
+	if not landmark.is_empty():
+		heading = landmark + " · "
 	if searched:
 		var completion: String = "已采空" if category == "果树" else "已清空" if category == "车辆" else "已搜集"
-		return heading + category + " · " + completion
+		return heading + (category + " · " if landmark.is_empty() else "") + completion
 	if member_id > 0 and phase in ["approach", "working"]:
 		var action: String = "前往" if phase == "approach" else "采集中" if category == "果树" else "搜集中"
 		return "%02d %s · %s\n%s再点取消" % [member_id, short_call_sign(call_sign), action, heading]
 	if primary:
-		return heading + "可搜" + category + "\n" + reward
+		return (heading + "可搜" + category if landmark.is_empty() else landmark) + "\n" + reward
 	return "可搜%s · %s" % [category, reward]
 
 

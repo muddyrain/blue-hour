@@ -112,9 +112,51 @@ func run() -> void:
 		expect(not fallback_content.is_empty(), "explicit forced fallback supports the original complete site budget")
 		if not fallback_content.is_empty():
 			expect(not LevelSummary.freeze(fallback,fallback_content.sites,fallback_content.objective,"supply").is_empty(), "explicit forced fallback completes real navigation routes and optional choice")
+	_industrial_yard()
 	write(folder.path_join("summary.json"), {"samples":samples,"checks":checks,"failures":failures,"seeds":seeds})
 	print(JSON.stringify({"suite":"level_generation","checks":checks,"failures":failures,"samples":samples.size()}))
 	quit(1 if failures else 0)
+
+func _industrial_yard() -> void:
+	for label: String in ["m19-mission-7", "m19-mission-1"]:
+		var old: Dictionary = _camp_fixture()
+		var seed: String = label.md5_text()
+		old.journey.seed = seed
+		old.journey.campaign = CampaignRules.initial_mission(old.profile_id)
+		old.journey.build = WorldgenState.initial_build(seed, true)
+		var current: Dictionary = old.duplicate(true)
+		current.journey.build = WorldgenState.initial_build(seed, true, true)
+		var prior: Array[Dictionary] = DailyActions.offers(old)
+		var offered: Array[Dictionary] = DailyActions.offers(current)
+		expect(prior.size() == 3 and offered.size() == 3, "both camp policies retain the ordinary daily offers " + label)
+		if prior.size() != 3 or offered.size() != 3:
+			continue
+		var gear: Dictionary = offered[1]
+		var yard: Dictionary = gear.layout.get("loading_yard", {})
+		expect(not yard.is_empty() and gear.worldgen.revision == 2 and gear.type == "airdrop", "industrial equipment has a distinct frozen revision " + label)
+		if yard.is_empty():
+			continue
+		expect(prior[1].worldgen.revision == 1 and not prior[1].layout.has("loading_yard")
+			and ExplorationActions.problem(prior[1]).is_empty() and DailyActions.matches(old, prior[1])
+			and not DailyActions.matches(old, gear), "old camp retains and authenticates its original offer " + label)
+		expect(TransactionReceipt.same(prior[0], offered[0]) and TransactionReceipt.same(prior[2], offered[2]),
+			"yard opt-in preserves supply and clue offers " + label)
+		var old_site: Dictionary = prior[1].sites.filter(func(site: Dictionary) -> bool: return site.id == "cash")[0]
+		var work_site: Dictionary = gear.sites.filter(func(site: Dictionary) -> bool: return site.id == "cash")[0]
+		expect(work_site.weapon and work_site.amount == old_site.amount and work_site.seconds == old_site.seconds
+			and TransactionReceipt.same(work_site.drop, old_site.drop)
+			and TaskActions.site_point(gear, work_site) == WorldLayout.point(yard.work_point), "same drop and work at one shared physical site " + label)
+		var routing: Dictionary = ExplorationLayout._routing(gear.layout)
+		expect(IndustrialYard.certified(gear.layout, routing.nav) and WorldgenLayout.validate(gear.layout, false).is_empty()
+			and ExplorationActions.problem(gear).is_empty() and DailyActions.matches(current, gear), "both real passages and bus return certify after props " + label)
+		var changed: Dictionary = gear.duplicate(true)
+		changed.layout.loading_yard.service.gate[0] += 16
+		expect(not WorldgenLayout.validate(changed.layout).is_empty() and not DailyActions.matches(current, changed),
+			"forged maintenance opening fails the frozen proof " + label)
+		changed = gear.duplicate(true)
+		changed.worldgen.revision = 1
+		expect(not ExplorationActions.problem(changed).is_empty(), "old revision cannot claim the new layout " + label)
+
 
 func reaches(nav: FieldNavigation, start: Vector2, point: Vector2) -> bool:
 	var path: PackedVector2Array = nav.path_between(start,point)

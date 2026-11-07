@@ -51,6 +51,12 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 			var entity: Dictionary = _choose(candidates, routing, "far" if index == 0 else "near", action_id + ":primary:" + kind)
 			if not supply_pair.is_empty() and kind == "food":
 				entity = supply_pair[index]
+			elif layout.has("loading_yard") and type == "airdrop" and kind == "cash" and index == 0:
+				entity = {}
+				for candidate: Dictionary in candidates:
+					if candidate.id == layout.loading_yard.warehouse:
+						entity = candidate
+						break
 			elif mission_policy == 1 and type == "equipment" and kind == "cash" and index == 0:
 				entity = LevelPolicy.mission_investigation_target(candidates, routing)
 			elif layout.has("level_task") and type!="airdrop":
@@ -200,6 +206,8 @@ static func _choose(candidates: Array[Dictionary], routing: Dictionary, zone: St
 
 
 static func _airdrop_point(layout: Dictionary, entity: Dictionary, nav: FieldNavigation) -> Array:
+	if layout.has("loading_yard"):
+		return layout.loading_yard.work_point.duplicate()
 	for offset: Vector2 in [Vector2(0, 16), Vector2(32, 16), Vector2(-32, 16), Vector2(0, 24)]:
 		var point: Vector2 = WorldLayout.point(entity.door) + offset
 		var clear: bool = not WorldLayout.rect(layout.bus.sweep).grow(40.0).has_point(point)

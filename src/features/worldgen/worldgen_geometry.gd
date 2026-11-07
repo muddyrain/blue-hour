@@ -5,7 +5,7 @@ const DIMENSIONS: Dictionary = {"small":[2560,1920],"medium":[3584,2688],"large"
 const MIN_WIDTH: int = 736
 const MIN_HEIGHT: int = 464
 
-static func assemble(seed: String, size: String, topology: String, attempt: int, fallback: bool, task: String = "") -> Dictionary:
+static func assemble(seed: String, size: String, topology: String, attempt: int, fallback: bool, task: String = "", industrial: bool = false) -> Dictionary:
 	var random: RandomNumberGenerator = RogueLayout.rng("worldgen-v1:" + ((size + ":" + topology + ":fallback") if fallback else seed + ":" + str(attempt)))
 	var dimensions: Array = DIMENSIONS[size]
 	var width: int = int(dimensions[0])
@@ -61,11 +61,24 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 	if not task.is_empty():
 		LevelPolicy.prepare(parcels,task,seed)
 	var entities: Array = []
+	var yard_plan: Dictionary = {}
+	var yard: Dictionary = {}
+	var yard_parcel: String = ""
+	if industrial and task == "airdrop" and topology == "industrial":
+		yard_plan = IndustrialYard.plan(parcels, roads, bus, seed)
+		if yard_plan.is_empty():
+			return {}
+		yard = yard_plan.frozen
+		yard_parcel = yard.parcel
 	for parcel: Dictionary in parcels:
-		_populate(parcel,topology,random,entities,roads,bus)
+		if parcel.id == yard_parcel:
+			if not _populate_yard(parcel, yard_plan, entities, roads, bus):
+				return {}
+		else:
+			_populate(parcel,topology,random,entities,roads,bus)
 	# Food and equipment are actual parcels, not rewards granted to every building.
-	_ensure_categories(entities,parcels,roads,bus)
-	_update_frontages(parcels,entities)
+	_ensure_categories(entities,parcels,roads,bus,yard_parcel)
+	_update_frontages(parcels,entities,yard_parcel)
 	var rescue: Array = entities[0].door.duplicate() if not entities.is_empty() else [64,64]
 	var furthest: float = 0.0
 	for entity: Dictionary in entities:
@@ -74,8 +87,14 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 			furthest=distance
 			rescue=entity.door.duplicate()
 	var walls: Dictionary = _walls(parcels,entities,roads,bus)
+	if not yard.is_empty():
+		walls.barriers.append_array(yard_plan.barriers)
+		walls.gates.append(yard.loading.gate)
+		walls.gates.append(yard.service.gate)
 	var arrivals: Array = [[door[0]-48,door[1]+24],[door[0],door[1]+24],[door[0]+48,door[1]+24],[door[0],door[1]+56]]
 	var data: Dictionary = {"version":5,"seed":seed,"size":size,"topology":topology,"attempt":attempt,"fallback":fallback,"bounds":[0,0,width,height],"entities":entities,"roads":roads,"barriers":walls.barriers,"gates":walls.gates,"bus":bus,"arrivals":arrivals,"enemy_points":[[24,main_y+24],[width-24,main_y+24]],"rescue":rescue,"objects":[],"parcels":parcels,"graph":WorldgenStructure.graph(segments)}
+	if not yard.is_empty():
+		data.loading_yard = yard
 	if not task.is_empty():
 		data.level_task=task
 		if task=="rescue":
@@ -129,6 +148,25 @@ static func _stop_x(width: int, main_y: int, roads: Array, random: RandomNumberG
 			if road.size.y > road.size.x and road.intersects(berth): clear=false
 		if clear: candidates.append(x)
 	return candidates[random.randi_range(0,candidates.size()-1)] if not candidates.is_empty() else 176
+
+static func _populate_yard(parcel: Dictionary, plan: Dictionary, entities: Array, roads: Array, bus: Dictionary) -> bool:
+	var yard: Dictionary = plan.frozen
+	var warehouse: Vector2 = plan.warehouse_foot
+	var garage: Vector2 = plan.garage_foot
+	if not _add_building("warehouse", 0, warehouse.x, warehouse.y, parcel, entities, roads, bus):
+		return false
+	yard.warehouse = entities[-1].id
+	if not _add_building("garage", 0, garage.x, garage.y, parcel, entities, roads, bus):
+		return false
+	yard.garage = entities[-1].id
+	parcel.kind = "service"
+	parcel.entrance = yard.loading.gate.duplicate()
+	parcel.frontage.scope = "internal"
+	_add_court(parcel, plan.cargo_area, "loading", plan.cargo_entry, entities, roads, bus)
+	for name: String in ["loading", "service"]:
+		for paving: Array in yard[name].paving:
+			_add_walk(parcel, WorldLayout.rect(paving))
+	return true
 
 static func _populate(parcel: Dictionary, topology: String, random: RandomNumberGenerator, entities: Array, roads: Array, bus: Dictionary) -> void:
 	var box: Rect2=WorldLayout.rect(parcel.rect)
@@ -288,8 +326,10 @@ static func _add_building(type: String, variant: int, x: float, foot: float, par
 	parcel.buildings.append(id)
 	return true
 
-static func _update_frontages(parcels: Array, entities: Array) -> void:
+static func _update_frontages(parcels: Array, entities: Array, yard_parcel: String = "") -> void:
 	for parcel: Dictionary in parcels:
+		if parcel.id == yard_parcel:
+			continue
 		# A blocked frontage stays empty; a remaining rear row must not become the street façade.
 		var setback: float=200.0 if parcel.kind=="loading" else 208.0 if parcel.kind=="parking" else (80.0 if parcel.road_edges[1] else 120.0) if parcel.kind=="garden" else (64.0 if parcel.road_edges[1] else 104.0)
 		var foot: float=WorldLayout.rect(parcel.rect).end.y-setback
@@ -324,7 +364,7 @@ static func _walls(parcels: Array, entities: Array, roads: Array, bus: Dictionar
 			barriers.append([wall.position.x,wall.position.y,wall.size.x,wall.size.y]);gates.append([gate.x,gate.y])
 	return {"barriers":barriers,"gates":gates}
 
-static func _ensure_categories(entities: Array, parcels: Array, roads: Array, bus: Dictionary) -> void:
+static func _ensure_categories(entities: Array, parcels: Array, roads: Array, bus: Dictionary, yard_parcel: String = "") -> void:
 	# Geometric distance is only a placement preference. The final navigation certificate
 	# must still prove a non-near real food/workshop entrance after every prop is added.
 	var farthest: float=0.0
@@ -347,7 +387,7 @@ static func _ensure_categories(entities: Array, parcels: Array, roads: Array, bu
 				if WorldLayout.point(entity.door).distance_squared_to(bus_door)>=farthest*0.36:other_away+=1
 		for entity: Dictionary in ranked:
 			if count>=2 and away:break
-			if entity.has("art"):continue
+			if entity.has("art") or entity.parcel == yard_parcel:continue
 			var distant: bool=WorldLayout.point(entity.door).distance_squared_to(bus_door)>=farthest*0.36
 			if entity.archetype in category or (entity.archetype in opposite and (other_count<=2 or (distant and other_away<=1))):continue
 			var type: String="eatery" if category==TaskActions.FOOD_TYPES else "garage"

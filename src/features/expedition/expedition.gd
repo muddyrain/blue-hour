@@ -1598,9 +1598,14 @@ func _street_supply_entrances() -> Array[Vector2]:
 
 
 func _street_camera_start() -> Vector2:
+	var view_size: Vector2 = get_viewport_rect().size / camera.zoom
+	var yard: Dictionary = layout.world_data.get("loading_yard", {})
+	if not yard.is_empty():
+		var scene: Rect2 = WorldLayout.rect(yard.bounds).expand(layout.bus_door + Vector2(0, 42))
+		if scene.size.x <= view_size.x - 144 and scene.size.y <= view_size.y - 160:
+			return scene.get_center() - Vector2(0, 32)
 	if _supply_entrances.is_empty():
 		return layout.camera_start
-	var view_size: Vector2 = get_viewport_rect().size / camera.zoom
 	var focus: Rect2 = Rect2(layout.bus_door, Vector2.ZERO).expand(_supply_entrances[0])
 	var both: Rect2 = focus.expand(_supply_entrances[1])
 	if both.size.x <= view_size.x - 192 and both.size.y <= view_size.y - 192:
@@ -1640,7 +1645,15 @@ func _clicked_site(point: Vector2) -> bool:
 
 func _make_world_buildings() -> void:
 	if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4 or layout.world_data.get("version")==5):
+		var yard: Dictionary = layout.world_data.get("loading_yard", {})
+		var yard_bounds: Rect2 = WorldLayout.rect(yard.bounds) if not yard.is_empty() else Rect2()
 		for wall: Rect2 in layout.fences:
+			if not yard.is_empty() and yard_bounds.encloses(wall):
+				var masonry: IndustrialYardWall = IndustrialYardWall.new()
+				masonry.footprint = wall
+				masonry.position = Vector2(wall.get_center().x, wall.end.y)
+				_sort.add_child(masonry)
+				continue
 			if layout.world_data.get("version")==5:
 				var stone: WorldgenFurniture=WorldgenFurniture.new()
 				stone.detail={"kind":"wall","width":wall.size.x};stone.position=Vector2(wall.get_center().x,wall.end.y);_sort.add_child(stone)

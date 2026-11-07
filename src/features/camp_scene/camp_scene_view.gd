@@ -31,7 +31,9 @@ var _daily: Dictionary = {}
 var _last_focus: String = "bus"
 var _shortage_text: Label
 var _return_summary: PanelContainer
+var _return_goods: Label
 var _return_text: Label
+var _return_advice: Label
 var _team_scroll: ScrollContainer
 var _team_count: Label
 
@@ -139,16 +141,25 @@ func _build_blue_hour_header() -> void:
 	eligibility_text.clip_text = true
 	eligibility_text.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	investigation.add_child(eligibility_text)
-	_return_summary = _blue_hour_panel("ReturnSummary", Rect2(42, 529, 700, 54), Color(0.045, 0.10, 0.14, 0.93))
+	_return_summary = _blue_hour_panel("ReturnSummary", Rect2(42, 505, 748, 78), Color(0.045, 0.10, 0.14, 0.93))
 	var return_row: HBoxContainer = HBoxContainer.new()
 	return_row.add_theme_constant_override("separation", 16)
 	_return_summary.add_child(return_row)
-	return_row.add_child(CampStyle.label("上次归航", 17, CampStyle.TEAL))
-	_return_text = CampStyle.label("", 17)
-	_return_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_return_text.clip_text = true
-	_return_text.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	return_row.add_child(_return_text)
+	var return_title: VBoxContainer = VBoxContainer.new()
+	return_title.custom_minimum_size.x = 160
+	return_title.add_theme_constant_override("separation", 2)
+	return_row.add_child(return_title)
+	return_title.add_child(CampStyle.label("上次归航 · 已入账", 17, CampStyle.TEAL))
+	_return_goods = CampStyle.label("", 14, CampStyle.MUTED)
+	return_title.add_child(_return_goods)
+	var return_details: VBoxContainer = VBoxContainer.new()
+	return_details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return_details.add_theme_constant_override("separation", 2)
+	return_row.add_child(return_details)
+	_return_text = CampStyle.label("", 16)
+	return_details.add_child(_return_text)
+	_return_advice = CampStyle.label("", 14, CampStyle.AMBER)
+	return_details.add_child(_return_advice)
 
 
 func _build_blue_hour_team() -> void:
@@ -302,7 +313,7 @@ func refresh(data: Dictionary, daily: Dictionary, can_depart: bool, reason: Stri
 	eligibility_text.text = "%s · 今日需%d粮%s" % [reason, daily.required, " / 缺口%d" % int(daily.shortage) if daily.shortage > 0 else " / 库存足够"]
 	if data.last_day.has("task"):
 		var found: int = data.weapons.filter(func(item: Dictionary) -> bool:return item.get("acquired_sortie")==data.last_settlement_id).size()
-		eligibility_text.text=TaskActions.summary_text(data.last_day.task)+" · 实得货币%d / 食物%d / 武器%d"%[data.last_day.cash_gained,data.last_day.food_found,found]
+		eligibility_text.text=TaskActions.summary_text(data.last_day.task)+" · 入库货币%d / 食物%d / 武器%d"%[data.last_day.cash_gained,data.last_day.food_stored,found]
 	notice.text = feedback if not feedback.is_empty() else "Tab选设施 · Enter/Space确认 · Esc关闭当前页"
 	hotspots[&"bus"].disabled = not can_depart
 	if CampaignState.is_short(data):
@@ -340,10 +351,12 @@ func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, r
 	var last: Dictionary = data.last_day
 	_return_summary.visible = not last.is_empty()
 	if not last.is_empty():
-		var found: int = data.weapons.filter(func(item: Dictionary) -> bool:
-			return item.get("acquired_sortie") == data.last_settlement_id).size()
-		_return_text.text = "实得 %d 币 / %d 粮 / %d 件武器 · 已用口粮 %d" % [last.cash_gained, last.food_found, found, last.food_consumed]
-		_return_summary.tooltip_text = _return_text.text
+		var returned_weapons: Array = data.weapons.filter(func(item: Dictionary) -> bool:
+			return item.get("acquired_sortie") == data.last_settlement_id)
+		_return_goods.text = "入库 %d 币 · %d 件武器" % [last.cash_gained, returned_weapons.size()]
+		_return_text.text = ReturnFeedback.food_text(last)
+		_return_advice.text = "损坏武器可先在武器整备中维修，再配装。"
+		_return_advice.visible = returned_weapons.any(func(item: Dictionary) -> bool: return item.condition == "damaged")
 	eligibility_text.text = reason
 	eligibility_text.tooltip_text = reason
 	if CampaignState.is_short(data):

@@ -187,6 +187,8 @@ static func mission_card_text(value: Dictionary, base: Dictionary = {}, rations:
 			var recruit: int = int(value.recruit)
 			reward = "同行者 %s" % SurvivorRoster.definition(recruit).default_display_name
 			route = "住宅簇单程约 %d 秒，援救 %d 秒" % [outbound, int(level.work_seconds[first])]
+			if value.layout.has("rescue_court"):
+				route = "正门直达、侧巷绕墙，援救 %d 秒" % int(level.work_seconds[first])
 			risk = "需要护送同行者生还归航"
 			if not base.is_empty():
 				reward += "｜主特长 %s" % TraitRules.NAMES[TraitRules.role({"id": recruit}) - 1]

@@ -143,6 +143,14 @@ static func food_problem(ledger: Dictionary) -> String:
 		return "食物容量无效"
 	var stored: int = mini(int(ledger.food_found),CampRules.FOOD_LIMIT-int(ledger.food_before))
 	var available: int = int(ledger.food_before)+stored
+	if CampFacilities.has_food_fields(ledger):
+		var facility: int = CampFacilities.SUPPLY_FOOD
+		if not integer(ledger.get("facility_food"), facility, facility) or not integer(ledger.get("facility_stored"), 0, facility):
+			return "设施口粮账本数字无效"
+		var facility_stored: int = mini(facility, CampRules.FOOD_LIMIT - available)
+		if ledger.facility_stored != facility_stored:
+			return "设施口粮账本不守恒"
+		available += facility_stored
 	var required: int = seen.size()*int(ledger.ration_per_member)
 	var consumed: int = mini(available,required)
 	if ledger.food_stored != stored or ledger.food_overflow != ledger.food_found-stored or ledger.food_required != required or ledger.food_consumed != consumed or ledger.food_shortage != required-consumed or ledger.food_after != available-consumed:

@@ -23,6 +23,7 @@ func _draw() -> void:
 	var street_material: bool = int(layout.world_data.get("art_revision", 0)) == 3
 	var blue_hour: bool = _blue_hour()
 	var loading_yard: Dictionary = layout.world_data.get("loading_yard", {})
+	var rescue_court: Dictionary = layout.world_data.get("rescue_court", {})
 	var grass: Color = Color(0.59, 0.72, 0.76, 0.56) if blue_hour else Color(0.93, 0.94, 0.81, 0.58) if street_material else Color(0.77, 0.88, 0.76, 0.42)
 	draw_rect(layout.world_bounds, Color("344846") if blue_hour else Color("59634c") if street_material else Color("586b60"))
 	draw_texture_rect(StreetBlock.GrassTexture, layout.world_bounds, true, grass)
@@ -32,6 +33,8 @@ func _draw() -> void:
 		draw_texture_rect(StreetBlock.GrassTexture, area, true, grass if blue_hour else Color(0.93, 0.94, 0.8, 0.60) if street_material else Color(0.7, 0.84, 0.66, 0.5))
 		if parcel.id == loading_yard.get("parcel"):
 			_loading_yard_floor(loading_yard)
+		if parcel.id == rescue_court.get("parcel"):
+			_rescue_court_floor(rescue_court)
 		for court: Dictionary in parcel.courtyards:
 			_court(court)
 		# Authored orthogonal shared paths join frontages and courts; no nav debug lines.
@@ -109,10 +112,32 @@ func _draw() -> void:
 		_supply_lights()
 	if not loading_yard.is_empty():
 		_loading_yard_lights(loading_yard)
+	if not rescue_court.is_empty():
+		_rescue_court_lights(rescue_court)
 
 
 func _blue_hour() -> bool:
-	return not supply_entrances.is_empty() or layout.world_data.has("loading_yard")
+	return not supply_entrances.is_empty() or layout.world_data.has("loading_yard") or layout.world_data.has("rescue_court")
+
+
+func _rescue_court_floor(court: Dictionary) -> void:
+	var target: Vector2 = WorldLayout.point(court.target)
+	var front: Vector2 = WorldLayout.point(court.front.gate)
+	# The front terrace contrasts with the narrow tiled alley and leaves the real gaps open.
+	var terrace: Rect2 = Rect2(target - Vector2(73.0, 56.0), Vector2(front.x - target.x + 155.0, 152.0))
+	draw_rect(terrace.grow(5.0), Color("34454f"))
+	_paving(terrace)
+
+
+func _rescue_court_lights(court: Dictionary) -> void:
+	var front: Vector2 = WorldLayout.point(court.front.gate)
+	var side: Vector2 = WorldLayout.point(court.side.gate)
+	var target: Vector2 = WorldLayout.point(court.target)
+	_yard_lamp_pool(front + Vector2(-69.0, 5.0), Vector2(90.0, 96.0), 0.45)
+	_yard_lamp_pool(front + Vector2(69.0, 5.0), Vector2(90.0, 96.0), 0.45)
+	_yard_lamp_pool(side + Vector2(36.0, -3.0), Vector2(76.0, 70.0), 0.32)
+	_yard_lamp_pool(WorldLayout.point(court.side.path[3]) + Vector2(25.0, 10.0), Vector2(90.0, 76.0), 0.30)
+	_yard_lamp_pool(target - Vector2(0.0, 24.0), Vector2(152.0, 112.0), 0.51)
 
 
 func _loading_yard_floor(yard: Dictionary) -> void:

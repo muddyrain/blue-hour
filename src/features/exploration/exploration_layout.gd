@@ -103,6 +103,8 @@ static func complete(data: Dictionary) -> Dictionary:
 		return {}
 	if data.has("loading_yard") and not IndustrialYard.certified(data, nav):
 		return {}
+	if data.has("rescue_court") and not RescueCourt.certified(data, nav, street.shot_obstacles()):
+		return {}
 	data.enemy_points = _spawn_points(data, nav)
 	if data.enemy_points.size() < data.entities.size():
 		return {}
@@ -161,6 +163,8 @@ static func _reserved(data: Dictionary) -> Array[Rect2]:
 		zones.append(Rect2(WorldLayout.point(value) - Vector2(56, 56), Vector2(112, 112)))
 	if data.has("loading_yard"):
 		zones.append_array(IndustrialYard.reserved_rects(data))
+	if data.has("rescue_court"):
+		zones.append(WorldLayout.rect(data.rescue_court.bounds))
 	if data.version==5:
 		for parcel: Dictionary in data.parcels:
 			zones.append(Rect2(WorldLayout.point(parcel.entrance)-Vector2(44,44),Vector2(88,88)))

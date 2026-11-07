@@ -30,11 +30,15 @@ static func problem(data: Dictionary) -> String:
 		if not issue.is_empty() or (data.last_day.task.status=="COMPLETED" and not data.last_day.get("evacuated",false)): return "ENEMY_TASK_SUMMARY"
 	var build_issue: String=BuildState.problem(data)
 	if not build_issue.is_empty(): return build_issue
+	var facility_issue: String = CampFacilities.camp_problem(data)
+	if not facility_issue.is_empty(): return facility_issue
 	var projected: Dictionary = data.duplicate(true)
 	projected.journey.erase("campaign")
 	projected.journey.erase("build")
 	# Explicit111 extension; older schemas retain their exact last_day whitelist.
-	if projected.get("last_day") is Dictionary: projected.last_day.erase("task")
+	if projected.get("last_day") is Dictionary:
+		projected.last_day.erase("task")
+		CampFacilities.project_legacy_food(projected.last_day)
 	projected.schema_version = WeaponState.SCHEMA
 	projected.journey.format = WeaponState.FORMAT
 	var issue: String=WeaponState.problem(projected,true,data.journey.get("build",{})) # Validation context, never a serialized permission.

@@ -38,6 +38,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var mission: bool = CampaignRules.is_mission(base.journey.campaign)
 	var industrial: bool = mission and WorldgenState.industrial_yard_enabled(base)
 	var action_choices: bool = CampaignRules.action_choices_enabled(base.journey.campaign)
+	var midgame: bool = CampaignRules.midgame_enabled(base.journey.campaign)
 	var clue: String = CampaignRules.next_clue(base.journey.campaign)
 	var result: Array[Dictionary] = []
 	if clue.is_empty():
@@ -45,9 +46,9 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 		var finale: Array[Dictionary] = ExplorationActions.offers(projected)
 		projected.journey.campaign.preparations = 0
 		if not finale.is_empty():
-			result = _day(projected, clue, mission, industrial, action_choices, finale[0])
+			result = _day(projected, clue, mission, industrial, action_choices, midgame, finale[0])
 	else:
-		result = _day(projected, clue, mission, industrial, action_choices)
+		result = _day(projected, clue, mission, industrial, action_choices, midgame)
 	if result.is_empty():
 		return {}
 	var fingerprints: Dictionary[String, String] = {}
@@ -85,7 +86,7 @@ static func site_problem(value: Dictionary) -> String:
 
 
 static func _day(projected: Dictionary, clue: String, mission: bool, industrial: bool,
-		action_choices: bool, finale: Dictionary = {}) -> Array[Dictionary]:
+		action_choices: bool, midgame: bool, finale: Dictionary = {}) -> Array[Dictionary]:
 	var original: Array[Dictionary] = PersonaActions.offers(projected)
 	if original.size() != 3:
 		return []
@@ -113,7 +114,7 @@ static func _day(projected: Dictionary, clue: String, mission: bool, industrial:
 		var task_type: String = "supply" if slot == slots[0] else "equipment" if investigation else optional_type
 		var offer: Dictionary
 		if action_choices and slot != slots[0] and not investigation:
-			offer = _choice_offer(projected, original[slot], industrial)
+			offer = _choice_offer(projected, original[slot], industrial, midgame)
 		else:
 			offer = _offer(original[slot], task_type, recruit if task_type == "rescue" else 0, mission, industrial)
 		if offer.is_empty():
@@ -127,24 +128,27 @@ static func _day(projected: Dictionary, clue: String, mission: bool, industrial:
 	return result
 
 
-static func _choice_offer(base: Dictionary, source: Dictionary, industrial: bool) -> Dictionary:
+static func _choice_offer(base: Dictionary, source: Dictionary, industrial: bool, midgame: bool) -> Dictionary:
 	var key: String = "m25-action-choice:%s:%d" % [base.journey.seed, int(base.day)]
 	if key.sha256_text().left(1).hex_to_int() % 2 == 0:
 		var transaction: String = "%s:%d" % [base.profile_id, int(base.settled_sorties) + 1]
 		var recruit: int = RescuePoolState.choice(base, transaction)
 		if recruit > 0:
-			var rescue: Dictionary = _offer(source, "rescue", recruit, true, industrial)
+			var rescue: Dictionary = _offer(source, "rescue", recruit, true, industrial, midgame)
 			if not rescue.is_empty():
 				return rescue
 	return _offer(source, "airdrop", 0, true, industrial)
 
 
-static func _offer(source: Dictionary, type: String, recruit: int, mission: bool, industrial: bool) -> Dictionary:
+static func _offer(source: Dictionary, type: String, recruit: int, mission: bool,
+		industrial: bool, residential_rescue: bool = false) -> Dictionary:
 	var topology: String = "industrial" if type == "equipment" and source.layout.topology == "residential" else source.layout.topology
+	if residential_rescue:
+		topology = "residential"
 	var size: String = source.layout["size"]
 	var yard: bool = industrial and type == "airdrop" and topology == "industrial"
 	var candidate: Dictionary = _with_type(source, type, recruit, topology, size)
-	var offer: Dictionary = ExplorationActions.upgrade(candidate, true, true, int(mission), yard) if not candidate.is_empty() else {}
+	var offer: Dictionary = ExplorationActions.upgrade(candidate, true, true, int(mission), yard, residential_rescue) if not candidate.is_empty() else {}
 	if not mission or not offer.is_empty():
 		return offer
 	# Keep the day and reward identity. Only retry the existing layout themes and sizes
@@ -156,12 +160,12 @@ static func _offer(source: Dictionary, type: String, recruit: int, mission: bool
 		for alternate_theme: String in NeighborhoodLayout.TOPOLOGIES:
 			if (alternate_size == size and alternate_theme == topology) or (type == "equipment" and alternate_theme == "residential"):
 				continue
-			if yard and alternate_theme != topology:
+			if (yard or residential_rescue) and alternate_theme != topology:
 				continue
 			candidate = _with_type(source, type, recruit, alternate_theme, alternate_size)
 			if candidate.is_empty():
 				continue
-			offer = ExplorationActions.upgrade(candidate, true, true, 1, yard)
+			offer = ExplorationActions.upgrade(candidate, true, true, 1, yard, residential_rescue)
 			if not offer.is_empty():
 				return offer
 	# An uncertifiable plot cannot remove the original day's playable gear offer.

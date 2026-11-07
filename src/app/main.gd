@@ -803,7 +803,7 @@ func _new_game() -> void:
 	_migration_notice = ""
 	profile_id = RunSave.new_profile_id()
 	if playable_entry:
-		_battle_meta.campaign=CampaignRules.initial_investigation(profile_id)
+		_battle_meta.campaign=CampaignRules.initial_mission(profile_id)
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true)
 	_initialize_weapons("initial")
 	last_settlement_id = ""
@@ -2220,7 +2220,15 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	var meal: Dictionary = frozen.get("food",snapshot.last_day)
 	var battle: Dictionary = frozen.get("battle",{})
 	var text: String = "结算已保存。\n" if durable else "结果预览 · 确认后保存入账。\n"
-	if snapshot.last_day.has("task") and not frozen.get("rules",{}).get("mission",{}).get("generated",{}).get("campaign",{}).get("is_finale",false): text+=TaskActions.summary_text(snapshot.last_day.task)+"\n"
+	var generated: Dictionary = frozen.get("rules",{}).get("mission",{}).get("generated",{})
+	if snapshot.last_day.has("task") and not generated.get("campaign",{}).get("is_finale",false):
+		var title: String = ""
+		if generated.get("mission_policy") == 1:
+			if generated.has("investigation"):
+				title = "调查 · " + CampaignRules.CLUE_NAMES[generated.investigation.clue_id]
+			elif generated.type == "airdrop":
+				title = "装备 · 露天回收"
+		text += TaskActions.summary_text(snapshot.last_day.task, title) + "\n"
 	if not meal.is_empty():
 		text += "带回：货币%d · 食物%d（入库%d） · 武器%d件\n口粮：%d名队员需%d粮，消耗%d，缺口%d\n" % [snapshot.last_day.cash_gained,meal.get("food_found",0),meal.get("food_stored",0),battle.get("weapons",[]).size(),meal.ration_member_ids.size(),meal.food_required,meal.food_consumed,meal.food_shortage]
 	if BuildState.enabled(snapshot) and int(frozen.get("rules",{}).get("data_version",0)) in [8,9,10]:
@@ -2229,7 +2237,6 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 		for item: String in obtained: names.append(BuildItems.definitions()[item].name)
 		text+="本次道具："+("、".join(names) if not names.is_empty() else "无")+" · 本局库存%d/6（"%snapshot.journey.build.owned.size()+("已保存" if durable else "确认后入库")+"）\n"
 	if PowerState.enabled(snapshot) and not battle.is_empty():
-		var generated: Dictionary=frozen.rules.mission.generated
 		var sample: String=generated.powers.sample if battle.evacuated and battle.site_facts.get("cash",{}).get("searched",false) else ""
 		text+="本次能力："+(SpecialPowers.POLICY[sample].name if not sample.is_empty() else "无")+" · 本旅程%d/2（"%snapshot.journey.build.powers.owned.size()+("已保存" if durable else "确认后入库")+"）\n"
 	for item: Dictionary in battle.get("weapons",[]):text+="带回武器："+WeaponInventory.loot_description(item)+"\n"

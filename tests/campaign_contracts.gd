@@ -13,24 +13,42 @@ func run() -> void:
 	var base: Dictionary=app.camp_snapshot()
 	check(TransactionReceipt.camp_problem(base).is_empty(),"normal new short camp strict")
 	var daily: Array[Dictionary] = DailyActions.offers(base)
-	check(CampaignRules.is_investigation(base.journey.campaign) and daily.size() == 3,
-		"ordinary new entry issues three investigation-mode cards")
+	check(CampaignRules.is_mission(base.journey.campaign) and daily.size() == 3,
+		"ordinary new entry issues three mission-mode cards")
 	if daily.size() == 3:
-		check(daily[0].type == "supply" and daily[1].investigation.clue_id == "dispatch_log" and not daily[2].has("investigation"),
-			"ordinary supplies and exactly one first investigation remain selectable")
+		var clue: Dictionary = daily[2]
+		check(daily[0].type == "supply" and daily[1].type == "airdrop" and clue.get("investigation", {}).get("clue_id") == "dispatch_log"
+			and clue.weapons == 0 and daily[1].weapons == 1 and TaskActions.outdoor_site(daily[1], &"cash"),
+			"normal first day offers different supply, outdoor gear and indoor clue rewards")
 		var old_mode: Dictionary = base.duplicate(true)
 		old_mode.journey.campaign = CampaignRules.initial(base.profile_id)
-		check(not DailyActions.matches(old_mode, daily[1]), "historical short mode cannot accept an investigation offer")
-		var altered: Dictionary = daily[1].duplicate(true)
+		check(not DailyActions.matches(old_mode, clue), "historical short mode cannot accept an investigation offer")
+		old_mode.journey.campaign = CampaignRules.initial_investigation(base.profile_id)
+		var old_clue: Dictionary = DailyActions.offers(old_mode)[1]
+		check(not old_clue.has("mission_policy") and old_clue.weapons == 1 and DailyActions.matches(old_mode, old_clue)
+			and not DailyActions.matches(old_mode, clue) and not DailyActions.matches(base, old_clue),
+			"M18 and M19 regenerate and authenticate their own investigation rewards only")
+		var altered: Dictionary = clue.duplicate(true)
 		altered.investigation.clue_id = "checkpoint_pass"
 		check(not DailyActions.matches(base, altered), "offer with the next clue cannot authorize departure early")
-		altered = daily[1].duplicate(true)
+		altered = clue.duplicate(true)
 		altered.investigation.site_id = "food"
 		check(not DailyActions.problem(altered).is_empty() and not DailyActions.matches(base, altered),
 			"wrong site rejects at both canonical and camp-bound checks")
-		altered = daily[1].duplicate(true)
+		altered = clue.duplicate(true)
 		altered.erase("investigation")
-		check(not DailyActions.matches(base, altered), "original task with its required investigation identity removed is not today's offer")
+		check(not DailyActions.problem(altered).is_empty() and not DailyActions.matches(base, altered),
+			"original task with its required investigation identity removed is not today's offer")
+		altered = clue.duplicate(true)
+		altered.investigation.version = CampaignRules.INVESTIGATION_VERSION
+		check(not DailyActions.problem(altered).is_empty(), "old investigation marker cannot authenticate new rewards")
+		var projected: Dictionary = JSON.parse_string(JSON.stringify(clue, "", true, true))
+		check(ExplorationActions.problem(projected, true).is_empty(), "plain camp JSON can retain the canonical ability source")
+		if RecordEncoding.fingerprint(projected) != RecordEncoding.fingerprint(clue):
+			check(not DailyActions.problem(projected).is_empty() and not DailyActions.matches(base, projected),
+				"warming the camp projection cannot authorize the rounded action in a receipt")
+		projected.exploration.metrics.routes.cash.length += 1.0
+		check(not ExplorationActions.problem(projected, true).is_empty(), "camp projection rejects a different route")
 	for action:Dictionary in daily:
 		var supply:MissionSupply=DailyActions.supply(action)
 		var rules:Dictionary=FrozenSettlement.pool_rules(base,supply)

@@ -1297,6 +1297,9 @@ func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
 		var names: PackedStringArray=[]
 		for item: String in supply.generated.build.drops: names.append(BuildItems.definitions()[item].name)
 		_show_notice("携带道具："+"、".join(names)+" · 归航确认后入库")
+	var investigation: Dictionary = supply.generated.get("investigation", {})
+	if supply.generated.get("mission_policy") == 1 and investigation.get("site_id") == String(site.id):
+		_show_notice("已携带线索：%s · 生还归航并确认后登记" % CampaignRules.CLUE_NAMES[investigation.clue_id])
 	print("BH_SEARCH completed kind=%s reward=%d cash=%d food=%d" % [site.kind,reward,loot,food_loot])
 	search_completed.emit(reward)
 	_search_log("completed",site)
@@ -1579,6 +1582,15 @@ func _searched_count() -> int:
 	return sites.filter(func(site: SearchSite) -> bool: return site.searched).size()
 
 func _clicked_site(point: Vector2) -> bool:
+	if supply.generated.get("mission_policy") == 1:
+		# The marked work entrance is a precise target even where two facade hit areas overlap.
+		for site: SearchSite in sites:
+			if site.prop.primary_target and site.door.distance_squared_to(point) <= 24.0 * 24.0:
+				if not site.searched:
+					request_search(site.id)
+				else:
+					command_move(site.door)
+				return true
 	# Foreground object art takes precedence over the broad building facade hit.
 	var candidates: Array[SearchSite]=[]
 	if exploration_mode():
@@ -1936,6 +1948,9 @@ func _exploration_objective_rows() -> Array[Dictionary]:
 	if not investigation.is_empty():
 		rows[0].title = "%s · %s" % ["已携带" if rows[0].complete else "调查", CampaignRules.CLUE_NAMES[investigation.clue_id]]
 		rows[0].hint = "搜索标记建筑取得线索，生还撤离并确认归航后登记。"
+	elif generated.get("mission_policy") == 1 and generated.type == "airdrop":
+		rows[0].title = "装备 · 露天回收"
+		rows[0].hint = "一次性增援已触发。" if task_event.started else "首次开工触发一次增援，工作中可受击。"
 	return rows
 
 

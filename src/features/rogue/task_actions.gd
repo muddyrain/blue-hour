@@ -194,7 +194,8 @@ static func outcome(value: Dictionary, report: Dictionary) -> Dictionary:
 		count=int(joined and not member.is_empty() and member.health>0)
 	else:
 		for id: String in value.objective.site_ids: count+=int(report.site_facts[id].searched)
-		if value.type in ["equipment","airdrop"] and report.weapons.is_empty(): count=0
+		var investigation: bool = value.get("mission_policy") == 1 and value.has("investigation")
+		if value.type in ["equipment","airdrop"] and not investigation and report.weapons.is_empty(): count=0
 	return {"version":1,"task_id":value.id,"type":value.type,"completed":count,"total":total,"status":"COMPLETED" if report.evacuated and count==total else "TARGET_LOST" if lost else "EARLY" if report.evacuated else "FAILED"}
 
 static func summary_problem(value: Variant) -> String:
@@ -203,8 +204,9 @@ static func summary_problem(value: Variant) -> String:
 	if (value.status=="COMPLETED" and value.completed!=value.total) or (value.status=="TARGET_LOST" and value.type!="rescue"): return "TASK_SUMMARY_STATUS"
 	return ""
 
-static func summary_text(value: Dictionary) -> String:
-	return "%s · %s（%d/%d）"%[CONFIG[value.type].name,{"COMPLETED":"完成主目标","EARLY":"提前撤离未完成","TARGET_LOST":"救援目标阵亡 · 未完成","FAILED":"未能归航 · 未完成"}[value.status],value.completed,value.total]
+static func summary_text(value: Dictionary, title: String = "") -> String:
+	var name: String = CONFIG[value.type].name if title.is_empty() else title
+	return "%s · %s（%d/%d）"%[name,{"COMPLETED":"完成主目标","EARLY":"提前撤离未完成","TARGET_LOST":"救援目标阵亡 · 未完成","FAILED":"未能归航 · 未完成"}[value.status],value.completed,value.total]
 
 static func hud(world: Expedition) -> String:
 	var value: Dictionary = world.supply.generated

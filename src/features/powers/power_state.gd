@@ -62,9 +62,10 @@ static func settled(before: Dictionary, report: Dictionary, generated: Dictionar
 
 static func _source_problem(camp: Dictionary, generated: Variant) -> String:
 	if not PersonaState.enabled(camp): return PowerActions.problem(generated)
-	var issue: String=ExplorationActions.problem(generated) if ExplorationState.enabled(camp) else PersonaActions.problem(generated)
+	var issue: String=ExplorationActions.problem(generated, true) if ExplorationState.enabled(camp) else PersonaActions.problem(generated)
 	if not issue.is_empty(): return issue
-	if generated.has("investigation") and not CampaignRules.is_investigation(camp.journey.get("campaign")):
+	var campaign: Variant = camp.journey.get("campaign")
+	if generated.has("investigation") and (not CampaignRules.is_investigation(campaign) or generated.investigation.version != campaign.version):
 		return "INVESTIGATION_POWER_SOURCE_MODE"
 	if ExplorationState.enabled(camp) and WorldgenState.enabled(camp)!=generated.has("worldgen"): return "WORLDGEN_POWER_SOURCE_MODE"
 	if WorldgenState.enabled(camp) and WorldgenState.level_enabled(camp)!=(generated.get("worldgen",{}).get("version")==2): return "LEVEL_POWER_SOURCE_MODE"

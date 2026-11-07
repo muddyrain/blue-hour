@@ -18,10 +18,10 @@ func _journey() -> void:
 	if "--investigation-no-clue" in OS.get_cmdline_user_args():
 		await _leave_without_clue()
 		return
-	var original: Dictionary = app.mission_select.daily_offers[1].duplicate(true)
+	var original: Dictionary = app.mission_select.daily_offers[_investigation_card()].duplicate(true)
 	await _tap(app.mission_select.cancel_button)
 	await _menu(0)
-	_check(TransactionReceipt.same(original, app.mission_select.daily_offers[1]),
+	_check(TransactionReceipt.same(original, app.mission_select.daily_offers[_investigation_card()]),
 		"same-day browsing reopens the exact signed investigation")
 
 	# Earn enough food for two investigations and both finale outcomes by taking ordinary supply cards.
@@ -42,12 +42,12 @@ func _journey() -> void:
 		if app.food >= 8:
 			break
 	_check(app.food >= 8, "ordinary supply trips earn reserves for all four planned departures")
-	_check(app.mission_select.daily_offers[1].investigation.clue_id == CLUES[0],
+	_check(app.mission_select.daily_offers[_investigation_card()].investigation.clue_id == CLUES[0],
 		"ordinary supply leaves the first investigation available on another day")
 
-	var signed: Dictionary = app.mission_select.daily_offers[1]
+	var signed: Dictionary = app.mission_select.daily_offers[_investigation_card()]
 	_validate_bindings(app.camp_snapshot(), signed)
-	var field: Expedition = await _start(1)
+	var field: Expedition = await _start(_investigation_card())
 	if field == null:
 		return
 	await _search_clue(field, 0)
@@ -72,7 +72,7 @@ func _journey() -> void:
 
 
 func _leave_without_clue() -> void:
-	var world: Expedition = await _start(1)
+	var world: Expedition = await _start(_investigation_card())
 	if world == null:
 		return
 	await _return_to_bus(world)
@@ -117,7 +117,7 @@ func _resume() -> void:
 	await _confirm(1, true)
 	await _camp_progress(1)
 	await _menu(1)
-	var second: Expedition = await _start(1)
+	var second: Expedition = await _start(_investigation_card())
 	if second == null:
 		return
 	await _search_clue(second, 1)
@@ -147,13 +147,18 @@ func _menu(count: int) -> void:
 			and offers.all(func(offer: Dictionary) -> bool: return DailyActions.matches(camp, offer)),
 			"unlocked finale and ordinary actions retain separate authenticated identities")
 		return
+	var card: int = _investigation_card()
 	_check(offers.size() == 3 and offers[0].type == "supply"
-		and offers[1].get("investigation", {}).get("clue_id") == CLUES[count]
+		and offers[card].get("investigation", {}).get("clue_id") == CLUES[count]
 		and offers.filter(func(offer: Dictionary) -> bool: return offer.has("investigation")).size() == 1,
 		"three ordinary cards include supply and exactly one pending investigation")
-	_check(app.mission_select._titles[1].text.contains("调查")
-		and app.mission_select._descriptions[1].text.contains(CLUE_NAMES[count]),
+	_check(app.mission_select._titles[card].text.contains("调查")
+		and app.mission_select._descriptions[card].text.contains(CLUE_NAMES[count]),
 		"actual investigation card identifies the precise clue")
+
+
+func _investigation_card() -> int:
+	return 2 if CampaignRules.is_mission(app.camp_snapshot().journey.campaign) else 1
 
 
 func _camp_progress(count: int) -> void:

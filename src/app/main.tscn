@@ -51,6 +51,7 @@ script = ExtResource("1_main")
 [node name="World" type="Node2D" parent="."]
 
 [node name="Interface" type="CanvasLayer" parent="."]
+layer = 3
 
 [node name="Screen" type="Control" parent="Interface"]
 layout_mode = 3

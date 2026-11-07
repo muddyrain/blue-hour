@@ -130,6 +130,7 @@ var _sort: Node2D
 var _effects: Node2D
 var _shop: FieldProp
 var _hud: ExpeditionHud
+var _night_lighting: NightLighting
 var _notice_text: String = ""
 var _spawn_clock: float = 0.0
 var _ai_clock: float = 0.0
@@ -307,11 +308,16 @@ func _ready() -> void:
 		bus_view = BusJourney.new()
 		bus_view.configure(self,_bus_sprite,layout.world_data.bus)
 		add_child(bus_view)
+	if not is_practice:
+		_night_lighting = NightLighting.new()
+		add_child(_night_lighting)
 	print("BH_SORTIE build=%s start day=%d members=%d" % [BUILD_ID, day, survivors.size()])
 
 
 func _process(delta: float) -> void:
-	if phase == Phase.FINISHED and bus_view != null and bus_view.running(): bus_view.advance(delta)
+	if phase == Phase.FINISHED and bus_view != null and bus_view.running():
+		bus_view.advance(delta)
+		_refresh_night_lighting()
 
 
 func _physics_process(delta: float) -> void:
@@ -1445,7 +1451,21 @@ func _show_notice(message: String) -> void:
 	_notice_clock = 7.0
 
 
+func _refresh_night_lighting() -> void:
+	if _night_lighting == null:
+		return
+	var daylight: float = tuning.daylight_seconds
+	var dusk: float = daylight * threat.rules.late_fraction
+	var deep_night: float = daylight * threat.rules.deep_fraction
+	var night_grade: float = 0.78
+	var amount: float = night_grade * smoothstep(dusk, daylight, elapsed)
+	if elapsed >= daylight:
+		amount = lerpf(night_grade, 1.0, smoothstep(daylight, deep_night, elapsed))
+	_night_lighting.refresh(amount, _bus_sprite.get_global_transform_with_canvas().origin, camera.zoom.x)
+
+
 func _update_ui() -> void:
+	_refresh_night_lighting()
 	_present_support()
 	_present_power()
 	if _hud == null:

@@ -429,6 +429,11 @@ static func compatibility(world: Expedition) -> String:
 	if ScreamerPolicyV1.enabled(world.supply.generated):
 		data.screamer_policy = {"version":ScreamerPolicyV1.VERSION, "range":ScreamerPolicyV1.RANGE,
 			"windup":ScreamerPolicyV1.WINDUP, "max_reinforcements":ScreamerPolicyV1.MAX_REINFORCEMENTS}
+	var campaign: Dictionary = world.field_departure.get("journey", {}).get("campaign", {})
+	if CampaignRules.weapon_affix_enabled(campaign):
+		data.weapon_affix_policy = {"version":campaign.weapon_affix_policy,
+			"pierce_factor":AttackRules.PIERCE_DAMAGE_FACTOR, "pierce_radius":AttackRules.PIERCE_HIT_RADIUS,
+			"defeat_refund_rounds":WeaponMagazine.DEFEAT_REFUND_ROUNDS}
 	if world.parallel_search:
 		data.search_policy={"version":SearchAssignments.VERSION,"occupancy":"one_member_one_site","order":"site_id"}
 	if world.power_mode(): data.power_policy=SpecialPowers.POLICY

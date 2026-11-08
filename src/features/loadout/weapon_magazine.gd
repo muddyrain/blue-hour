@@ -3,6 +3,7 @@ extends RefCounted
 ## PROJECT_TEMP V1. One equipped instance, simulation time only, infinite reserve.
 const BUILD: String = "M7-WEAPON-01-1"
 const PARAMETERS: Dictionary = WeaponDefinition.MAGAZINES
+const DEFEAT_REFUND_ROUNDS: int = 1 # PROJECT_TEMP M33
 
 var instance_id: String
 var weapon_id: String
@@ -23,11 +24,15 @@ func seconds() -> float:
 func can_fire() -> bool:
 	return not reloading and rounds>0
 
-func commit_shot() -> void:
+func commit_shot(defeat_refund: bool = false) -> int:
 	assert(can_fire())
-	rounds-=1
-	if rounds==0:
-		reloading=true;remaining=seconds()
+	rounds -= 1
+	var refunded: int = clampi(capacity() - rounds, 0, DEFEAT_REFUND_ROUNDS) if defeat_refund else 0
+	rounds += refunded
+	if rounds == 0:
+		reloading = true
+		remaining = seconds()
+	return refunded
 
 func advance(delta: float) -> void:
 	if not reloading:return

@@ -4,6 +4,9 @@ extends RefCounted
 
 const Definitions: Array[WeaponDefinition] = [preload("res://src/features/loadout/carbine.tres"),
 	preload("res://src/features/loadout/long_rifle.tres")]
+const AFFIX_POLICY_VERSION: int = 1
+const AFFIX_DROP_VERSION: int = 3
+const AFFIX_SLOT: int = 2
 
 
 static func definition(id: String) -> WeaponDefinition:
@@ -37,24 +40,53 @@ static func drop_weapon(seed: String, action: String, site: String) -> String:
 	return "carbine" if ("BH_SITE_WEAPON_DROP_V1:%s:%s:%s"%[seed,action,site]).sha256_text().substr(0,2).hex_to_int()%2==0 else "long_rifle"
 
 
+static func affix_eligible(generated: Dictionary) -> bool:
+	var campaign: Variant = generated.get("campaign")
+	var sites: Variant = generated.get("sites")
+	var objective: Variant = generated.get("objective")
+	if generated.get("version") != 9 or generated.get("type") != "airdrop" \
+			or not SurvivalContracts.integer(generated.get("day"), 3, RunSave.MAX_COUNTER) \
+			or not SurvivalContracts.integer(generated.get("slot"), AFFIX_SLOT, AFFIX_SLOT) \
+			or not SurvivalContracts.integer(generated.get("mission_policy"), 1, 1) \
+			or generated.has("rare_policy") or generated.has("investigation") or generated.has("finale_policy") \
+			or not campaign is Dictionary or campaign.get("is_finale") != false \
+			or not objective is Dictionary or objective.get("site_ids") != ["cash"] or not sites is Array:
+		return false
+	return sites.any(func(site: Variant) -> bool:
+		return site is Dictionary and site.get("id") == "cash" and site.get("kind") == "cash" \
+			and site.get("weapon") == true and site.get("work_mode") == "outdoor")
+
+
+static func affix_enabled(generated: Dictionary) -> bool:
+	return SurvivalContracts.integer(generated.get("weapon_affix_policy"), AFFIX_POLICY_VERSION,
+		AFFIX_POLICY_VERSION) and affix_eligible(generated)
+
+
 static func site_reward(sortie_id: String, generated: Dictionary, site: Dictionary, quality: bool) -> Dictionary:
 	if (generated.get("version")!=5 and (generated.get("version")!=6 and (generated.get("version")!=7 and (generated.get("version")!=8 and generated.get("version")!=9)))):return reward(sortie_id,quality)
 	var value: Dictionary=reward(sortie_id)
 	value.weapon_id=site.drop.weapon_id
 	value.drop={"version":2 if (generated.get("version")==8 or generated.get("version")==9) else 1,"slot":generated.slot,"site_id":site.id}
+	if quality and value.weapon_id == "long_rifle" and site.id == "cash" and affix_enabled(generated):
+		value.drop.version = AFFIX_DROP_VERSION
+		return WeaponModifiers.site_affix_reward(value, generated.seed, generated.id, site.id)
 	return WeaponModifiers.reward(value) if quality else value
 
 
-static func instance_reward(data: Dictionary, item: Dictionary) -> Dictionary:
+static func instance_reward(data: Dictionary, item: Dictionary, affix_policy: bool = false) -> Dictionary:
 	var drop: Variant=item.get("drop")
-	if not drop is Dictionary or drop.size()!=3 or not drop.has_all(["version","slot","site_id"]) or not SurvivalContracts.integer(drop.version,1,2) or not SurvivalContracts.integer(drop.slot,0,2) or drop.site_id!="cash" or item.origin!="north-cache":return {}
+	if not drop is Dictionary or drop.size()!=3 or not drop.has_all(["version","slot","site_id"]) or not SurvivalContracts.integer(drop.version,1,AFFIX_DROP_VERSION) or not SurvivalContracts.integer(drop.slot,0,2) or drop.site_id!="cash" or item.origin!="north-cache":return {}
 	var parts: PackedStringArray=item.acquired_sortie.split(":")
 	if parts.size()!=2 or not parts[1].is_valid_int():return {}
 	# RunSave authenticates day == settled_sorties + 2; sortie N starts on day N+1.
 	var action: String=("daily-v4:%s:%d:%d"%[data.journey.seed,int(parts[1])+1,int(drop.slot)]).sha256_text()
 	var value: Dictionary=reward(item.acquired_sortie)
-	value.weapon_id=CombatActions.drop(data.journey.seed,action,drop.site_id,int(parts[1])==1) if drop.version==2 else drop_weapon(data.journey.seed,action,drop.site_id)
+	value.weapon_id=CombatActions.drop(data.journey.seed,action,drop.site_id,int(parts[1])==1) if drop.version>=2 else drop_weapon(data.journey.seed,action,drop.site_id)
 	value.drop=drop.duplicate(true);value.condition=item.condition
+	if drop.version == AFFIX_DROP_VERSION:
+		if not affix_policy or int(parts[1]) < 2 or drop.slot != AFFIX_SLOT or value.weapon_id != "long_rifle":
+			return {}
+		return WeaponModifiers.site_affix_reward(value, data.journey.seed, action, drop.site_id)
 	return WeaponModifiers.reward(value)
 
 

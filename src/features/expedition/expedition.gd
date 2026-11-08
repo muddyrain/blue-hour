@@ -68,6 +68,7 @@ var mission_title: String = "旧街补给点"
 var starting_health: Array[float] = [200.0, 200.0]
 var crew_snapshot: Array[Dictionary] = []
 var exploration_props: Dictionary = {}
+var _supply_entrances: Array[Vector2] = []
 var _objective_cursors: Dictionary = {}
 var _locate_marker: Node2D
 var _locate_ring: Line2D
@@ -189,6 +190,7 @@ func _ready() -> void:
 		return
 	if (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9))): tuning.spawn_seconds*=float(supply.generated.campaign.pressure)
 	layout = supply.layout
+	_supply_entrances = _street_supply_entrances()
 	_cash_site.door = layout.cash_door
 	_food_site.door = layout.food_door
 	if exploration_mode(): navigation=ExplorationLayout._routing(layout.world_data).nav
@@ -198,6 +200,7 @@ func _ready() -> void:
 		los_setup = LosPracticeSetup.for_layout(layout, los_range_case)
 	var ground: StreetBlock = StreetBlock.new()
 	ground.layout = layout
+	ground.supply_entrances = _supply_entrances
 	ground.food_source_visible = supply.supports(&"food")
 	ground.z_index = -10
 	add_child(ground)
@@ -208,7 +211,7 @@ func _ready() -> void:
 	camera.zoom_step = tuning.camera_zoom_step
 	camera.bounds = layout.world_bounds
 	add_child(camera)
-	camera.pan_by(layout.camera_start-camera.position)
+	camera.pan_by(_street_camera_start() - camera.position)
 	_sort = Node2D.new()
 	_sort.name = "ActorsAndProps"
 	_sort.y_sort_enabled = true
@@ -296,7 +299,8 @@ func _ready() -> void:
 			camera.pan_by(los_setup.camera_center - camera.position)
 			_show_notice("项目验收演练 · 实墙挡枪，左键绕角后自动恢复；正式进度不改变。")
 	if not is_practice:
-		_show_notice(layout.route_hint)
+		_show_notice(layout.route_hint if _supply_entrances.is_empty() else
+			"先搜近点食品 · 可回巴士撤离，也可沿街追加第二处。")
 		if threat_rehearsal:
 			_show_notice("短时压力演练 · 21秒夜间候选；正常出击105秒，规则均待校准。")
 	if not layout.world_data.is_empty():
@@ -1578,6 +1582,32 @@ class SearchSite:
 func _kind_searched(kind: StringName) -> bool:
 	return sites.any(func(site: SearchSite) -> bool: return site.kind==kind and site.searched)
 
+
+func _street_supply_entrances() -> Array[Vector2]:
+	var doors: Array[Vector2] = []
+	var generated: Dictionary = supply.generated
+	if generated.get("mission_policy") != 1 or generated.get("type") != "supply" \
+			or layout.world_data.get("size") != "medium" or layout.world_data.get("art_revision") != 3:
+		return doors
+	for identity: String in generated.objective.site_ids:
+		for site: Dictionary in generated.sites:
+			if site.id == identity:
+				doors.append(TaskActions.site_point(generated, site))
+				break
+	return doors if doors.size() == 2 and doors[0].is_finite() and doors[1].is_finite() else []
+
+
+func _street_camera_start() -> Vector2:
+	if _supply_entrances.is_empty():
+		return layout.camera_start
+	var view_size: Vector2 = get_viewport_rect().size / camera.zoom
+	var focus: Rect2 = Rect2(layout.bus_door, Vector2.ZERO).expand(_supply_entrances[0])
+	var both: Rect2 = focus.expand(_supply_entrances[1])
+	if both.size.x <= view_size.x - 192 and both.size.y <= view_size.y - 192:
+		focus = both
+	var roof_room: float = clampf((view_size.y - focus.size.y) * 0.5 - 96, 0, 72)
+	return focus.get_center() - Vector2(0, roof_room)
+
 func _searched_count() -> int:
 	return sites.filter(func(site: SearchSite) -> bool: return site.searched).size()
 
@@ -1653,6 +1683,9 @@ func _make_world_buildings() -> void:
 		building.soft_contact=layout.world_data.get("art_revision")==3
 		if layout.world_data.get("version")==5:
 			building.modulate=[Color.WHITE,Color(0.92,0.97,1.0),Color(1.0,0.97,0.9),Color.WHITE][int(entity.variant)]
+		if not _supply_entrances.is_empty():
+			building.roof_tint = Color(0.69, 0.81, 1.0)
+			building.facade_tint = Color(0.87, 0.91, 0.98)
 		building.world_asset = true
 		if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4 or layout.world_data.get("version")==5):
 			building.calibrated=true;building.roof_cut=int(definition.roof_split);building.body_depth=block.size.y
@@ -1703,6 +1736,8 @@ func _make_world_buildings() -> void:
 		if exploration_mode() and not crate:
 			var category: String = "果树" if def.source == "fruit_tree" else "车辆" if object_site else "建筑"
 			var anchor: Vector2 = Vector2(0, 5) if object_site else Vector2(site.prop.door_offset, 28)
+			if not _supply_entrances.is_empty() and site.prop.primary_target and site.kind == &"food":
+				site.prop.loot_landmark = "近点食品" if def.id == supply.generated.objective.site_ids[0] else "追加食品"
 			site.prop.configure_loot_badge(category, anchor)
 		sites.append(site)
 		if site.id==&"cash": _cash_site=site; _shop=site.prop

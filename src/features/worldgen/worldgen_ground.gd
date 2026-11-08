@@ -7,7 +7,7 @@ var _light_pool: GradientTexture2D
 
 
 func _ready() -> void:
-	if supply_entrances.is_empty():
+	if not _blue_hour():
 		return
 	var falloff: Gradient = Gradient.new()
 	falloff.offsets = PackedFloat32Array([0.0, 0.42, 1.0])
@@ -21,7 +21,8 @@ func _ready() -> void:
 
 func _draw() -> void:
 	var street_material: bool = int(layout.world_data.get("art_revision", 0)) == 3
-	var blue_hour: bool = not supply_entrances.is_empty()
+	var blue_hour: bool = _blue_hour()
+	var loading_yard: Dictionary = layout.world_data.get("loading_yard", {})
 	var grass: Color = Color(0.59, 0.72, 0.76, 0.56) if blue_hour else Color(0.93, 0.94, 0.81, 0.58) if street_material else Color(0.77, 0.88, 0.76, 0.42)
 	draw_rect(layout.world_bounds, Color("344846") if blue_hour else Color("59634c") if street_material else Color("586b60"))
 	draw_texture_rect(StreetBlock.GrassTexture, layout.world_bounds, true, grass)
@@ -29,6 +30,8 @@ func _draw() -> void:
 		var area: Rect2=WorldLayout.rect(parcel.rect)
 		draw_rect(area, Color("3c514b") if blue_hour else Color("62694f") if street_material else Color("56664e"))
 		draw_texture_rect(StreetBlock.GrassTexture, area, true, grass if blue_hour else Color(0.93, 0.94, 0.8, 0.60) if street_material else Color(0.7, 0.84, 0.66, 0.5))
+		if parcel.id == loading_yard.get("parcel"):
+			_loading_yard_floor(loading_yard)
 		for court: Dictionary in parcel.courtyards:
 			_court(court)
 		# Authored orthogonal shared paths join frontages and courts; no nav debug lines.
@@ -50,6 +53,8 @@ func _draw() -> void:
 		else:
 			draw_rect(paving,Color("93998a"))
 			draw_texture_rect(StreetBlock.PavingTexture,paving,true,Color(0.88,0.91,0.86,0.52))
+	if not loading_yard.is_empty():
+		_loading_yard_surface(loading_yard)
 	for entity: Dictionary in layout.world_data.entities:
 		var block: Rect2=WorldLayout.rect(entity.rect)
 		var door: Vector2=WorldLayout.point(entity.door)
@@ -102,6 +107,73 @@ func _draw() -> void:
 				_crossing_landings(b, y)
 	if blue_hour:
 		_supply_lights()
+	if not loading_yard.is_empty():
+		_loading_yard_lights(loading_yard)
+
+
+func _blue_hour() -> bool:
+	return not supply_entrances.is_empty() or layout.world_data.has("loading_yard")
+
+
+func _loading_yard_floor(yard: Dictionary) -> void:
+	var gate: Vector2 = WorldLayout.point(yard.loading.gate)
+	var surface: Rect2 = WorldLayout.rect(yard.bounds).grow(-12)
+	surface.size.y = gate.y - 8.0 - surface.position.y
+	draw_rect(surface, Color("3e4953"))
+	draw_texture_rect(StreetBlock.AsphaltTexture, surface, true, Color(0.62, 0.71, 0.83, 0.31))
+
+
+func _loading_yard_surface(yard: Dictionary) -> void:
+	var loading_gate: Vector2 = WorldLayout.point(yard.loading.gate)
+	var service_gate: Vector2 = WorldLayout.point(yard.service.gate)
+	var work_point: Vector2 = WorldLayout.point(yard.work_point)
+	var apron: Rect2
+	for footprint: Array in yard.loading.paving:
+		var slab: Rect2 = WorldLayout.rect(footprint)
+		draw_rect(slab, Color("424e5a"))
+		draw_texture_rect(StreetBlock.AsphaltTexture, slab, true, Color(0.67, 0.76, 0.88, 0.43))
+		if slab.get_area() > apron.get_area():
+			apron = slab
+	# Draw all shoulders before the tiles so intersecting legs read as one paved bend.
+	for footprint: Array in yard.service.paving:
+		draw_rect(WorldLayout.rect(footprint).grow(3), Color("34444d"))
+	for footprint: Array in yard.service.paving:
+		_paving(WorldLayout.rect(footprint))
+	var paint: Color = Color(0.73, 0.57, 0.34, 0.46)
+	# Worn approach paint stays within the frozen apron and leaves the work point open.
+	for side: float in [-1.0, 1.0]:
+		var x: float = loading_gate.x + side * 51.0
+		for y: float in [loading_gate.y - 50.0, loading_gate.y - 86.0, loading_gate.y - 122.0]:
+			var start: Vector2 = Vector2(x, y)
+			var end: Vector2 = start - Vector2(0, 23)
+			if apron.has_point(start) and apron.has_point(end):
+				draw_line(start, end, paint, 2.0, true)
+	for offset: int in range(-48, 48, 16):
+		var start: Vector2 = loading_gate + Vector2(offset, 5)
+		var stroke: Vector2 = Vector2(9, -10) if offset != -16 else Vector2(5, -6)
+		draw_line(start, start + stroke, paint, 3.0, true)
+	for offset: float in [-18.0, 14.0]:
+		var start: Vector2 = service_gate + Vector2(offset, 1)
+		draw_line(start, start + Vector2(7, 0), Color(0.72, 0.71, 0.61, 0.44), 2.0, true)
+	var stop_line: Rect2 = Rect2(work_point + Vector2(-36, 30), Vector2(72, 3))
+	if apron.encloses(stop_line):
+		draw_rect(stop_line, paint)
+
+
+func _loading_yard_lights(yard: Dictionary) -> void:
+	var loading_gate: Vector2 = WorldLayout.point(yard.loading.gate)
+	var service_gate: Vector2 = WorldLayout.point(yard.service.gate)
+	var work_point: Vector2 = WorldLayout.point(yard.work_point)
+	_yard_lamp_pool(loading_gate + Vector2(-70, 5), Vector2(78, 70), 0.32)
+	_yard_lamp_pool(loading_gate + Vector2(70, 5), Vector2(78, 70), 0.32)
+	_yard_lamp_pool(service_gate + Vector2(36, 1), Vector2(80, 81), 0.36)
+	_yard_lamp_pool(work_point - Vector2(0, 21), Vector2(146, 104), 0.43)
+
+
+func _yard_lamp_pool(point: Vector2, size: Vector2, opacity: float) -> void:
+	draw_texture_rect(_light_pool, Rect2(point - size * 0.5, size), false, Color(1.0, 0.67, 0.32, opacity))
+	var core: Vector2 = size * 0.36
+	draw_texture_rect(_light_pool, Rect2(point - core * 0.5, core), false, Color(1.0, 0.77, 0.47, opacity * 0.73))
 
 
 func _walk_edges(walk: Rect2) -> void:
@@ -167,7 +239,7 @@ func _court(court: Dictionary) -> void:
 	var parking: bool=court.kind=="parking"
 	var loading: bool=court.kind=="loading"
 	var street_material: bool = int(layout.world_data.get("art_revision", 0)) == 3
-	var blue_hour: bool = not supply_entrances.is_empty()
+	var blue_hour: bool = _blue_hour()
 	if street_material:
 		if garden:
 			draw_rect(area, Color("3b5049") if blue_hour else Color("5d684a"))
@@ -213,7 +285,7 @@ func _paving(area: Rect2) -> void:
 	var top: int = int(floor(area.position.y / patch))
 	var right: int = int(ceil(area.end.x / patch))
 	var bottom: int = int(ceil(area.end.y / patch))
-	var blue_hour: bool = not supply_entrances.is_empty()
+	var blue_hour: bool = _blue_hour()
 	var material: Color = Color(0.64, 0.72, 0.85) if blue_hour else Color(1.0, 0.97, 0.89)
 	var joint: Color = Color(0.16, 0.24, 0.32, 0.48) if blue_hour else Color(0.37, 0.36, 0.33, 0.48)
 	for y: int in range(top, bottom):

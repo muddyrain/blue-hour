@@ -36,6 +36,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	projected.journey = base.journey.duplicate(false)
 	projected.journey.campaign = CampaignRules.initial(base.profile_id)
 	var mission: bool = CampaignRules.is_mission(base.journey.campaign)
+	var industrial: bool = mission and WorldgenState.industrial_yard_enabled(base)
 	var clue: String = CampaignRules.next_clue(base.journey.campaign)
 	var result: Array[Dictionary] = []
 	if clue.is_empty():
@@ -43,9 +44,9 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 		var finale: Array[Dictionary] = ExplorationActions.offers(projected)
 		projected.journey.campaign.preparations = 0
 		if not finale.is_empty():
-			result = _day(projected, clue, mission, finale[0])
+			result = _day(projected, clue, mission, industrial, finale[0])
 	else:
-		result = _day(projected, clue, mission)
+		result = _day(projected, clue, mission, industrial)
 	if result.is_empty():
 		return {}
 	var fingerprints: Dictionary[String, String] = {}
@@ -82,7 +83,7 @@ static func site_problem(value: Dictionary) -> String:
 	return "INVESTIGATION_ACTION_SITE"
 
 
-static func _day(projected: Dictionary, clue: String, mission: bool, finale: Dictionary = {}) -> Array[Dictionary]:
+static func _day(projected: Dictionary, clue: String, mission: bool, industrial: bool, finale: Dictionary = {}) -> Array[Dictionary]:
 	var original: Array[Dictionary] = PersonaActions.offers(projected)
 	if original.size() != 3:
 		return []
@@ -108,7 +109,7 @@ static func _day(projected: Dictionary, clue: String, mission: bool, finale: Dic
 	for slot: int in slots:
 		var investigation: bool = not clue.is_empty() and slot == INVESTIGATION_SLOT
 		var task_type: String = "supply" if slot == slots[0] else "equipment" if investigation else optional_type
-		var offer: Dictionary = _offer(original[slot], task_type, recruit if task_type == "rescue" else 0, mission)
+		var offer: Dictionary = _offer(original[slot], task_type, recruit if task_type == "rescue" else 0, mission, industrial)
 		if offer.is_empty():
 			return []
 		if investigation:
@@ -120,11 +121,12 @@ static func _day(projected: Dictionary, clue: String, mission: bool, finale: Dic
 	return result
 
 
-static func _offer(source: Dictionary, type: String, recruit: int, mission: bool) -> Dictionary:
+static func _offer(source: Dictionary, type: String, recruit: int, mission: bool, industrial: bool) -> Dictionary:
 	var topology: String = "industrial" if type == "equipment" and source.layout.topology == "residential" else source.layout.topology
 	var size: String = source.layout["size"]
+	var yard: bool = industrial and type == "airdrop" and topology == "industrial"
 	var candidate: Dictionary = _with_type(source, type, recruit, topology, size)
-	var offer: Dictionary = ExplorationActions.upgrade(candidate, true, true, int(mission)) if not candidate.is_empty() else {}
+	var offer: Dictionary = ExplorationActions.upgrade(candidate, true, true, int(mission), yard) if not candidate.is_empty() else {}
 	if not mission or not offer.is_empty():
 		return offer
 	# Keep the day and reward identity. Only retry the existing layout themes and sizes
@@ -136,13 +138,16 @@ static func _offer(source: Dictionary, type: String, recruit: int, mission: bool
 		for alternate_theme: String in NeighborhoodLayout.TOPOLOGIES:
 			if (alternate_size == size and alternate_theme == topology) or (type == "equipment" and alternate_theme == "residential"):
 				continue
+			if yard and alternate_theme != topology:
+				continue
 			candidate = _with_type(source, type, recruit, alternate_theme, alternate_size)
 			if candidate.is_empty():
 				continue
-			offer = ExplorationActions.upgrade(candidate, true, true, 1)
+			offer = ExplorationActions.upgrade(candidate, true, true, 1, yard)
 			if not offer.is_empty():
 				return offer
-	return {}
+	# An uncertifiable plot cannot remove the original day's playable gear offer.
+	return _offer(source, type, recruit, mission, false) if yard else {}
 
 
 static func _with_type(source: Dictionary, type: String, recruit: int, topology: String, size: String) -> Dictionary:

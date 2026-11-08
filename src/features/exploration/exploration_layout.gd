@@ -101,6 +101,8 @@ static func complete(data: Dictionary) -> Dictionary:
 		return {}
 	if data.version==5 and not WorldgenLayout.content_reachable(data,certificate):
 		return {}
+	if data.has("loading_yard") and not IndustrialYard.certified(data, nav):
+		return {}
 	data.enemy_points = _spawn_points(data, nav)
 	if data.enemy_points.size() < data.entities.size():
 		return {}
@@ -157,6 +159,8 @@ static func _reserved(data: Dictionary) -> Array[Rect2]:
 		zones.append(Rect2(WorldLayout.point(value) - Vector2(40, 40), Vector2(80, 80)))
 	for value: Array in data.gates:
 		zones.append(Rect2(WorldLayout.point(value) - Vector2(56, 56), Vector2(112, 112)))
+	if data.has("loading_yard"):
+		zones.append_array(IndustrialYard.reserved_rects(data))
 	if data.version==5:
 		for parcel: Dictionary in data.parcels:
 			zones.append(Rect2(WorldLayout.point(parcel.entrance)-Vector2(44,44),Vector2(88,88)))

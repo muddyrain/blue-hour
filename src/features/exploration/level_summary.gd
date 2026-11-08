@@ -165,6 +165,8 @@ static func mission_card_text(value: Dictionary) -> String:
 					break
 			reward = "损坏%s 1 件，可回营维修" % weapon
 			route = "露天单程约 %d 秒，回收 %d 秒" % [outbound, int(level.work_seconds[first])]
+			if value.layout.has("loading_yard"):
+				route = "宽装卸口、折角维修道汇合，回收 %d 秒" % int(level.work_seconds[first])
 			risk = "可受击，首次回收最多增援 %d 名" % int(value.parameters.reinforcements)
 		"equipment":
 			reward = CampaignRules.CLUE_NAMES[value.investigation.clue_id]

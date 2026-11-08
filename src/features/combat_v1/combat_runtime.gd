@@ -5,20 +5,29 @@ var actions: Dictionary={}
 var toxic: Dictionary={}
 var spawns: Dictionary={}
 var toxic_view: Node2D
+var screamer: ScreamerRuntimeV1
 
 func snapshot() -> Dictionary:
-	return {"version":1,"actions":actions.duplicate(true),"toxic":toxic.duplicate(true),"spawns":spawns.duplicate(true)}
+	var value: Dictionary = {"version":1,"actions":actions.duplicate(true),"toxic":toxic.duplicate(true),"spawns":spawns.duplicate(true)}
+	if screamer != null:
+		value.version = 2
+		value.screamer = screamer.state.duplicate(true)
+	return value
 
 func restore(value: Dictionary) -> void:
 	actions=value.actions.duplicate(true)
 	toxic=value.toxic.duplicate(true)
 	spawns=value.spawns.duplicate(true)
+	if screamer != null:
+		screamer.state = value.screamer.duplicate(true)
 
 func setup(world: Expedition) -> void:
 	toxic=ToxicV1.initial()
 	toxic_view=ToxicVisualV1.new()
 	toxic_view.z_index=-1
 	world.add_child(toxic_view)
+	if ScreamerPolicyV1.enabled(world.supply.generated):
+		screamer = ScreamerRuntimeV1.new()
 
 func action(actor: FieldActor) -> Dictionary:
 	var key: String=str(actor.member_id)
@@ -140,6 +149,9 @@ func present(actor: FieldActor) -> void:
 func pick_spawn(world: Expedition,index: int) -> String:
 	var kind: String=CombatEnemyRules.pick(world.sortie_id,index,int(world.threat.stage))
 	var fallback: int=-1
+	if kind == EnemyRules.NORMAL and screamer != null and screamer.state.actor_id == -1 \
+			and world.threat.stage >= ThreatDirector.Stage.LATE:
+		kind = ScreamerPolicyV1.KIND
 	if kind==CombatEnemyRules.TOXIC:
 		for actor: FieldActor in world.enemies:
 			if actor.health>0 and actor.enemy_behavior!=null and actor.enemy_behavior.kind==CombatEnemyRules.TOXIC:
@@ -150,7 +162,7 @@ func pick_spawn(world: Expedition,index: int) -> String:
 	return kind
 
 func holds(actor: FieldActor) -> bool:
-	return toxic.get("casters",{}).get(str(actor.actor_id),{}).get("phase")=="windup"
+	return (screamer != null and screamer.holds(actor)) or toxic.get("casters",{}).get(str(actor.actor_id),{}).get("phase")=="windup"
 
 func advance_toxic(world: Expedition,delta: float) -> void:
 	var casters: Array[Dictionary]=[]
@@ -162,7 +174,7 @@ func advance_toxic(world: Expedition,delta: float) -> void:
 	toxic=plan.state
 	if int(toxic.sequence)>prior_sequence: world._show_notice("毒气预警 · 离开危险区域。")
 	for actor: FieldActor in world.enemies:
-		if holds(actor) and not world.power_frozen:
+		if toxic.casters.get(str(actor.actor_id), {}).get("phase") == "windup" and not world.power_frozen:
 			actor.clear_order()
 			var point: Array=toxic.casters[str(actor.actor_id)].point
 			actor.aim=actor.position.direction_to(Vector2(point[0],point[1]))
@@ -208,7 +220,8 @@ func cancel_unavailable(world: Expedition) -> void:
 		if actions.has(str(actor.member_id)) and (actor.health<=0 or not actor.visible or actor.activity in [FieldActor.Activity.DOWN,FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING]): actions[str(actor.member_id)].remaining=0.0
 
 static func problem(value: Variant,world: Dictionary,receipt: Dictionary) -> String:
-	if not value is Dictionary or value.size()!=4 or not value.has_all(["version","actions","toxic","spawns"]) or value.version!=1 or not value.actions is Dictionary or not value.spawns is Dictionary or value.spawns.size()>GrowthRules.MAX_EVENTS: return "COMBAT_WORLD_FIELDS"
+	var screaming: bool = world.get("generated") is Dictionary and ScreamerPolicyV1.enabled(world.generated)
+	if not value is Dictionary or value.size()!=4 + int(screaming) or not value.has_all(["version","actions","toxic","spawns"]) or value.version!=1 + int(screaming) or not value.actions is Dictionary or not value.spawns is Dictionary or value.spawns.size()>GrowthRules.MAX_EVENTS: return "COMBAT_WORLD_FIELDS"
 	if not CombatActions.enabled(receipt.base): return "COMBAT_WORLD_MODE"
 	var issue: String=ToxicV1.problem(value.toxic)
 	if not issue.is_empty(): return issue
@@ -247,7 +260,13 @@ static func problem(value: Variant,world: Dictionary,receipt: Dictionary) -> Str
 		var source: Variant=value.spawns[key]
 		if not key is String or not key.is_valid_int() or key!=str(int(key)) or int(key)<0 or int(key)>=world.sim._spawn_count or not source is Dictionary or source.size()!=3 or not source.has_all(["kind","stage","fallback"]) or not SurvivalContracts.integer(source.stage,0,int(world.threat.stage)) or not source.kind is String or not SurvivalContracts.integer(source.fallback,-1,int(key)-1): return "COMBAT_SPAWN_FIELDS"
 		var rolled: String=CombatEnemyRules.pick(receipt.transaction_id,int(key),int(source.stage))
-		if source.kind!=rolled and not (rolled==CombatEnemyRules.TOXIC and source.kind==EnemyRules.NORMAL and source.fallback>=0 and value.spawns.get(str(int(source.fallback)),{}).get("kind")==CombatEnemyRules.TOXIC): return "COMBAT_SPAWN_SOURCE"
+		var replacement: bool = screaming and source.kind == ScreamerPolicyV1.KIND and rolled == EnemyRules.NORMAL \
+			and int(source.stage) >= ThreatDirector.Stage.LATE and source.fallback == -1 \
+			and value.get("screamer") is Dictionary and value.screamer.get("actor_id") == int(key)
+		if source.kind!=rolled and not replacement and not (rolled==CombatEnemyRules.TOXIC and source.kind==EnemyRules.NORMAL and source.fallback>=0 and value.spawns.get(str(int(source.fallback)),{}).get("kind")==CombatEnemyRules.TOXIC): return "COMBAT_SPAWN_SOURCE"
+	if screaming:
+		var screamer_issue: String = ScreamerRuntimeV1.problem(value.get("screamer"), world, receipt, layout)
+		if not screamer_issue.is_empty(): return screamer_issue
 
 	for source: Dictionary in value.toxic.releases:
 		if value.spawns.get(str(int(source.source_id)),{}).get("kind")!=CombatEnemyRules.TOXIC or not layout.world_bounds.has_point(SortieSnapshot._vec(source.source_point)) or not layout.world_bounds.has_point(SortieSnapshot._vec(source.point)) or not ToxicV1.line_clear(SortieSnapshot._vec(source.source_point),SortieSnapshot._vec(source.point),layout.shot_obstacles()): return "TOXIC_RELEASE_WORLD_SOURCE"

@@ -103,6 +103,7 @@ func run() -> void:
 	_rare_sorties(base)
 	_opening_build(base)
 	_catalog_terminal(base)
+	_screamer_policy(base)
 	app.audio.shutdown();app.queue_free();await process_frame
 	print("CAMPAIGN_CONTRACTS checks=",checks," failures=",failures)
 	quit(1 if failures else 0)
@@ -124,6 +125,50 @@ func _catalog_terminal(base: Dictionary) -> void:
 		check(CatalogProgress._terminal(receipt), "catalog uses the journey defeat for evacuated=%s" % str(evacuated))
 		receipt.transaction_id = base.profile_id + ":2"
 		check(not CatalogProgress._terminal(receipt), "catalog rejects a terminal bound to another transaction")
+
+
+func _screamer_policy(fresh: Dictionary) -> void:
+	var base: Dictionary = fresh.duplicate(true)
+	base.journey.seed = "m30-opening-4".md5_text()
+	base.journey.campaign = CampaignRules.initial_mission(base.profile_id, true, true, true, true, true)
+	var build: Dictionary = WorldgenState.initial_build(base.journey.seed, true, true)
+	var starter: Dictionary = OpeningBuild.source("scavenge", base.profile_id, base.journey.root_id, base.journey.seed)
+	build.opening = starter
+	build.owned = [starter.item_id]
+	build.slots = [starter.item_id, ""]
+	base.journey.build = build
+	check(CampaignRules.screamer_enabled(base.journey.campaign) and CampaignRules.problem(base.journey.campaign).is_empty(),
+		"the explicit M32 journey policy authenticates")
+	var unknown: Dictionary = base.journey.campaign.duplicate(false)
+	unknown.screamer_policy = 2
+	check(CampaignRules.problem(unknown) == "SCREAMER_CAMPAIGN_POLICY", "unknown M32 journey policy rejects")
+	var early: Array[Dictionary] = DailyActions.offers(base)
+	check(early.size() == 3 and early.all(func(action: Dictionary) -> bool: return not action.has("screamer_policy")),
+		"early airdrop remains unmarked")
+	base = _after_food(_after_food(base, 5, 0), 0, 0)
+	var older: Dictionary = base.duplicate(true)
+	older.journey.campaign.erase("screamer_policy")
+	var current: Array[Dictionary] = DailyActions.offers(base)
+	var historical: Array[Dictionary] = DailyActions.offers(older)
+	check(current.size() == 3 and historical.size() == 3, "both policy versions retain the day's three offers")
+	if current.size() != 3 or historical.size() != 3:
+		return
+	var gear: Dictionary = current[1]
+	check(ScreamerPolicyV1.enabled(gear) and DailyActions.problem(gear).is_empty() and DailyActions.matches(base, gear),
+		"day-four ordinary industrial gear freezes and authenticates the screamer policy")
+	var stripped: Dictionary = gear.duplicate(false)
+	stripped.erase("screamer_policy")
+	check(RecordEncoding.fingerprint(stripped) == RecordEncoding.fingerprint(historical[1])
+		and DailyActions.matches(older, historical[1]) and not DailyActions.matches(older, gear)
+		and not DailyActions.matches(base, stripped), "M31 retains the exact historical offer and rejects foreign policy")
+	var altered: Dictionary = gear.duplicate(false)
+	altered.screamer_policy = 2
+	check(DailyActions.problem(altered) == "SCREAMER_ACTION_POLICY", "unknown action policy rejects")
+	for index: int in [0, 2]:
+		var forged: Dictionary = current[index].duplicate(false)
+		forged.screamer_policy = ScreamerPolicyV1.VERSION
+		check(RecordEncoding.fingerprint(current[index]) == RecordEncoding.fingerprint(historical[index])
+			and DailyActions.problem(forged) == "SCREAMER_ACTION_POLICY", "supply and investigation reject the gear-only policy")
 
 
 func _facilities(fresh: Dictionary) -> void:
@@ -226,6 +271,9 @@ func _rare_sorties(fresh: Dictionary) -> void:
 			"old and new policies retain supply and investigation but certify their own optional action")
 		check(DailyActions.problem(offer).is_empty() and DailyActions.matches(base, offer),
 			"frozen rare action passes standalone and camp-bound authentication")
+		var forged_screamer: Dictionary = offer.duplicate(false)
+		forged_screamer.screamer_policy = ScreamerPolicyV1.VERSION
+		check(DailyActions.problem(forged_screamer) == "SCREAMER_ACTION_POLICY", "rare offer rejects the screamer policy")
 		var altered: Dictionary = offer.duplicate(true)
 		altered.erase("rare_policy")
 		check(not DailyActions.problem(altered).is_empty(), "removing the rare marker cannot certify a rare layout")

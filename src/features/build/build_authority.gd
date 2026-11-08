@@ -144,6 +144,8 @@ static func propose(before: Dictionary, request: Dictionary) -> Dictionary:
 				after.sim.kills+=1
 				after.enemies.erase(row)
 				if SortieSnapshot.combat_version(after.get("version")): after.combat.toxic.casters.erase(str(id))
+				if after.get("combat", {}).has("screamer"):
+					ScreamerRuntimeV1.cancel(after.combat.screamer, id)
 				if id==0 and not after.generated.encounter.is_empty():
 					after.encounter.health=0.0
 					after.encounter.defeat=event.duplicate(true)

@@ -428,6 +428,12 @@
       "license": "No additional license granted"
     },
     {
+      "path": "assets/infected_v1/screamer/screamer.png",
+      "sha256": "fb5d3789ab2cd19545d2fd026d6cabb4c1b6c101570fc76060f8d4958e09b030",
+      "origin": "AI-assisted original Blue Hour art, M32-THREAT-01; built-in image_gen, five-view pursuit, windup and release poses registered to a shared foot anchor",
+      "license": "No additional license granted"
+    },
+    {
       "path": "assets/infected_v1/toxic/carrier.png",
       "sha256": "5c04573a58a6216394170f2fa41c849c7d412cf059afb5dea731fde5ee03b5ac",
       "origin": "AI-assisted original Blue Hour art, M23-ART-TOXIC-01; built-in image_gen, registered five-view pose atlas",

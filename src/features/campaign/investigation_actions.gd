@@ -56,7 +56,10 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	if result.is_empty():
 		return {}
 	var fingerprints: Dictionary[String, String] = {}
+	var screamer: bool = CampaignRules.screamer_enabled(base.journey.campaign)
 	for candidate: Dictionary in result:
+		if screamer and ScreamerPolicyV1.eligible(candidate):
+			candidate.screamer_policy = ScreamerPolicyV1.VERSION
 		fingerprints[candidate.id] = RecordEncoding.fingerprint(candidate)
 	var frozen: Dictionary = {"offers":result, "fingerprints":fingerprints}
 	if _days.size() >= MAX_DAYS_CACHED:

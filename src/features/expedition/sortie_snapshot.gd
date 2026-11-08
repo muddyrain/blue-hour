@@ -385,6 +385,8 @@ static func apply(world: Expedition, value: Dictionary) -> String:
 	if combat_version(value.version):
 		world.combat.restore(value.combat)
 		world.combat.refresh_toxic(world)
+		if world.combat.screamer != null:
+			world.combat.screamer.present(world)
 		for actor: FieldActor in world.survivors: world.combat.present(actor)
 	if power_version(value.version): world.powers=value.powers.duplicate(true)
 	world.refresh_power_factors()
@@ -424,6 +426,9 @@ static func compatibility(world: Expedition) -> String:
 	if (world.supply.generated.get("version")==7 or (world.supply.generated.get("version")==8 or world.supply.generated.get("version")==9)): data.build_policy=world.supply.generated.build.policy.duplicate(true)
 	data.contact = {"distance":FieldContacts.DISTANCE,"approach":FieldContacts.APPROACH,"rechase":FieldContacts.RECHASE,"step":FieldContacts.STEP_DISTANCE,"steps":FieldContacts.MAX_STEPS,"path_parts":FieldContacts.MAX_PATH_PARTS,"pass_dot":FieldContacts.PASS_DOT,"recovery_speed":FieldContacts.RECOVERY_SPEED,"recovery_cap":FieldContacts.MAX_RECOVERY,"recovery_passes":FieldContacts.RECOVERY_PASSES,"yield_speed":FieldContacts.YIELD_SPEED}
 	if world.combat_mode(): data.combat_policy={"weapons":CombatEquipment.policy(),"definitions":[_resource(CombatEquipment.definition("fire_axe_v1")),_resource(CombatEquipment.definition("shotgun_v1"))],"toxic":ToxicV1.POLICY}
+	if ScreamerPolicyV1.enabled(world.supply.generated):
+		data.screamer_policy = {"version":ScreamerPolicyV1.VERSION, "range":ScreamerPolicyV1.RANGE,
+			"windup":ScreamerPolicyV1.WINDUP, "max_reinforcements":ScreamerPolicyV1.MAX_REINFORCEMENTS}
 	if world.parallel_search:
 		data.search_policy={"version":SearchAssignments.VERSION,"occupancy":"one_member_one_site","order":"site_id"}
 	if world.power_mode(): data.power_policy=SpecialPowers.POLICY

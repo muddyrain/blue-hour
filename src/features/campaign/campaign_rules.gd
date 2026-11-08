@@ -29,7 +29,7 @@ static func initial_investigation(run_id: String) -> Dictionary:
 
 
 static func initial_mission(run_id: String, action_choices: bool = false, midgame: bool = false,
-		pump_station: bool = false, rare_sorties: bool = false) -> Dictionary:
+		pump_station: bool = false, rare_sorties: bool = false, screamer: bool = false) -> Dictionary:
 	var value: Dictionary = initial_investigation(run_id)
 	value.version = MISSION_VERSION
 	value.mode = MISSION_MODE
@@ -41,6 +41,8 @@ static func initial_mission(run_id: String, action_choices: bool = false, midgam
 		value.finale_policy = 1
 		if rare_sorties:
 			value.rare_policy = RareSortie.VERSION
+			if screamer:
+				value.screamer_policy = ScreamerPolicyV1.VERSION
 	return value
 
 
@@ -61,6 +63,11 @@ static func pump_station_enabled(value: Variant) -> bool:
 
 static func rare_sorties_enabled(value: Variant) -> bool:
 	return pump_station_enabled(value) and SurvivalContracts.integer(value.get("rare_policy"), RareSortie.VERSION, RareSortie.VERSION)
+
+
+static func screamer_enabled(value: Variant) -> bool:
+	return rare_sorties_enabled(value) and SurvivalContracts.integer(value.get("screamer_policy"),
+		ScreamerPolicyV1.VERSION, ScreamerPolicyV1.VERSION)
 
 
 static func is_investigation(value: Variant) -> bool:
@@ -99,7 +106,8 @@ static func _investigation_problem(value: Dictionary, run_id: String) -> String:
 	var has_midgame: bool = value.has("midgame")
 	var has_finale: bool = value.has("finale_policy")
 	var has_rare: bool = value.has("rare_policy")
-	if value.size() != INVESTIGATION_KEYS.size() + int(has_action_policy) + int(has_midgame) + int(has_finale) + int(has_rare) or not value.has_all(INVESTIGATION_KEYS) or not SurvivalContracts.integer(value.version,version,version):
+	var has_screamer: bool = value.has("screamer_policy")
+	if value.size() != INVESTIGATION_KEYS.size() + int(has_action_policy) + int(has_midgame) + int(has_finale) + int(has_rare) + int(has_screamer) or not value.has_all(INVESTIGATION_KEYS) or not SurvivalContracts.integer(value.version,version,version):
 		return "INVESTIGATION_FIELDS"
 	if has_action_policy and not action_choices_enabled(value):
 		return "INVESTIGATION_ACTION_POLICY"
@@ -109,6 +117,8 @@ static func _investigation_problem(value: Dictionary, run_id: String) -> String:
 		return "PUMP_CAMPAIGN_POLICY"
 	if has_rare and not rare_sorties_enabled(value):
 		return "RARE_CAMPAIGN_POLICY"
+	if has_screamer and not screamer_enabled(value):
+		return "SCREAMER_CAMPAIGN_POLICY"
 	if not value.run_id is String or not _identity(value.run_id) or (not run_id.is_empty() and run_id != value.run_id):
 		return "INVESTIGATION_IDENTITY"
 	if not value.clues is Array or value.clues.size() > CLUE_IDS.size() or value.outcome not in ["ACTIVE","VICTORY","DEFEAT"] or not value.result_transaction is String:

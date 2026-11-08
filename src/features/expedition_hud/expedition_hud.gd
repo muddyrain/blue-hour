@@ -598,7 +598,7 @@ func _finite_number(value: Variant) -> bool:
 
 
 func _fit_persona_members() -> void:
-	if _persona_cards.is_empty() or not _persona_cards[0].visible: return
+	if not is_inside_tree() or _persona_cards.is_empty() or not _persona_cards[0].visible: return
 	var height: float=0.0
 	var count: int=0
 	for card: PersonaCard in _persona_cards:

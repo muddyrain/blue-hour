@@ -25,6 +25,8 @@ static func speed(kind: String, rushing: bool, normal: float) -> float:
 
 
 static func name_for(kind: String) -> String:
+	if kind == ScreamerPolicyV1.KIND:
+		return "尖啸感染者"
 	return "毒气" if kind==CombatEnemyRules.TOXIC else "疾奔" if kind==RUSH else "重压" if kind==HEAVY else "普通"
 
 

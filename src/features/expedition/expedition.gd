@@ -484,6 +484,9 @@ func step(delta: float) -> void:
 	_update_combat()
 	if combat_mode(): combat.cancel_unavailable(self)
 	if combat_mode() and not is_paused: combat.advance_toxic(self,delta)
+	# Resolve after the original attacks so a lethal hit on the last windup frame wins.
+	if combat.screamer != null and not is_paused and living_count() > 0:
+		combat.screamer.advance(self, delta)
 	if combat_mode():
 		for actor: FieldActor in survivors: combat.present(actor)
 	if encounter!=null and not is_paused:
@@ -942,9 +945,24 @@ func _spawn_enemy(forced_kind: String = "", pressure_point: Vector2 = Vector2.IN
 	var enemy: FieldActor = _make_actor(true, _spawn_count, point,{},forced_kind)
 	enemies.append(enemy)
 	_spawn_count += 1
+	if combat.screamer != null and enemy.enemy_behavior.kind == ScreamerPolicyV1.KIND:
+		combat.screamer.spawned(self, enemy)
 	_record_spawn(&"spawned", point, enemy.actor_id)
 
 	return {"reason":"spawned","enemy_id":enemy.actor_id}
+
+
+func _spawn_screamer_batch(event: Dictionary) -> void:
+	# Insert the whole batch before notifying listeners. It never modifies the ambient clock.
+	for row: Dictionary in event.spawned:
+		var point: Vector2 = SortieSnapshot._vec(row.point)
+		var enemy: FieldActor = _make_actor(true, int(row.enemy_id), point, {}, EnemyRules.NORMAL)
+		enemies.append(enemy)
+	_spawn_count += event.spawned.size()
+	_spawn_attempts += event.spawned.size()
+	for row: Dictionary in event.spawned:
+		_record_spawn(&"spawned", SortieSnapshot._vec(row.point), int(row.enemy_id),
+			{"source":"screamer", "source_id":event.source_id, "event_id":event.event_id, "entrance":row.entrance}, false)
 
 
 func visible_world_rect() -> Rect2:
@@ -975,22 +993,15 @@ func _safe_spawn_point(pressure_point: Vector2 = Vector2.INF) -> Vector2:
 	if pressure_point.is_finite():
 		candidates.sort_custom(func(a: Vector2,b: Vector2) -> bool:return a.distance_squared_to(pressure_point)<b.distance_squared_to(pressure_point))
 	var visible: Rect2 = visible_world_rect().grow(threat.rules.screen_margin)
+	var occupied: Array[Vector2] = []
+	for enemy: FieldActor in enemies:
+		occupied.append(enemy.position)
 	for point: Vector2 in candidates:
-		if visible.has_point(point) or not navigation.is_clear(point):
-			continue
 		if pressure_point.is_finite() and point.distance_to(pressure_point)<threat.rules.party_distance:
 			continue
 		var nearest: FieldActor = _nearest_target_from_point(point)
-		if nearest == null or point.distance_to(nearest.position) < threat.rules.party_distance:
-			continue
-		var occupied: bool = false
-		for enemy: FieldActor in enemies:
-			if point.distance_to(enemy.position) < threat.rules.enemy_separation:
-				occupied = true
-				break
-		if occupied or navigation.path_between(point, nearest.position).size() < 2:
-			continue
-		return point
+		if nearest != null and threat.rules.spawn_point_legal(point, visible, navigation, nearest.position, occupied):
+			return point
 	return Vector2.INF
 
 
@@ -1007,8 +1018,9 @@ func _nearest_target_from_point(point: Vector2) -> FieldActor:
 	return nearest
 
 
-func _record_spawn(reason: StringName, point: Vector2, enemy_id: int = -1) -> void:
-	_spawn_attempts += 1
+func _record_spawn(reason: StringName, point: Vector2, enemy_id: int = -1,
+		provenance: Dictionary = {}, count_attempt: bool = true) -> void:
+	_spawn_attempts += int(count_attempt)
 	var event: Dictionary = threat_status()
 	var party_points: Array[Vector2] = []
 	var enemy_points: Array[Vector2] = []
@@ -1028,6 +1040,7 @@ func _record_spawn(reason: StringName, point: Vector2, enemy_id: int = -1) -> vo
 				event.enemy_type = actor.enemy_behavior.kind
 				event.enemy_health = actor.health
 				event.enemy_speed = actor.speed
+	event.merge(provenance, true)
 	spawn_resolved.emit(event)
 	print("BH_SPAWN " + JSON.stringify(event))
 
@@ -1202,6 +1215,8 @@ func _update_enemy_behaviors(delta: float) -> void:
 func _reap_defeated_enemies() -> void:
 	for index: int in range(enemies.size() - 1, -1, -1):
 		if enemies[index].activity == FieldActor.Activity.DOWN:
+			if combat.screamer != null:
+				combat.screamer.removed(self, enemies[index].actor_id)
 			if enemies[index].enemy_behavior!=null:
 				enemies[index].enemy_behavior.cancel(self,enemies[index])
 			_corpses.append(enemies[index])
@@ -1340,6 +1355,9 @@ func _finish(evacuated: bool, boarding: Vector2i = Vector2i.ZERO) -> void:
 	FreezeProfile.start({"day":day,"size":layout.world_data.get("size","legacy"),"buildings":_buildings.size(),"sites":sites.size(),"survivors":survivors.size(),"enemies":enemies.size(),"elapsed":elapsed})
 	var profile_report: int = FreezeProfile.enter("report.build")
 	phase = Phase.FINISHED
+	if combat.screamer != null and combat.screamer.state.phase == "windup":
+		ScreamerRuntimeV1.cancel(combat.screamer.state, int(combat.screamer.state.actor_id))
+		combat.screamer.present(self)
 	for enemy: FieldActor in enemies:
 		if enemy.enemy_behavior!=null:
 			enemy.enemy_behavior.cancel(self,enemy)
@@ -1960,6 +1978,8 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 		return false
 	pending_support={}
 	var after: Dictionary=result.world
+	var interrupted: bool = before.get("combat", {}).get("screamer", {}).get("phase") == "windup" \
+		and after.get("combat", {}).get("screamer", {}).get("phase") == "cancelled"
 	print("BH_SUPPORT "+JSON.stringify({"kind":request.kind,"status":"ACCEPTED","sequence_before":before.support.sequence,"sequence":after.support.sequence,"cooldowns":after.support.cooldowns,"kills_before":before.sim.kills,"kills":after.sim.kills,"facts":after.support.accepted.back().facts,"elapsed":after.sim.elapsed}))
 	# All fallible validation and I/O preceded this visible state replacement.
 	for enemy: FieldActor in enemies: enemy.free()
@@ -1971,7 +1991,11 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 		support_aiming=false
 		support_aim.impact(SortieSnapshot._vec(request.payload.point),request.payload.radius)
 		var hits: int=request.payload.targets.size()
-		_show_notice("空袭命中 · %d 个目标"%hits if hits>0 else "空袭已落地")
+		var notice: String = "空袭命中 · %d 个目标" % hits if hits > 0 else "空袭已落地"
+		if interrupted:
+			combat.screamer.report_cancelled(self, notice)
+		else:
+			_show_notice(notice)
 	else:
 		_show_notice("治疗已确认")
 	_update_ui()
@@ -2045,7 +2069,8 @@ func refresh_power_factors() -> void:
 	var factor: float=SpecialPowers.move_factor(powers,elapsed) if power_mode() else 1.0
 	power_frozen=SpecialPowers.frozen(powers,elapsed) if power_mode() else false
 	for actor: FieldActor in survivors: actor.power_move_factor=factor
-	for actor: FieldActor in enemies: actor.motion_locked=power_frozen
+	for actor: FieldActor in enemies:
+		actor.motion_locked = power_frozen or (combat.screamer != null and combat.screamer.holds(actor))
 
 func request_power() -> bool:
 	if not power_mode() or not support_available() or not pending_power.is_empty() or not survivors.any(func(actor:FieldActor)->bool:return actor.health>0): return false

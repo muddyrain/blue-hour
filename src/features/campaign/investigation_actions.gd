@@ -50,7 +50,8 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 			if not selected.is_empty():
 				result = _day(projected, clue, mission, industrial, action_choices, midgame, selected)
 	else:
-		result = _day(projected, clue, mission, industrial, action_choices, midgame)
+		var rare_type: String = RareSortie.selection(base.journey.seed, int(base.day), RareSortie.SLOT) if CampaignRules.rare_sorties_enabled(base.journey.campaign) else ""
+		result = _day(projected, clue, mission, industrial, action_choices, midgame, {}, rare_type)
 	if result.is_empty():
 		return {}
 	var fingerprints: Dictionary[String, String] = {}
@@ -88,7 +89,7 @@ static func site_problem(value: Dictionary) -> String:
 
 
 static func _day(projected: Dictionary, clue: String, mission: bool, industrial: bool,
-		action_choices: bool, midgame: bool, finale: Dictionary = {}) -> Array[Dictionary]:
+		action_choices: bool, midgame: bool, finale: Dictionary = {}, rare_type: String = "") -> Array[Dictionary]:
 	var original: Array[Dictionary] = PersonaActions.offers(projected)
 	if original.size() != 3:
 		return []
@@ -116,7 +117,14 @@ static func _day(projected: Dictionary, clue: String, mission: bool, industrial:
 		var task_type: String = "supply" if slot == slots[0] else "equipment" if investigation else optional_type
 		var offer: Dictionary
 		if action_choices and slot != slots[0] and not investigation:
-			offer = _choice_offer(projected, original[slot], industrial, midgame)
+			if not rare_type.is_empty():
+				var yard: bool = rare_type == "airdrop"
+				var source: Dictionary = _with_type(original[slot], rare_type, 0,
+					"industrial" if yard else "commercial", "medium" if yard else "large")
+				if not source.is_empty():
+					offer = ExplorationActions.upgrade(source, true, true, 1, yard, false, RareSortie.VERSION)
+			if offer.is_empty():
+				offer = _choice_offer(projected, original[slot], industrial, midgame)
 		else:
 			offer = _offer(original[slot], task_type, recruit if task_type == "rescue" else 0, mission, industrial)
 		if offer.is_empty():

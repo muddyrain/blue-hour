@@ -5,17 +5,17 @@ extends RefCounted
 const SPEED: float = 125.0
 
 
-static func freeze(layout: Dictionary, sites: Array, objective: Dictionary, type: String) -> Dictionary:
-	var proof: Dictionary=ValueProofCache.lookup("level-summary",{"layout":layout,"sites":sites,"objective":objective,"type":type})
+static func freeze(layout: Dictionary, sites: Array, objective: Dictionary, type: String, extra_site: String = "") -> Dictionary:
+	var proof: Dictionary=ValueProofCache.lookup("level-summary",{"layout":layout,"sites":sites,"objective":objective,"type":type,"extra_site":extra_site})
 	if proof.hit:
 		return proof.result
-	var result: Dictionary=_freeze(layout,sites,objective,type)
+	var result: Dictionary=_freeze(layout,sites,objective,type,extra_site)
 	if not result.is_empty():
 		ValueProofCache.remember(proof,result)
 	return result
 
 
-static func _freeze(layout: Dictionary, sites: Array, objective: Dictionary, type: String) -> Dictionary:
+static func _freeze(layout: Dictionary, sites: Array, objective: Dictionary, type: String, extra_site: String) -> Dictionary:
 	var routing: Dictionary = ExplorationLayout._routing(layout)
 	if routing.is_empty() or type not in TaskActions.TYPES:
 		return {}
@@ -62,7 +62,8 @@ static func _freeze(layout: Dictionary, sites: Array, objective: Dictionary, typ
 	from_ids.append("bus")
 	# The selected branch measures a genuine choice, not another completion reward.
 	for site: Dictionary in sites:
-		if site.source not in ["optional_building", "vehicle", "fruit_tree"]:
+		if (extra_site.is_empty() and site.source not in ["optional_building", "vehicle", "fruit_tree"]) \
+				or (not extra_site.is_empty() and site.id != extra_site):
 			continue
 		var extra_routes: Dictionary = routes.duplicate()
 		var valid: bool = true

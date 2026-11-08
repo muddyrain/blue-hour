@@ -1,4 +1,8 @@
-# M15-LEVEL-01 当前候选
+# M29-RARE-SORTIE-01 当前候选
+
+新旅程从第 3 天起可在备选位遇到断电冷库或封锁军需站。补给、调查与两份线索之后的泵站规则沿用 M28。候选依赖未合并的 PR #33，从已审 `0b76a5d721b94a0ec0f83f1ec5f32d190816ec03` 继续，Draft 以 `codex/m28-finale-01` 为 base。[任务与兼容合同](design/m29-rare-sortie-01.md)。正式生存发布门禁仍为 **BLOCKED**。
+
+# M15-LEVEL-01 历史候选
 
 PR #19 的已审 `11a5ad2c19f74052f29224d19e6b788eabc8ba72` 已普通合入 main `09f7d6d302375d2c89189793a9f225d81797e332`。唯一目录独立分支 `codex/m15-level-01`，新 Draft 以 main 为 base；本轮不合并新 PR、不发布。
 

@@ -26,6 +26,8 @@ M27 的新旅程通过 campaign.midgame 选择设施规则和住宅院生成。C
 
 M28 新旅程通过 `campaign.finale_policy` 选择河堤泵站。PumpStationAction 冻结固定地图和零战利品的停机工作点，原派工事实同时驱动控制柜、首领可见性和胜利资格。泵站的 encounter V2 严格校验冲锋状态与真实障碍，旧 encounter V1 保留原字段和判定。原伤害、死亡、暂存、结算与收据继续负责持久化。胜利画面只投影已提交泵站收据。[M28 设计](design/m28-finale-01.md)。
 
+M29 以 `campaign.rare_policy` 选择备选位策略，只有稀有行动附带同版本的冻结标识。InvestigationActions 认证当日候选，ExplorationActions 从原行动来源重建地图和站点，LevelSummary 测量指定追加站点的返程路线。冷库沿用灯光与室内派工，军需站沿用装卸院与一次性露天回收事件。实际携带、暂存及唯一入库由原世界和事务链负责。[M29 设计](design/m29-rare-sortie-01.md)。
+
 WeaponActions只在原TaskActions描述上冻结V5站点枪型，WeaponInventory新增显式站点奖励分支并保留历史固定reward；WorldSites/FrozenSettlement继续拥有实际携带与唯一入库。FieldActor持有按实例绑定的WeaponMagazine，Expedition按活跃模拟推进并在原成功攻击提交后扣弹，HUD只读。世界8扩展原快照，不增加战斗/保存/奖励owner；见[弹匣与掉落合同](design/m7-weapon-01.md)。
 
 TaskActions只生成/校验V4任务描述并投影真实目标进度；DailyActions保留V1/V2/V3认证分支。Expedition沿原站点/刷怪owner推进空投工作和有界一次性压力，SortieSnapshot世界6保存同一task_event及原敌人事实；FrozenSettlement从报告计算任务摘要，EnemyState只对111开放经校验的last_day.task。没有新保存或收益owner；见[任务合同](design/m6-rogue-02.md)。

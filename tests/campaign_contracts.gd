@@ -12,6 +12,7 @@ func run() -> void:
 	app._new_game()
 	var base: Dictionary=app.camp_snapshot()
 	check(TransactionReceipt.camp_problem(base).is_empty(),"normal new short camp strict")
+	check(CampaignRules.pump_station_enabled(base.journey.campaign), "ordinary new entry opts into the explicit pump finale policy")
 	var daily: Array[Dictionary] = DailyActions.offers(base)
 	check(CampaignRules.is_mission(base.journey.campaign) and daily.size() == 3,
 		"ordinary new entry issues three mission-mode cards")
@@ -115,6 +116,9 @@ func _facilities(fresh: Dictionary) -> void:
 	var camp: Dictionary = _after_food(fresh, 4, 0)
 	check(TransactionReceipt.camp_problem(camp).is_empty(), "unchanged field food ledger is valid before construction")
 	var legacy: Dictionary = camp.duplicate(true)
+	legacy.journey.campaign.erase("finale_policy")
+	check(TransactionReceipt.camp_problem(legacy).is_empty() and CampFacilities.enabled(legacy)
+		and not CampaignRules.pump_station_enabled(legacy.journey.campaign), "M27 facilities remain valid without opting into the pump finale")
 	legacy.journey.campaign.erase("midgame")
 	check(TransactionReceipt.camp_problem(legacy).is_empty() and CampEdit.propose(legacy, supply_request).is_empty(),
 		"M25 camp remains valid and cannot opt in from a camp edit")
@@ -155,6 +159,7 @@ func _facilities(fresh: Dictionary) -> void:
 	result_food.facility_stored = 0
 	check(not CampFacilities.result_problem(supply, settled, result).is_empty(), "forged facility payout is rejected")
 	var stripped: Dictionary = settled.duplicate(true)
+	stripped.journey.campaign.erase("finale_policy")
 	stripped.journey.campaign.erase("midgame")
 	check(not TransactionReceipt.camp_problem(stripped).is_empty(), "historic camp cannot authenticate a facility payout")
 

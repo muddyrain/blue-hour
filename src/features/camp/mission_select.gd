@@ -172,7 +172,10 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 			_descriptions[index].remove_theme_constant_override("line_spacing")
 		_pictures[index].custom_minimum_size.y = 88
 		var mission_card: bool = supply.generated.get("mission_policy") == 1
-		if mission_card:
+		var pump_card: bool = PumpStationAction.enabled(supply.generated)
+		if pump_card:
+			_descriptions[index].add_theme_font_size_override("font_size", 16)
+		elif mission_card:
 			var title: String = {"supply":"补给", "airdrop":"装备", "equipment":"调查", "rescue":"救援"}[supply.generated.type]
 			_titles[index].text = "%02d / %s" % [index + 1, title]
 			_descriptions[index].text = LevelSummary.mission_card_text(supply.generated, base if action_choices else {}, rations)
@@ -193,9 +196,11 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 			_titles[index].text = "%02d / 调查 · %s" % [index+1, clue_name]
 			_descriptions[index].text = "搜索标记建筑：%s\n" % clue_name + _descriptions[index].text
 			_pictures[index].custom_minimum_size.y = 40
-		var outdoor: bool=TaskActions.outdoor_site(supply.generated,&"cash")
+		var outdoor: bool = not pump_card and TaskActions.outdoor_site(supply.generated, &"cash")
 		var picture: Texture2D = MARKET if supply.id == &"supermarket" else SHOP
-		if mission_card or (player_mode and supply.generated.get("exploration", {}).has("level")):
+		if pump_card:
+			picture = BuildingLibrary.definition("warehouse").texture
+		elif mission_card or (player_mode and supply.generated.get("exploration", {}).has("level")):
 			picture = _mission_picture(supply.generated, picture)
 		elif outdoor:
 			picture = null

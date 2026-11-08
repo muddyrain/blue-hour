@@ -84,6 +84,8 @@ static func offers(base: Dictionary) -> Array[Dictionary]:
 	return result
 
 static func problem(value: Variant, camp_source: bool = false) -> String:
+	if value is Dictionary and value.has("finale_policy"):
+		return PumpStationAction.problem(value)
 	if value is Dictionary and value.has("investigation"):
 		var issue: String = InvestigationActions.marker_problem(value.investigation)
 		if not issue.is_empty():
@@ -142,6 +144,8 @@ static func matches(base: Dictionary,value: Variant) -> bool:
 
 static func supply(value: Dictionary) -> MissionSupply:
 	assert(problem(value).is_empty())
+	if PumpStationAction.enabled(value):
+		return PumpStationAction.supply(value)
 	var source: Dictionary=origin(value)
 	var result: MissionSupply=PersonaActions.supply(source)
 	result.generated=value.duplicate(true)

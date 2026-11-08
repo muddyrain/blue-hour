@@ -46,7 +46,9 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 		var finale: Array[Dictionary] = ExplorationActions.offers(projected)
 		projected.journey.campaign.preparations = 0
 		if not finale.is_empty():
-			result = _day(projected, clue, mission, industrial, action_choices, midgame, finale[0])
+			var selected: Dictionary = PumpStationAction.freeze(finale[0]) if CampaignRules.pump_station_enabled(base.journey.campaign) else finale[0]
+			if not selected.is_empty():
+				result = _day(projected, clue, mission, industrial, action_choices, midgame, selected)
 	else:
 		result = _day(projected, clue, mission, industrial, action_choices, midgame)
 	if result.is_empty():

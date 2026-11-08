@@ -96,6 +96,8 @@ var _migration_source: String = ""
 var _migration_entry: Button
 var _migration_preview: Dictionary = {}
 var _battle_new_button: Button
+var _pump_victory: PumpVictoryView
+var _pump_details_back: Button
 var progress_session: ProductionProgress
 var _transactional_new_pending: bool = false
 var _damage_gates: Array[PersistedDamageGate] = []
@@ -846,7 +848,7 @@ func _new_game() -> void:
 	_migration_notice = ""
 	profile_id = RunSave.new_profile_id()
 	if playable_entry:
-		_battle_meta.campaign=CampaignRules.initial_mission(profile_id, true, true)
+		_battle_meta.campaign=CampaignRules.initial_mission(profile_id, true, true, true)
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true, true)
 	_initialize_weapons("initial")
 	last_settlement_id = ""
@@ -1623,6 +1625,9 @@ func _show_battle_result(snapshot: Dictionary, durable: bool) -> void:
 	_result.show()
 	var ended: bool = snapshot.journey.state == "FAILED" or CampaignState.ended(snapshot)
 	var victory: bool = snapshot.journey.get("campaign",{}).get("outcome")=="VICTORY"
+	_set_pump_victory_visible(false)
+	if _pump_details_back != null:
+		_pump_details_back.hide()
 	$Interface/Screen/Result/Heading.text = ("旅程胜利" if durable else "胜利预览 · 待确认保存") if victory else "旅程结束 · 全员阵亡" if ended else "幸存者归航"
 	var text: String = "隔离生存测试版 / 战斗永久死亡\n"
 	if snapshot.journey.seed != "NONE":
@@ -1652,6 +1657,59 @@ func _show_battle_result(snapshot: Dictionary, durable: bool) -> void:
 		if victory and not durable and CampFacilities.enabled(snapshot):
 			$Interface/Screen/Result/Heading.text = "归航待确认 · 破阵者已倒地"
 			$Interface/Screen/Result/Continue.text = "确认归航并保存胜利 →" if not _progress_blocked else "重试保存终局 →"
+		if victory and durable and CampaignRules.pump_station_enabled(snapshot.journey.campaign):
+			_show_pump_victory(snapshot)
+
+
+func _show_pump_victory(snapshot: Dictionary) -> void:
+	var inspected: Dictionary = progress_session.inspect()
+	var receipt: Dictionary = inspected.get("receipt", {})
+	var frozen: Dictionary = receipt.get("envelope", {}).get("result", {})
+	var generated: Dictionary = frozen.get("rules", {}).get("mission", {}).get("generated", {})
+	var battle: Dictionary = frozen.get("battle", {})
+	if inspected.error != OK or receipt.get("phase") != "COMMITTED" or receipt.get("transaction_id") != snapshot.last_settlement_id \
+			or not PumpStationAction.enabled(generated) or not battle.get("evacuated", false) \
+			or not PumpStationAction.stopped(battle.get("site_facts", {})) or battle.get("encounter", {}).get("defeat", {}).is_empty():
+		return
+	if _pump_victory == null:
+		_pump_victory = PumpVictoryView.new()
+		_result.add_child(_pump_victory)
+		_pump_victory.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_pump_victory.record_requested.connect(return_to_title)
+		_pump_victory.new_journey_requested.connect(_request_battle_new_journey)
+		_pump_victory.details_requested.connect(_open_pump_details)
+		_pump_details_back = Button.new()
+		_pump_details_back.text = "返回胜利画面"
+		_result.add_child(_pump_details_back)
+		_pump_details_back.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+		_pump_details_back.offset_left = 688
+		_pump_details_back.offset_right = 900
+		_pump_details_back.offset_top = -84
+		_pump_details_back.offset_bottom = -28
+		_pump_details_back.pressed.connect(func() -> void:
+			_pump_details_back.hide()
+			_set_pump_victory_visible(true)
+			_pump_victory.record_button.grab_focus())
+		_pump_details_back.hide()
+	var returned: int = battle.member_results.filter(func(member: Dictionary) -> bool: return member.health > 0.0).size()
+	_pump_victory.present(int(snapshot.last_day.day), returned)
+	_set_pump_victory_visible(true)
+
+
+func _open_pump_details() -> void:
+	_set_pump_victory_visible(false)
+	_pump_details_back.show()
+	_pump_details_back.grab_focus()
+
+
+func _set_pump_victory_visible(enabled: bool) -> void:
+	if _pump_victory == null:
+		return
+	_pump_victory.visible = enabled
+	$Interface/Screen/Result/Heading.visible = not enabled
+	$Interface/Screen/Result/Scroll.visible = not enabled
+	$Interface/Screen/Result/Continue.visible = not enabled
+	_battle_new_button.visible = not enabled
 
 
 func _hunger_policy_text() -> String:
@@ -2416,6 +2474,11 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	var battle: Dictionary = frozen.get("battle",{})
 	var text: String = "归航结果 · 已入账\n" if durable else "归航预览 · 确认保存后入账\n"
 	var generated: Dictionary = frozen.get("rules",{}).get("mission",{}).get("generated",{})
+	if PumpStationAction.enabled(generated) and not battle.is_empty():
+		if battle.encounter.defeat.is_empty():
+			text += "河堤泵站 · 提前撤离，未登记胜利。\n" if battle.evacuated else "河堤泵站 · 未能归航。\n"
+		else:
+			text += "河堤泵站 · 已停机 · 破阵者已倒地\n"
 	if snapshot.last_day.has("task") and not generated.get("campaign",{}).get("is_finale",false):
 		var title: String = ""
 		if generated.get("mission_policy") == 1:

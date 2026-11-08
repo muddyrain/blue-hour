@@ -195,13 +195,14 @@ static func _terminal(receipt: Dictionary) -> bool:
 	var camp: Dictionary = TransactionReceipt.camp(receipt)
 	if not camp.get("journey", {}).get("build", {}).has("catalog"):
 		return false
-	var battle: Dictionary = receipt.envelope.result.battle
 	var campaign: Dictionary = camp.journey.campaign
 	if campaign.result_transaction != receipt.transaction_id:
 		return false
-	return (campaign.outcome == "VICTORY" and battle.evacuated and battle.mission_outcome == "EXTRACTED") \
-		or (campaign.outcome == "DEFEAT" and not battle.evacuated and battle.mission_outcome == "FAILED" \
-			and camp.journey.active_member_ids.is_empty())
+	if campaign.outcome == "DEFEAT":
+		# Rations settle after evacuation, so an extracted sortie can still end the journey.
+		return camp.journey.active_member_ids.is_empty()
+	var battle: Dictionary = receipt.envelope.result.battle
+	return campaign.outcome == "VICTORY" and battle.evacuated and battle.mission_outcome == "EXTRACTED"
 
 
 static func _found(receipt: Dictionary, battle: Dictionary, unlock_hash: String) -> bool:

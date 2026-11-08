@@ -166,18 +166,25 @@ static func mission_card_text(value: Dictionary, base: Dictionary = {}, rations:
 				route = "巴士到两点约 %d / %d 秒" % [outbound, second]
 			risk = "可只搜一处，多留会加重敌情"
 		"airdrop":
+			var sortie_risk: bool = SortieRiskV1.enabled(value)
 			reward = "损坏武器 1 件，可回营维修"
 			for site: Dictionary in value.sites:
 				if site.id == first and site.weapon:
 					var weapon: String = WeaponInventory.definition(site.drop.weapon_id).display_name
+					var damaged: bool = true
 					reward = "损坏%s 1 件，可回营维修" % weapon
 					if not base.is_empty():
 						var sortie_id: String = "%s:%d" % [base.profile_id, int(base.settled_sorties) + 1]
 						var item: Dictionary = WeaponInventory.site_reward(sortie_id, value, site, false)
-						reward = "损坏%s ×1，先维修再配装" % weapon if item.condition == "damaged" else "%s ×1，可直接配装" % weapon
+						damaged = item.condition == "damaged"
+						reward = "损坏%s ×1，先维修再配装" % weapon if damaged else "%s ×1，可直接配装" % weapon
+					if sortie_risk:
+						reward = ("损坏" if damaged else "") + "%s ×1" % weapon
 					break
 			if value.has("gear_build_policy") and not value.build.drops.is_empty():
 				reward += " · 被动道具 %d 件" % value.build.drops.size()
+			if sortie_risk:
+				return _sortie_risk_card_text(value, level, reward)
 			route = "露天单程约 %d 秒，回收 %d 秒" % [outbound, int(level.work_seconds[first])]
 			if value.layout.has("loading_yard"):
 				route = "宽装卸口、折角维修道汇合，回收 %d 秒" % int(level.work_seconds[first])
@@ -199,6 +206,22 @@ static func mission_card_text(value: Dictionary, base: Dictionary = {}, rations:
 				if recruit == FirstAidV1.SOURCE_ID and CampaignRules.first_aid_enabled(base.get("journey", {}).get("campaign")):
 					reward = "%s · 确认入队后下次出击可急救" % SurvivorRoster.definition(recruit).default_display_name
 	return "主收益 · %s%s\n路线 · %s\n风险 · %s" % [reward, decision, route, risk]
+
+
+static func _sortie_risk_card_text(value: Dictionary, level: Dictionary, reward: String) -> String:
+	var size: String = {"medium":"中型街区", "large":"大型街区"}[value.layout["size"]]
+	var round_trip: int = ceili(SortieRiskV1.round_trip_seconds(level))
+	var optional: String = ""
+	for site: Dictionary in value.sites:
+		if site.id != level.optional.site_id:
+			continue
+		var source: String = {"optional_building":"可选建筑", "vehicle":"停放车辆", "fruit_tree":"果树"}[site.source]
+		var resource: String = "货币" if site.kind == "cash" else "食物"
+		var added: int = ceili(float(level.optional.single.team_return_seconds) - float(level.single.team_return_seconds))
+		optional = "可选 · %s %s +%d，绕路另约 %d 秒（含搜集）\n" % [source, resource, int(site.amount), added]
+		break
+	return "主收益 · %s\n路线 · %s，步行往返约 %d 秒\n%s风险 · 首次最多增援 %d 名，取到即可撤离" % [
+		reward, size, round_trip, optional, int(value.parameters.reinforcements)]
 
 
 static func _mission_route_seconds(level: Dictionary, from: String, to: String) -> int:

@@ -30,12 +30,14 @@ static func initial_investigation(run_id: String) -> Dictionary:
 
 static func initial_mission(run_id: String, action_choices: bool = false, midgame: bool = false,
 		pump_station: bool = false, rare_sorties: bool = false, screamer: bool = false,
-		weapon_affixes: bool = false, first_aid: bool = false) -> Dictionary:
+		weapon_affixes: bool = false, first_aid: bool = false, sortie_risk: bool = false) -> Dictionary:
 	var value: Dictionary = initial_investigation(run_id)
 	value.version = MISSION_VERSION
 	value.mode = MISSION_MODE
 	if action_choices or midgame:
 		value.action_policy = ACTION_POLICY_VERSION
+		if sortie_risk:
+			value.sortie_risk_policy = SortieRiskV1.VERSION
 	if midgame:
 		value.midgame = CampFacilities.initial()
 	if midgame and pump_station:
@@ -85,6 +87,11 @@ static func first_aid_enabled(value: Variant) -> bool:
 		FirstAidV1.VERSION, FirstAidV1.VERSION)
 
 
+static func sortie_risk_enabled(value: Variant) -> bool:
+	return action_choices_enabled(value) and SurvivalContracts.integer(value.get("sortie_risk_policy"),
+		SortieRiskV1.VERSION, SortieRiskV1.VERSION)
+
+
 static func is_investigation(value: Variant) -> bool:
 	return is_mission(value) or (value is Dictionary and value.get("version") == INVESTIGATION_VERSION and value.get("mode") == INVESTIGATION_MODE)
 
@@ -124,8 +131,9 @@ static func _investigation_problem(value: Dictionary, run_id: String) -> String:
 	var has_screamer: bool = value.has("screamer_policy")
 	var has_affixes: bool = value.has("weapon_affix_policy")
 	var has_first_aid: bool = value.has("first_aid_policy")
+	var has_sortie_risk: bool = value.has("sortie_risk_policy")
 	var field_count: int = INVESTIGATION_KEYS.size() + int(has_action_policy) + int(has_midgame) \
-		+ int(has_finale) + int(has_rare) + int(has_screamer) + int(has_affixes) + int(has_first_aid)
+		+ int(has_finale) + int(has_rare) + int(has_screamer) + int(has_affixes) + int(has_first_aid) + int(has_sortie_risk)
 	if value.size() != field_count or not value.has_all(INVESTIGATION_KEYS) or not SurvivalContracts.integer(value.version,version,version):
 		return "INVESTIGATION_FIELDS"
 	if has_action_policy and not action_choices_enabled(value):
@@ -142,6 +150,8 @@ static func _investigation_problem(value: Dictionary, run_id: String) -> String:
 		return "WEAPON_AFFIX_CAMPAIGN_POLICY"
 	if has_first_aid and not first_aid_enabled(value):
 		return "FIRST_AID_CAMPAIGN_POLICY"
+	if has_sortie_risk and not sortie_risk_enabled(value):
+		return "SORTIE_RISK_CAMPAIGN_POLICY"
 	if not value.run_id is String or not _identity(value.run_id) or (not run_id.is_empty() and run_id != value.run_id):
 		return "INVESTIGATION_IDENTITY"
 	if not value.clues is Array or value.clues.size() > CLUE_IDS.size() or value.outcome not in ["ACTIVE","VICTORY","DEFEAT"] or not value.result_transaction is String:

@@ -102,6 +102,8 @@ static func problem(value: Variant, camp_source: bool = false) -> String:
 		return "WEAPON_AFFIX_ACTION_POLICY"
 	if value is Dictionary and value.has("first_aid_policy") and not FirstAidV1.enabled(value):
 		return "FIRST_AID_ACTION_POLICY"
+	if value is Dictionary and value.has("sortie_risk") and not SortieRiskV1.enabled(value):
+		return "SORTIE_RISK_ACTION_POLICY"
 	if value is Dictionary and value.has("finale_policy"):
 		return PumpStationAction.problem(value)
 	if value is Dictionary and value.has("investigation"):
@@ -127,6 +129,7 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 	var screamer: bool = value is Dictionary and value.has("screamer_policy")
 	var weapon_affixes: bool = value is Dictionary and value.has("weapon_affix_policy")
 	var first_aid: bool = value is Dictionary and value.has("first_aid_policy")
+	var sortie_risk: bool = value is Dictionary and value.has("sortie_risk")
 	if worldgen and (not value.worldgen is Dictionary or not TransactionReceipt.same(value.worldgen,WorldgenLayout.policy(level, industrial, residential_rescue))): return "WORLDGEN_ACTION_POLICY"
 	if mission and (not level or not SurvivalContracts.integer(value.mission_policy, 1, 1)): return "MISSION_ACTION_POLICY"
 	if rare and (not mission or not SurvivalContracts.integer(value.rare_policy, RareSortie.VERSION, RareSortie.VERSION)): return "RARE_ACTION_POLICY"
@@ -134,7 +137,7 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 			or not SurvivalContracts.integer(value.gear_build_policy, BuildItems.VERSION, BuildItems.CATALOG_POOL)):
 		return "GEAR_BUILD_POLICY"
 	var field_count: int = 23 + int(worldgen) + int(mission) + int(rare) + int(gear_build) \
-		+ int(screamer) + int(weapon_affixes) + int(first_aid)
+		+ int(screamer) + int(weapon_affixes) + int(first_aid) + int(sortie_risk)
 	if not value is Dictionary or not SurvivalContracts.json_value(value) or value.size()!=field_count or value.get("version")!=9 or not value.get("layout") is Dictionary or not value.get("exploration") is Dictionary or not value.get("build") is Dictionary or not value.get("powers") is Dictionary or not value.get("persona") is Dictionary or not value.get("campaign") is Dictionary: return "EXPLORATION_ACTION_FIELDS"
 	if not SurvivalContracts.integer(value.build.get("version"), BuildItems.VERSION, BuildItems.CATALOG_POOL):
 		return "EXPLORATION_BUILD_POOL"
@@ -144,7 +147,11 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 	if _checked.has(proof_key): return ""
 	var source: Dictionary=origin(value)
 	if source.is_empty(): return "EXPLORATION_ORIGINAL_SOURCE"
-	var expected: Dictionary = upgrade(source, worldgen, level, int(mission), industrial, residential_rescue, int(value.get("rare_policy", 0)))
+	var expected: Dictionary
+	if sortie_risk:
+		expected = SortieRiskV1.freeze(source, value.sortie_risk.topology, value.sortie_risk.yard)
+	else:
+		expected = upgrade(source, worldgen, level, int(mission), industrial, residential_rescue, int(value.get("rare_policy", 0)))
 	if expected.is_empty(): return "EXPLORATION_ACTION_CANONICAL"
 	if gear_build:
 		expected = BuildActions.with_gear_drops(expected)

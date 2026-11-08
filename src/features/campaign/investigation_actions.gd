@@ -40,6 +40,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var action_choices: bool = CampaignRules.action_choices_enabled(base.journey.campaign)
 	var midgame: bool = CampaignRules.midgame_enabled(base.journey.campaign)
 	var gear_build: bool = base.journey.build.has("opening")
+	var sortie_risk: bool = CampaignRules.sortie_risk_enabled(base.journey.campaign)
 	var clue: String = CampaignRules.next_clue(base.journey.campaign)
 	var result: Array[Dictionary] = []
 	if clue.is_empty():
@@ -49,10 +50,10 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 		if not finale.is_empty():
 			var selected: Dictionary = PumpStationAction.freeze(finale[0]) if CampaignRules.pump_station_enabled(base.journey.campaign) else finale[0]
 			if not selected.is_empty():
-				result = _day(projected, clue, mission, industrial, action_choices, midgame, selected, "", gear_build)
+				result = _day(projected, clue, mission, industrial, action_choices, midgame, selected, "", gear_build, sortie_risk)
 	else:
 		var rare_type: String = RareSortie.selection(base.journey.seed, int(base.day), RareSortie.SLOT) if CampaignRules.rare_sorties_enabled(base.journey.campaign) else ""
-		result = _day(projected, clue, mission, industrial, action_choices, midgame, {}, rare_type, gear_build)
+		result = _day(projected, clue, mission, industrial, action_choices, midgame, {}, rare_type, gear_build, sortie_risk)
 	if result.is_empty():
 		return {}
 	var fingerprints: Dictionary[String, String] = {}
@@ -100,7 +101,7 @@ static func site_problem(value: Dictionary) -> String:
 
 static func _day(projected: Dictionary, clue: String, mission: bool, industrial: bool,
 		action_choices: bool, midgame: bool, finale: Dictionary = {}, rare_type: String = "",
-		gear_build: bool = false) -> Array[Dictionary]:
+		gear_build: bool = false, sortie_risk: bool = false) -> Array[Dictionary]:
 	var original: Array[Dictionary] = PersonaActions.offers(projected)
 	if original.size() != 3:
 		return []
@@ -135,7 +136,7 @@ static func _day(projected: Dictionary, clue: String, mission: bool, industrial:
 				if not source.is_empty():
 					offer = ExplorationActions.upgrade(source, true, true, 1, yard, false, RareSortie.VERSION)
 			if offer.is_empty():
-				offer = _choice_offer(projected, original[slot], industrial, midgame)
+				offer = _choice_offer(projected, original[slot], industrial, midgame, sortie_risk)
 		else:
 			offer = _offer(original[slot], task_type, recruit if task_type == "rescue" else 0, mission, industrial)
 		if offer.is_empty():
@@ -151,7 +152,8 @@ static func _day(projected: Dictionary, clue: String, mission: bool, industrial:
 	return result
 
 
-static func _choice_offer(base: Dictionary, source: Dictionary, industrial: bool, midgame: bool) -> Dictionary:
+static func _choice_offer(base: Dictionary, source: Dictionary, industrial: bool, midgame: bool,
+		sortie_risk: bool) -> Dictionary:
 	var key: String = "m25-action-choice:%s:%d" % [base.journey.seed, int(base.day)]
 	if key.sha256_text().left(1).hex_to_int() % 2 == 0:
 		var transaction: String = "%s:%d" % [base.profile_id, int(base.settled_sorties) + 1]
@@ -160,6 +162,11 @@ static func _choice_offer(base: Dictionary, source: Dictionary, industrial: bool
 			var rescue: Dictionary = _offer(source, "rescue", recruit, true, industrial, midgame)
 			if not rescue.is_empty():
 				return rescue
+	if sortie_risk and not SortieRiskV1.selection(source.seed, int(source.day), int(source.slot)).is_empty():
+		var topology: String = source.layout.topology
+		var risk_offer: Dictionary = SortieRiskV1.freeze(source, topology, industrial and topology == "industrial")
+		if not risk_offer.is_empty():
+			return risk_offer
 	return _offer(source, "airdrop", 0, true, industrial)
 
 

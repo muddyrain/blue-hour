@@ -141,7 +141,7 @@ func refresh(data: Dictionary, feedback: String = "") -> void:
 	build_panel.visible=BuildState.enabled(data)
 	if build_panel.visible:
 		var build: Dictionary = data.journey.build
-		build_panel.present(build.owned, build.slots, true, not CampaignState.ended(data), build.get("opening", {}).get("plan", ""))
+		build_panel.present(build.owned, build.slots, true, not CampaignState.ended(data), build.get("opening", {}).get("plan", ""), BuildState.pool(data))
 	items.max_text_lines = 3 if WeaponState.is_family(_data) else 1
 	_sync_members()
 	for id: int in _member_equipment:
@@ -220,7 +220,7 @@ func _select(index: int) -> void:
 			var proposed: Dictionary = WeaponModifiers.effective(item,factor)
 			_detail.text += "\n%02d %s · 当前→所选\n伤%.2f→%.2f / 秒%.3f→%.3f / 距%.2f→%.2f" % [int(member.id),member.call_sign.left(5),before.damage,proposed.damage,before.interval,proposed.interval,before.range,proposed.range]
 	if BuildState.enabled(_data):
-		var factors: Dictionary=BuildItems.factors(_data.journey.build.slots)
+		var factors: Dictionary=BuildItems.factors(_data.journey.build.slots, BuildState.pool(_data))
 		var values: Dictionary=WeaponModifiers.effective(item)
 		if item.weapon_id=="shotgun_v1": _detail.text+="\n本局单颗 %.2f×5"%(values.damage*factors.damage)
 		_detail.text+="\n本局道具有效：%.2f伤 · 换弹%.2f秒\n小队移速×%.2f · 搜刮耗时×%.2f\n原属性保留；仅本局已保存两槽生效。"%[values.damage*(1.0 if CombatEquipment.melee(item.weapon_id) else factors.damage),weapon.reload_seconds()*factors.reload,factors.move,factors.work]

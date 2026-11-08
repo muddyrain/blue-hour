@@ -2,6 +2,12 @@
   "status": "PROJECT_TEMP",
   "files": [
     {
+      "path": "assets/ui/m31/filter-mask.svg",
+      "sha256": "bc76031d9591a7079984326953a798f68fe8bbeca99e61ccec3b893e5333896e",
+      "origin": "Original project vector illustration",
+      "license": "No additional license granted"
+    },
+    {
       "path": "assets/audio/b1/bus_start.wav",
       "sha256": "0171ead05c755e110850b1d13d3d4bf0994fa1b94f0685b04ddea7cb6adf42d8",
       "origin": "original mathematical synthesis",

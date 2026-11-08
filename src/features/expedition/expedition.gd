@@ -1283,7 +1283,7 @@ func _update_search(delta: float) -> void:
 			_search_log("interrupted",site)
 			continue
 		var prior_progress: float = site.progress
-		site.progress += delta / (actor.trait_search_factor * actor.persona_work_factor * (BuildItems.factors(supply.generated.build.slots).work if build_mode() else 1.0))
+		site.progress += delta / (actor.trait_search_factor * actor.persona_work_factor * (BuildItems.frozen_factors(supply.generated.build).work if build_mode() else 1.0))
 		if site.progress >= _site_seconds(site):
 			if not _complete_search(actor,site):
 				site.progress = prior_progress
@@ -1323,7 +1323,7 @@ func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
 		_show_notice("已携带能力样本：%s · 归航确认后入库"%SpecialPowers.POLICY[supply.generated.powers.sample].name if not supply.generated.powers.sample.is_empty() else "特殊能力已集齐。")
 	if build_mode() and site.id==&"cash" and not supply.generated.build.drops.is_empty():
 		var names: PackedStringArray=[]
-		for item: String in supply.generated.build.drops: names.append(BuildItems.definitions()[item].name)
+		for item: String in supply.generated.build.drops: names.append(supply.generated.build.policy.items[item].name)
 		_show_notice("携带道具："+"、".join(names)+" · 归航确认后入库")
 	var investigation: Dictionary = supply.generated.get("investigation", {})
 	if supply.generated.get("mission_policy") == 1 and investigation.get("site_id") == String(site.id):
@@ -1890,7 +1890,7 @@ func build_mode() -> bool:
 	return (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9))
 
 func apply_build(actor: FieldActor, profile: Dictionary = {}, item: Dictionary = {}) -> void:
-	var factors: Dictionary=BuildItems.factors(supply.generated.build.slots)
+	var factors: Dictionary=BuildItems.frozen_factors(supply.generated.build)
 	if persona_mode():
 		if profile.is_empty(): profile=SurvivorRoster.member(_setup_crew,actor.member_id)
 		var recipe: Dictionary=PersonaState.recipe(supply.generated,actor.member_id,actor.definition_id)
@@ -1997,7 +1997,7 @@ func _present_support() -> void:
 	var state: Dictionary=basic_support.snapshot()
 	var members: Array[Dictionary]=[]
 	for actor: FieldActor in survivors: members.append({"member_id":actor.member_id,"health":actor.health,"max_health":actor.max_health,"present":actor.activity!=FieldActor.Activity.DOWN})
-	var plan: Dictionary=basic_support.plan_heal(members,BuildItems.factors(supply.generated.build.slots).heal)
+	var plan: Dictionary=basic_support.plan_heal(members,BuildItems.frozen_factors(supply.generated.build).heal)
 	var heal_text: String="Q 治疗 · %.1fs"%state.cooldowns.heal if state.cooldowns.heal>0 else "Q 治疗 · 队员%d +%.0fHP"%[plan.member_id,plan.amount] if not plan.is_empty() else "Q 治疗 · 无受伤存活者"
 	var strike_text: String="E 空袭 · %.1fs"%state.cooldowns.airstrike if state.cooldowns.airstrike>0 else "左键确认 · 右键/Esc取消" if support_aiming else "E 空袭 · 就绪"
 	if not support_available(): heal_text="治疗 · 当前阶段不可用"; strike_text="空袭 · 当前阶段不可用"
@@ -2009,7 +2009,7 @@ func _present_support() -> void:
 		for actor: FieldActor in survivors:
 			if actor.health>0 and actor.visible and actor.activity not in [2,3,4] and (caller==null or actor.position.distance_to(point)<caller.position.distance_to(point) or (actor.position.distance_to(point)==caller.position.distance_to(point) and actor.member_id<caller.member_id)): caller=actor
 		if caller!=null: support_aim.present_caller(caller.position)
-	support_aim.present(point,BasicSupport.POLICY.airstrike_radius*BuildItems.factors(supply.generated.build.slots).blast,legal,support_aiming)
+	support_aim.present(point,BasicSupport.POLICY.airstrike_radius*BuildItems.frozen_factors(supply.generated.build).blast,legal,support_aiming)
 
 func support_plan_airstrike(point: Vector2) -> Dictionary:
 	var view: Dictionary={"version":10,"generated":supply.generated,"survivors":[],"enemies":[]}

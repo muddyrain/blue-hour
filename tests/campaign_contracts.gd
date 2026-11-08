@@ -102,9 +102,28 @@ func run() -> void:
 	_facilities(base)
 	_rare_sorties(base)
 	_opening_build(base)
+	_catalog_terminal(base)
 	app.audio.shutdown();app.queue_free();await process_frame
 	print("CAMPAIGN_CONTRACTS checks=",checks," failures=",failures)
 	quit(1 if failures else 0)
+
+
+func _catalog_terminal(base: Dictionary) -> void:
+	# Test the terminal classification in isolation. Journal acknowledgement is tested separately.
+	var camp: Dictionary = base.duplicate(true)
+	camp.journey.build.catalog = {"version":CatalogProgress.VERSION, "unlock":""}
+	camp.journey.state = "FAILED"
+	camp.journey.active_member_ids = []
+	var identity: String = base.profile_id + ":1"
+	for evacuated: bool in [false, true]:
+		var battle: Dictionary = {"evacuated":evacuated, "mission_outcome":"EXTRACTED" if evacuated else "FAILED",
+			"sortie_id":identity}
+		camp.journey.campaign = CampaignState.settled(base, camp, battle, {})
+		var receipt: Dictionary = {"phase":"COMMITTED", "transaction_id":identity, "camp_key":"camp",
+			"envelope":{"result":{"camp":camp, "battle":battle}}}
+		check(CatalogProgress._terminal(receipt), "catalog uses the journey defeat for evacuated=%s" % str(evacuated))
+		receipt.transaction_id = base.profile_id + ":2"
+		check(not CatalogProgress._terminal(receipt), "catalog rejects a terminal bound to another transaction")
 
 
 func _facilities(fresh: Dictionary) -> void:

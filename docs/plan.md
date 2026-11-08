@@ -1,4 +1,8 @@
-# M30-OPENING-BUILD-01 当前候选
+# M31-META-PROGRESSION-01 当前候选
+
+从包含 M30 已审提交 `7862dfb5e05e93453b3cba5830d6fe5207d1461b` 的 `main` 开发。正常旅程先确认两次成功归航，再确认胜利或全灭，可解锁后续新旅程的滤毒面罩。回收并确认入库后，标题装备图鉴记录发现。详见[设计与兼容合同](design/m31-meta-progression-01.md)。正式生存发布门禁仍为 **BLOCKED**。
+
+# M30-OPENING-BUILD-01 历史候选
 
 正常新旅程选择搜集型或火力型，首槽装备相应道具。普通装备回收可继续获得未拥有的道具。本候选叠加于未合并的 PR #34，已审基线为 `2c8b16247ee47da0f3aed44604f713dd224599ee`，Draft 以 `codex/m29-rare-sortie-01` 为 base。[设计与兼容合同](design/m30-opening-build-01.md)。正式生存发布门禁仍为 **BLOCKED**。
 

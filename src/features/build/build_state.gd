@@ -7,22 +7,33 @@ static func enabled(camp: Dictionary) -> bool:
 static func initial() -> Dictionary:
 	return {"version":1,"owned":[],"slots":["",""],"sources":[],"healing":{}}
 
+
+static func pool(camp: Dictionary) -> int:
+	var catalog: Dictionary = camp.get("journey", {}).get("build", {}).get("catalog", {})
+	return BuildItems.CATALOG_POOL if not catalog.get("unlock", "").is_empty() else BuildItems.VERSION
+
+
 static func problem(camp: Dictionary) -> String:
 	if not enabled(camp): return ""
 	var build: Variant = camp.journey.build
 	if not build is Dictionary or not build.has("opening"):
-		return _problem(camp, "")
+		return _problem(camp, "", BuildItems.VERSION)
 	var issue: String = OpeningBuild.problem(camp)
 	if not issue.is_empty():
 		return issue
+	if build.has("catalog"):
+		issue = CatalogProgress.policy_problem(build.catalog)
+		if not issue.is_empty():
+			return issue
 	var projected: Dictionary = camp.duplicate(false)
 	projected.journey = camp.journey.duplicate(false)
 	projected.journey.build = build.duplicate(false)
 	projected.journey.build.erase("opening")
-	return _problem(projected, build.opening.item_id)
+	projected.journey.build.erase("catalog")
+	return _problem(projected, build.opening.item_id, pool(camp))
 
 
-static func _problem(camp: Dictionary, opening_item: String) -> String:
+static func _problem(camp: Dictionary, opening_item: String, item_pool: int) -> String:
 	if ExplorationState.enabled(camp):
 		if camp.journey.build.size()!=(10 if WorldgenState.enabled(camp) else 9): return "EXPLORATION_BUILD_FIELDS"
 		var issue: String=WorldgenState.problem(camp) if WorldgenState.enabled(camp) else ""
@@ -36,7 +47,7 @@ static func _problem(camp: Dictionary, opening_item: String) -> String:
 		old.journey.build.erase("exploration")
 		old.journey.build.erase("worldgen")
 		for source: Dictionary in old.journey.build.powers.sources: source.generated=ExplorationActions.origin(source.generated)
-		return _problem(old, opening_item)
+		return _problem(old, opening_item, item_pool)
 	if PersonaState.enabled(camp):
 		if camp.journey.build.size()!=8: return "PERSONA_BUILD_FIELDS"
 		var issue: String=SurvivorPersona.problem(camp.journey.build.get("persona"),String(camp.journey.get("seed","")))
@@ -50,17 +61,17 @@ static func _problem(camp: Dictionary, opening_item: String) -> String:
 		# old validator. Legacy camps still reject every persona-bearing source.
 		for source: Dictionary in old.journey.build.powers.sources:
 			source.generated=PersonaActions.legacy(source.generated)
-		return _problem(old, opening_item)
+		return _problem(old, opening_item, item_pool)
 	if PowerState.enabled(camp):
 		if camp.journey.build.size()!=7 or camp.journey.build.get("combat_version")!=1: return "POWER_BUILD_FIELDS"
 		var old: Dictionary=camp.duplicate(true)
 		old.journey.build.version=2
 		old.journey.build.erase("powers")
-		var issue: String=_problem(old, opening_item)
+		var issue: String=_problem(old, opening_item, item_pool)
 		return PowerState.problem(camp) if issue.is_empty() else issue
 	var v: Variant=camp.journey.build
 	if not CampaignState.is_short(camp) or not v is Dictionary or v.size()!=(6 if v.get("version")==2 else 5) or not v.has_all(["version","owned","slots","sources","healing"]) or ((v.version!=1 and v.version!=2) or (v.version==2 and v.get("combat_version")!=1)) or not v.sources is Array: return "BUILD_FIELDS"
-	var issue: String=BuildItems.problem(v.owned,v.slots)
+	var issue: String=BuildItems.problem(v.owned,v.slots,item_pool)
 	if not issue.is_empty(): return issue
 	if not v.healing is Dictionary or v.healing.size()>5: return "BUILD_HEALING_HISTORY"
 	for id: Variant in v.healing:
@@ -89,7 +100,7 @@ static func _problem(camp: Dictionary, opening_item: String) -> String:
 			context=source.context
 			group_owned=prior.duplicate()
 		if not TransactionReceipt.same(context,source.context) or not TransactionReceipt.same({"v":group_owned},{"v":source.owned}): return "BUILD_ACQUISITION_DEPARTURE_OWNED"
-		if not BuildItems.problem(source.owned,["",""]).is_empty() or source.item_id not in BuildItems.drop(source.context,source.owned): return "BUILD_ACQUISITION_SOURCE"
+		if source.item_id not in BuildItems.drop(source.context,source.owned,item_pool): return "BUILD_ACQUISITION_SOURCE"
 		seen.append(source.item_id)
 		prior.append(source.item_id)
 	return ""

@@ -10,6 +10,7 @@ var inventory: Label
 var _effects: Array[Label] = []
 var _owned: Array = []
 var _slots: Array = ["", ""]
+var _pool: int = BuildItems.VERSION
 var _built: bool = false
 
 
@@ -17,9 +18,10 @@ func _ready() -> void:
 	_build()
 
 
-func present(owned: Array, slots: Array, saved: bool, enabled: bool = true, opening_plan: String = "") -> void:
+func present(owned: Array, slots: Array, saved: bool, enabled: bool = true, opening_plan: String = "",
+		pool: int = BuildItems.VERSION) -> void:
 	_build()
-	var issue: String = BuildItems.problem(owned, slots)
+	var issue: String = BuildItems.problem(owned, slots, pool)
 	if not issue.is_empty():
 		status.text = "道具配置无效 · 无法换装"
 		status.add_theme_color_override("font_color", CampStyle.AMBER)
@@ -29,12 +31,14 @@ func present(owned: Array, slots: Array, saved: bool, enabled: bool = true, open
 		return
 	_owned = owned.duplicate(true)
 	_slots = slots.duplicate(true)
+	_pool = pool
 	var names: PackedStringArray = []
-	var definitions: Dictionary = BuildItems.definitions()
-	for id: String in BuildItems.ids():
+	var definitions: Dictionary = BuildItems.definitions(pool)
+	var available: Array[String] = BuildItems.ids(pool)
+	for id: String in available:
 		if id in owned:
 			names.append(definitions[id].name)
-	inventory.text = "库存 %d/6%s" % [owned.size(), " · 已集齐" if owned.size() == 6 else ""]
+	inventory.text = "库存 %d/%d%s" % [owned.size(), available.size(), " · 已集齐" if owned.size() == available.size() else ""]
 	inventory.text += "：" + "、".join(names) if not names.is_empty() else " · 装备搜寻回收，归航确认后入库"
 	if OpeningBuild.PLANS.has(opening_plan):
 		inventory.text += "  ·  开局 %s" % OpeningBuild.PLANS[opening_plan].title
@@ -45,7 +49,7 @@ func present(owned: Array, slots: Array, saved: bool, enabled: bool = true, open
 		choice.clear()
 		choice.add_item("槽 %d · 空槽 / 卸下" % (slot + 1))
 		choice.set_item_metadata(0, "")
-		for id: String in BuildItems.ids():
+		for id: String in available:
 			if id not in owned:
 				continue
 			var index: int = choice.item_count
@@ -109,7 +113,7 @@ func _selected(index: int, slot: int) -> void:
 		return
 	var proposed: Array = _slots.duplicate(true)
 	proposed[slot] = id
-	if BuildItems.problem(_owned, proposed).is_empty():
+	if BuildItems.problem(_owned, proposed, _pool).is_empty():
 		requested.emit(slot, id)
 
 

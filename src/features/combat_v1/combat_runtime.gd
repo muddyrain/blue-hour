@@ -177,14 +177,18 @@ func advance_toxic(world: Expedition,delta: float) -> void:
 		if victim.health<=0:
 			toxic=ToxicV1.ack(toxic,hit)
 			continue
-		if not victim.take_damage(float(hit.amount)):
+		var amount: float = float(hit.amount)
+		var build: Dictionary = world.supply.generated.get("build", {})
+		if build.get("version") == BuildItems.CATALOG_POOL:
+			amount *= float(BuildItems.frozen_factors(build).get("poison", 1.0))
+		if not victim.take_damage(amount):
 			refresh_toxic(world)
 			_blocked(world)
 			return
 		toxic=ToxicV1.ack(toxic,hit)
 		world._clear_dead_worker()
 		world._update_enemy_behaviors(0.0)
-		world._hit_effect(victim.position,float(hit.amount),true)
+		world._hit_effect(victim.position,amount,true)
 		world.combat_feedback.emit({"kind":"toxic_hit","zone_id":hit.zone_id,"tick":hit.tick,"member_id":hit.member_id,"health":victim.health,"elapsed":world.elapsed})
 		print("BH_TOXIC_HIT zone=%s tick=%d member=%d health=%.2f"%[hit.zone_id,hit.tick,hit.member_id,victim.health])
 	refresh_toxic(world)

@@ -2,7 +2,7 @@ class_name BuildAuthority
 extends RefCounted
 ## Pure support proposals; RunTransaction alone publishes their full recoverable world.
 static func factor(world: Dictionary, key: String) -> float:
-	return BuildItems.factors(world.generated.build.slots)[key] if (world.get("version")==10 or SortieSnapshot.combat_version(world.get("version"))) else 1.0
+	return BuildItems.frozen_factors(world.generated.build)[key] if (world.get("version")==10 or SortieSnapshot.combat_version(world.get("version"))) else 1.0
 
 static func healed(events: Array, id: int) -> float:
 	var amount: float=0.0
@@ -31,10 +31,10 @@ static func support_problem(value: Variant, token: Dictionary, generated: Dictio
 			if facts.size()!=7 or not facts.has_all(["at","at_ms","member_id","health_before","health_after","amount","damage_received"]): return "HEAL_FACT_FIELDS"
 			for key: String in ["health_before","health_after","amount","damage_received"]:
 				if not SurvivalContracts.number(facts[key]): return "HEAL_FACT_NUMBER"
-			if facts.health_before<=0 or facts.amount<=0 or facts.amount>BasicSupport.POLICY.heal_amount*BuildItems.factors(generated.build.slots).heal or facts.health_after!=facts.health_before+facts.amount or facts.damage_received<0: return "HEAL_FACT_AMOUNT"
+			if facts.health_before<=0 or facts.amount<=0 or facts.amount>BasicSupport.POLICY.heal_amount*BuildItems.frozen_factors(generated.build).heal or facts.health_after!=facts.health_before+facts.amount or facts.damage_received<0: return "HEAL_FACT_AMOUNT"
 			if not TransactionReceipt.same(event.payload,{"member_id":facts.member_id,"amount":facts.amount}): return "HEAL_REQUEST_SOURCE"
 		else:
-			if facts.size()!=4 or not facts.get("targets") is Array or not event.payload.has_all(["member_id","point","radius","targets"]) or event.payload.member_id!=facts.member_id or event.payload.radius!=BasicSupport.POLICY.airstrike_radius*BuildItems.factors(generated.build.slots).blast: return "AIRSTRIKE_FACT_FIELDS"
+			if facts.size()!=4 or not facts.get("targets") is Array or not event.payload.has_all(["member_id","point","radius","targets"]) or event.payload.member_id!=facts.member_id or event.payload.radius!=BasicSupport.POLICY.airstrike_radius*BuildItems.frozen_factors(generated.build).blast: return "AIRSTRIKE_FACT_FIELDS"
 			var seen: Array[int]=[]
 			for target: Variant in facts.targets:
 				if not target is Dictionary or target.size()!=4 or not target.has_all(["enemy_id","health_before","health_after","amount"]) or not SurvivalContracts.integer(target.enemy_id,0,RunSave.MAX_COUNTER) or int(target.enemy_id) in seen: return "AIRSTRIKE_TARGET_FIELDS"

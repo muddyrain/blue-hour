@@ -2373,7 +2373,7 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	var frozen: Dictionary = state.get("receipt",{}).get("envelope",{}).get("result",{})
 	var meal: Dictionary = frozen.get("food",snapshot.last_day)
 	var battle: Dictionary = frozen.get("battle",{})
-	var text: String = "结算已保存。\n" if durable else "结果预览 · 确认后保存入账。\n"
+	var text: String = "归航结果 · 已入账\n" if durable else "归航预览 · 确认保存后入账\n"
 	var generated: Dictionary = frozen.get("rules",{}).get("mission",{}).get("generated",{})
 	if snapshot.last_day.has("task") and not generated.get("campaign",{}).get("is_finale",false):
 		var title: String = ""
@@ -2384,7 +2384,17 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 				title = "装备 · 露天回收"
 		text += TaskActions.summary_text(snapshot.last_day.task, title) + "\n"
 	if not meal.is_empty():
-		text += "带回：货币%d · 食物%d（入库%d） · 武器%d件\n口粮：%d名队员需%d粮，消耗%d，缺口%d\n" % [snapshot.last_day.cash_gained,meal.get("food_found",0),meal.get("food_stored",0),battle.get("weapons",[]).size(),meal.ration_member_ids.size(),meal.food_required,meal.food_consumed,meal.food_shortage]
+		text += ReturnFeedback.food_text(meal) + "\n"
+		if meal.food_shortage > 0:
+			text += "本次口粮缺口 %d 粮\n" % meal.food_shortage
+	text += "带回 %d 币 · %d 件武器\n" % [snapshot.last_day.cash_gained, battle.get("weapons", []).size()]
+	var ended: bool = snapshot.journey.state == "FAILED" or CampaignState.ended(snapshot)
+	if not ended:
+		var next_rations: Dictionary = CampEconomy.rations(snapshot.day, snapshot.crew, snapshot.food, camp_rules)
+		if next_rations.shortage > 0:
+			text += "下一趟口粮缺口 %d 粮，可优先选择补给。\n" % next_rations.shortage
+		if battle.get("weapons", []).any(func(item: Dictionary) -> bool: return item.condition == "damaged"):
+			text += "损坏武器可在营地武器整备中先维修，再配装。\n"
 	if BuildState.enabled(snapshot) and int(frozen.get("rules",{}).get("data_version",0)) in [8,9,10]:
 		var obtained: Array=BuildState.acquired(frozen.rules.mission.generated,battle.site_facts,battle.evacuated)
 		var names: PackedStringArray=[]
@@ -2394,21 +2404,26 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 		var sample: String=generated.powers.sample if battle.evacuated and battle.site_facts.get("cash",{}).get("searched",false) else ""
 		text+="本次能力："+(SpecialPowers.POLICY[sample].name if not sample.is_empty() else "无")+" · 本旅程%d/2（"%snapshot.journey.build.powers.owned.size()+("已保存" if durable else "确认后入库")+"）\n"
 	for item: Dictionary in battle.get("weapons",[]):text+="带回武器："+WeaponInventory.loot_description(item)+"\n"
+	if CampaignState.is_short(snapshot):
+		var campaign: Dictionary = snapshot.journey.campaign
+		var recorded: Dictionary = campaign
+		if CampaignRules.is_investigation(campaign):
+			if not durable:
+				recorded = camp_snapshot().journey.campaign
+			if not campaign.clues.is_empty():
+				var clue: Dictionary = campaign.clues.back()
+				if clue.transaction_id == snapshot.last_settlement_id:
+					text += "调查线索：%s（%s）\n" % [CampaignRules.CLUE_NAMES[clue.id], "已登记" if durable else "确认后登记"]
+		var display: Dictionary = CampaignRules.display(recorded)
+		text += display.title + " · " + display.progress + "\n"
+		if campaign.outcome == "VICTORY":
+			text += "首领真实击败、存活者巴士撤离；" + ("旅程胜利已保存。" if durable else "胜利仅为预览，确认保存成功才结束旅程。") + "\n"
 	for member: Dictionary in snapshot.crew:
 		var awarded: Dictionary = GrowthRules.member_row(frozen.get("xp",{}).get("members",[]),int(member.id))
 		var fate: String = _member_fate(snapshot,int(member.id)).replace(" / STARVATION", "").replace(" / BATTLE", "")
 		text += "\n%02d %s · %s · 生命%.0f/%.0f\nLv%d · %d XP（本次+%d）\n" % [member.id,member.call_sign,fate,member.health,GrowthRules.maximum(member),member.growth.level,member.growth.xp_total,awarded.get("xp_gained",0)]
-	text += "\n营地：第%d天 · 货币%d · 食物%d · 存活%d人\n" % [snapshot.day,snapshot.cash,snapshot.food,snapshot.journey.active_member_ids.size()]
-	if CampaignState.is_short(snapshot):
-		var campaign: Dictionary = snapshot.journey.campaign
-		var display: Dictionary=CampaignRules.display(campaign)
-		if CampaignRules.is_investigation(campaign) and not campaign.clues.is_empty():
-			var clue: Dictionary = campaign.clues.back()
-			if clue.transaction_id == snapshot.last_settlement_id:
-				text += "调查线索：%s（%s）\n" % [CampaignRules.CLUE_NAMES[clue.id], "已登记" if durable else "确认后登记"]
-		text+=display.title+" · "+display.progress+"\n"
-		if campaign.outcome=="VICTORY": text+="首领真实击败、存活者巴士撤离；"+("旅程胜利已保存。" if durable else "胜利仅为预览，确认保存成功才结束旅程。")+"\n"
-	text += "旅程已结束，不能再次出击。" if snapshot.journey.state=="FAILED" or CampaignState.ended(snapshot) else "确认结算后可回营整备，再次出击。"
+	text += "\n营地：第%d天 · 货币%d · 存活%d人\n" % [snapshot.day,snapshot.cash,snapshot.journey.active_member_ids.size()]
+	text += "旅程已结束，不能再次出击。" if ended else "确认结算后可回营整备，再次出击。"
 	return text
 
 func equip_build_item(slot: int, item: String) -> void:

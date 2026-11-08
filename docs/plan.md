@@ -1,4 +1,8 @@
-# M33-WEAPON-BUILD-01 当前候选
+# M34-SURVIVOR-ROLE-01 当前候选
+
+从合并 #37 与 #39 后的 `main` 开发。新旅程正常救出并确认沈听澜入队后，下一趟可使用一次战地急救，沿原生命与收据链确认并恢复。[规则与兼容](design/m34-survivor-role-01.md)。正式生存发布门禁仍为 **BLOCKED**。
+
+# M33-WEAPON-BUILD-01 历史候选
 
 从 Draft PR #37 已审提交 `8fd888c10053a448bc0321d1f579ea7b7e04390c` 开独立分支，Draft 以 `codex/m32-threat-01` 为 base。符合条件的新旅程普通装备回收可带回带战斗词缀的稀有长管步枪。沿原归航、维修和配装路径，下一次出击可用穿透弹或击倒补弹。[规则与兼容](design/m33-weapon-build-01.md)。正式生存发布门禁仍为 **BLOCKED**。
 

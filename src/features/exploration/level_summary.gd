@@ -196,6 +196,8 @@ static func mission_card_text(value: Dictionary, base: Dictionary = {}, rations:
 			if not base.is_empty():
 				reward += "｜主特长 %s" % TraitRules.NAMES[TraitRules.role({"id": recruit}) - 1]
 				risk = "现场接纳，生还归航确认入队"
+				if recruit == FirstAidV1.SOURCE_ID and CampaignRules.first_aid_enabled(base.get("journey", {}).get("campaign")):
+					reward = "%s · 确认入队后下次出击可急救" % SurvivorRoster.definition(recruit).default_display_name
 	return "主收益 · %s%s\n路线 · %s\n风险 · %s" % [reward, decision, route, risk]
 
 

@@ -38,6 +38,8 @@ WeaponActions只在原TaskActions描述上冻结V5站点枪型，WeaponInventory
 
 M33 在新旅程及符合条件的冻结行动上加版本标记。WeaponInventory 认证长管步枪的新来源分支，WeaponModifiers 从同一实例派生单个战斗词缀。Expedition 沿原射击和击倒归因应用穿透或补弹，WeaponMagazine 继续保存实际弹量。旧世界保持原兼容指纹。[M33 合同](design/m33-weapon-build-01.md)。
 
+M34 由新旅程和已确认入队的出发身份认证急救资格。FirstAidV1 计算合法目标，Expedition 在原模拟步触发，BuildAuthority 和 RunTransaction 用原支援证明提交。一次性使用状态和实际恢复量来自同一接受事实，生命守恒与归航由原核验链负责。[M34 合同](design/m34-survivor-role-01.md)。
+
 TaskActions只生成/校验V4任务描述并投影真实目标进度；DailyActions保留V1/V2/V3认证分支。Expedition沿原站点/刷怪owner推进空投工作和有界一次性压力，SortieSnapshot世界6保存同一task_event及原敌人事实；FrozenSettlement从报告计算任务摘要，EnemyState只对111开放经校验的last_day.task。没有新保存或收益owner；见[任务合同](design/m6-rogue-02.md)。
 
 RogueActions只拥有每日V1配置与确定性描述，RogueLayout只拼装/校验值布局并构造StreetLayout；现有Main/ProductionProgress/FrozenSettlement/Snapshot继续拥有选择、写入、结果和恢复。data_version2与世界version3显式绑定完整generated；旧规则与旧历史认证独立保留，普通入口在消费前拒绝旧途中。空间描述统一驱动原绘制、寻路、遮挡和交互，详情见[生成合同](design/m6-rogue-01.md)。

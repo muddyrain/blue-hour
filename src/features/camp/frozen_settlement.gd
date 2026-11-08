@@ -539,7 +539,7 @@ static func _facts_problem(input: Dictionary) -> String:
 		var encounter_issue: String=EncounterRuntime.facts_problem(report.get("encounter"),input.rules.mission.generated,report.get("xp_inputs",{}),report.get("site_facts",{}))
 		if not encounter_issue.is_empty(): return encounter_issue
 	if (input.rules.get("data_version")==8 or (input.rules.get("data_version")==9 or input.rules.get("data_version")==10)):
-		var support_issue: String=BuildAuthority.support_problem(report.get("support"),input.token,input.rules.mission.generated)
+		var support_issue: String=BuildAuthority.support_problem(report.get("support"),input.token,input.rules.mission.generated,input.before)
 		if not support_issue.is_empty(): return support_issue
 	var source: Dictionary = input.rules.mission
 	if PowerState.enabled(input.before):

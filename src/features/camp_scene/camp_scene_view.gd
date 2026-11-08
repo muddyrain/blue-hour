@@ -444,6 +444,9 @@ func _refresh_blue_hour_member(button: Button, data: Dictionary, id: int) -> voi
 	var specialty: Label = button.find_child("Trait", true, false) as Label
 	var trait_id: int = TraitRules.IDS.find(member.get("growth", {}).get("trait", {}).get("id", ""))
 	specialty.text = TraitRules.NAMES[trait_id] if trait_id >= 0 else "同行队员"
+	if id == FirstAidV1.SOURCE_ID and CampaignRules.first_aid_enabled(data.get("journey", {}).get("campaign")) \
+			and FirstAidV1.qualified(data):
+		specialty.text = FirstAidV1.TITLE
 	specialty.add_theme_color_override("font_color", definition.colour)
 	var call_sign: Label = button.find_child("CallSign", true, false) as Label
 	call_sign.text = member.call_sign

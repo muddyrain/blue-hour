@@ -149,7 +149,7 @@ static func _profiled_problem(value: Variant) -> String:
 	if (value.rules.get("data_version")==8 or (value.rules.get("data_version")==9 or value.rules.get("data_version")==10)):
 		if not value.get("support") is Array: return "SUPPORT_RECEIPT_FIELDS"
 		var component: Dictionary={"version":1,"binding":token_for_compat(value),"sequence":value.support.size(),"cooldowns":{"heal":0.0,"airstrike":0.0},"accepted":value.support}
-		var support_issue: String=BuildAuthority.support_problem(component,token_for_compat(value),value.rules.mission.generated)
+		var support_issue: String=BuildAuthority.support_problem(component,token_for_compat(value),value.rules.mission.generated,value.base)
 		if not support_issue.is_empty(): return support_issue
 	if PowerAuthority.mode(value.rules):
 		if not value.get("powers") is Array or (value.phase=="STARTED" and not value.powers.is_empty()): return "POWER_RECEIPT_FIELDS"

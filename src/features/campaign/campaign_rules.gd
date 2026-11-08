@@ -28,12 +28,14 @@ static func initial_investigation(run_id: String) -> Dictionary:
 		"clues":[], "outcome":"ACTIVE", "result_transaction":""}
 
 
-static func initial_mission(run_id: String, action_choices: bool = false) -> Dictionary:
+static func initial_mission(run_id: String, action_choices: bool = false, midgame: bool = false) -> Dictionary:
 	var value: Dictionary = initial_investigation(run_id)
 	value.version = MISSION_VERSION
 	value.mode = MISSION_MODE
-	if action_choices:
+	if action_choices or midgame:
 		value.action_policy = ACTION_POLICY_VERSION
+	if midgame:
+		value.midgame = CampFacilities.initial()
 	return value
 
 
@@ -43,6 +45,10 @@ static func is_mission(value: Variant) -> bool:
 
 static func action_choices_enabled(value: Variant) -> bool:
 	return is_mission(value) and SurvivalContracts.integer(value.get("action_policy"), ACTION_POLICY_VERSION, ACTION_POLICY_VERSION)
+
+
+static func midgame_enabled(value: Variant) -> bool:
+	return action_choices_enabled(value) and CampFacilities.marker_problem(value.get("midgame")).is_empty()
 
 
 static func is_investigation(value: Variant) -> bool:
@@ -78,10 +84,13 @@ static func problem(value: Variant, run_id: String = "") -> String:
 static func _investigation_problem(value: Dictionary, run_id: String) -> String:
 	var version: int = MISSION_VERSION if is_mission(value) else INVESTIGATION_VERSION
 	var has_action_policy: bool = value.has("action_policy")
-	if value.size() != INVESTIGATION_KEYS.size() + int(has_action_policy) or not value.has_all(INVESTIGATION_KEYS) or not SurvivalContracts.integer(value.version,version,version):
+	var has_midgame: bool = value.has("midgame")
+	if value.size() != INVESTIGATION_KEYS.size() + int(has_action_policy) + int(has_midgame) or not value.has_all(INVESTIGATION_KEYS) or not SurvivalContracts.integer(value.version,version,version):
 		return "INVESTIGATION_FIELDS"
 	if has_action_policy and not action_choices_enabled(value):
 		return "INVESTIGATION_ACTION_POLICY"
+	if has_midgame and not midgame_enabled(value):
+		return "MIDGAME_CAMPAIGN_POLICY"
 	if not value.run_id is String or not _identity(value.run_id) or (not run_id.is_empty() and run_id != value.run_id):
 		return "INVESTIGATION_IDENTITY"
 	if not value.clues is Array or value.clues.size() > CLUE_IDS.size() or value.outcome not in ["ACTIVE","VICTORY","DEFEAT"] or not value.result_transaction is String:

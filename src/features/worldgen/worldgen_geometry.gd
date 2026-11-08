@@ -5,7 +5,10 @@ const DIMENSIONS: Dictionary = {"small":[2560,1920],"medium":[3584,2688],"large"
 const MIN_WIDTH: int = 736
 const MIN_HEIGHT: int = 464
 
-static func assemble(seed: String, size: String, topology: String, attempt: int, fallback: bool, task: String = "", industrial: bool = false) -> Dictionary:
+static func assemble(seed: String, size: String, topology: String, attempt: int, fallback: bool,
+		task: String = "", industrial: bool = false, residential_rescue: bool = false) -> Dictionary:
+	if residential_rescue and (topology != "residential" or task != "rescue"):
+		return {}
 	var random: RandomNumberGenerator = RogueLayout.rng("worldgen-v1:" + ((size + ":" + topology + ":fallback") if fallback else seed + ":" + str(attempt)))
 	var dimensions: Array = DIMENSIONS[size]
 	var width: int = int(dimensions[0])
@@ -64,15 +67,25 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 	var yard_plan: Dictionary = {}
 	var yard: Dictionary = {}
 	var yard_parcel: String = ""
+	var rescue_plan: Dictionary = {}
+	var court: Dictionary = {}
 	if industrial and task == "airdrop" and topology == "industrial":
 		yard_plan = IndustrialYard.plan(parcels, roads, bus, seed)
 		if yard_plan.is_empty():
 			return {}
 		yard = yard_plan.frozen
 		yard_parcel = yard.parcel
+	if residential_rescue:
+		rescue_plan = RescueCourt.plan(parcels, roads, bus, seed, float(width))
+		if rescue_plan.is_empty():
+			return {}
+		court = rescue_plan.frozen
+		yard_parcel = court.parcel
 	for parcel: Dictionary in parcels:
 		if parcel.id == yard_parcel:
-			if not _populate_yard(parcel, yard_plan, entities, roads, bus):
+			var filled: bool = _populate_rescue_court(parcel, rescue_plan, entities, roads, bus) if residential_rescue \
+				else _populate_yard(parcel, yard_plan, entities, roads, bus)
+			if not filled:
 				return {}
 		else:
 			_populate(parcel,topology,random,entities,roads,bus)
@@ -91,6 +104,10 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 		walls.barriers.append_array(yard_plan.barriers)
 		walls.gates.append(yard.loading.gate)
 		walls.gates.append(yard.service.gate)
+	if not court.is_empty():
+		walls.barriers.append_array(rescue_plan.barriers)
+		walls.gates.append(court.front.gate)
+		walls.gates.append(court.side.gate)
 	var arrivals: Array = [[door[0]-48,door[1]+24],[door[0],door[1]+24],[door[0]+48,door[1]+24],[door[0],door[1]+56]]
 	var data: Dictionary = {"version":5,"seed":seed,"size":size,"topology":topology,"attempt":attempt,"fallback":fallback,"bounds":[0,0,width,height],"entities":entities,"roads":roads,"barriers":walls.barriers,"gates":walls.gates,"bus":bus,"arrivals":arrivals,"enemy_points":[[24,main_y+24],[width-24,main_y+24]],"rescue":rescue,"objects":[],"parcels":parcels,"graph":WorldgenStructure.graph(segments)}
 	if not yard.is_empty():
@@ -98,10 +115,12 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 	if not task.is_empty():
 		data.level_task=task
 		if task=="rescue":
-			var target_point: Array=LevelPolicy.rescue_point(data)
+			var target_point: Array = court.target.duplicate() if not court.is_empty() else LevelPolicy.rescue_point(data)
 			if target_point.is_empty():
 				return {}
 			data.rescue=target_point
+	if not court.is_empty():
+		data.rescue_court = court
 	data.art_revision = 3
 	data.id = "worldgen_v1_"+RecordEncoding.fingerprint(data).substr(0,32)
 	return data
@@ -165,6 +184,26 @@ static func _populate_yard(parcel: Dictionary, plan: Dictionary, entities: Array
 	_add_court(parcel, plan.cargo_area, "loading", plan.cargo_entry, entities, roads, bus)
 	for name: String in ["loading", "service"]:
 		for paving: Array in yard[name].paving:
+			_add_walk(parcel, WorldLayout.rect(paving))
+	return true
+
+
+static func _populate_rescue_court(parcel: Dictionary, plan: Dictionary, entities: Array, roads: Array, bus: Dictionary) -> bool:
+	var home: Vector2 = plan.home
+	var annex: Vector2 = plan.annex
+	var court: Dictionary = plan.frozen
+	if not _add_building("row_house", 0, home.x, home.y, parcel, entities, roads, bus):
+		return false
+	court.home = entities[-1].id
+	RescueCourt.finish(court, plan, WorldLayout.point(entities[-1].door))
+	if not _add_building("detached_home", 3, annex.x, annex.y, parcel, entities, roads, bus):
+		return false
+	court.optional_building = entities[-1].id
+	parcel.kind = "homes"
+	parcel.entrance = court.front.gate.duplicate()
+	parcel.frontage.scope = "internal"
+	for approach: Dictionary in [court.front, court.side]:
+		for paving: Array in approach.paving:
 			_add_walk(parcel, WorldLayout.rect(paving))
 	return true
 

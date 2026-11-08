@@ -185,6 +185,7 @@ func _select(index: int) -> void:
 	_detail.get_parent().set_deferred("scroll_vertical",0)
 	var item: Dictionary = WeaponInventory.find(_data, _selected_id)
 	var weapon: WeaponDefinition = WeaponInventory.definition(item.weapon_id)
+	var repair_quote: int = WeaponInventory.repair_quote(_data, item)
 	_preview.texture = weapon.presentation.texture
 	var owner_id: int = WeaponInventory.owner(_data, _selected_id)
 	var ownership: String = SurvivorRoster.member(_data.crew, owner_id).call_sign if owner_id > 0 else "装备仓"
@@ -198,14 +199,16 @@ func _select(index: int) -> void:
 	else:
 		_detail.text += "\n未配装；配装后按持有者本人的射击Trait生效。"
 	_detail.text += "\n\n理论持续 %.2f伤/秒（未计接敌与过量伤害）\n来源  /  %s\n维修报价  /  %d 货币" % [weapon.damage/weapon.interval,
-		("救援同伴当场加入时自带" if item.origin == "rescue-first-contact" else ("街区补给点搜集" if item.origin == "north-cache" else "初始装备")),weapon.repair_cost]
+		("救援同伴当场加入时自带" if item.origin == "rescue-first-contact" else ("街区补给点搜集" if item.origin == "north-cache" else "初始装备")),repair_quote]
 	if WeaponState.is_family(_data):
 		_detail.text = "%s · PROJECT_TEMP\n%s\n%s · %s\n\n武器基础：%.0f伤 · %.3f秒 · %.0f距" % [weapon.display_name,WeaponModifiers.description(item),"损坏 · 须维修" if item.condition=="damaged" else "状态良好",ownership,weapon.damage,weapon.interval,weapon.shot_range]
 		_detail.text += "\n近战 · 正面110° · 最多3目标 · 起手0.18秒；靠近敌人有风险。" if CombatEquipment.melee(item.weapon_id) else "\n弹匣 %d发 · 自动换弹 %.1f秒 · 备弹∞"%[weapon.magazine_capacity(),weapon.reload_seconds()]
 		if item.weapon_id=="shotgun_v1": _detail.text+="\n每次扳机9×5弹丸 · 每条射线只命中首个目标 · 近距清群。"
 		var stats: Dictionary = WeaponModifiers.effective(item,TraitRules.factor(SurvivorRoster.member(_data.crew,owner_id),"shot") if owner_id>0 else 1.0)
 		if item.weapon_id=="shotgun_v1": _detail.text+="\n实例单颗 %.2f×5"%stats.damage
-		_detail.text += "\n实例等级伤害：×%.2f\n%s：%.2f伤 · %.3f秒 · %.2f距\n维修10币，只改状态，不重抽词条。" % [1.10 if item.weapon_level==2 else 1.0,"本人有效" if owner_id>0 else "未配装实例",stats.damage,stats.interval,stats.range]
+		_detail.text += "\n实例等级伤害：×%.2f\n%s：%.2f伤 · %.3f秒 · %.2f距\n维修 %d 币，只改状态，不重抽词条。" % [1.10 if item.weapon_level==2 else 1.0,"本人有效" if owner_id>0 else "未配装实例",stats.damage,stats.interval,stats.range,repair_quote]
+		if repair_quote < weapon.repair_cost:
+			_detail.text += "\n工坊优惠 · 原价 %d 币" % weapon.repair_cost
 		_detail.text += "\n\n与实际成员当前武器比较（同一本人Trait）："
 		for member: Dictionary in _data.crew:
 			if member.health<=0: continue
@@ -234,7 +237,7 @@ func _select(index: int) -> void:
 	repair_button.disabled = item.condition != "damaged"
 	if BattleState.is_state(_data) and _data.journey.state == "FAILED":
 		repair_button.disabled = true
-	repair_button.text = "维修 %d 货币…" % weapon.repair_cost if item.condition == "damaged" else "无需维修"
+	repair_button.text = "维修 %d 货币…" % repair_quote if item.condition == "damaged" else "无需维修"
 
 	if player_mode:
 		_detail.text = _detail.text.replace(" · PROJECT_TEMP", "")
@@ -245,7 +248,7 @@ func _confirm_repair() -> void:
 	_confirmation_id = _selected_id
 	var item: Dictionary = WeaponInventory.find(_data, _confirmation_id)
 	var weapon: WeaponDefinition = WeaponInventory.definition(item.weapon_id)
-	confirmation.dialog_text = "维修%s，消耗%d货币？\n确认后保存营地；取消不会消耗资源。" % [weapon.display_name, weapon.repair_cost]
+	confirmation.dialog_text = "维修%s，消耗%d货币？\n确认后保存营地；取消不会消耗资源。" % [weapon.display_name, WeaponInventory.repair_quote(_data, item)]
 	confirmation.popup_centered(Vector2i(620, 230))
 
 

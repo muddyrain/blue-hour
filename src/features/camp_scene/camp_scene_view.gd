@@ -3,6 +3,9 @@ extends Control
 ## Read-only scene adapter: emit original intentions, never edit campaign data.
 
 signal action_requested(action: StringName, member_id: int)
+signal facility_requested(choice: String)
+
+const FACILITY_NAMES: Dictionary[String, String] = {"supply": "补给设施", "workshop": "工坊升级"}
 
 const CAPTIONS: Dictionary[StringName, String] = {
 	&"bus": "巴士停靠\n选择出击目标 →",
@@ -17,6 +20,7 @@ var input_allowed: Callable
 var player_mode: bool = false
 var world: CampSceneWorld
 var hotspots: Dictionary[StringName, Button] = {}
+var facility_buttons: Dictionary[String, Button] = {}
 var member_buttons: Dictionary[int, Button] = {}
 var footer_buttons: Dictionary[StringName, Button] = {}
 var resource_text: Label
@@ -34,6 +38,8 @@ var _return_summary: PanelContainer
 var _return_goods: Label
 var _return_text: Label
 var _return_advice: Label
+var _facilities: PanelContainer
+var _facility_heading: Label
 var _team_scroll: ScrollContainer
 var _team_count: Label
 
@@ -106,6 +112,7 @@ func _build_blue_hour() -> void:
 	add_child(background)
 	move_child(background, 0)
 	_build_blue_hour_header()
+	_build_facilities()
 	_build_blue_hour_team()
 	_build_blue_hour_footer()
 	_build_info()
@@ -160,6 +167,30 @@ func _build_blue_hour_header() -> void:
 	return_details.add_child(_return_text)
 	_return_advice = CampStyle.label("", 14, CampStyle.AMBER)
 	return_details.add_child(_return_advice)
+
+
+func _build_facilities() -> void:
+	_facilities = _blue_hour_panel("FacilityChoices", Rect2(42, 370, 748, 103), Color(0.045, 0.10, 0.14, 0.96))
+	_facilities.hide()
+	var column: VBoxContainer = VBoxContainer.new()
+	_facilities.add_child(column)
+	_facility_heading = CampStyle.label("营地建设", 15, CampStyle.TEAL)
+	column.add_child(_facility_heading)
+	var row: HBoxContainer = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	column.add_child(row)
+	for choice: String in FACILITY_NAMES:
+		var button: Button = Button.new()
+		button.name = "Facility" + choice.capitalize()
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.custom_minimum_size.y = 55
+		button.add_theme_font_size_override("font_size", 15)
+		button.pressed.connect(func() -> void:
+			if not input_allowed.is_valid() or input_allowed.call():
+				facility_requested.emit(choice))
+		button.focus_entered.connect(_announce.bind(button, ""))
+		row.add_child(button)
+		facility_buttons[choice] = button
 
 
 func _build_blue_hour_team() -> void:
@@ -349,8 +380,24 @@ func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, r
 	_shortage_text.text = "口粮缺口 %d · 可考虑先补给" % daily.shortage if daily.shortage > 0 else "口粮缺口 0 · 库存充足"
 	_shortage_text.add_theme_color_override("font_color", CampStyle.AMBER if daily.shortage > 0 else CampStyle.MUTED)
 	var last: Dictionary = data.last_day
+	_facilities.visible = CampFacilities.enabled(data)
+	if _facilities.visible:
+		var selected: String = CampFacilities.selected(data)
+		_facility_heading.text = "营地建设 · 每个旅程只选一项" if last.get("evacuated", false) or not selected.is_empty() else "营地建设 · 首次确认归航后开放"
+		for choice: String in FACILITY_NAMES:
+			var button: Button = facility_buttons[choice]
+			var condition: String = ("成功归航供 %d 粮，受库存上限" % CampFacilities.SUPPLY_FOOD if choice == "supply"
+				else "维修少付 %d 币，最低 1 币" % CampFacilities.REPAIR_DISCOUNT)
+			var state: String = "已建成" if choice == selected else "本旅程额度已用" if not selected.is_empty() else "%d 币" % CampFacilities.BUILD_COST
+			button.text = "%s · %s\n%s" % [FACILITY_NAMES[choice], state, condition]
+			button.disabled = not CampFacilities.can_build(data, choice)
+			button.tooltip_text = condition
+			if selected.is_empty() and button.disabled:
+				button.tooltip_text = "先完成并确认一次成功归航" if not last.get("evacuated", false) else "货币不足"
 	_return_summary.visible = not last.is_empty()
 	if not last.is_empty():
+		var facility_meal: bool = int(last.get("facility_food", 0)) > 0
+		CampStyle.place(_return_summary, Rect2(42, 480, 748, 103) if facility_meal else Rect2(42, 505, 748, 78))
 		var returned_weapons: Array = data.weapons.filter(func(item: Dictionary) -> bool:
 			return item.get("acquired_sortie") == data.last_settlement_id)
 		_return_goods.text = "入库 %d 币 · %d 件武器" % [last.cash_gained, returned_weapons.size()]
@@ -409,6 +456,8 @@ func clear() -> void:
 		button.hide()
 	if is_instance_valid(_return_summary):
 		_return_summary.hide()
+	if is_instance_valid(_facilities):
+		_facilities.hide()
 	_info.hide()
 	_data.clear()
 	_daily.clear()
@@ -501,6 +550,9 @@ func _link_focus() -> void:
 	for id: int in [1, 2, 3, 4, 5]:
 		if member_buttons[id].visible:
 			sequence.append(member_buttons[id])
+	for button: Button in facility_buttons.values():
+		if button.is_visible_in_tree() and not button.disabled:
+			sequence.append(button)
 	for button: Button in footer_buttons.values():
 		sequence.append(button)
 	for index: int in range(sequence.size()):

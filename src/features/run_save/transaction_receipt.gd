@@ -296,6 +296,9 @@ static func _result_problem(receipt: Dictionary) -> String:
 	var after: Dictionary = camp(receipt)
 	if after.is_empty() or not camp_problem(after).is_empty() or after.schema_version != receipt.base.schema_version:
 		return "RESULT_CAMP_FORMAT"
+	var facility_issue: String = CampFacilities.result_problem(receipt.base, after, receipt.envelope.result)
+	if not facility_issue.is_empty():
+		return facility_issue
 	if SurvivalState.is_extended(after):
 		var deaths: Array = []
 		for checkpoint: Dictionary in receipt.deaths:

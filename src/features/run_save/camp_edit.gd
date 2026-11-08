@@ -29,6 +29,8 @@ static func _propose_valid(before: Dictionary, request: Dictionary) -> Dictionar
 			return PowerState.equip(before,request.value) if member_id==0 else {}
 		"build_slot":
 			return BuildState.equip(before,member_id,request.value)
+		"facility":
+			return CampFacilities.build(before, request.value) if member_id == 0 else {}
 		"train_trait":
 			return TrainingRules.propose(before,request)
 		"rename":

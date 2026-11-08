@@ -1510,9 +1510,12 @@ func _update_ui() -> void:
 			pending.append("%02d +%d" % [actor.member_id,0 if battle_drill or actor.health <= 0 else xp_inputs.pending(actor.member_id)])
 	var xp_text: String = "本次经验（归航后生效）："+" / ".join(pending) if growth_mode else ""
 	if not weapon_loot.is_empty():xp_text+="\n携带："+WeaponInventory.loot_description(weapon_loot[0])
+	var objective: String = TaskActions.hud(self)
+	if encounter != null and not encounter.defeat.is_empty() and CampFacilities.enabled(field_departure):
+		objective = "破阵者已倒地 · 集合回车"
 	_hud.refresh({
 		"exploration_objectives":_exploration_objective_rows() if exploration_mode() else [],
-		"objective":TaskActions.hud(self),
+		"objective":objective,
 		"mission_title":("交火练习" if is_practice else mission_title) if los_setup == null else mission_title, "members":members,
 		"can_extract":phase != Phase.FINISHED if is_practice else phase == Phase.ACTIVE and elapsed >= tuning.bus_ready_seconds,
 		"boarding":boarding,
@@ -1619,7 +1622,7 @@ func _street_supply_entrances() -> Array[Vector2]:
 
 func _street_camera_start() -> Vector2:
 	var view_size: Vector2 = get_viewport_rect().size / camera.zoom
-	var yard: Dictionary = layout.world_data.get("loading_yard", {})
+	var yard: Dictionary = layout.world_data.get("loading_yard", layout.world_data.get("rescue_court", {}))
 	if not yard.is_empty():
 		var scene: Rect2 = WorldLayout.rect(yard.bounds).expand(layout.bus_door + Vector2(0, 42))
 		if scene.size.x <= view_size.x - 144 and scene.size.y <= view_size.y - 160:
@@ -1665,7 +1668,7 @@ func _clicked_site(point: Vector2) -> bool:
 
 func _make_world_buildings() -> void:
 	if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4 or layout.world_data.get("version")==5):
-		var yard: Dictionary = layout.world_data.get("loading_yard", {})
+		var yard: Dictionary = layout.world_data.get("loading_yard", layout.world_data.get("rescue_court", {}))
 		var yard_bounds: Rect2 = WorldLayout.rect(yard.bounds) if not yard.is_empty() else Rect2()
 		for wall: Rect2 in layout.fences:
 			if not yard.is_empty() and yard_bounds.encloses(wall):

@@ -78,6 +78,8 @@ var _camp_legacy: bool = false
 var _camp_scene_problem: String = ""
 var _camp_legacy_return: Button
 var _camp_leave_dialog: ConfirmationDialog
+var _facility_confirmation: ConfirmationDialog
+var _facility_choice: String = ""
 var _camp_leave_action: Callable
 var _recruits: Array = []
 var hunger_trial: bool = false
@@ -844,7 +846,7 @@ func _new_game() -> void:
 	_migration_notice = ""
 	profile_id = RunSave.new_profile_id()
 	if playable_entry:
-		_battle_meta.campaign=CampaignRules.initial_mission(profile_id, true)
+		_battle_meta.campaign=CampaignRules.initial_mission(profile_id, true, true)
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true, true)
 	_initialize_weapons("initial")
 	last_settlement_id = ""
@@ -1084,6 +1086,8 @@ func _suspend_problem(result: Dictionary) -> String:
 
 func request_exit(target: String) -> void:
 	# A native exclusive dialog owns Esc/close until its choice is resolved.
+	if is_instance_valid(_facility_confirmation) and _facility_confirmation.visible:
+		return
 	if _new_game_confirmation.visible or _hunger_confirmation.visible or (is_instance_valid(_camp_leave_dialog) and _camp_leave_dialog.visible) or (is_instance_valid(training_panel) and training_panel.confirmation.visible):
 		return
 	if pause_menu.root.visible and pause_menu.confirming:
@@ -1195,6 +1199,8 @@ func _close_sound_settings() -> void:
 
 
 func _settings_open() -> bool:
+	if is_instance_valid(_facility_confirmation) and _facility_confirmation.visible:
+		return true
 	return (is_instance_valid(training_panel) and training_panel.visible) or (is_instance_valid(_camp_leave_dialog) and _camp_leave_dialog.visible) or (is_instance_valid(camp_scene) and camp_scene.info_visible()) or (is_instance_valid(migration_panel) and migration_panel.visible) or (is_instance_valid(sound_settings) and sound_settings.visible) or _new_game_confirmation.visible or (is_instance_valid(mission_select) and mission_select.visible) or (is_instance_valid(loadout_panel) and loadout_panel.visible) or (is_instance_valid(roster_panel) and roster_panel.visible) or (is_instance_valid(growth_panel) and growth_panel.visible)
 
 
@@ -1643,6 +1649,9 @@ func _show_battle_result(snapshot: Dictionary, durable: bool) -> void:
 	if playable_entry:
 		_status.text = _progress_message if _progress_blocked else ("结算已保存。" if durable else "确认结算后保存；保存失败时不会进入下一次行动。")
 		$Interface/Screen/Result/Continue.text = ("查看旅程记录 →" if durable else "重试保存终局 →") if ended else "确认结算并回营 →"
+		if victory and not durable and CampFacilities.enabled(snapshot):
+			$Interface/Screen/Result/Heading.text = "归航待确认 · 破阵者已倒地"
+			$Interface/Screen/Result/Continue.text = "确认归航并保存胜利 →" if not _progress_blocked else "重试保存终局 →"
 
 
 func _hunger_policy_text() -> String:
@@ -2083,6 +2092,16 @@ func _setup_camp_scene() -> void:
 	_title.add_child(camp_scene)
 	camp_scene.input_allowed = _camp_input_allowed
 	camp_scene.action_requested.connect(_camp_action)
+	camp_scene.facility_requested.connect(_offer_camp_facility)
+	_facility_confirmation = ConfirmationDialog.new()
+	_facility_confirmation.title = "确认营地建设"
+	_facility_confirmation.ok_button_text = "建设并保存"
+	_facility_confirmation.cancel_button_text = "暂不建设"
+	_facility_confirmation.confirmed.connect(_confirm_camp_facility)
+	_facility_confirmation.canceled.connect(func() -> void:
+		_facility_choice = ""
+		camp_scene.restore_focus.call_deferred())
+	_screen.add_child(_facility_confirmation)
 	camp_scene.hide()
 	_camp_legacy_return = Button.new()
 	_camp_legacy_return.text = "返回2D营地场景 →"
@@ -2093,6 +2112,26 @@ func _setup_camp_scene() -> void:
 	_title.add_child(_camp_legacy_return)
 	_camp_legacy_return.hide()
 
+
+
+func _offer_camp_facility(choice: String) -> void:
+	var before: Dictionary = camp_snapshot()
+	if not _camp_input_allowed() or not CampFacilities.can_build(before, choice):
+		return
+	_facility_choice = choice
+	_facility_confirmation.dialog_text = "花费 %d 货币建设%s？\n本旅程建设额度仅一次，确认保存后生效。" % [CampFacilities.BUILD_COST, CampSceneView.FACILITY_NAMES[choice]]
+	_facility_confirmation.popup_centered(Vector2i(540, 210))
+
+
+func _confirm_camp_facility() -> void:
+	var choice: String = _facility_choice
+	_facility_choice = ""
+	if phase != Phase.TITLE or not _camp_open or not transactional_mode or not CampSceneView.FACILITY_NAMES.has(choice):
+		return
+	if _accept_transaction(progress_session.edit(camp_snapshot(), {"kind": "facility", "member_id": 0, "value": choice}), true):
+		_progress_message = "%s已建成，建设支出已保存。" % CampSceneView.FACILITY_NAMES[choice]
+	_update_camp()
+	camp_scene.restore_focus.call_deferred()
 
 
 func _sync_camp_scene() -> void:

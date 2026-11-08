@@ -34,6 +34,9 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 		routes[site.id] = route
 	var sites: Array[Dictionary] = []
 	var used: Array[String] = []
+	var rescue_court: Dictionary = layout.get("rescue_court", {})
+	if not rescue_court.is_empty():
+		used.assign([rescue_court.home, rescue_court.optional_building])
 	var chosen: Array[Dictionary] = []
 	var supply_pair: Array[Dictionary] = []
 	if mission_policy == 1 and type == "supply":
@@ -81,6 +84,8 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 			if route.is_empty():
 				return {}
 			routes[site.id] = route
+	if not rescue_court.is_empty():
+		used.erase(rescue_court.optional_building)
 	var desired_far: int = 1 if layout["size"] == "small" else 2
 	for index: int in range(int(ExplorationLayout.SIZES[layout["size"]].optional_buildings)):
 		var zones: Dictionary = _zone_counts(routes)
@@ -89,6 +94,11 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 		if candidates.is_empty():
 			return {}
 		var entity: Dictionary = _choose(candidates, routing, wanted, action_id + ":optional:" + str(index))
+		if index == 0 and not rescue_court.is_empty():
+			for candidate: Dictionary in candidates:
+				if candidate.id == rescue_court.optional_building:
+					entity = candidate
+					break
 		var kind: String = "food" if (ExplorationLayout.POLICY_ID + "|optional-reward|" + action_id + "|" + entity.id).sha256_text().substr(0, 8).hex_to_int() % 2 == 0 else "cash"
 		var site: Dictionary = {"id":"optional_" + entity.id, "building":entity.id, "kind":kind, "amount":1, "weapon":false,
 			"seconds":18.0, "source":"optional_building", "object_id":entity.id, "work_mode":"indoor"}
@@ -122,6 +132,9 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 		var br: String = (ExplorationLayout.POLICY_ID + "|optional-objective|" + action_id + "|" + b).sha256_text()
 		return ar < br if ar != br else a < b
 	)
+	if not rescue_court.is_empty():
+		pool.erase("optional_buildings_all")
+		pool.push_front("optional_buildings_all")
 	var objectives: Array[Dictionary] = []
 	for index: int in range(2):
 		var id: String = pool[index]

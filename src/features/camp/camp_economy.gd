@@ -14,19 +14,24 @@ static func rations(day: int, crew: Array, food: int, rules: CampRules) -> Dicti
 		"required":required,"shortage":maxi(0,required-food)}
 
 
-static func post_battle_food(day: int, crew: Array, food: int, found: int, per_member: int, growth: bool = false) -> Dictionary:
+static func post_battle_food(day: int, crew: Array, food: int, found: int, per_member: int, growth: bool = false,
+		facility_food: int = 0) -> Dictionary:
 	if not SurvivalContracts.identity_problem(crew,growth).is_empty() or food < 0 or food > CampRules.FOOD_LIMIT or found < 0 or found > RunSave.MAX_COUNTER or per_member < 1 or per_member > 100:
 		return {}
 	var rules: CampRules = CampRules.new()
 	rules.ration_per_member = per_member
 	var stored: int = mini(found, CampRules.FOOD_LIMIT - food)
-	var available: int = food + stored
+	var facility_stored: int = mini(facility_food, CampRules.FOOD_LIMIT - food - stored)
+	var available: int = food + stored + facility_stored
 	var daily: Dictionary = rations(day, crew, available, rules)
 	var consumed: int = mini(available, int(daily.required))
 	var ledger: Dictionary = {"food_before":food, "food_found":found, "food_stored":stored,
 		"food_overflow":found-stored, "food_required":daily.required, "food_consumed":consumed,
 		"food_shortage":daily.shortage, "food_after":available-consumed,
 		"ration_member_ids":daily.member_ids, "ration_per_member":per_member}
+	if facility_food != 0:
+		ledger.facility_food = facility_food
+		ledger.facility_stored = facility_stored
 	return ledger if SurvivalContracts.food_problem(ledger).is_empty() else {}
 
 

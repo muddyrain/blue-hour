@@ -193,11 +193,18 @@ static func equip(data: Dictionary, member_id: int, identity: String) -> Diction
 	return {"data":after, "message":"已交换两名队员的武器。" if previous_owner > 0 else "已配给队员%d；原武器转入闲置库存。" % member_id}
 
 
+static func repair_quote(data: Dictionary, item: Dictionary) -> int:
+	var cost: int = definition(item.weapon_id).repair_cost
+	if CampFacilities.selected(data) == CampFacilities.WORKSHOP:
+		return maxi(1, cost - CampFacilities.REPAIR_DISCOUNT)
+	return cost
+
+
 static func repair(data: Dictionary, identity: String) -> Dictionary:
 	var selected: Dictionary = find(data, identity)
 	if selected.is_empty() or selected.condition != "damaged":
 		return {"message":"这件武器无需维修，未重复扣款。"}
-	var cost: int = definition(selected.weapon_id).repair_cost
+	var cost: int = repair_quote(data, selected)
 	if int(data.cash) < cost:
 		return {"message":"货币不足，需要%d。" % cost}
 	var after: Dictionary = data.duplicate(true)

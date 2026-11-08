@@ -190,7 +190,8 @@ func _ready() -> void:
 		set_physics_process(false)
 		set_process_unhandled_input(false)
 		return
-	if (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9))): tuning.spawn_seconds*=float(supply.generated.campaign.pressure)
+	if SurvivalContracts.integer(supply.generated.get("version"), 6, 9):
+		tuning.spawn_seconds *= CampaignPressureV1.spawn_factor(supply.generated)
 	layout = supply.layout
 	_supply_entrances = _street_supply_entrances()
 	_cash_site.door = layout.cash_door

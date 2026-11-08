@@ -60,6 +60,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var screamer: bool = CampaignRules.screamer_enabled(base.journey.campaign)
 	var weapon_affixes: bool = CampaignRules.weapon_affix_enabled(base.journey.campaign)
 	var first_aid: bool = CampaignRules.first_aid_enabled(base.journey.campaign) and FirstAidV1.qualified(base)
+	var campaign_pressure: bool = CampaignRules.campaign_pressure_enabled(base.journey.campaign)
 	for candidate: Dictionary in result:
 		if screamer and ScreamerPolicyV1.eligible(candidate):
 			candidate.screamer_policy = ScreamerPolicyV1.VERSION
@@ -67,6 +68,8 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 			candidate.weapon_affix_policy = WeaponInventory.AFFIX_POLICY_VERSION
 		if first_aid and candidate.get("version") == 9:
 			candidate.first_aid_policy = FirstAidV1.VERSION
+		if campaign_pressure and candidate.get("version") == 9:
+			candidate.campaign_pressure = CampaignPressureV1.marker(int(base.settled_sorties))
 		fingerprints[candidate.id] = RecordEncoding.fingerprint(candidate)
 	var frozen: Dictionary = {"offers":result, "fingerprints":fingerprints}
 	if _days.size() >= MAX_DAYS_CACHED:

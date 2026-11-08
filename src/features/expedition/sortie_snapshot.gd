@@ -246,7 +246,9 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 		var issue: String=CombatRuntime.problem(value.get("combat"),value,receipt)
 		if not issue.is_empty(): return issue
 	var director: ThreatDirector = ThreatDirector.new()
-	director.update(float(sim.elapsed),105,7.0*(float(value.generated.campaign.pressure) if (value.version==CAMPAIGN_VERSION or (value.version==BUILD_VERSION or combat_version(value.version))) else 1.0))
+	var spawn_factor: float = CampaignPressureV1.spawn_factor(value.generated) if (
+		value.version == CAMPAIGN_VERSION or value.version == BUILD_VERSION or combat_version(value.version)) else 1.0
+	director.update(float(sim.elapsed), 105, 7.0 * spawn_factor)
 	if value.threat.stage != director.stage or value.threat.interval != director.interval:
 		return "WORLD_THREAT_CLOCK"
 	if (value.version==CAMPAIGN_VERSION or (value.version==BUILD_VERSION or combat_version(value.version))):

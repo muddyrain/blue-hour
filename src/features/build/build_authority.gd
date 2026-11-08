@@ -97,9 +97,7 @@ static func world_problem(world: Dictionary, receipt: Dictionary) -> String:
 	return ""
 
 static func line_clear(layout: StreetLayout, start: Vector2, end: Vector2) -> bool:
-	for obstacle: ShotObstacle in layout.shot_obstacles():
-		if obstacle.blocks_shots and AttackRules._segment_entry(start,end,obstacle.footprint)<INF: return false
-	return true
+	return ToxicV1.line_clear(start, end, layout.shot_obstacles())
 
 static func plan_heal(world: Dictionary) -> Dictionary:
 	var support: BasicSupport=BasicSupport.new()
@@ -120,19 +118,37 @@ static func plan_first_aid(world: Dictionary) -> Dictionary:
 	return FirstAidV1.plan(states, DailyActions.supply(world.generated).layout)
 
 static func plan_airstrike(world: Dictionary, point: Vector2) -> Dictionary:
-	var layout: StreetLayout=DailyActions.supply(world.generated).layout
-	var navigation: FieldNavigation=FieldNavigation.new()
-	navigation.configure(layout.blockers(),layout.world_bounds)
-	return plan_airstrike_on_map(world,point,layout,navigation)
+	var stamp: int = FreezeProfile.enter("support.airstrike_plan")
+	var map_stamp: int = FreezeProfile.enter("support.airstrike_map")
+	var layout: StreetLayout = DailyActions.supply(world.generated).layout
+	var navigation: FieldNavigation
+	if world.generated.get("version") == 9 and not PumpStationAction.enabled(world.generated):
+		# The same validated final geometry certifies the field and receipt replay.
+		navigation = ExplorationLayout._routing(layout.world_data).nav
+		FreezeProfile.count("airstrike_navigation_reuses")
+	else:
+		navigation = FieldNavigation.new()
+		navigation.configure(layout.blockers(), layout.world_bounds)
+		FreezeProfile.count("airstrike_navigation_builds")
+	FreezeProfile.leave("support.airstrike_map", map_stamp)
+	var plan: Dictionary = plan_airstrike_on_map(world, point, layout, navigation)
+	FreezeProfile.leave("support.airstrike_plan", stamp)
+	return plan
 
 static func plan_airstrike_on_map(world: Dictionary, point: Vector2, layout: StreetLayout,
 		navigation: FieldNavigation) -> Dictionary:
 	if not layout.world_bounds.has_point(point) or not navigation.is_clear(point): return {}
+	var obstacles: Array[ShotObstacle] = layout.shot_obstacles()
 	var callers: Array[Dictionary]=[]
 	for row: Dictionary in world.survivors:
 		var state: Dictionary=row.state
-		var distance: float=SortieSnapshot._vec(state.position).distance_to(point)
-		if state.health>0 and state.visible and state.activity not in [2,3,4] and distance<=BasicSupport.POLICY.airstrike_range and line_clear(layout,SortieSnapshot._vec(state.position),point) and not navigation.path_between(SortieSnapshot._vec(state.position),point).is_empty(): callers.append({"id":state.member_id,"distance":distance})
+		var position: Vector2 = SortieSnapshot._vec(state.position)
+		var distance: float = position.distance_to(point)
+		if (state.health > 0 and state.visible and state.activity not in [2, 3, 4]
+				and distance <= BasicSupport.POLICY.airstrike_range
+				and ToxicV1.line_clear(position, point, obstacles)
+				and not navigation.path_between(position, point).is_empty()):
+			callers.append({"id":state.member_id,"distance":distance})
 	if callers.is_empty(): return {}
 	callers.sort_custom(func(a:Dictionary,b:Dictionary)->bool:return a.distance<b.distance or (a.distance==b.distance and a.id<b.id))
 	var radius: float=BasicSupport.POLICY.airstrike_radius*factor(world,"blast")
@@ -140,7 +156,9 @@ static func plan_airstrike_on_map(world: Dictionary, point: Vector2, layout: Str
 	for row: Dictionary in world.enemies:
 		if row.state.actor_id == 0 and PumpStationAction.enabled(world.generated) and not row.state.get("visible", false):
 			continue
-		if row.state.health>0 and SortieSnapshot._vec(row.state.position).distance_to(point)<=radius and line_clear(layout,point,SortieSnapshot._vec(row.state.position)): targets.append(int(row.state.actor_id))
+		var position: Vector2 = SortieSnapshot._vec(row.state.position)
+		if row.state.health > 0 and position.distance_to(point) <= radius and ToxicV1.line_clear(point, position, obstacles):
+			targets.append(int(row.state.actor_id))
 	targets.sort()
 	return {"member_id":callers[0].id,"point":[point.x,point.y],"radius":radius,"targets":targets}
 

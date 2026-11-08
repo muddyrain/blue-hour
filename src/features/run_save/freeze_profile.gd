@@ -8,6 +8,7 @@ static var latest: Dictionary = {}
 static var _rows: Dictionary = {}
 static var _stack: Array[Dictionary] = []
 static var _meta: Dictionary = {}
+static var _marks: Dictionary = {}
 static var _started: int = 0
 
 
@@ -17,6 +18,7 @@ static func start(metadata: Dictionary) -> void:
 	active = true
 	_rows.clear()
 	_stack.clear()
+	_marks.clear()
 	_meta = metadata.duplicate(true)
 	_started = Time.get_ticks_usec()
 
@@ -59,13 +61,18 @@ static func count(label: String) -> void:
 		_meta[label] = int(_meta.get(label, 0)) + 1
 
 
+static func mark(label: String, stamp: int = 0) -> void:
+	if active and not _marks.has(label):
+		_marks[label] = stamp if stamp > 0 else Time.get_ticks_usec()
+
+
 static func finish() -> void:
 	if not active:
 		return
 	var elapsed: int = Time.get_ticks_usec() - _started
 	assert(_stack.is_empty())
 	latest = {"total_usec":elapsed, "synchronous_callback_usec":elapsed,
-		"metadata":_meta.duplicate(true), "stages":_rows.duplicate(true),
+		"metadata":_meta.duplicate(true), "stages":_rows.duplicate(true), "marks":_marks.duplicate(),
 		"mode":"synchronous; inclusive durations nest; self_usec excludes measured children"}
 	active = false
 

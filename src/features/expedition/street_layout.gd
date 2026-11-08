@@ -55,6 +55,7 @@ func buildings() -> Array[Rect2]:
 
 
 func shot_obstacles() -> Array[ShotObstacle]:
+	FreezeProfile.count("shot_blocker_builds")
 	if not world_data.is_empty():
 		var walls: Array[ShotObstacle] = []
 		for row: Dictionary in world_data.entities: walls.append(ShotObstacle.new(StringName(row.id),Rect2(row.rect[0],row.rect[1],row.rect[2],row.rect[3]),true))

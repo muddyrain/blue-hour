@@ -180,7 +180,7 @@ func _ready() -> void:
 	growth_inputs.configure(participants_snapshot)
 	if growth_mode:
 		xp_inputs.configure(growth_binding)
-	if build_mode(): basic_support.configure(growth_binding)
+	if build_mode(): basic_support.configure(growth_binding, FirstAidV1.enabled(supply.generated))
 	if power_mode(): powers=SpecialPowers.initial(growth_binding,supply.generated.powers.slot)
 	if combat_mode(): combat.setup(self)
 	if trait_mode:
@@ -494,6 +494,9 @@ func step(delta: float) -> void:
 		else: encounter.advance(delta)
 	if is_paused:
 		_update_ui()
+		return
+	request_first_aid()
+	if is_paused:
 		return
 	if living_count() == 0:
 		_finish(false)
@@ -2032,6 +2035,30 @@ func request_heal() -> bool:
 	if plan.is_empty(): return false
 	return _accept_support(before,basic_support.request("heal",plan))
 
+func first_aid_status() -> String:
+	if is_practice or not FirstAidV1.enabled(supply.generated):
+		return ""
+	if not basic_support.ready(FirstAidV1.KIND):
+		return "已用"
+	var medic: FieldActor = search_member(FirstAidV1.SOURCE_ID)
+	var present: bool = medic != null and FirstAidV1.available({"health":medic.health,
+		"visible":medic.visible, "activity":medic.activity})
+	return "可用" if present else "暂不可用"
+
+func request_first_aid() -> bool:
+	if is_practice or not FirstAidV1.enabled(supply.generated) or not support_available() \
+			or not support_commit.is_valid() or not basic_support.ready(FirstAidV1.KIND):
+		return false
+	var states: Array[Dictionary] = []
+	for actor: FieldActor in survivors:
+		states.append({"member_id":actor.member_id, "health":actor.health, "max_health":actor.max_health,
+			"visible":actor.visible, "activity":actor.activity, "position":[actor.position.x, actor.position.y]})
+	var plan: Dictionary = FirstAidV1.plan(states, layout)
+	if plan.is_empty():
+		return false
+	var before: Dictionary = support_world()
+	return _accept_support(before, basic_support.request(FirstAidV1.KIND, plan))
+
 func request_airstrike(point: Vector2) -> bool:
 	if not support_available(): return false
 	var before: Dictionary=support_world()
@@ -2060,6 +2087,7 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 		and after.get("combat", {}).get("screamer", {}).get("phase") == "cancelled"
 	print("BH_SUPPORT "+JSON.stringify({"kind":request.kind,"status":"ACCEPTED","sequence_before":before.support.sequence,"sequence":after.support.sequence,"cooldowns":after.support.cooldowns,"kills_before":before.sim.kills,"kills":after.sim.kills,"facts":after.support.accepted.back().facts,"elapsed":after.sim.elapsed}))
 	# All fallible validation and I/O preceded this visible state replacement.
+	var preserve_aim: bool = request.kind == FirstAidV1.KIND and support_aiming
 	for enemy: FieldActor in enemies: enemy.free()
 	enemies.clear()
 	var issue: String=SortieSnapshot.apply(self,after)
@@ -2074,6 +2102,15 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 			combat.screamer.report_cancelled(self, notice)
 		else:
 			_show_notice(notice)
+	elif request.kind == FirstAidV1.KIND:
+		support_aiming = preserve_aim
+		var facts: Dictionary = after.support.accepted.back().facts
+		var patient: FieldActor = search_member(int(facts.member_id))
+		var amount: String = str(snappedf(float(facts.amount), 0.01))
+		_show_notice("%s · %s +%s HP" % [FirstAidV1.TITLE, patient.call_sign, amount])
+		_combat_popup(patient.position + Vector2(12, -136), "+%s HP" % amount, Color("a5dfce"))
+		combat_feedback.emit({"kind":FirstAidV1.KIND, "source_id":facts.source_id,
+			"member_id":facts.member_id, "amount":facts.amount, "health":facts.health_after})
 	else:
 		_show_notice("治疗已确认")
 	_update_ui()

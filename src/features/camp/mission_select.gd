@@ -148,6 +148,7 @@ func refresh_rescue(completed: bool, reason: String = "") -> void:
 func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 	daily_offers = DailyActions.offers(base)
 	var action_choices: bool = CampaignRules.action_choices_enabled(base.get("journey", {}).get("campaign"))
+	var first_aid: bool = CampaignRules.first_aid_enabled(base.get("journey", {}).get("campaign"))
 	var has_mission_cards: bool = daily_offers.any(func(offer: Dictionary) -> bool: return offer.get("mission_policy") == 1)
 	_subtitle.text = "比较主收益、路线与风险。物资和线索随生还归航确认。" if has_mission_cards else "选择此行的补给方向，准备好后出发。"
 	_heading.text = "选择行动 · 第 %d 天" % int(base.day) if player_mode else "第%d天 · 选择一项行动" % int(base.day)
@@ -181,6 +182,8 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 			_descriptions[index].add_theme_font_size_override("font_size", 16)
 		elif mission_card:
 			var title: String = {"supply":"补给", "airdrop":"装备", "equipment":"调查", "rescue":"救援"}[supply.generated.type]
+			if first_aid and supply.generated.type == "rescue" and int(supply.generated.recruit) == FirstAidV1.SOURCE_ID:
+				title = "救援 · " + FirstAidV1.TITLE
 			_titles[index].text = "%02d / %s" % [index + 1, title]
 			_descriptions[index].text = LevelSummary.mission_card_text(supply.generated, base if action_choices else {}, rations)
 			_descriptions[index].custom_minimum_size.y = 100

@@ -117,7 +117,7 @@ static func acquired(generated: Dictionary, sites: Dictionary, evacuated: bool) 
 static func settled(before: Dictionary, report: Dictionary, generated: Dictionary) -> Dictionary:
 	var result: Dictionary=before.journey.build.duplicate(true)
 	for event: Dictionary in report.support.accepted:
-		if event.kind=="heal":
+		if BuildAuthority.healing_kind(event.kind):
 			var id: String=str(int(event.facts.member_id))
 			result.healing[id]=float(result.healing.get(id,0.0))+float(event.facts.amount)
 	for item: String in acquired(generated,report.site_facts,report.evacuated):

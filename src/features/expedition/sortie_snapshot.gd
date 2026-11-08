@@ -381,7 +381,8 @@ static func apply(world: Expedition, value: Dictionary) -> String:
 		actor.visual._apply_pose()
 		world.enemies.append(actor)
 	if (value.version==CAMPAIGN_VERSION or (value.version==BUILD_VERSION or combat_version(value.version))): world.encounter.restore(value.encounter)
-	if (value.version==BUILD_VERSION or combat_version(value.version)): world.basic_support.restore(value.support)
+	if (value.version==BUILD_VERSION or combat_version(value.version)):
+		world.basic_support.restore(value.support, FirstAidV1.enabled(value.generated))
 	if combat_version(value.version):
 		world.combat.restore(value.combat)
 		world.combat.refresh_toxic(world)
@@ -434,6 +435,9 @@ static func compatibility(world: Expedition) -> String:
 		data.weapon_affix_policy = {"version":campaign.weapon_affix_policy,
 			"pierce_factor":AttackRules.PIERCE_DAMAGE_FACTOR, "pierce_radius":AttackRules.PIERCE_HIT_RADIUS,
 			"defeat_refund_rounds":WeaponMagazine.DEFEAT_REFUND_ROUNDS}
+	if FirstAidV1.enabled(world.supply.generated):
+		data.first_aid_policy = {"version":FirstAidV1.VERSION, "source":FirstAidV1.SOURCE_ID,
+			"range":FirstAidV1.RANGE, "health_ratio":FirstAidV1.HEALTH_RATIO, "amount":FirstAidV1.HEAL_AMOUNT}
 	if world.parallel_search:
 		data.search_policy={"version":SearchAssignments.VERSION,"occupancy":"one_member_one_site","order":"site_id"}
 	if world.power_mode(): data.power_policy=SpecialPowers.POLICY

@@ -7,8 +7,11 @@ static func factor(world: Dictionary, key: String) -> float:
 static func healed(events: Array, id: int) -> float:
 	var amount: float=0.0
 	for event: Dictionary in events:
-		if event.kind=="heal" and event.facts.get("member_id")==id: amount+=float(event.facts.amount)
+		if healing_kind(event.kind) and event.facts.get("member_id")==id: amount+=float(event.facts.amount)
 	return amount
+
+static func healing_kind(kind: Variant) -> bool:
+	return kind == "heal" or kind == FirstAidV1.KIND
 
 static func ability(event: Variant) -> bool:
 	return event is Dictionary and event.get("source")=="ability"
@@ -18,14 +21,17 @@ static func ability_problem(event: Dictionary, transaction: String, include_memb
 	if event.size()!=(7 if include_member else 6) or not event.has_all(["kind","source","ability_id","request_id","enemy_id","at_ms"]) or event.kind!="defeat" or event.source!="ability" or event.ability_id!="airstrike_v1" or not event.request_id is String or not event.request_id.begins_with(transaction+":basic:"): return "ABILITY_DEFEAT_SOURCE"
 	return ""
 
-static func support_problem(value: Variant, token: Dictionary, generated: Dictionary) -> String:
-	var issue: String=BasicSupport.problem(value,token)
+static func support_problem(value: Variant, token: Dictionary, generated: Dictionary, departure: Dictionary = {}) -> String:
+	var first_aid: bool = FirstAidV1.enabled(generated) and FirstAidV1.qualified(departure) \
+		and CampaignRules.first_aid_enabled(departure.get("journey", {}).get("campaign", {}))
+	var issue: String=BasicSupport.problem(value,token,first_aid)
 	if not issue.is_empty(): return issue
 	var previous: int=-1
 	var last: Dictionary={"heal":-30.0,"airstrike":-20.0}
 	for event: Dictionary in value.accepted:
 		var facts: Dictionary=event.facts
-		if not SurvivalContracts.integer(facts.get("at_ms"),0,RunSave.MAX_COUNTER) or facts.at_ms<previous or not SurvivalContracts.number(facts.get("at")) or not SortieSnapshot.duration_matches(float(facts.at),facts.at_ms) or facts.at-last[event.kind]<BasicSupport.POLICY[event.kind+"_cooldown"]-0.00000001: return "SUPPORT_FACT_TIME"
+		if not SurvivalContracts.integer(facts.get("at_ms"),0,RunSave.MAX_COUNTER) or facts.at_ms<previous or not SurvivalContracts.number(facts.get("at")) or not SortieSnapshot.duration_matches(float(facts.at),facts.at_ms): return "SUPPORT_FACT_TIME"
+		if event.kind in BasicSupport.KINDS and facts.at-last[event.kind]<BasicSupport.POLICY[event.kind+"_cooldown"]-0.00000001: return "SUPPORT_FACT_TIME"
 		if not SurvivalContracts.integer(facts.get("member_id"),1,5): return "SUPPORT_FACT_MEMBER"
 		if event.kind=="heal":
 			if facts.size()!=7 or not facts.has_all(["at","at_ms","member_id","health_before","health_after","amount","damage_received"]): return "HEAL_FACT_FIELDS"
@@ -33,6 +39,10 @@ static func support_problem(value: Variant, token: Dictionary, generated: Dictio
 				if not SurvivalContracts.number(facts[key]): return "HEAL_FACT_NUMBER"
 			if facts.health_before<=0 or facts.amount<=0 or facts.amount>BasicSupport.POLICY.heal_amount*BuildItems.frozen_factors(generated.build).heal or facts.health_after!=facts.health_before+facts.amount or facts.damage_received<0: return "HEAL_FACT_AMOUNT"
 			if not TransactionReceipt.same(event.payload,{"member_id":facts.member_id,"amount":facts.amount}): return "HEAL_REQUEST_SOURCE"
+		elif event.kind == FirstAidV1.KIND:
+			var aid_issue: String = _first_aid_problem(facts, event.payload, generated)
+			if not aid_issue.is_empty():
+				return aid_issue
 		else:
 			if facts.size()!=4 or not facts.get("targets") is Array or not event.payload.has_all(["member_id","point","radius","targets"]) or event.payload.member_id!=facts.member_id or event.payload.radius!=BasicSupport.POLICY.airstrike_radius*BuildItems.frozen_factors(generated.build).blast: return "AIRSTRIKE_FACT_FIELDS"
 			var seen: Array[int]=[]
@@ -43,12 +53,32 @@ static func support_problem(value: Variant, token: Dictionary, generated: Dictio
 				if target.health_before<=0 or target.health_after!=maxf(0.0,target.health_before-BasicSupport.POLICY.airstrike_damage) or target.amount!=target.health_before-target.health_after: return "AIRSTRIKE_TARGET_DAMAGE"
 				seen.append(int(target.enemy_id))
 			if not TransactionReceipt.same({"v":seen},{"v":event.payload.targets}): return "AIRSTRIKE_TARGET_SET"
-		last[event.kind]=float(facts.at)
+		if event.kind in BasicSupport.KINDS:
+			last[event.kind]=float(facts.at)
 		previous=int(facts.at_ms)
 	return ""
 
+static func _first_aid_problem(facts: Dictionary, payload: Dictionary, generated: Dictionary) -> String:
+	if facts.size() != 11 or not facts.has_all(["at", "at_ms", "member_id", "health_before", "health_after",
+			"amount", "damage_received", "source_id", "source_point", "target_point", "max_health"]):
+		return "FIRST_AID_FACT_FIELDS"
+	if not SurvivalContracts.integer(facts.source_id, FirstAidV1.SOURCE_ID, FirstAidV1.SOURCE_ID) or facts.member_id == facts.source_id \
+			or not SortieSnapshot._vector(facts.source_point) or not SortieSnapshot._vector(facts.target_point):
+		return "FIRST_AID_SOURCE"
+	for key: String in ["health_before", "health_after", "amount", "damage_received", "max_health"]:
+		if not SurvivalContracts.number(facts[key]):
+			return "FIRST_AID_FACT_NUMBER"
+	if facts.max_health <= 0.0 or facts.health_before <= 0.0 or facts.health_before / facts.max_health > FirstAidV1.HEALTH_RATIO \
+			or facts.damage_received < 0.0 or facts.amount <= 0.0 or facts.amount != minf(FirstAidV1.HEAL_AMOUNT, facts.max_health - facts.health_before) \
+			or facts.health_after != facts.health_before + facts.amount:
+		return "FIRST_AID_FACT_AMOUNT"
+	if not TransactionReceipt.same(payload, {"source_id":facts.source_id, "member_id":facts.member_id, "amount":facts.amount}):
+		return "FIRST_AID_REQUEST_SOURCE"
+	var layout: StreetLayout = DailyActions.supply(generated).layout
+	return "" if FirstAidV1.reach(layout, SortieSnapshot._vec(facts.source_point), SortieSnapshot._vec(facts.target_point)) else "FIRST_AID_REACH"
+
 static func world_problem(world: Dictionary, receipt: Dictionary) -> String:
-	var issue: String=support_problem(world.get("support"),RunTransaction.token_for(receipt),world.generated)
+	var issue: String=support_problem(world.get("support"),RunTransaction.token_for(receipt),world.generated,receipt.base)
 	if not issue.is_empty(): return issue
 	if not TransactionReceipt.same({"v":world.support.accepted},{"v":receipt.get("support",[])}): return "SUPPORT_NOT_DURABLE"
 	for kind: String in BasicSupport.KINDS:
@@ -59,10 +89,11 @@ static func world_problem(world: Dictionary, receipt: Dictionary) -> String:
 		if absf(float(world.support.cooldowns[kind])-expected)>0.00000001: return "SUPPORT_COOLDOWN_CAUSAL_SOURCE"
 	for event: Dictionary in world.support.accepted:
 		if event.facts.at_ms>floori(world.sim.elapsed*1000.0): return "SUPPORT_FUTURE"
-		if event.kind=="heal":
+		if healing_kind(event.kind):
 			var member: Dictionary=SurvivorRoster.member(FieldJoinRules.participants(receipt),int(event.facts.member_id))
 			if member.is_empty() or event.facts.health_before+event.facts.damage_received!=member.health_before+healed(world.support.accepted.slice(0,world.support.accepted.find(event)),int(member.id)): return "HEAL_CAUSAL_SOURCE"
-			if event.facts.health_after>GrowthRules.maximum(SurvivorRoster.member(FieldJoinRules.context(receipt).crew,int(member.id))): return "HEAL_MAXIMUM"
+			var maximum: float = GrowthRules.maximum(SurvivorRoster.member(FieldJoinRules.context(receipt).crew,int(member.id)))
+			if event.facts.health_after > maximum or (event.kind == FirstAidV1.KIND and event.facts.max_health != maximum): return "HEAL_MAXIMUM"
 	return ""
 
 static func line_clear(layout: StreetLayout, start: Vector2, end: Vector2) -> bool:
@@ -72,11 +103,21 @@ static func line_clear(layout: StreetLayout, start: Vector2, end: Vector2) -> bo
 
 static func plan_heal(world: Dictionary) -> Dictionary:
 	var support: BasicSupport=BasicSupport.new()
-	support.restore(world.support)
+	support.restore(world.support,FirstAidV1.enabled(world.generated))
 	var members: Array[Dictionary]=[]
 	for row: Dictionary in world.survivors:
 		members.append({"member_id":row.state.member_id,"health":row.state.health,"max_health":row.state.max_health,"present":row.state.activity!=FieldActor.Activity.DOWN})
 	return support.plan_heal(members,factor(world,"heal"))
+
+static func plan_first_aid(world: Dictionary) -> Dictionary:
+	if not FirstAidV1.enabled(world.generated):
+		return {}
+	var states: Array[Dictionary] = []
+	for row: Variant in world.survivors:
+		if not row is Dictionary or not row.get("state") is Dictionary:
+			return {}
+		states.append(row.state)
+	return FirstAidV1.plan(states, DailyActions.supply(world.generated).layout)
 
 static func plan_airstrike(world: Dictionary, point: Vector2) -> Dictionary:
 	var layout: StreetLayout=DailyActions.supply(world.generated).layout
@@ -104,17 +145,29 @@ static func plan_airstrike_on_map(world: Dictionary, point: Vector2, layout: Str
 	return {"member_id":callers[0].id,"point":[point.x,point.y],"radius":radius,"targets":targets}
 
 static func propose(before: Dictionary, request: Dictionary) -> Dictionary:
-	if (before.get("version")!=10 and not SortieSnapshot.combat_version(before.get("version"))) or request.size()!=3 or not request.has_all(["id","kind","payload"]) or not request.kind is String or request.kind not in BasicSupport.KINDS or not request.payload is Dictionary: return {}
+	if (before.get("version")!=10 and not SortieSnapshot.combat_version(before.get("version"))) or request.size()!=3 or not request.has_all(["id","kind","payload"]) or not request.kind is String or not request.payload is Dictionary: return {}
 	var component: BasicSupport=BasicSupport.new()
-	component.restore(before.support)
+	component.restore(before.support,FirstAidV1.enabled(before.generated))
 	if not TransactionReceipt.same(request,component.request(request.kind,request.payload)): return {}
-	var expected: Dictionary=plan_heal(before) if request.kind=="heal" else plan_airstrike(before,SortieSnapshot._vec(request.payload.get("point",[]))) if request.kind=="airstrike" and SortieSnapshot._vector(request.payload.get("point")) else {}
+	var expected: Dictionary = {}
+	match request.kind:
+		"heal":
+			expected = plan_heal(before)
+		"airstrike":
+			if SortieSnapshot._vector(request.payload.get("point")):
+				expected = plan_airstrike(before, SortieSnapshot._vec(request.payload.point))
+		FirstAidV1.KIND:
+			expected = plan_first_aid(before)
 	if expected.is_empty() or not TransactionReceipt.same(expected,request.payload): return {}
 	var after: Dictionary=before.duplicate(true)
 	var facts: Dictionary={"at":before.sim.elapsed,"at_ms":floori(before.sim.elapsed*1000.0),"member_id":request.payload.member_id}
-	if request.kind=="heal":
+	if healing_kind(request.kind):
 		var row: Dictionary=SortieSnapshot._member(after.survivors,int(request.payload.member_id))
 		facts.merge({"health_before":row.state.health,"health_after":row.state.health+request.payload.amount,"amount":request.payload.amount,"damage_received":row.state.damage_received})
+		if request.kind == FirstAidV1.KIND:
+			var source: Dictionary = SortieSnapshot._member(after.survivors, FirstAidV1.SOURCE_ID)
+			facts.merge({"source_id":FirstAidV1.SOURCE_ID, "source_point":source.state.position.duplicate(),
+				"target_point":row.state.position.duplicate(), "max_health":row.state.max_health})
 		row.state.health=facts.health_after
 	else:
 		var kills: int=0

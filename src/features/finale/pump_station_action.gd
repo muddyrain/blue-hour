@@ -30,6 +30,8 @@ static func freeze(context: Dictionary) -> Dictionary:
 	value.version = 9
 	value.finale_policy = VERSION
 	value.mission_policy = 1
+	if FirstAidV1.enabled(context):
+		value.first_aid_policy = FirstAidV1.VERSION
 	value.worldgen = WorldgenLayout.policy(true)
 	value.layout = layout
 	value.cash = 0

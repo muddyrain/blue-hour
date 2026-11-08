@@ -182,5 +182,84 @@ func run() -> void:
 	expect(support.plan_airstrike(callers, [], Vector2(INF, 0), 1.0, legal, clear).is_empty(), "nonfinite strike point rejects")
 	expect(support.plan_airstrike(callers, [], Vector2.ZERO, NAN, legal, clear).is_empty(), "nonfinite strike factor rejects")
 	expect(same(support.snapshot(), checkpoint), "all target planning leaves cooldown ledger immutable")
+	_first_aid()
 	print(JSON.stringify({"suite":"basic_support", "checks":checks, "failures":failures, "policy_source":"PROJECT_TEMP", "scope":"PURE_COMPONENT_ONLY"}))
 	quit(0 if failures == 0 else 1)
+
+
+func _aid_actor(id: int, x: float, health: float, maximum: float = 200.0) -> Dictionary:
+	return {"member_id":id, "health":health, "max_health":maximum, "position":[x, 100.0],
+		"visible":true, "activity":FieldActor.Activity.IDLE}
+
+
+func _first_aid() -> void:
+	var kind: String = FirstAidV1.KIND
+	var layout: StreetLayout = StreetLayout.new()
+	var medic: Dictionary = _aid_actor(4, 100.0, 20.0)
+	var injured: Dictionary = _aid_actor(2, 196.0, 100.0)
+	var expected: Dictionary = {"source_id":4, "member_id":2, "amount":24.0}
+	expect(same(FirstAidV1.plan([medic, injured], layout), expected), "first aid includes exact distance and health thresholds")
+	var encoded: String = RecordEncoding.stringify({"states":[medic, injured]})
+	var restored: Dictionary = RecordEncoding.unpack(JSON.parse_string(encoded)).payload
+	expect(same(FirstAidV1.plan(restored.states, layout), expected), "first aid plans identically on exact journal readback")
+	injured.position[0] = 197.0
+	expect(FirstAidV1.plan([medic, injured], layout).is_empty(), "first aid excludes distant target")
+	injured.position[0] = 196.0
+	layout.residences.append(Rect2(145, 90, 10, 20))
+	expect(FirstAidV1.plan([medic, injured], layout).is_empty(), "first aid respects original shot walls")
+	layout.residences.clear()
+	expect(FirstAidV1.plan([medic], layout).is_empty(), "first aid excludes the source as target")
+	injured.health = 101.0
+	expect(FirstAidV1.plan([medic, injured], layout).is_empty(), "first aid excludes health above threshold")
+	injured.health = 0.0
+	expect(FirstAidV1.plan([medic, injured], layout).is_empty(), "first aid excludes fallen target")
+	injured.health = 100.0
+	injured.visible = false
+	expect(FirstAidV1.plan([medic, injured], layout).is_empty(), "first aid excludes absent target")
+	injured.visible = true
+	medic.activity = FieldActor.Activity.SEARCHING
+	expect(FirstAidV1.plan([medic, injured], layout).is_empty(), "first aid excludes source inside a building")
+	medic.activity = FieldActor.Activity.RECOVERING
+	var lower_id: Dictionary = _aid_actor(1, 142.0, 50.0, 100.0)
+	expect(FirstAidV1.plan([medic, injured, lower_id], layout).get("member_id") == 1, "first aid breaks ratio ties by stable ID")
+	lower_id.health = 51.0
+	injured.health = 80.0
+	expect(same(FirstAidV1.plan([medic, injured, lower_id], layout), expected), "first aid prefers lower health ratio over ID")
+	var small: Dictionary = _aid_actor(1, 160.0, 10.0, 20.0)
+	expect(FirstAidV1.plan([medic, small], layout).get("amount") == 10.0, "first aid caps actual gain at missing health")
+	expect(FirstAidV1.plan([medic, injured, injured], layout).is_empty(), "first aid rejects ambiguous member identity")
+
+	var departure: Dictionary = {"profile_id":BINDING.run_id, "settled_sorties":1,
+		"crew":[{"id":4, "definition_id":"crew_4", "health":200.0}],
+		"recruits":[{"member_id":4, "rescue_id":RescueState.TARGET, "field_status":"RETURNED",
+			"recruit_id":BINDING.run_id + ":recruit:4", "settlement_id":BINDING.transaction_id}]}
+	expect(FirstAidV1.qualified(departure), "first aid qualifies prior confirmed return")
+	departure.recruits[0].settlement_id = BINDING.run_id + ":2"
+	expect(not FirstAidV1.qualified(departure), "first aid rejects a transient join from the current sortie")
+	departure.recruits[0].settlement_id = BINDING.transaction_id
+	departure.recruits[0].field_status = "LOST"
+	expect(not FirstAidV1.qualified(departure), "first aid rejects recruit lost before return")
+	expect(not FirstAidV1.enabled({"version":9}) and FirstAidV1.enabled({"version":9, "first_aid_policy":1}), "first aid requires frozen rule marker")
+
+	var support: BasicSupport = BasicSupport.new()
+	support.configure(BINDING)
+	expect(not support.ready(kind) and support.request(kind, expected).is_empty(), "legacy support does not recognize the new action")
+	support.configure(BINDING, true)
+	var request: Dictionary = support.request(kind, expected)
+	var facts: Dictionary = {"at_ms":1000, "source_id":4, "member_id":2, "amount":24.0}
+	expect(not request.is_empty() and support.ready(kind), "planning first aid leaves use available")
+	expect(support.accept(request, facts) and not support.ready(kind) and support.request(kind, expected).is_empty(), "accepted first aid consumes the only use")
+	var checkpoint: Dictionary = support.snapshot()
+	expect(BasicSupport.problem(checkpoint, BINDING, true).is_empty() and not BasicSupport.problem(checkpoint, BINDING).is_empty(), "only authorized rules validate first aid receipts")
+	expect(support.ready("heal") and support.ready("airstrike") and checkpoint.cooldowns.size() == 2, "first aid leaves Q and E cooldowns independent")
+	var resumed: BasicSupport = BasicSupport.new()
+	resumed.restore(checkpoint, true)
+	expect(not resumed.ready(kind) and resumed.accept(request, facts) and same(resumed.snapshot(), checkpoint), "resumed first aid cannot replay or replace its facts")
+	var heal: Dictionary = resumed.request("heal", {"member_id":2, "amount":10.0})
+	expect(resumed.accept(heal, {"at_ms":1001, "member_id":2, "amount":10.0}), "resumed first aid permits a separate Q heal")
+	expect(BuildAuthority.healed(resumed.snapshot().accepted, 2) == 34.0, "health authority counts both independent healing sources")
+	var duplicate: Dictionary = checkpoint.accepted[0].duplicate(true)
+	duplicate.id = BINDING.transaction_id + ":basic:1"
+	checkpoint.accepted.append(duplicate)
+	checkpoint.sequence += 1
+	expect(BasicSupport.problem(checkpoint, BINDING, true) == "FIRST_AID_ALREADY_USED", "ledger rejects a second first aid even with fresh identity")

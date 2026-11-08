@@ -22,6 +22,12 @@ static func camp(base: Dictionary, id: int, scope: String = "camp") -> Dictionar
 		"positive":{"name":positive.name,"detail":positive.description},"negative":{"name":negative.name,"detail":negative.description},
 		"trait_detail":TraitRules.description(member).replace("Trait ","").replace(" · PROJECT_TEMP",""),
 		"scope":scope,"editable":scope=="camp" and member.health>0}
+	if id == FirstAidV1.SOURCE_ID and CampaignRules.first_aid_enabled(base.journey.get("campaign")):
+		if scope == "candidate":
+			_show_first_aid(model)
+			model.status = "确认归航入队后，下次出击生效"
+		elif scope == "camp" and FirstAidV1.qualified(base):
+			_show_first_aid(model)
 	var item: Dictionary=WeaponInventory.for_member(source,id)
 	_weapon(model,item,personal,passive,TraitRules.factor(member,"shot"))
 	var speed: float=125.0*TraitRules.factor(member,"move")*personal.move*passive.move
@@ -33,7 +39,7 @@ static func camp(base: Dictionary, id: int, scope: String = "camp") -> Dictionar
 static func field(world: Expedition, actor: FieldActor, status: String) -> Dictionary:
 	if not world.persona_views.has(actor.member_id):
 		var source: Dictionary=FieldJoinRules.action_base(world.field_departure,world.field_joins)
-		world.persona_views[actor.member_id]=camp(source,actor.member_id,"camp")
+		world.persona_views[actor.member_id]=camp(source,actor.member_id,"field")
 	var model: Dictionary=world.persona_views[actor.member_id].duplicate(true)
 	if model.is_empty(): return {}
 	model.scope="field"
@@ -43,6 +49,12 @@ static func field(world: Expedition, actor: FieldActor, status: String) -> Dicti
 	model.alive=actor.health>0
 	model.name=actor.call_sign
 	model.status="阵亡 · 只读历史" if actor.health<=0 else status
+	if actor.member_id == FirstAidV1.SOURCE_ID:
+		var first_aid: String = world.first_aid_status()
+		if not first_aid.is_empty():
+			_show_first_aid(model)
+			model.first_aid_status = first_aid
+			model.status = "%s · %s" % [first_aid, model.status]
 	model.ammo=world._ammo_text(actor)
 	var gun: WeaponDefinition=actor.weapon_definition
 	model.weapon_detail=_weapon_text(gun,actor.trait_shot_factor)
@@ -54,6 +66,13 @@ static func field(world: Expedition, actor: FieldActor, status: String) -> Dicti
 	var effective: float=seconds*actor.trait_search_factor*actor.persona_work_factor*BuildItems.frozen_factors(world.supply.generated.build).work
 	model.work_detail="%s · 有效耗时 %.4f 秒\n%s"%[world.site_label(site) if site!=null else "基准搜刮（30秒室内）",effective,"进度 %.0f%%"%(site.progress/seconds*100.0) if site!=null else "接到任务后按实际站点基础计算"]
 	return model
+
+static func _show_first_aid(model: Dictionary) -> void:
+	model.primary = FirstAidV1.TITLE
+	model.primary_short = FirstAidV1.TITLE
+	model.trait_detail = "每次出击可自动急救一次。为生命不高于 %.0f%%、相距不超过 %.0f 且无遮挡的队友恢复最多 %.0f HP。\n%s" % [
+		FirstAidV1.HEALTH_RATIO * 100.0, FirstAidV1.RANGE, FirstAidV1.HEAL_AMOUNT, model.trait_detail]
+
 
 static func _weapon(model: Dictionary, item: Dictionary, personal: Dictionary, passive: Dictionary, shot_factor: float) -> void:
 	if item.is_empty():

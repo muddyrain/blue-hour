@@ -162,7 +162,7 @@ func refresh(state: Dictionary) -> void:
 				var model: Dictionary=members[index].persona
 				_persona_models[int(model.id)]=model
 				_persona_cards[index].present(model,true)
-				_compact_persona_card(_persona_cards[index])
+				_compact_persona_card(_persona_cards[index], model.get("first_aid_status", ""))
 		if _persona_id>0 and _persona_models.has(_persona_id): persona_details.present(_persona_models[_persona_id])
 		_fit_persona_members()
 		# Font/theme minimum sizes settle after compact cards are populated.
@@ -611,21 +611,21 @@ func _fit_persona_members() -> void:
 	_members_panel.reset_size()
 
 
-func _compact_persona_card(card: PersonaCard) -> void:
+func _compact_persona_card(card: PersonaCard, first_aid: String) -> void:
 	# Only field presentation changes. The shared card retains its complete model
 	# and the same details for camp, rescue and field selection.
 	card.custom_minimum_size.x=148
 	card.portrait_button.custom_minimum_size=Vector2(40,40)
 	card.info_button.custom_minimum_size=Vector2(22,24)
 	card.primary_label.add_theme_font_size_override("font_size",13)
-	card.name_label.hide()
+	card.name_label.visible = not first_aid.is_empty()
 	card.health_label.hide()
 	card.ammo_label.hide()
 	card.positive_label.get_parent().hide()
 	card.health_bar.custom_minimum_size.y=4
 	card.health_bar.tooltip_text=card.health_label.text
 	card.status_label.add_theme_font_size_override("font_size",12)
-	card.status_label.text=_short_activity(card.status_label.text)
+	card.status_label.text = _short_activity(card.status_label.text) if first_aid.is_empty() else first_aid
 	card.reset_size()
 
 

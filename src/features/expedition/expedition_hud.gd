@@ -58,7 +58,14 @@ func refresh(state: Dictionary) -> void:
 	var night: bool = threat.get("enabled",false) and int(threat.get("stage",0)) >= ThreatDirector.Stage.NIGHT
 	var display_seconds: int = floori(float(threat.get("overtime",0.0))) if night else seconds
 	var time_label: String = "夜间经过" if night else "出击时间"
-	if not player_mode and threat.get("enabled",false): time_label += " · 候选"
+	var compact_hint: String = ""
+	if threat.get("enabled", false):
+		if player_mode:
+			time_label = "已入夜" if night else "距入夜"
+			compact_hint = time_label
+		else:
+			time_label += " · 候选"
+			compact_hint = "威胁 %d" % int(threat.get("stage", 0))
 	var action: String = "结束交火练习" if practice else "发动巴士"
 	var bus_waiting: PackedStringArray = []
 	if not enabled:
@@ -83,7 +90,7 @@ func refresh(state: Dictionary) -> void:
 		"exploration_objectives":state.get("exploration_objectives",[]),
 		"time":{"label":time_label,
 			"text":("+" if night else "") + "%02d:%02d" % [display_seconds / 60, display_seconds % 60],
-			"compact_hint":"威胁 %d" % int(threat.get("stage",0)) if threat.get("enabled", false) else "",
+			"compact_hint":compact_hint,
 			"hint":threat.get("hint", "") if threat.get("enabled", false) else ""},
 		"bus_status_text":"交火练习" if practice else ("巴士就绪" if enabled else bus_text),
 		"bus_waiting_text":"\n".join(bus_waiting), "bus_count_visible":gathering,

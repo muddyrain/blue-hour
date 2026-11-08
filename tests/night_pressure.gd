@@ -42,6 +42,7 @@ func _check_sortie(supply: MissionSupply) -> void:
 	var warnings: Array[Dictionary] = []
 	sortie.threat_changed.connect(func(event: Dictionary) -> void: warnings.append(event))
 	_expect(sortie.threat.stage == ThreatDirector.Stage.CALM and sortie._spawn_count == 0, "new sortie starts clean")
+	_expect(sortie._night_lighting.amount == 0.0, "calm retains the original ungraded street")
 	sortie.step(7.0)
 	_expect(spawns.size() == 1 and spawns[0].reason == "spawned" and sortie.enemies.size() == 1, "ordinary generator creates real enemy from first deadline")
 	var enemy: FieldActor = sortie.enemies[0]
@@ -63,10 +64,17 @@ func _check_sortie(supply: MissionSupply) -> void:
 	_expect(sortie.threat.stage == ThreatDirector.Stage.LATE and warnings.size() == 1 and sortie._spawn_count == 1, "resume advances current simulation only, no frozen-time backlog")
 	sortie.step(0.16)
 	_expect(sortie._spawn_count == 2 and is_equal_approx(sortie._spawn_clock,5.0), "one due spawn resets exact current stage interval")
+	var dusk_grade: float = sortie._night_lighting.amount
+	sortie.toggle_pause()
+	sortie.step(60.0)
+	_expect(dusk_grade > 0.0 and dusk_grade < 1.0 and sortie._night_lighting.amount == dusk_grade,
+		"dusk grade derives from simulation time and remains frozen under pause")
+	sortie.toggle_pause()
 	var second_birth: Vector2 = Vector2(spawns[-1].point[0],spawns[-1].point[1])
 	_expect(second_birth.distance_to(sortie.enemies[0].position) >= ThreatRules.ENEMY_SEPARATION, "second birth cannot overlap the earlier enemy")
 	sortie.step(500.0)
 	_expect(sortie._spawn_count <= 3 and sortie.threat.stage == ThreatDirector.Stage.DEEP and sortie.phase != Expedition.Phase.FINISHED, "large unpaused delta coalesces to one attempt, zero deadline cannot force failure")
+	_expect(sortie._night_lighting.amount == 1.0, "deep night reaches the bounded final grade")
 	for unit: FieldActor in sortie.enemies:
 		unit.queue_free()
 	sortie.enemies.clear()

@@ -17,9 +17,14 @@ func run() -> void:
 		"ordinary new entry issues three mission-mode cards")
 	if daily.size() == 3:
 		var clue: Dictionary = daily[2]
-		check(daily[0].type == "supply" and daily[1].type == "airdrop" and clue.get("investigation", {}).get("clue_id") == "dispatch_log"
-			and clue.weapons == 0 and daily[1].weapons == 1 and TaskActions.outdoor_site(daily[1], &"cash"),
-			"normal first day offers different supply, outdoor gear and indoor clue rewards")
+		var optional: Dictionary = daily[1]
+		var gear: bool = optional.type == "airdrop" and optional.weapons == 1 and TaskActions.outdoor_site(optional, &"cash")
+		var rescue: bool = (optional.type == "rescue" and optional.weapons == 0
+			and int(optional.recruit) in RescuePoolState.available(base)
+			and optional.exploration.level.routes.has_all(["bus>rescue", "rescue>bus"]))
+		check(daily[0].type == "supply" and (gear or rescue) and DailyActions.matches(base, optional)
+			and clue.get("investigation", {}).get("clue_id") == "dispatch_log" and clue.weapons == 0,
+			"normal first day offers supplies, a legal gear or rescue choice, and an indoor clue")
 		var old_mode: Dictionary = base.duplicate(true)
 		old_mode.journey.campaign = CampaignRules.initial(base.profile_id)
 		check(not DailyActions.matches(old_mode, clue), "historical short mode cannot accept an investigation offer")

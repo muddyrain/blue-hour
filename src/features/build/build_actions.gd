@@ -1,6 +1,17 @@
 class_name BuildActions
 extends RefCounted
 ## Explicit V7; old V6 generators remain unchanged for historical authentication.
+const GEAR_POLICY_VERSION: int = 1
+
+
+static func with_gear_drops(action: Dictionary) -> Dictionary:
+	var value: Dictionary = action.duplicate(false)
+	value.gear_build_policy = GEAR_POLICY_VERSION
+	value.build = action.build.duplicate(false)
+	value.build.drops = BuildItems.drop(value.build.drop_context, value.build.owned)
+	return value
+
+
 static func offers(base: Dictionary) -> Array[Dictionary]:
 	var result: Array[Dictionary]=[]
 	for old: Dictionary in CampaignActions.offers(base):

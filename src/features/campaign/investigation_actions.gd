@@ -39,6 +39,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var industrial: bool = mission and WorldgenState.industrial_yard_enabled(base)
 	var action_choices: bool = CampaignRules.action_choices_enabled(base.journey.campaign)
 	var midgame: bool = CampaignRules.midgame_enabled(base.journey.campaign)
+	var gear_build: bool = base.journey.build.has("opening")
 	var clue: String = CampaignRules.next_clue(base.journey.campaign)
 	var result: Array[Dictionary] = []
 	if clue.is_empty():
@@ -48,10 +49,10 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 		if not finale.is_empty():
 			var selected: Dictionary = PumpStationAction.freeze(finale[0]) if CampaignRules.pump_station_enabled(base.journey.campaign) else finale[0]
 			if not selected.is_empty():
-				result = _day(projected, clue, mission, industrial, action_choices, midgame, selected)
+				result = _day(projected, clue, mission, industrial, action_choices, midgame, selected, "", gear_build)
 	else:
 		var rare_type: String = RareSortie.selection(base.journey.seed, int(base.day), RareSortie.SLOT) if CampaignRules.rare_sorties_enabled(base.journey.campaign) else ""
-		result = _day(projected, clue, mission, industrial, action_choices, midgame, {}, rare_type)
+		result = _day(projected, clue, mission, industrial, action_choices, midgame, {}, rare_type, gear_build)
 	if result.is_empty():
 		return {}
 	var fingerprints: Dictionary[String, String] = {}
@@ -89,7 +90,8 @@ static func site_problem(value: Dictionary) -> String:
 
 
 static func _day(projected: Dictionary, clue: String, mission: bool, industrial: bool,
-		action_choices: bool, midgame: bool, finale: Dictionary = {}, rare_type: String = "") -> Array[Dictionary]:
+		action_choices: bool, midgame: bool, finale: Dictionary = {}, rare_type: String = "",
+		gear_build: bool = false) -> Array[Dictionary]:
 	var original: Array[Dictionary] = PersonaActions.offers(projected)
 	if original.size() != 3:
 		return []
@@ -129,6 +131,8 @@ static func _day(projected: Dictionary, clue: String, mission: bool, industrial:
 			offer = _offer(original[slot], task_type, recruit if task_type == "rescue" else 0, mission, industrial)
 		if offer.is_empty():
 			return []
+		if gear_build and offer.type == "airdrop" and not offer.has("rare_policy"):
+			offer = BuildActions.with_gear_drops(offer)
 		if investigation:
 			var version: int = CampaignRules.MISSION_VERSION if mission else CampaignRules.INVESTIGATION_VERSION
 			offer.investigation = {"version":version, "clue_id":clue, "site_id":SITE_ID}

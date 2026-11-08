@@ -1,4 +1,8 @@
-# M29-RARE-SORTIE-01 当前候选
+# M30-OPENING-BUILD-01 当前候选
+
+正常新旅程选择搜集型或火力型，首槽装备相应道具。普通装备回收可继续获得未拥有的道具。本候选叠加于未合并的 PR #34，已审基线为 `2c8b16247ee47da0f3aed44604f713dd224599ee`，Draft 以 `codex/m29-rare-sortie-01` 为 base。[设计与兼容合同](design/m30-opening-build-01.md)。正式生存发布门禁仍为 **BLOCKED**。
+
+# M29-RARE-SORTIE-01 历史候选
 
 新旅程从第 3 天起可在备选位遇到断电冷库或封锁军需站。补给、调查与两份线索之后的泵站规则沿用 M28。候选依赖未合并的 PR #33，从已审 `0b76a5d721b94a0ec0f83f1ec5f32d190816ec03` 继续，Draft 以 `codex/m28-finale-01` 为 base。[任务与兼容合同](design/m29-rare-sortie-01.md)。正式生存发布门禁仍为 **BLOCKED**。
 

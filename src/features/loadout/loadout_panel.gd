@@ -139,7 +139,9 @@ func refresh(data: Dictionary, feedback: String = "") -> void:
 	_data = data.duplicate(true)
 	power_panel.present(data,not CampaignState.ended(data))
 	build_panel.visible=BuildState.enabled(data)
-	if build_panel.visible: build_panel.present(data.journey.build.owned,data.journey.build.slots,true,not CampaignState.ended(data))
+	if build_panel.visible:
+		var build: Dictionary = data.journey.build
+		build_panel.present(build.owned, build.slots, true, not CampaignState.ended(data), build.get("opening", {}).get("plan", ""))
 	items.max_text_lines = 3 if WeaponState.is_family(_data) else 1
 	_sync_members()
 	for id: int in _member_equipment:

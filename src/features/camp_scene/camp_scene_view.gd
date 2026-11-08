@@ -378,6 +378,13 @@ func refresh(data: Dictionary, daily: Dictionary, can_depart: bool, reason: Stri
 func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, reason: String, feedback: String) -> void:
 	resource_text.text = "第 %d 天     货币 %d     食物 %d     今日需粮 %d" % [data.day, data.cash, data.food, daily.required]
 	_shortage_text.text = "口粮缺口 %d · 可考虑先补给" % daily.shortage if daily.shortage > 0 else "口粮缺口 0 · 库存充足"
+	var build: Dictionary = data.get("journey", {}).get("build", {})
+	if build.has("opening"):
+		var equipped: PackedStringArray = []
+		for item: String in build.slots:
+			if not item.is_empty():
+				equipped.append(BuildItems.DEFINITIONS[item].name)
+		_shortage_text.text += "   ·   已配 " + ("、".join(equipped) if not equipped.is_empty() else "空槽")
 	_shortage_text.add_theme_color_override("font_color", CampStyle.AMBER if daily.shortage > 0 else CampStyle.MUTED)
 	var last: Dictionary = data.last_day
 	_facilities.visible = CampFacilities.enabled(data)

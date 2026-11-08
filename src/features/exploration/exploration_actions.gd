@@ -117,10 +117,14 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 	var residential_rescue: bool = level and value.worldgen.get("revision") == 3
 	var mission: bool = value is Dictionary and value.has("mission_policy")
 	var rare: bool = value is Dictionary and value.has("rare_policy")
+	var gear_build: bool = value is Dictionary and value.has("gear_build_policy")
 	if worldgen and (not value.worldgen is Dictionary or not TransactionReceipt.same(value.worldgen,WorldgenLayout.policy(level, industrial, residential_rescue))): return "WORLDGEN_ACTION_POLICY"
 	if mission and (not level or not SurvivalContracts.integer(value.mission_policy, 1, 1)): return "MISSION_ACTION_POLICY"
 	if rare and (not mission or not SurvivalContracts.integer(value.rare_policy, RareSortie.VERSION, RareSortie.VERSION)): return "RARE_ACTION_POLICY"
-	if not value is Dictionary or not SurvivalContracts.json_value(value) or value.size()!=23+int(worldgen)+int(mission)+int(rare) or value.get("version")!=9 or not value.get("layout") is Dictionary or not value.get("exploration") is Dictionary or not value.get("build") is Dictionary or not value.get("powers") is Dictionary or not value.get("persona") is Dictionary or not value.get("campaign") is Dictionary: return "EXPLORATION_ACTION_FIELDS"
+	if gear_build and (not mission or rare or value.get("type") != "airdrop" \
+			or not SurvivalContracts.integer(value.gear_build_policy, BuildActions.GEAR_POLICY_VERSION, BuildActions.GEAR_POLICY_VERSION)):
+		return "GEAR_BUILD_POLICY"
+	if not value is Dictionary or not SurvivalContracts.json_value(value) or value.size()!=23+int(worldgen)+int(mission)+int(rare)+int(gear_build) or value.get("version")!=9 or not value.get("layout") is Dictionary or not value.get("exploration") is Dictionary or not value.get("build") is Dictionary or not value.get("powers") is Dictionary or not value.get("persona") is Dictionary or not value.get("campaign") is Dictionary: return "EXPLORATION_ACTION_FIELDS"
 	if not value.get("seed") is String or value.seed.length()!=32 or value.seed.to_lower()!=value.seed or not value.seed.is_valid_hex_number(false) or not SurvivalContracts.integer(value.get("day"),2,RunSave.MAX_COUNTER) or not SurvivalContracts.integer(value.get("slot"),0,2) or value.get("type") not in TaskActions.TYPES or value.layout.get("size") not in NeighborhoodLayout.SIZES or value.layout.get("topology") not in NeighborhoodLayout.TOPOLOGIES or not SurvivalContracts.integer(value.get("recruit"),0,5) or not value.build.get("owned") is Array or not value.build.get("slots") is Array or not value.powers.get("owned") is Array or not value.powers.get("slot") is String or not value.persona.get("facts") is Dictionary or not value.campaign.get("run_id") is String or value.campaign.run_id.length()!=32 or not value.campaign.run_id.is_valid_hex_number(false) or not SurvivalContracts.integer(value.campaign.get("preparations"),0,3): return "EXPLORATION_ACTION_CONTEXT"
 	var signature: String=RecordEncoding.fingerprint(value) if mission else SurvivalContracts.fingerprint(value)
 	var proof_key: String = "camp-source:" + signature if mission and camp_source else signature
@@ -129,6 +133,8 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 	if source.is_empty(): return "EXPLORATION_ORIGINAL_SOURCE"
 	var expected: Dictionary = upgrade(source, worldgen, level, int(mission), industrial, residential_rescue, int(value.get("rare_policy", 0)))
 	if expected.is_empty(): return "EXPLORATION_ACTION_CANONICAL"
+	if gear_build:
+		expected = BuildActions.with_gear_drops(expected)
 	var matches: bool = signature == RecordEncoding.fingerprint(expected) if mission else TransactionReceipt.same(value,expected)
 	if not matches and mission and camp_source:
 		# RunSave keeps its historical JSON camp projection. A stored ability source

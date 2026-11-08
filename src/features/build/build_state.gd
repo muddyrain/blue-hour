@@ -9,6 +9,20 @@ static func initial() -> Dictionary:
 
 static func problem(camp: Dictionary) -> String:
 	if not enabled(camp): return ""
+	var build: Variant = camp.journey.build
+	if not build is Dictionary or not build.has("opening"):
+		return _problem(camp, "")
+	var issue: String = OpeningBuild.problem(camp)
+	if not issue.is_empty():
+		return issue
+	var projected: Dictionary = camp.duplicate(false)
+	projected.journey = camp.journey.duplicate(false)
+	projected.journey.build = build.duplicate(false)
+	projected.journey.build.erase("opening")
+	return _problem(projected, build.opening.item_id)
+
+
+static func _problem(camp: Dictionary, opening_item: String) -> String:
 	if ExplorationState.enabled(camp):
 		if camp.journey.build.size()!=(10 if WorldgenState.enabled(camp) else 9): return "EXPLORATION_BUILD_FIELDS"
 		var issue: String=WorldgenState.problem(camp) if WorldgenState.enabled(camp) else ""
@@ -22,7 +36,7 @@ static func problem(camp: Dictionary) -> String:
 		old.journey.build.erase("exploration")
 		old.journey.build.erase("worldgen")
 		for source: Dictionary in old.journey.build.powers.sources: source.generated=ExplorationActions.origin(source.generated)
-		return problem(old)
+		return _problem(old, opening_item)
 	if PersonaState.enabled(camp):
 		if camp.journey.build.size()!=8: return "PERSONA_BUILD_FIELDS"
 		var issue: String=SurvivorPersona.problem(camp.journey.build.get("persona"),String(camp.journey.get("seed","")))
@@ -36,13 +50,13 @@ static func problem(camp: Dictionary) -> String:
 		# old validator. Legacy camps still reject every persona-bearing source.
 		for source: Dictionary in old.journey.build.powers.sources:
 			source.generated=PersonaActions.legacy(source.generated)
-		return problem(old)
+		return _problem(old, opening_item)
 	if PowerState.enabled(camp):
 		if camp.journey.build.size()!=7 or camp.journey.build.get("combat_version")!=1: return "POWER_BUILD_FIELDS"
 		var old: Dictionary=camp.duplicate(true)
 		old.journey.build.version=2
 		old.journey.build.erase("powers")
-		var issue: String=problem(old)
+		var issue: String=_problem(old, opening_item)
 		return PowerState.problem(camp) if issue.is_empty() else issue
 	var v: Variant=camp.journey.build
 	if not CampaignState.is_short(camp) or not v is Dictionary or v.size()!=(6 if v.get("version")==2 else 5) or not v.has_all(["version","owned","slots","sources","healing"]) or ((v.version!=1 and v.version!=2) or (v.version==2 and v.get("combat_version")!=1)) or not v.sources is Array: return "BUILD_FIELDS"
@@ -51,14 +65,18 @@ static func problem(camp: Dictionary) -> String:
 	if not v.healing is Dictionary or v.healing.size()>5: return "BUILD_HEALING_HISTORY"
 	for id: Variant in v.healing:
 		if not id is String or id not in ["1","2","3","4","5"] or not SurvivalContracts.number(v.healing[id]) or v.healing[id]<0 or v.healing[id]>RunSave.MAX_COUNTER: return "BUILD_HEALING_HISTORY"
-	if v.sources.size()!=v.owned.size(): return "BUILD_ACQUISITION_COUNT"
+	if v.sources.size() + int(not opening_item.is_empty()) != v.owned.size(): return "BUILD_ACQUISITION_COUNT"
 	var seen: Array[String]=[]
 	var prior: Array[String]=[]
+	if not opening_item.is_empty():
+		seen.append(opening_item)
+		prior.append(opening_item)
 	var group: String=""
 	var context: Dictionary={}
 	var group_owned: Array=[]
 	for source: Variant in v.sources:
 		if not source is Dictionary or source.size()!=4 or not source.has_all(["item_id","transaction_id","context","owned"]) or source.item_id not in v.owned or source.item_id in seen or not source.context is Dictionary or not source.owned is Array: return "BUILD_ACQUISITION_FIELDS"
+		if not opening_item.is_empty() and v.owned[seen.size()] != source.item_id: return "BUILD_ACQUISITION_ORDER"
 		if not source.transaction_id is String: return "BUILD_ACQUISITION_ID"
 		var parts: PackedStringArray=source.transaction_id.split(":")
 		if parts.size()!=2 or parts[0]!=camp.profile_id or not parts[1].is_valid_int() or int(parts[1])<1 or int(parts[1])>camp.settled_sorties or source.transaction_id!="%s:%d"%[camp.profile_id,int(parts[1])] or source.context.get("run_id")!=camp.profile_id or source.context.get("seed")!=camp.journey.seed or source.context.get("site_id")!="cash" or source.context.get("day")!=int(parts[1])+1: return "BUILD_ACQUISITION_ID"

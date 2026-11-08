@@ -17,7 +17,7 @@ func _ready() -> void:
 	_build()
 
 
-func present(owned: Array, slots: Array, saved: bool, enabled: bool = true) -> void:
+func present(owned: Array, slots: Array, saved: bool, enabled: bool = true, opening_plan: String = "") -> void:
 	_build()
 	var issue: String = BuildItems.problem(owned, slots)
 	if not issue.is_empty():
@@ -36,6 +36,8 @@ func present(owned: Array, slots: Array, saved: bool, enabled: bool = true) -> v
 			names.append(definitions[id].name)
 	inventory.text = "库存 %d/6%s" % [owned.size(), " · 已集齐" if owned.size() == 6 else ""]
 	inventory.text += "：" + "、".join(names) if not names.is_empty() else " · 装备搜寻回收，归航确认后入库"
+	if OpeningBuild.PLANS.has(opening_plan):
+		inventory.text += "  ·  开局 %s" % OpeningBuild.PLANS[opening_plan].title
 	status.text = "已保存 · 下一行动生效" if saved else "保存未确认 · 保持原配装"
 	status.add_theme_color_override("font_color", CampStyle.TEAL if saved else CampStyle.AMBER)
 	for slot: int in range(BuildItems.SLOT_COUNT):

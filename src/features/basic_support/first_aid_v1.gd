@@ -49,6 +49,10 @@ static func available(row: Dictionary) -> bool:
 static func plan(states: Array, layout: StreetLayout) -> Dictionary:
 	if layout == null:
 		return {}
+	return plan_on_map(states, layout.world_bounds, layout.shot_obstacles())
+
+
+static func plan_on_map(states: Array, bounds: Rect2, obstacles: Array[ShotObstacle]) -> Dictionary:
 	var members: Dictionary = {}
 	for state: Variant in states:
 		if not state is Dictionary or not SurvivalContracts.integer(state.get("member_id"), 1, SurvivalContracts.MAX_ID) \
@@ -70,7 +74,7 @@ static func plan(states: Array, layout: StreetLayout) -> Dictionary:
 			continue
 		var ratio: float = float(member.health) / float(member.max_health)
 		var target: Vector2 = SortieSnapshot._vec(member.position)
-		if ratio > HEALTH_RATIO or not reach(layout, start, target):
+		if ratio > HEALTH_RATIO or not _reach(bounds, obstacles, start, target):
 			continue
 		if ratio < lowest or (ratio == lowest and member_id < int(chosen.member_id)):
 			chosen = member
@@ -82,5 +86,10 @@ static func plan(states: Array, layout: StreetLayout) -> Dictionary:
 
 
 static func reach(layout: StreetLayout, start: Vector2, target: Vector2) -> bool:
-	return layout != null and layout.world_bounds.has_point(start) and layout.world_bounds.has_point(target) \
-		and start.distance_squared_to(target) <= RANGE * RANGE and BuildAuthority.line_clear(layout, start, target)
+	return layout != null and _reach(layout.world_bounds, layout.shot_obstacles(), start, target)
+
+
+static func _reach(bounds: Rect2, obstacles: Array[ShotObstacle], start: Vector2, target: Vector2) -> bool:
+	return (bounds.has_point(start) and bounds.has_point(target)
+		and start.distance_squared_to(target) <= RANGE * RANGE
+		and ToxicV1.line_clear(start, target, obstacles))

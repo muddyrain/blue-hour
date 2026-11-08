@@ -45,6 +45,7 @@ func _draw() -> void:
 				var direction: Vector2 = Vector2.from_angle(TAU * float(index) / 8.0)
 				draw_line(_impact_point + direction * wave_radius * 0.55,
 					_impact_point + direction * wave_radius, Color(IMPACT_CORE, flash), 2.0, true)
+		FreezeProfile.mark("impact_draw")
 
 
 func present(point: Vector2, radius: float, legal: bool, aiming: bool) -> void:

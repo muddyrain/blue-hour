@@ -1,4 +1,8 @@
-# M34-SURVIVOR-ROLE-01 当前候选
+# AIRSTRIKE-02 当前候选
+
+从已合入 #40 的 `main` 开发。空袭确认及其收据回放共用已认证的街区导航，急救实时判定复用场上射线障碍。[Windows 对照与计时口径](design/airstrike-02.md)。正式生存发布门禁仍为 **BLOCKED**。
+
+# M34-SURVIVOR-ROLE-01 历史候选
 
 从合并 #37 与 #39 后的 `main` 开发。新旅程正常救出并确认沈听澜入队后，下一趟可使用一次战地急救，沿原生命与收据链确认并恢复。[规则与兼容](design/m34-survivor-role-01.md)。正式生存发布门禁仍为 **BLOCKED**。
 

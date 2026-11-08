@@ -2018,6 +2018,7 @@ func support_available() -> bool:
 	return build_mode() and not is_paused and not suspend_sealed and phase!=Phase.FINISHED and not (bus_view!=null and bus_view.running()) and field_join_error.is_empty()
 
 func support_world() -> Dictionary:
+	var stamp: int = FreezeProfile.enter("support.capture")
 	var paused: bool=is_paused
 	is_paused=true
 	_clear_dead_worker()
@@ -2026,6 +2027,7 @@ func support_world() -> Dictionary:
 	_reap_defeated_enemies()
 	var value: Dictionary=SortieSnapshot.capture(self)
 	is_paused=paused
+	FreezeProfile.leave("support.capture", stamp)
 	return value
 
 func request_heal() -> bool:
@@ -2049,13 +2051,16 @@ func request_first_aid() -> bool:
 	if is_practice or not FirstAidV1.enabled(supply.generated) or not support_available() \
 			or not support_commit.is_valid() or not basic_support.ready(FirstAidV1.KIND):
 		return false
+	var stamp: int = FreezeProfile.enter("support.first_aid_plan")
 	var states: Array[Dictionary] = []
 	for actor: FieldActor in survivors:
 		states.append({"member_id":actor.member_id, "health":actor.health, "max_health":actor.max_health,
 			"visible":actor.visible, "activity":actor.activity, "position":[actor.position.x, actor.position.y]})
-	var plan: Dictionary = FirstAidV1.plan(states, layout)
+	var plan: Dictionary = FirstAidV1.plan_on_map(states, layout.world_bounds, shot_obstacles)
+	FreezeProfile.leave("support.first_aid_plan", stamp)
 	if plan.is_empty():
 		return false
+	FreezeProfile.mark("aid_eligible", stamp)
 	var before: Dictionary = support_world()
 	return _accept_support(before, basic_support.request(FirstAidV1.KIND, plan))
 
@@ -2072,7 +2077,9 @@ func request_airstrike(point: Vector2) -> bool:
 
 func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 	if request.is_empty() or not support_commit.is_valid(): return false
+	var confirmation: int = FreezeProfile.enter("support.confirm")
 	var result: Dictionary=support_commit.call(before,request)
+	FreezeProfile.leave("support.confirm", confirmation)
 	if result.get("error",ERR_UNAVAILABLE)!=OK:
 		pending_support={"before":before,"request":request}
 		print("BH_SUPPORT "+JSON.stringify({"kind":request.kind,"status":"PENDING","reason":result.get("reason",""),"sequence":before.support.sequence,"elapsed":before.sim.elapsed}))
@@ -2088,9 +2095,11 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 	print("BH_SUPPORT "+JSON.stringify({"kind":request.kind,"status":"ACCEPTED","sequence_before":before.support.sequence,"sequence":after.support.sequence,"cooldowns":after.support.cooldowns,"kills_before":before.sim.kills,"kills":after.sim.kills,"facts":after.support.accepted.back().facts,"elapsed":after.sim.elapsed}))
 	# All fallible validation and I/O preceded this visible state replacement.
 	var preserve_aim: bool = request.kind == FirstAidV1.KIND and support_aiming
+	var application: int = FreezeProfile.enter("support.apply")
 	for enemy: FieldActor in enemies: enemy.free()
 	enemies.clear()
 	var issue: String=SortieSnapshot.apply(self,after)
+	FreezeProfile.leave("support.apply", application)
 	assert(issue.is_empty(),issue)
 	is_paused=false
 	if request.kind=="airstrike":
@@ -2103,6 +2112,7 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 		else:
 			_show_notice(notice)
 	elif request.kind == FirstAidV1.KIND:
+		FreezeProfile.mark("aid_hp_applied")
 		support_aiming = preserve_aim
 		var facts: Dictionary = after.support.accepted.back().facts
 		var patient: FieldActor = search_member(int(facts.member_id))
@@ -2133,6 +2143,7 @@ func _support_input(event: InputEvent) -> bool:
 	if support_aiming and event is InputEventMouseButton and event.pressed:
 		if event.button_index==MOUSE_BUTTON_RIGHT: support_aiming=false; return true
 		if event.button_index==MOUSE_BUTTON_LEFT:
+			FreezeProfile.mark("left_received")
 			request_airstrike(get_global_transform_with_canvas().affine_inverse()*event.position)
 			return true
 	return false

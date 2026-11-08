@@ -42,6 +42,49 @@ static func theme(base: Theme) -> Theme:
 	return result
 
 
+static func blue_hour_theme(base: Theme) -> Theme:
+	var result: Theme = theme(base if base != null else Theme.new())
+	result.default_font_size = 18
+	result.set_color("font_color", "Label", Color("f3e7d1"))
+	result.set_color("font_color", "Button", Color("f3e7d1"))
+	result.set_color("font_hover_color", "Button", Color("fff3db"))
+	result.set_color("font_pressed_color", "Button", Color("fff3db"))
+	result.set_color("font_focus_color", "Button", Color("fff3db"))
+	result.set_color("font_disabled_color", "Button", Color("a1afb1"))
+	result.set_stylebox("normal", "Button", _blue_hour_box(Color("172e3b"), Color("48646d")))
+	result.set_stylebox("hover", "Button", _blue_hour_box(Color("244556"), TEAL))
+	result.set_stylebox("pressed", "Button", _blue_hour_box(Color("10232f"), AMBER))
+	result.set_stylebox("disabled", "Button", _blue_hour_box(Color("10212c"), Color("3e5057")))
+	var focus: StyleBoxFlat = _blue_hour_box(Color.TRANSPARENT, TEAL, 0)
+	focus.set_border_width_all(2)
+	result.set_stylebox("focus", "Button", focus)
+	return result
+
+
+static func blue_hour_primary(button: Button) -> void:
+	button.add_theme_stylebox_override("normal", _blue_hour_box(Color("eeb96f"), Color("f2ce9b")))
+	button.add_theme_stylebox_override("hover", _blue_hour_box(Color("ffce8a"), Color("fff0d4")))
+	button.add_theme_stylebox_override("pressed", _blue_hour_box(Color("c88e49"), Color("ffe0ad")))
+	for state: String in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		button.add_theme_color_override(state, Color("172533"))
+
+
+static func blue_hour_background(texture: Texture2D) -> TextureRect:
+	var background: TextureRect = TextureRect.new()
+	background.texture = texture
+	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	return background
+
+
+static func _blue_hour_box(colour: Color, edge: Color, padding: int = 10) -> StyleBoxFlat:
+	var style: StyleBoxFlat = box(colour, edge, padding)
+	style.set_corner_radius_all(6)
+	return style
+
+
 static func label(value: String, font_size: int = 18, colour: Color = TEXT) -> Label:
 	var node: Label = Label.new()
 	node.text = value

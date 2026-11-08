@@ -41,7 +41,9 @@ static func problem(data: Dictionary) -> String:
 		CampFacilities.project_legacy_food(projected.last_day)
 	projected.schema_version = WeaponState.SCHEMA
 	projected.journey.format = WeaponState.FORMAT
-	var issue: String=WeaponState.problem(projected,true,data.journey.get("build",{})) # Validation context, never a serialized permission.
+	# Validation context comes from the original campaign, never the projected old shape.
+	var weapon_affixes: bool = CampaignRules.weapon_affix_enabled(data.journey.get("campaign"))
+	var issue: String = WeaponState.problem(projected, true, data.journey.get("build", {}), weapon_affixes)
 	if not issue.is_empty(): return issue
 	issue=CampaignState.problem(data)
 	return issue if not issue.is_empty() else BuildState.problem(data)

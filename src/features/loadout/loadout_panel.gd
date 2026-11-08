@@ -48,6 +48,7 @@ func _ready() -> void:
 	column.add_theme_constant_override("separation", 8)
 	var scroll: ScrollContainer=ScrollContainer.new()
 	scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true
 	margins.add_child(scroll)
 	column.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	scroll.add_child(column)
@@ -84,11 +85,12 @@ func _ready() -> void:
 	detail_column.add_theme_constant_override("separation", 8)
 	row.add_child(detail_column)
 	_preview = TextureRect.new()
-	_preview.custom_minimum_size = Vector2(400, 88)
+	_preview.custom_minimum_size = Vector2(400, 64)
 	_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	detail_column.add_child(_preview)
 	var detail_scroll: ScrollContainer = ScrollContainer.new()
+	detail_scroll.custom_minimum_size.y = 210
 	detail_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	detail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	detail_column.add_child(detail_scroll)
@@ -175,6 +177,8 @@ func refresh(data: Dictionary, feedback: String = "") -> void:
 			WeaponInventory.definition(item.weapon_id).display_name if not item.is_empty() else ("已阵亡，原实例在库" if member.condition == "dead" else "倒地，装备在库")]
 		if not item.is_empty():
 			var weapon: WeaponDefinition = WeaponModifiers.combat_definition(item)
+			if not WeaponModifiers.combat_affix(item).is_empty():
+				label.text += "\n" + WeaponModifiers.description(item)
 			label.text += ("\n%.2f伤 · %.3fs · %.2f距" if WeaponState.is_family(_data) else "\n%.0f伤 · %.3fs · %.0f距") % [weapon.damage,weapon.shot_interval(1.0 if CombatEquipment.melee(item.weapon_id) else TraitRules.factor(member,"shot")),weapon.shot_range]
 		var base: SurvivorDefinition = SurvivorRoster.definition(int(member.id))
 		label.tooltip_text = "%s · %s\n呼号：%s" % [base.default_display_name, base.gender_text(), member.call_sign]
@@ -203,7 +207,12 @@ func _select(index: int) -> void:
 	_detail.text += "\n\n理论持续 %.2f伤/秒（未计接敌与过量伤害）\n来源  /  %s\n维修报价  /  %d 货币" % [weapon.damage/weapon.interval,
 		("救援同伴当场加入时自带" if item.origin == "rescue-first-contact" else ("街区补给点搜集" if item.origin == "north-cache" else "初始装备")),repair_quote]
 	if WeaponState.is_family(_data):
-		_detail.text = "%s · PROJECT_TEMP\n%s\n%s · %s\n\n武器基础：%.0f伤 · %.3f秒 · %.0f距" % [weapon.display_name,WeaponModifiers.description(item),"损坏 · 须维修" if item.condition=="damaged" else "状态良好",ownership,weapon.damage,weapon.interval,weapon.shot_range]
+		_detail.text = "%s · PROJECT_TEMP\n%s\n%s · %s" % [weapon.display_name,WeaponModifiers.description(item),
+			"损坏 · 须维修" if item.condition=="damaged" else "状态良好",ownership]
+		var effect: String = WeaponModifiers.effect_description(item)
+		if not effect.is_empty():
+			_detail.text += "\n" + effect
+		_detail.text += "\n\n武器基础：%.0f伤 · %.3f秒 · %.0f距" % [weapon.damage,weapon.interval,weapon.shot_range]
 		_detail.text += "\n近战 · 正面110° · 最多3目标 · 起手0.18秒；靠近敌人有风险。" if CombatEquipment.melee(item.weapon_id) else "\n弹匣 %d发 · 自动换弹 %.1f秒 · 备弹∞"%[weapon.magazine_capacity(),weapon.reload_seconds()]
 		if item.weapon_id=="shotgun_v1": _detail.text+="\n每次扳机9×5弹丸 · 每条射线只命中首个目标 · 近距清群。"
 		var stats: Dictionary = WeaponModifiers.effective(item,TraitRules.factor(SurvivorRoster.member(_data.crew,owner_id),"shot") if owner_id>0 else 1.0)
@@ -218,7 +227,8 @@ func _select(index: int) -> void:
 			var factor: float = TraitRules.factor(member,"shot")
 			var before: Dictionary = WeaponModifiers.effective(current,factor)
 			var proposed: Dictionary = WeaponModifiers.effective(item,factor)
-			_detail.text += "\n%02d %s · 当前→所选\n伤%.2f→%.2f / 秒%.3f→%.3f / 距%.2f→%.2f" % [int(member.id),member.call_sign.left(5),before.damage,proposed.damage,before.interval,proposed.interval,before.range,proposed.range]
+			_detail.text += "\n%02d %s · 当前 %s → 所选\n伤%.2f→%.2f / 秒%.3f→%.3f / 距%.2f→%.2f" % [int(member.id),member.call_sign.left(5),
+				WeaponInventory.definition(current.weapon_id).display_name,before.damage,proposed.damage,before.interval,proposed.interval,before.range,proposed.range]
 	if BuildState.enabled(_data):
 		var factors: Dictionary=BuildItems.factors(_data.journey.build.slots, BuildState.pool(_data))
 		var values: Dictionary=WeaponModifiers.effective(item)

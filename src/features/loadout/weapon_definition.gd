@@ -12,6 +12,8 @@ const MAGAZINES: Dictionary = {"carbine":{"capacity":12,"seconds":1.6},"long_rif
 @export var shot_range: float = 210.0
 @export var repair_cost: int = 10
 
+var combat_affix: String = ""
+
 
 func shot_interval(personal_factor: float = 1.0) -> float:
 	return interval * personal_factor

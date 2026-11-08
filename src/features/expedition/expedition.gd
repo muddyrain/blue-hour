@@ -1103,55 +1103,14 @@ func _update_combat() -> void:
 		if actor.activity in [FieldActor.Activity.DOWN, FieldActor.Activity.SEARCHING, FieldActor.Activity.RECOVERING]:
 			continue
 		if actor.magazine!=null and not actor.magazine.can_fire():continue
-		var weapon: WeaponDefinition = actor.weapon_definition
 		var target: FieldActor = _attack_target(actor)
 		if target != null:
 			actor.aim = target.position - actor.position
 			var decision: AttackRules.Decision = evaluate_attack(actor, target)
 			if decision.can_fire:
-				if growth_mode and not xp_inputs.has_capacity():
-					_reap_defeated_enemies()
-					_show_notice("成长账本达到安全容量，已暂停；不能丢弃事件或虚报保存成功。")
-					toggle_pause()
+				_fire_ranged(actor, target, decision)
+				if is_paused:
 					return
-				if target.health<=weapon.damage and growth_mode and not is_practice and (not growth_inputs.can_record(actor,target,elapsed) or not xp_inputs.can_record(self,actor,target)):
-					_show_notice("成长来源不可提交，已暂停；生命、弹量与开火均未应用。")
-					toggle_pause();return
-				var recorded: Dictionary={}
-				var cooldown_before: float = actor.cooldown
-				var health_before: float = target.health
-				if not target.take_damage(weapon.damage, (target.position - actor.position).normalized()):continue
-				if target.activity == FieldActor.Activity.DOWN:
-					kills += 1
-					actor.confirmed_kills += 1
-					if not is_practice and not loadout_snapshot.is_empty():
-						var receipt: Dictionary = growth_inputs.accept_defeat(actor,target,elapsed)
-						if not receipt.is_empty():
-							if growth_mode and not xp_inputs.accept(self,actor,target,receipt):
-								_show_notice("成长来源校验失败，已暂停；本次不会伪造经验。")
-								toggle_pause()
-								return
-							recorded=receipt
-						if encounter!=null: encounter.record_defeat(target,receipt)
-				actor.cooldown = weapon.shot_interval(actor.trait_shot_factor)
-				if actor.magazine!=null:actor.magazine.commit_shot()
-				if not recorded.is_empty():growth_input_recorded.emit(recorded)
-				actor.visual.show_fire(actor.aim)
-				var muzzle: Vector2 = actor.position + actor.visual.muzzle_offset(actor.aim)
-				_shot_effect(muzzle, target.position, weapon.damage)
-				combat_feedback.emit({"kind": "shot", "actor": actor.actor_id,
-					"target": target.actor_id, "target_health": target.health,
-					"damage": weapon.damage, "from": actor.position, "to": target.position,
-					"instance_id":actor.weapon_instance_id, "weapon_id":String(weapon.id), "interval":actor.cooldown,
-					"applied_damage": health_before - target.health,
-					"magazine":actor.magazine.snapshot() if actor.magazine!=null else {},"member_id":actor.member_id,"shot_from":muzzle,"hit_to":decision.hit_to,
-					"foot_distance":decision.distance,"shot_range":weapon.shot_range,
-					"blocker_id":String(decision.blocker_id),"attack_reason":String(decision.reason),
-					"predicted_muzzle_error":muzzle.distance_to(decision.shot_from),
-					"cooldown_before":cooldown_before,"cooldown_after":actor.cooldown,
-					"moving": actor.activity == FieldActor.Activity.MOVING, "elapsed": elapsed,
-					"weapon": String(actor.visual.weapon_view.id), "row": actor.visual.direction_row,
-					"facing": actor.visual.presentation_state()["facing"]})
 		else:
 			actor.aim = Vector2.ZERO
 	for enemy: FieldActor in enemies:
@@ -1230,6 +1189,111 @@ func evaluate_attack(actor: FieldActor, target: FieldActor) -> AttackRules.Decis
 	return AttackRules.evaluate(_combatant(actor), _combatant(target),
 		actor.position + actor.visual.aimed_shot_offset(target.position - actor.position),
 		actor.weapon_definition.shot_range, actor.cooldown, shot_obstacles)
+
+
+func _fire_ranged(actor: FieldActor, target: FieldActor, decision: AttackRules.Decision) -> void:
+	var weapon: WeaponDefinition = actor.weapon_definition
+	var secondary: FieldActor
+	var impact: Vector2 = Vector2.INF
+	var closest: float = INF
+	if weapon.combat_affix == WeaponModifiers.PIERCE:
+		for candidate: FieldActor in enemies:
+			if candidate.actor_id == target.actor_id:
+				continue
+			var hit: Vector2 = AttackRules.pierce_hit(decision, actor.position, _combatant(candidate),
+				weapon.shot_range, shot_obstacles)
+			if not hit.is_finite():
+				continue
+			var distance: float = decision.hit_to.distance_squared_to(hit)
+			if distance < closest or (distance == closest and secondary != null and candidate.actor_id < secondary.actor_id):
+				secondary = candidate
+				impact = hit
+				closest = distance
+	var secondary_damage: float = weapon.damage * AttackRules.PIERCE_DAMAGE_FACTOR
+	if growth_mode:
+		var fatal: int = int(target.health <= weapon.damage)
+		if secondary != null and secondary.health <= secondary_damage:
+			fatal += 1
+		# Reserve room for both defeat facts before the first hit can change HP.
+		if not xp_inputs.has_capacity() or xp_inputs.events.size() + fatal > GrowthRules.MAX_EVENTS:
+			_reap_defeated_enemies()
+			_show_notice("成长账本达到安全容量，已暂停；不能丢弃事件或虚报保存成功。")
+			toggle_pause()
+			return
+		if not is_practice and (not _ranged_hit_recordable(actor, target, weapon.damage)
+				or (secondary != null and not _ranged_hit_recordable(actor, secondary, secondary_damage))):
+			_show_notice("成长来源不可提交，已暂停；生命、弹量与开火均未应用。")
+			toggle_pause()
+			return
+	var recorded: Array[Dictionary] = []
+	var cooldown_before: float = actor.cooldown
+	var health_before: float = target.health
+	if not _commit_ranged_hit(actor, target, weapon.damage, recorded):
+		return
+	var extra: Dictionary = {}
+	if secondary != null:
+		var secondary_before: float = secondary.health
+		if _commit_ranged_hit(actor, secondary, secondary_damage, recorded):
+			extra = {"target": secondary.actor_id, "target_health": secondary.health,
+				"damage": secondary_damage, "applied_damage": secondary_before - secondary.health,
+				"to": secondary.position, "hit_to": impact}
+		elif is_paused:
+			return
+	actor.cooldown = weapon.shot_interval(actor.trait_shot_factor)
+	var refunded: int = 0
+	if actor.magazine != null:
+		refunded = actor.magazine.commit_shot(weapon.combat_affix == WeaponModifiers.REFUND
+			and target.activity == FieldActor.Activity.DOWN)
+	for receipt: Dictionary in recorded:
+		growth_input_recorded.emit(receipt)
+	actor.visual.show_fire(actor.aim)
+	var muzzle: Vector2 = actor.position + actor.visual.muzzle_offset(actor.aim)
+	_shot_effect(muzzle, target.position, weapon.damage)
+	if not extra.is_empty():
+		_shot_trace(decision.hit_to, impact, Color("a5dfce"))
+		_draw_hit_effect(secondary.position, float(extra.applied_damage), false, "穿透 ")
+	if refunded > 0:
+		_combat_popup(actor.position + Vector2(12, -136), "击倒补弹 +%d" % refunded, Color("a5dfce"))
+	var feedback: Dictionary = {"kind": "shot", "actor": actor.actor_id,
+		"target": target.actor_id, "target_health": target.health,
+		"damage": weapon.damage, "from": actor.position, "to": target.position,
+		"instance_id":actor.weapon_instance_id, "weapon_id":String(weapon.id), "interval":actor.cooldown,
+		"applied_damage": health_before - target.health,
+		"magazine":actor.magazine.snapshot() if actor.magazine!=null else {},"member_id":actor.member_id,"shot_from":muzzle,"hit_to":decision.hit_to,
+		"foot_distance":decision.distance,"shot_range":weapon.shot_range,
+		"blocker_id":String(decision.blocker_id),"attack_reason":String(decision.reason),
+		"predicted_muzzle_error":muzzle.distance_to(decision.shot_from),
+		"cooldown_before":cooldown_before,"cooldown_after":actor.cooldown,
+		"moving": actor.activity == FieldActor.Activity.MOVING, "elapsed": elapsed,
+		"weapon": String(actor.visual.weapon_view.id), "row": actor.visual.direction_row,
+		"facing": actor.visual.presentation_state()["facing"]}
+	if not weapon.combat_affix.is_empty():
+		feedback.merge({"affix": weapon.combat_affix, "secondary": extra, "rounds_refunded": refunded})
+	combat_feedback.emit(feedback)
+
+
+func _ranged_hit_recordable(actor: FieldActor, target: FieldActor, damage: float) -> bool:
+	return target.health > damage or (growth_inputs.can_record(actor, target, elapsed)
+		and xp_inputs.can_record(self, actor, target))
+
+
+func _commit_ranged_hit(actor: FieldActor, target: FieldActor, damage: float, recorded: Array[Dictionary]) -> bool:
+	if not target.take_damage(damage, actor.position.direction_to(target.position)):
+		return false
+	if target.activity == FieldActor.Activity.DOWN:
+		kills += 1
+		actor.confirmed_kills += 1
+		if not is_practice and not loadout_snapshot.is_empty():
+			var receipt: Dictionary = growth_inputs.accept_defeat(actor, target, elapsed)
+			if not receipt.is_empty():
+				if growth_mode and not xp_inputs.accept(self, actor, target, receipt):
+					_show_notice("成长来源校验失败，已暂停；本次不会伪造经验。")
+					toggle_pause()
+					return false
+				recorded.append(receipt)
+			if encounter != null:
+				encounter.record_defeat(target, receipt)
+	return true
 
 
 func _combatant(actor: FieldActor) -> AttackRules.Combatant:
@@ -1409,18 +1473,26 @@ func _finish(evacuated: bool, boarding: Vector2i = Vector2i.ZERO) -> void:
 
 
 func _shot_effect(from: Vector2, to: Vector2, damage: float) -> void:
+	_shot_trace(from, to + Vector2.UP * AttackRules.HIT_HEIGHT, Color("f1d5a1"))
+	_hit_effect(to, damage, false)
+
+
+func _shot_trace(from: Vector2, to: Vector2, colour: Color) -> void:
 	var line: Line2D = Line2D.new()
-	line.points = PackedVector2Array([from, to + Vector2.UP * AttackRules.HIT_HEIGHT])
+	line.points = PackedVector2Array([from, to])
 	line.width = 1.5
-	line.default_color = Color("f1d5a1")
+	line.default_color = colour
 	_effects.add_child(line)
 	var tween: Tween = line.create_tween()
 	tween.tween_property(line, "modulate:a", 0.0, 0.09)
 	tween.tween_callback(line.queue_free)
-	_hit_effect(to, damage, false)
 
 
 func _hit_effect(to: Vector2, damage: float, survivor_hit: bool) -> void:
+	_draw_hit_effect(to, damage, survivor_hit, "")
+
+
+func _draw_hit_effect(to: Vector2, damage: float, survivor_hit: bool, prefix: String) -> void:
 	var impact: Node2D = Node2D.new()
 	impact.position = to + Vector2(0, -30)
 	_effects.add_child(impact)
@@ -1434,13 +1506,19 @@ func _hit_effect(to: Vector2, damage: float, survivor_hit: bool) -> void:
 	var fade: Tween = impact.create_tween()
 	fade.tween_property(impact, "modulate:a", 0.0, 0.18)
 	fade.tween_callback(impact.queue_free)
-	var label: Label = Label.new()
 	var amount_text: String = str(int(damage)) if is_equal_approx(damage,roundf(damage)) else "%.2f" % damage
-	label.text = ("−" if survivor_hit else "") + amount_text
-	label.add_theme_color_override("font_color", Color("f8b491") if survivor_hit else Color("f1dfbd"))
+	var text: String = prefix + ("−" if survivor_hit else "") + amount_text
+	_combat_popup(to + Vector2(-38 if survivor_hit else 8, -108), text,
+		Color("f8b491") if survivor_hit else Color("f1dfbd"))
+
+
+func _combat_popup(at: Vector2, text: String, colour: Color) -> void:
+	var label: Label = Label.new()
+	label.text = text
+	label.add_theme_color_override("font_color", colour)
 	label.add_theme_color_override("font_outline_color", Color("142d36"))
 	label.add_theme_constant_override("outline_size", 3)
-	label.position = to + Vector2(-38 if survivor_hit else 8, -108)
+	label.position = at
 	_effects.add_child(label)
 	var popup: Tween = label.create_tween()
 	popup.tween_property(label, "position:y", label.position.y - 18.0, 0.5)

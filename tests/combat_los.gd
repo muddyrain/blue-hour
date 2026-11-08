@@ -14,6 +14,7 @@ func _run() -> void:
 	await _muzzle_projection()
 	await _actual_combat()
 	await _actual_friendly()
+	await _actual_rifle_affixes()
 	var folder: String = ""
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with("--bh-progress="):
@@ -161,6 +162,93 @@ func _actual_friendly() -> void:
 	_expect(sortie.crew_snapshot.is_empty() and sortie.survivors[0].health == 200 and sortie.survivors[1].health == 200 and enemy.health == 18,"C06 only hostile loses actual shared damage, neither friend takes friendly fire")
 	sortie.queue_free()
 	await process_frame
+
+
+func _actual_rifle_affixes() -> void:
+	for scenario: String in ["pierce", "wall", "capacity", "lethal_pair", "refund"]:
+		var sortie: Expedition = Expedition.new()
+		sortie.supply = preload("res://src/features/camp/scavenge.tres")
+		sortie.is_practice = true
+		root.add_child(sortie)
+		sortie.set_physics_process(false)
+		sortie.shot_obstacles.clear()
+		var shooter: FieldActor = sortie.survivors[0]
+		sortie.survivors[1].cooldown = INF
+		shooter.weapon_definition = WeaponInventory.definition("long_rifle").duplicate() as WeaponDefinition
+		shooter.weapon_definition.combat_affix = WeaponModifiers.REFUND if scenario == "refund" else WeaponModifiers.PIERCE
+		shooter.visual.set_weapon(shooter.weapon_definition.presentation)
+		shooter.weapon_instance_id = "affix-fixture"
+		shooter.magazine = WeaponMagazine.new(shooter.weapon_instance_id, "long_rifle")
+		var primary: FieldActor = sortie._make_actor(true, 40, shooter.position + Vector2.RIGHT * 90.0)
+		sortie.enemies.append(primary)
+		var shot: AttackRules.Decision = sortie.evaluate_attack(shooter, primary)
+		var direction: Vector2 = shot.shot_from.direction_to(shot.hit_to)
+		var second: FieldActor = sortie._make_actor(true, 41,
+			shot.hit_to + direction * 60.0 + Vector2.DOWN * AttackRules.HIT_HEIGHT)
+		var third: FieldActor = sortie._make_actor(true, 42,
+			shot.hit_to + direction * 120.0 + Vector2.DOWN * AttackRules.HIT_HEIGHT)
+		sortie.enemies.append_array([second, third])
+		var second_health: float = second.health
+		var third_health: float = third.health
+		if scenario == "wall":
+			var wall: Vector2 = shot.hit_to + direction * 28.0 + Vector2.DOWN * AttackRules.HIT_HEIGHT
+			sortie.shot_obstacles.append(ShotObstacle.new(&"pierce_test_wall", Rect2(wall - Vector2(4, 20), Vector2(8, 40)), true))
+		elif scenario in ["capacity", "lethal_pair"]:
+			sortie.growth_mode = true
+			primary.health = 1.0
+			second.health = 1.0
+			if scenario == "capacity":
+				sortie.xp_inputs.events.resize(GrowthRules.MAX_EVENTS - 1)
+				sortie.xp_inputs.events.fill({"member_id":0})
+			else:
+				sortie.is_practice = false
+				sortie.loadout_snapshot.append({"member_id":shooter.member_id,
+					"instance":{"instance_id":shooter.weapon_instance_id}})
+				sortie.growth_inputs.configure([{"id":shooter.member_id}])
+		elif scenario == "refund":
+			primary.health = shooter.weapon_definition.damage + 5.0
+			shooter.magazine.rounds = 2
+		var first_health: float = primary.health
+		var shots: Array[Dictionary] = []
+		sortie.combat_feedback.connect(func(event: Dictionary) -> void:
+			if event.kind == "shot":
+				shots.append(event)
+		)
+		sortie._update_combat()
+		var first: Dictionary = shots.front() if not shots.is_empty() else {}
+		var extra: Dictionary = first.get("secondary", {})
+		match scenario:
+			"pierce":
+				_expect(shots.size() == 1 and first.get("target") == 40 and extra.get("target") == 41,
+					"M33 one firing event hits the original target and its nearest aligned successor")
+				_expect(second_health - second.health == shooter.weapon_definition.damage * AttackRules.PIERCE_DAMAGE_FACTOR
+					and third.health == third_health and shooter.magazine.rounds == shooter.magazine.capacity() - 1,
+					"M33 second takes half configured damage, third stays healthy, and one round is consumed")
+			"wall":
+				_expect(shots.size() == 1 and primary.health < first_health and second.health == second_health
+					and third.health == third_health and extra.is_empty(),
+					"M33 a wall behind the first enemy stops the continuing ray")
+			"capacity":
+				_expect(sortie.is_paused and shots.is_empty() and primary.health == 1.0 and second.health == 1.0
+					and shooter.magazine.rounds == shooter.magazine.capacity(),
+					"M33 two planned lethals require room for both XP facts before any HP or ammo change")
+			"lethal_pair":
+				var defeats: Array[Dictionary] = sortie.xp_inputs.events
+				_expect(shots.size() == 1 and defeats.size() == 2 and shooter.confirmed_kills == 2
+					and defeats[0].enemy_id == 40 and defeats[1].enemy_id == 41
+					and defeats.all(func(fact: Dictionary) -> bool: return fact.instance_id == shooter.weapon_instance_id),
+					"M33 two real defeats use the same weapon instance and distinct original XP facts")
+			"refund":
+				_expect(shots.size() == 1 and primary.health == 5.0 and shooter.magazine.rounds == 1
+					and first.get("rounds_refunded") == 0, "M33 nonlethal shot cannot refund")
+				shooter.cooldown = 0.0
+				sortie._update_combat()
+				var last: Dictionary = shots.back() if not shots.is_empty() else {}
+				_expect(shots.size() == 2 and primary.health == 0.0 and shooter.confirmed_kills == 1
+					and last.get("rounds_refunded") == 1 and shooter.magazine.rounds == 1 and not shooter.magazine.reloading,
+					"M33 genuine last-round defeat refunds once without starting reload")
+		sortie.queue_free()
+		await process_frame
 
 
 func _expect(value: bool, label: String) -> void:

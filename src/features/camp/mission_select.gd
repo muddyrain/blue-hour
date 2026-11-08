@@ -182,7 +182,9 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 			_descriptions[index].add_theme_font_size_override("font_size", 16)
 		elif mission_card:
 			var title: String = {"supply":"补给", "airdrop":"装备", "equipment":"调查", "rescue":"救援"}[supply.generated.type]
-			if first_aid and supply.generated.type == "rescue" and int(supply.generated.recruit) == FirstAidV1.SOURCE_ID:
+			if SortieRiskV1.enabled(supply.generated):
+				title = "装备 · 深入回收" if supply.generated.sortie_risk.tier == SortieRiskV1.DEEP else "装备 · 常规回收"
+			elif first_aid and supply.generated.type == "rescue" and int(supply.generated.recruit) == FirstAidV1.SOURCE_ID:
 				title = "救援 · " + FirstAidV1.TITLE
 			_titles[index].text = "%02d / %s" % [index + 1, title]
 			_descriptions[index].text = LevelSummary.mission_card_text(supply.generated, base if action_choices else {}, rations)

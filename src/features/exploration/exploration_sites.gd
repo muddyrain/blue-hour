@@ -7,7 +7,8 @@ const OPTIONAL_TITLES: Dictionary = {"optional_buildings_all":"搜完可选建�
 static var _generated: Dictionary = {}
 
 
-static func generate(layout: Dictionary, type: String, cash: int, food: int, weapons: int, action_id: String, mission_policy: int = 0) -> Dictionary:
+static func generate(layout: Dictionary, type: String, cash: int, food: int, weapons: int, action_id: String,
+		mission_policy: int = 0, rare_policy: int = 0) -> Dictionary:
 	if not ExplorationLayout.validate(layout).is_empty() or type not in TaskActions.TYPES or not _action_id(action_id):
 		return {}
 	if mission_policy != 0 and (mission_policy != 1 or layout.get("level_task") != type):
@@ -15,7 +16,9 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 	var config: Dictionary = TaskActions.CONFIG[type]
 	if cash < int(config.cash[0]) or cash > int(config.cash[1]) or food < int(config.food[0]) or food > int(config.food[1]) or weapons < int(config.weapons[0]) or weapons > int(config.weapons[1]):
 		return {}
-	var key: String = RecordEncoding.fingerprint({"layout":layout, "type":type, "cash":cash, "food":food, "weapons":weapons, "action_id":action_id, "policy":ExplorationLayout.policy(), "mission_policy":mission_policy})
+	var cold_store: bool = rare_policy == RareSortie.VERSION and type == "supply"
+	var armory: bool = rare_policy == RareSortie.VERSION and type == "airdrop"
+	var key: String = RecordEncoding.fingerprint({"layout":layout, "type":type, "cash":cash, "food":food, "weapons":weapons, "action_id":action_id, "policy":ExplorationLayout.policy(), "mission_policy":mission_policy, "rare_policy":rare_policy})
 	if _generated.has(key):
 		return _generated[key].duplicate(true)
 	var routing: Dictionary = ExplorationLayout._routing(layout)
@@ -40,7 +43,15 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 	var chosen: Array[Dictionary] = []
 	var supply_pair: Array[Dictionary] = []
 	if mission_policy == 1 and type == "supply":
-		supply_pair = LevelPolicy.mission_supply_pair(_candidates(layout, used, TaskActions.FOOD_TYPES), routing)
+		var groceries: Array[Dictionary] = _candidates(layout, used, TaskActions.FOOD_TYPES)
+		if cold_store and groceries.size() >= 2:
+			var near: Dictionary = _choose(groceries, routing, "near", action_id)
+			groceries.erase(near)
+			var far: Dictionary = _choose(groceries, routing, "far", action_id)
+			if routing.doors[far.id].length - routing.doors[near.id].length >= 750.0:
+				supply_pair = [near, far]
+		elif not cold_store:
+			supply_pair = LevelPolicy.mission_supply_pair(groceries, routing)
 		if supply_pair.size() != 2:
 			return {}
 	for kind: String in ["food", "cash"]:
@@ -54,7 +65,7 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 			var entity: Dictionary = _choose(candidates, routing, "far" if index == 0 else "near", action_id + ":primary:" + kind)
 			if not supply_pair.is_empty() and kind == "food":
 				entity = supply_pair[index]
-			elif layout.has("loading_yard") and type == "airdrop" and kind == "cash" and index == 0:
+			elif layout.has("loading_yard") and type == "airdrop" and kind == "cash" and (index == 0 or armory):
 				entity = {}
 				for candidate: Dictionary in candidates:
 					if candidate.id == layout.loading_yard.warehouse:
@@ -78,7 +89,15 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 				site.point = point
 				site.seconds = 12.0
 				site.work_mode = "outdoor"
-			used.append(entity.id)
+			if cold_store:
+				site.weapon = false
+				if kind == "food":
+					site.amount = RareSortie.NEAR_FOOD if index == 0 else RareSortie.DEEP_FOOD
+					site.seconds = 12.0 if index == 0 else WorldSites.WORK_SECONDS
+			if armory and kind == "cash":
+				site.amount = 0 if index == 0 else RareSortie.EQUIPMENT_CASH
+			if not (armory and kind == "cash" and index == 0):
+				used.append(entity.id)
 			sites.append(site)
 			var route: Dictionary = _route(layout, site_point(layout, site), nav, float(routing.dmax))
 			if route.is_empty():
@@ -114,7 +133,7 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 	var targets: Array[String] = []
 	if type == "supply":
 		for site: Dictionary in sites:
-			if site.source == "primary" and site.kind == "food":
+			if site.source == "primary" and site.kind == "food" and (not cold_store or site.id == "food"):
 				targets.append(site.id)
 	elif type != "rescue":
 		targets.append("cash")
@@ -143,6 +162,9 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 			if (id == "optional_buildings_all" and site.source == "optional_building") or (id == "searchable_vehicles_all" and site.source == "vehicle") or (id == "fruit_trees_all" and site.source == "fruit_tree"):
 				ids.append(site.id)
 		objectives.append({"id":id, "title":OPTIONAL_TITLES[id], "site_ids":ids})
+	if cold_store or armory:
+		var extra_id: String = "food_2" if cold_store else "cash_2"
+		objectives[0] = {"id":"rare_extra", "title":RareSortie.landmark(type, extra_id), "site_ids":[extra_id]}
 	var result: Dictionary = {"sites":sites, "objective":{"task_id":action_id, "site_ids":targets, "member_id":0},
 		"optional_objectives":objectives, "metrics":{"dmax":routing.dmax, "routes":routes}}
 	if sites.size() > 15:

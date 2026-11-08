@@ -1641,10 +1641,12 @@ func _kind_searched(kind: StringName) -> bool:
 func _street_supply_entrances() -> Array[Vector2]:
 	var doors: Array[Vector2] = []
 	var generated: Dictionary = supply.generated
+	var cold_store: bool = generated.has("rare_policy") and generated.type == "supply"
 	if pump_station_mode() or generated.get("mission_policy") != 1 or generated.get("type") != "supply" \
-			or layout.world_data.get("size") != "medium" or layout.world_data.get("art_revision") != 3:
+			or (not cold_store and layout.world_data.get("size") != "medium") or layout.world_data.get("art_revision") != 3:
 		return doors
-	for identity: String in generated.objective.site_ids:
+	var ids: Array = ["food", "food_2"] if cold_store else generated.objective.site_ids
+	for identity: String in ids:
 		for site: Dictionary in generated.sites:
 			if site.id == identity:
 				doors.append(TaskActions.site_point(generated, site))
@@ -1675,7 +1677,8 @@ func _clicked_site(point: Vector2) -> bool:
 	if supply.generated.get("mission_policy") == 1:
 		# The marked work entrance is a precise target even where two facade hit areas overlap.
 		for site: SearchSite in sites:
-			if site.prop.primary_target and site.door.distance_squared_to(point) <= 24.0 * 24.0:
+			if (site.prop.primary_target or (supply.generated.has("rare_policy") and not site.prop.loot_landmark.is_empty())) \
+					and site.door.distance_squared_to(point) <= 24.0 * 24.0:
 				if not site.searched:
 					request_search(site.id)
 				else:
@@ -1825,11 +1828,15 @@ func _make_world_buildings() -> void:
 		if exploration_mode():
 			site.prop.primary_target=supply.generated.objective.site_ids.has(def.id)
 			site.prop.reward_hint=("货币" if site.kind==&"cash" else "食物")+" +%d"%site.reward
+		if supply.generated.has("rare_policy"):
+			site.prop.loot_landmark = RareSortie.landmark(supply.generated.type, def.id)
+			if site.weapon:
+				site.prop.reward_hint = "武器 +1"
 		if build_mode() and site.id==&"cash" and supply.generated.type=="equipment": site.prop.reward_hint+=" / 道具%d件"%supply.generated.build.drops.size() if not supply.generated.build.drops.is_empty() else " / 道具已集齐"
 		if exploration_mode() and not crate:
 			var category: String = "果树" if def.source == "fruit_tree" else "车辆" if object_site else "建筑"
 			var anchor: Vector2 = Vector2(0, 5) if object_site else Vector2(site.prop.door_offset, 28)
-			if not _supply_entrances.is_empty() and site.prop.primary_target and site.kind == &"food":
+			if not _supply_entrances.is_empty() and site.prop.loot_landmark.is_empty() and site.prop.primary_target and site.kind == &"food":
 				site.prop.loot_landmark = "近点食品" if def.id == supply.generated.objective.site_ids[0] else "追加食品"
 			site.prop.configure_loot_badge(category, anchor)
 		sites.append(site)
@@ -1850,7 +1857,8 @@ func _trigger_airdrop() -> void:
 			task_event.resolutions.append({"reason":"capacity","enemy_id":-1})
 		else: task_event.resolutions.append(_spawn_enemy(EnemyRules.NORMAL,search_site(&"cash").door))
 	print("BH_TASK_EVENT "+JSON.stringify(task_event))
-	_show_notice("空投信标已启动 · 留意来袭；回收后可直接集合归航。")
+	_show_notice("武器箱开工 · 增援接近；拿到武器即可集合归航。" if supply.generated.has("rare_policy")
+		else "空投信标已启动 · 留意来袭；回收后可直接集合归航。")
 
 
 func _site_weapon(site: SearchSite) -> Dictionary:
@@ -2090,6 +2098,17 @@ func _exploration_objective_rows() -> Array[Dictionary]:
 	elif not investigation.is_empty():
 		rows[0].title = "%s · %s" % ["已携带" if rows[0].complete else "调查", CampaignRules.CLUE_NAMES[investigation.clue_id]]
 		rows[0].hint = "搜索标记建筑取得线索，生还撤离并确认归航后登记。"
+	elif generated.has("rare_policy"):
+		if generated.type == "supply":
+			rows[0].title = "近处配货间 · %d 粮" % RareSortie.NEAR_FOOD
+			rows[0].hint = "取粮后可直接归航。"
+			rows[1].title = "后装卸区 · %d 粮" % RareSortie.DEEP_FOOD
+			rows[1].hint = "深入作业会压缩天黑前回车时间。"
+		else:
+			rows[0].title = "露天武器箱 · 武器 1 件"
+			rows[0].hint = "增援已触发，可集合归航。" if task_event.started else "首次开工引来增援。"
+			rows[1].title = "器材库 · %d 币" % RareSortie.EQUIPMENT_CASH
+			rows[1].hint = "可选，带回用于维修或建设。"
 	elif generated.get("mission_policy") == 1 and generated.type == "airdrop":
 		rows[0].title = "装备 · 露天回收"
 		rows[0].hint = "一次性增援已触发。" if task_event.started else "首次开工触发一次增援，工作中可受击。"

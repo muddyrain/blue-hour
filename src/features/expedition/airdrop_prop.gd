@@ -26,5 +26,6 @@ static func draw_crate(canvas: CanvasItem, recovered: bool) -> void:
 func update_work(actor_id: int, fraction: float, inside: bool, call_sign: String = "", work_text: String = "") -> void:
 	super.update_work(actor_id,fraction,inside,call_sign,work_text)
 	if _work!=null:
-		_work.text=work_text if not work_text.is_empty() else "空投 · 已回收" if searched else "空投 · 回收中 %d%%"%roundi(fraction*100) if inside else "空投 · 主目标 · 左键回收"
+		var name_text: String = "空投" if loot_landmark.is_empty() else loot_landmark
+		_work.text=work_text if not work_text.is_empty() else name_text + " · 已回收" if searched else name_text + " · 回收中 %d%%"%roundi(fraction*100) if inside else name_text + " · 主目标 · 左键回收"
 	queue_redraw()

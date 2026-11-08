@@ -173,7 +173,11 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 		_pictures[index].custom_minimum_size.y = 88
 		var mission_card: bool = supply.generated.get("mission_policy") == 1
 		var pump_card: bool = PumpStationAction.enabled(supply.generated)
-		if pump_card:
+		var rare_card: bool = supply.generated.has("rare_policy")
+		if rare_card:
+			_titles[index].text = "%02d / 稀有行动 · %s" % [index + 1, supply.display_name]
+			_descriptions[index].add_theme_font_size_override("font_size", 16)
+		elif pump_card:
 			_descriptions[index].add_theme_font_size_override("font_size", 16)
 		elif mission_card:
 			var title: String = {"supply":"补给", "airdrop":"装备", "equipment":"调查", "rescue":"救援"}[supply.generated.type]
@@ -225,7 +229,7 @@ func _refresh_blue_hour_card(index: int, generated: Dictionary) -> void:
 	_role_marks[index].role = role
 	_role_marks[index].queue_redraw()
 	_map_marks[index].visible = role == "investigation"
-	_buses[index].visible = role == "supply"
+	_buses[index].visible = role == "supply" and not generated.has("rare_policy")
 	var primary: Array = generated.get("exploration", {}).get("level", {}).get("primary", [])
 	var second: TextureRect = _secondary_pictures[index]
 	second.visible = role == "supply" and primary.size() > 1
@@ -233,7 +237,7 @@ func _refresh_blue_hour_card(index: int, generated: Dictionary) -> void:
 		second.texture = _mission_picture(generated, MARKET, 1)
 	_pictures[index].custom_minimum_size = Vector2.ZERO
 	_description_scrolls[index].scroll_vertical = 0
-	if type == "supply" and _has_extra_weapon(generated):
+	if type == "supply" and not generated.has("rare_policy") and _has_extra_weapon(generated):
 		var lines: PackedStringArray = _descriptions[index].text.split("\n")
 		lines.insert(1, "附带装备 · 需另搜")
 		_descriptions[index].text = "\n".join(lines)

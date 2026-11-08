@@ -26,7 +26,8 @@ static func source_from_task(task: Dictionary, context: Dictionary) -> Dictionar
 	return PersonaActions.upgrade(source, context.persona.facts)
 
 static func upgrade(source: Dictionary, worldgen: bool = false, level: bool = false,
-		mission_policy: int = 0, industrial: bool = false, residential_rescue: bool = false) -> Dictionary:
+		mission_policy: int = 0, industrial: bool = false, residential_rescue: bool = false,
+		rare_policy: int = 0) -> Dictionary:
 	if mission_policy != 0 and (mission_policy != 1 or not worldgen or not level):
 		return {}
 	if industrial and (mission_policy != 1 or source.type != "airdrop" or source.layout.topology != "industrial"):
@@ -35,21 +36,32 @@ static func upgrade(source: Dictionary, worldgen: bool = false, level: bool = fa
 		return {}
 	var value: Dictionary=source.duplicate(true)
 	value.version=9
+	if rare_policy != 0:
+		if rare_policy != RareSortie.VERSION or mission_policy != 1 or source.recruit != 0 \
+				or RareSortie.selection(source.seed, int(source.day), int(source.slot)) != source.type:
+			return {}
+		var required_topology: String = "industrial" if industrial else "commercial"
+		var required_size: String = "medium" if industrial else "large"
+		if industrial != (source.type == "airdrop") or source.layout.topology != required_topology or source.layout["size"] != required_size:
+			return {}
+		value.rare_policy = rare_policy
+		value.id = ("rare-sortie:%d:%s:%s" % [rare_policy, source.id, source.type]).sha256_text()
 	if mission_policy == 1:
 		value.mission_policy = mission_policy
-		if value.type == "equipment":
+		if value.type == "equipment" or (rare_policy != 0 and value.type == "supply"):
 			value.weapons = 0
 	var content: Dictionary = {}
 	if level:
 		for attempt: int in range(4):
-			value.layout = WorldgenLayout._assemble("BH_LEVEL_V1:" + source.id, source.layout["size"],
+			value.layout = WorldgenLayout._assemble("BH_LEVEL_V1:" + value.id, source.layout["size"],
 				source.layout.topology, mini(attempt, 2), attempt == 3, source.type, industrial, residential_rescue)
 			if value.layout.is_empty():
 				continue
-			content=ExplorationSites.generate(value.layout,value.type,int(source.cash),int(source.food),int(source.weapons),value.id,mission_policy)
+			content=ExplorationSites.generate(value.layout,value.type,int(source.cash),int(source.food),int(source.weapons),value.id,mission_policy,rare_policy)
 			if not content.is_empty():
-				content.level=LevelSummary.freeze(value.layout,content.sites,content.objective,value.type)
-				if not content.level.is_empty():
+				var extra: String = "" if rare_policy == 0 else "food_2" if value.type == "supply" else "cash_2"
+				content.level=LevelSummary.freeze(value.layout,content.sites,content.objective,value.type,extra)
+				if not content.level.is_empty() and (extra != "food_2" or RareSortie.cold_route_fits(content.level)):
 					break
 				content={}
 	else:
@@ -104,16 +116,18 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 	var industrial: bool = level and value.worldgen.get("revision") == 2
 	var residential_rescue: bool = level and value.worldgen.get("revision") == 3
 	var mission: bool = value is Dictionary and value.has("mission_policy")
+	var rare: bool = value is Dictionary and value.has("rare_policy")
 	if worldgen and (not value.worldgen is Dictionary or not TransactionReceipt.same(value.worldgen,WorldgenLayout.policy(level, industrial, residential_rescue))): return "WORLDGEN_ACTION_POLICY"
 	if mission and (not level or not SurvivalContracts.integer(value.mission_policy, 1, 1)): return "MISSION_ACTION_POLICY"
-	if not value is Dictionary or not SurvivalContracts.json_value(value) or value.size()!=23+int(worldgen)+int(mission) or value.get("version")!=9 or not value.get("layout") is Dictionary or not value.get("exploration") is Dictionary or not value.get("build") is Dictionary or not value.get("powers") is Dictionary or not value.get("persona") is Dictionary or not value.get("campaign") is Dictionary: return "EXPLORATION_ACTION_FIELDS"
+	if rare and (not mission or not SurvivalContracts.integer(value.rare_policy, RareSortie.VERSION, RareSortie.VERSION)): return "RARE_ACTION_POLICY"
+	if not value is Dictionary or not SurvivalContracts.json_value(value) or value.size()!=23+int(worldgen)+int(mission)+int(rare) or value.get("version")!=9 or not value.get("layout") is Dictionary or not value.get("exploration") is Dictionary or not value.get("build") is Dictionary or not value.get("powers") is Dictionary or not value.get("persona") is Dictionary or not value.get("campaign") is Dictionary: return "EXPLORATION_ACTION_FIELDS"
 	if not value.get("seed") is String or value.seed.length()!=32 or value.seed.to_lower()!=value.seed or not value.seed.is_valid_hex_number(false) or not SurvivalContracts.integer(value.get("day"),2,RunSave.MAX_COUNTER) or not SurvivalContracts.integer(value.get("slot"),0,2) or value.get("type") not in TaskActions.TYPES or value.layout.get("size") not in NeighborhoodLayout.SIZES or value.layout.get("topology") not in NeighborhoodLayout.TOPOLOGIES or not SurvivalContracts.integer(value.get("recruit"),0,5) or not value.build.get("owned") is Array or not value.build.get("slots") is Array or not value.powers.get("owned") is Array or not value.powers.get("slot") is String or not value.persona.get("facts") is Dictionary or not value.campaign.get("run_id") is String or value.campaign.run_id.length()!=32 or not value.campaign.run_id.is_valid_hex_number(false) or not SurvivalContracts.integer(value.campaign.get("preparations"),0,3): return "EXPLORATION_ACTION_CONTEXT"
 	var signature: String=RecordEncoding.fingerprint(value) if mission else SurvivalContracts.fingerprint(value)
 	var proof_key: String = "camp-source:" + signature if mission and camp_source else signature
 	if _checked.has(proof_key): return ""
 	var source: Dictionary=origin(value)
 	if source.is_empty(): return "EXPLORATION_ORIGINAL_SOURCE"
-	var expected: Dictionary = upgrade(source, worldgen, level, int(mission), industrial, residential_rescue)
+	var expected: Dictionary = upgrade(source, worldgen, level, int(mission), industrial, residential_rescue, int(value.get("rare_policy", 0)))
 	if expected.is_empty(): return "EXPLORATION_ACTION_CANONICAL"
 	var matches: bool = signature == RecordEncoding.fingerprint(expected) if mission else TransactionReceipt.same(value,expected)
 	if not matches and mission and camp_source:
@@ -153,6 +167,10 @@ static func supply(value: Dictionary) -> MissionSupply:
 	result.cash_reward=int(value.cash)
 	result.food_reward=int(value.food)
 	result.has_weapon_sample = value.weapons == 1
+	if value.has("rare_policy"):
+		result.display_name = RareSortie.title(value.type)
+		result.description = RareSortie.card_text(value)
+		return result
 	var optional_cash: int=int(value.cash-source.cash)
 	var optional_food: int=int(value.food-source.food)
 	result.description="%s · %s · %d栋 / %d互动点\n主目标收益：钱%d / 粮%d / 武器%d\n可选收益上限：钱%d / 粮%d（无额外目标奖金）\n主目标位于中远区域；附近留有补给。\n按路线分工，随时可按原条件归航；夜间时钟不延长。"%[{"small":"小型","medium":"中型","large":"大型"}[value.layout["size"]],result.layout.display_name,value.layout.entities.size(),value.sites.size(),source.cash,source.food,source.weapons,optional_cash,optional_food]

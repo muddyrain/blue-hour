@@ -848,7 +848,7 @@ func _new_game() -> void:
 	_migration_notice = ""
 	profile_id = RunSave.new_profile_id()
 	if playable_entry:
-		_battle_meta.campaign=CampaignRules.initial_mission(profile_id, true, true, true)
+		_battle_meta.campaign=CampaignRules.initial_mission(profile_id, true, true, true, true)
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true, true)
 	_initialize_weapons("initial")
 	last_settlement_id = ""
@@ -2482,7 +2482,9 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	if snapshot.last_day.has("task") and not generated.get("campaign",{}).get("is_finale",false):
 		var title: String = ""
 		if generated.get("mission_policy") == 1:
-			if generated.has("investigation"):
+			if generated.has("rare_policy"):
+				title = RareSortie.title(generated.type)
+			elif generated.has("investigation"):
 				title = "调查 · " + CampaignRules.CLUE_NAMES[generated.investigation.clue_id]
 			elif generated.type == "airdrop":
 				title = "装备 · 露天回收"

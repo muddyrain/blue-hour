@@ -100,6 +100,7 @@ func run() -> void:
 		var bad:Dictionary=base.duplicate(true);bad.erase(key)
 		check(not TransactionReceipt.camp_problem(bad).is_empty(),"short camp rejects missing "+key+" without attribute errors")
 	_facilities(base)
+	_rare_sorties(base)
 	app.audio.shutdown();app.queue_free();await process_frame
 	print("CAMPAIGN_CONTRACTS checks=",checks," failures=",failures)
 	quit(1 if failures else 0)
@@ -116,6 +117,7 @@ func _facilities(fresh: Dictionary) -> void:
 	var camp: Dictionary = _after_food(fresh, 4, 0)
 	check(TransactionReceipt.camp_problem(camp).is_empty(), "unchanged field food ledger is valid before construction")
 	var legacy: Dictionary = camp.duplicate(true)
+	legacy.journey.campaign.erase("rare_policy")
 	legacy.journey.campaign.erase("finale_policy")
 	check(TransactionReceipt.camp_problem(legacy).is_empty() and CampFacilities.enabled(legacy)
 		and not CampaignRules.pump_station_enabled(legacy.journey.campaign), "M27 facilities remain valid without opting into the pump finale")
@@ -159,6 +161,7 @@ func _facilities(fresh: Dictionary) -> void:
 	result_food.facility_stored = 0
 	check(not CampFacilities.result_problem(supply, settled, result).is_empty(), "forged facility payout is rejected")
 	var stripped: Dictionary = settled.duplicate(true)
+	stripped.journey.campaign.erase("rare_policy")
 	stripped.journey.campaign.erase("finale_policy")
 	stripped.journey.campaign.erase("midgame")
 	check(not TransactionReceipt.camp_problem(stripped).is_empty(), "historic camp cannot authenticate a facility payout")
@@ -175,3 +178,38 @@ func _after_food(before: Dictionary, field_food: int, facility_food: int) -> Dic
 	after.last_day.merge({"day": before.day, "settlement_id": after.last_settlement_id, "evacuated": true,
 		"cash_before": before.cash, "cash_after": after.cash, "cash_gained": 0})
 	return after
+
+
+func _rare_sorties(fresh: Dictionary) -> void:
+	check(CampaignRules.rare_sorties_enabled(fresh.journey.campaign), "normal new journey opts into rare actions")
+	var unknown: Dictionary = fresh.journey.campaign.duplicate(true)
+	unknown.rare_policy = "1"
+	check(CampaignRules.problem(unknown) == "RARE_CAMPAIGN_POLICY", "unknown campaign marker rejects")
+	for sample: Array in [["m29-sample-2", "supply", "food", "food_2"], ["m29-sample-6", "airdrop", "cash", "cash_2"]]:
+		var base: Dictionary = _after_food(fresh, 4, 0)
+		base.journey.seed = sample[0].md5_text()
+		base.journey.build = WorldgenState.initial_build(base.journey.seed, true, true)
+		var old: Dictionary = base.duplicate(true)
+		old.journey.campaign.erase("rare_policy")
+		var legacy: Array[Dictionary] = DailyActions.offers(old)
+		var offers: Array[Dictionary] = DailyActions.offers(base)
+		check(offers.size() == 3 and legacy.size() == 3, "both strategies produce three cards")
+		if offers.size() != 3 or legacy.size() != 3:
+			continue
+		var offer: Dictionary = offers[1]
+		check(offer.get("rare_policy") == RareSortie.VERSION and offer.type == sample[1]
+			and offer.slot == RareSortie.SLOT and offer.id != legacy[1].id
+			and offer.objective.site_ids == [sample[2]] and offer.exploration.level.optional.site_id == sample[3],
+			"rare action binds its optional slot and independent work sites")
+		check(TransactionReceipt.same(offers[0], legacy[0]) and TransactionReceipt.same(offers[2], legacy[2])
+			and not DailyActions.matches(old, offer) and not DailyActions.matches(base, legacy[1]),
+			"old and new policies retain supply and investigation but certify their own optional action")
+		check(DailyActions.problem(offer).is_empty() and DailyActions.matches(base, offer),
+			"frozen rare action passes standalone and camp-bound authentication")
+		var altered: Dictionary = offer.duplicate(true)
+		altered.erase("rare_policy")
+		check(not DailyActions.problem(altered).is_empty(), "removing the rare marker cannot certify a rare layout")
+		altered = offer.duplicate(true)
+		altered.sites[0].amount += 1
+		check(not DailyActions.problem(altered).is_empty() and not DailyActions.matches(base, altered),
+			"reassigning a frozen reward fails even after authenticating the original")

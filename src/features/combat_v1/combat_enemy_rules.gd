@@ -12,6 +12,18 @@ static func snapshot_problem(row: Dictionary,world: Dictionary,receipt: Dictiona
 	if not SurvivalContracts.integer(behavior.spawn_stage,0,int(world.threat.stage)) or behavior.state not in ["chase","rush","windup"] or not SurvivalContracts.integer(behavior.target_id,0,5) or not SurvivalContracts.number(behavior.windup_remaining): return "COMBAT_ENEMY_STATE"
 	for resolution: Dictionary in world.task_event.resolutions:
 		if resolution.reason=="spawned" and resolution.enemy_id==state.actor_id: summoned=true
+	if world.combat.has("screamer"):
+		if behavior.kind == ScreamerPolicyV1.KIND:
+			var source: Dictionary = world.combat.spawns.get(str(int(state.actor_id)), {})
+			if summoned or state.actor_id != world.combat.screamer.actor_id or source.get("stage") != behavior.spawn_stage \
+					or source.get("kind") != ScreamerPolicyV1.KIND:
+				return "SCREAMER_ENEMY_SOURCE"
+			# It uses the original ordinary contact, stats and chase validation.
+			var ordinary: Dictionary = row.duplicate(true)
+			ordinary.behavior.kind = EnemyRules.NORMAL
+			return EnemyRules.snapshot_problem(ordinary, world, receipt, true)
+		if int(state.actor_id) in ScreamerRuntimeV1.summon_ids(world):
+			summoned = true
 	if summoned or state.actor_id>=10000: return EnemyRules.snapshot_problem(row,world,receipt,true)
 	var source: Variant=world.combat.spawns.get(str(int(state.actor_id)))
 	if not source is Dictionary or source.size()!=3 or not source.has_all(["kind","stage","fallback"]) or source.stage!=behavior.spawn_stage: return "COMBAT_ENEMY_SOURCE"

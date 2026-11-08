@@ -51,6 +51,9 @@ var _contact_initialized: bool = false
 var _toxic_casting: bool = false
 var _toxic_heading: Vector2 = Vector2.RIGHT
 var _toxic_progress: float = 0.0
+var _screamer_phase: StringName = &"chase"
+var _screamer_heading: Vector2 = Vector2.RIGHT
+var _screamer_progress: float = 0.0
 
 
 func _ready() -> void:
@@ -93,6 +96,8 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO)
 	if not is_enemy and not _is_defeated:
 		draw_arc(Vector2.ZERO, 17.0, 0.0, TAU, 28, COLOURS[variant % COLOURS.size()], 2.0, true)
+	if _screamer_enemy() and not _is_defeated:
+		ScreamerVisualV1.draw_cue(self, _screamer_phase, _screamer_progress)
 
 
 func advance(delta: float, movement: Vector2, aim: Vector2) -> void:
@@ -136,6 +141,10 @@ func _toxic_enemy() -> bool:
 	return is_enemy and enemy_kind == CombatEnemyRules.TOXIC
 
 
+func _screamer_enemy() -> bool:
+	return is_enemy and enemy_kind == ScreamerVisualV1.KIND
+
+
 func present_toxic_cast(heading: Vector2, casting: bool, progress: float) -> void:
 	if not casting and not _toxic_casting:
 		return
@@ -143,6 +152,16 @@ func present_toxic_cast(heading: Vector2, casting: bool, progress: float) -> voi
 	if heading.is_finite() and heading.length_squared() > 0.001:
 		_toxic_heading = heading.normalized()
 	_toxic_progress = clampf(progress, 0.0, 1.0)
+	_apply_pose()
+
+
+func present_screamer(heading: Vector2, phase: StringName, progress: float) -> void:
+	if _is_defeated or not _screamer_enemy():
+		return
+	_screamer_phase = phase
+	if heading.is_finite() and heading.length_squared() > 0.001:
+		_screamer_heading = heading.normalized()
+	_screamer_progress = clampf(progress, 0.0, 1.0)
 	_apply_pose()
 
 
@@ -185,6 +204,7 @@ func show_attack(direction: Vector2) -> void:
 func show_defeat() -> void:
 	_is_defeated = true
 	_defeat_clock = 0.0
+	_screamer_phase = &"cancelled"
 	_apply_pose()
 
 
@@ -282,6 +302,14 @@ func _apply_pose() -> void:
 		motion_state = &"windup"
 		legs = _toxic_heading
 		_body.position = Vector2.ZERO
+	if _screamer_enemy() and not _is_defeated:
+		if _screamer_phase == &"windup":
+			motion_state = &"windup"
+			legs = _screamer_heading
+			_body.position = Vector2.ZERO
+		elif _screamer_phase == &"released" and _screamer_progress < 1.0:
+			motion_state = &"release"
+			legs = _screamer_heading
 	_pose_body(legs, action)
 	_body.scale = Vector2.ONE * BODY_SCALE
 	if is_enemy:
@@ -290,6 +318,8 @@ func _apply_pose() -> void:
 			_body.scale = Vector2.ONE * NormalInfectedV1.DISPLAY_SCALE
 		elif _toxic_enemy():
 			_body.scale = Vector2.ONE * ToxicCarrierVisualV1.DISPLAY_SCALE
+		elif _screamer_enemy():
+			_body.scale = Vector2.ONE * ScreamerVisualV1.DISPLAY_SCALE
 		# Presentation spacing only. Logical feet, navigation, LOS and melee range stay put.
 		_body.position += _contact_offset()
 	_body.self_modulate = tint
@@ -307,6 +337,9 @@ func _pose_body(direction: Vector2, action: int) -> void:
 	if _toxic_enemy():
 		ToxicCarrierVisualV1.pose(_body, direction, motion_state, _walk_clock,
 			_attack_clock, _defeat_clock, _toxic_progress)
+	elif _screamer_enemy():
+		ScreamerVisualV1.pose(_body, direction, motion_state, _walk_clock,
+			_attack_clock, _defeat_clock, _screamer_progress)
 	elif _normal_enemy() and NormalInfectedV1.enabled():
 		NormalInfectedV1.pose(_body, direction, motion_state, _walk_clock, _attack_clock, _hit_clock, _defeat_clock)
 	else:

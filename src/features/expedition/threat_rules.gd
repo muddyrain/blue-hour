@@ -20,3 +20,14 @@ const REHEARSAL_DAYLIGHT: float = 21.0
 @export var party_distance: float = PARTY_DISTANCE
 @export var enemy_separation: float = ENEMY_SEPARATION
 
+
+func spawn_point_legal(point: Vector2, visible: Rect2, navigation: FieldNavigation,
+		nearest: Vector2, occupied: Array[Vector2]) -> bool:
+	if not nearest.is_finite() or visible.has_point(point) or not navigation.is_clear(point) \
+			or point.distance_to(nearest) < party_distance:
+		return false
+	for other: Vector2 in occupied:
+		if point.distance_to(other) < enemy_separation:
+			return false
+	return navigation.path_between(point, nearest).size() >= 2
+

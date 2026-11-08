@@ -113,6 +113,7 @@ func run() -> void:
 		if not fallback_content.is_empty():
 			expect(not LevelSummary.freeze(fallback,fallback_content.sites,fallback_content.objective,"supply").is_empty(), "explicit forced fallback completes real navigation routes and optional choice")
 	_industrial_yard()
+	_action_choices()
 	write(folder.path_join("summary.json"), {"samples":samples,"checks":checks,"failures":failures,"seeds":seeds})
 	print(JSON.stringify({"suite":"level_generation","checks":checks,"failures":failures,"samples":samples.size()}))
 	quit(1 if failures else 0)
@@ -156,6 +157,50 @@ func _industrial_yard() -> void:
 		changed = gear.duplicate(true)
 		changed.worldgen.revision = 1
 		expect(not ExplorationActions.problem(changed).is_empty(), "old revision cannot claim the new layout " + label)
+
+
+func _action_choices() -> void:
+	var base: Dictionary = _camp_fixture()
+	var seed: String = "m19-mission-9".md5_text()
+	base.journey.seed = seed
+	base.journey.build = WorldgenState.initial_build(seed, true, true)
+	base.journey.campaign = CampaignRules.initial_mission(base.profile_id)
+	var old: Array[Dictionary] = DailyActions.offers(base)
+	var current: Dictionary = base.duplicate(true)
+	current.journey.campaign = CampaignRules.initial_mission(base.profile_id, true)
+	expect(CampaignRules.problem(current.journey.campaign).is_empty()
+		and CampaignRules.action_choices_enabled(current.journey.campaign)
+		and not CampaignRules.action_choices_enabled(base.journey.campaign), "new action strategy requires the explicit mission marker")
+	for marker: Variant in [0, 2, "1", true]:
+		var invalid: Dictionary = current.journey.campaign.duplicate()
+		invalid.action_policy = marker
+		expect(not CampaignRules.problem(invalid).is_empty(), "unknown or mistyped action strategy is rejected")
+	var offered: Array[Dictionary] = DailyActions.offers(current)
+	expect(old.size() == 3 and offered.size() == 3, "new and previous starts each retain three valid choices")
+	if old.size() != 3 or offered.size() != 3:
+		return
+	expect(TransactionReceipt.same(old[0], offered[0]) and TransactionReceipt.same(old[2], offered[2])
+		and old[1].type == "airdrop" and offered[1].type == "rescue", "legacy gear remains signed while the opted-in seed offers rescue")
+	var rescue: Dictionary = offered[1]
+	var eligible: int = RescuePoolState.choice(current, "%s:1" % current.profile_id)
+	expect(eligible > 0 and rescue.recruit == eligible and rescue.objective.member_id == eligible
+		and WorldgenLayout.validate(rescue.layout).is_empty() and DailyActions.problem(rescue).is_empty()
+		and DailyActions.matches(current, rescue) and not DailyActions.matches(base, rescue)
+		and DailyActions.matches(base, old[1]), "reachable rescue uses the same candidate and canonical dispatch proofs")
+	var decoded: Dictionary = RecordEncoding.unpack(JSON.parse_string(RecordEncoding.stringify(current))).payload
+	expect(RecordEncoding.fingerprint({"offers": DailyActions.offers(decoded)}) == RecordEncoding.fingerprint({"offers": offered}),
+		"exact camp round trip preserves offer order, IDs and rewards")
+	var later: Dictionary = current.duplicate(true)
+	later.day = 3
+	later.settled_sorties = 1
+	var next: Array[Dictionary] = DailyActions.offers(later)
+	expect(next.size() == 3 and next[1].type == "airdrop", "same seed on a different date can offer original equipment recovery")
+	var full: Dictionary = current.duplicate(true)
+	RescuePoolState.grant(full, 3)
+	RescuePoolState.grant(full, 4)
+	var fallback: Array[Dictionary] = DailyActions.offers(full)
+	expect(RescuePoolState.available(full).is_empty() and fallback.size() == 3 and fallback[1].type == "airdrop"
+		and DailyActions.matches(full, fallback[1]), "rescue preference with no eligible recruit falls back to legal gear")
 
 
 func reaches(nav: FieldNavigation, start: Vector2, point: Vector2) -> bool:

@@ -11,6 +11,7 @@ const INVESTIGATION_VERSION: int = 2
 const INVESTIGATION_MODE: String = "investigation_v1"
 const MISSION_VERSION: int = 3
 const MISSION_MODE: String = "mission_v1"
+const ACTION_POLICY_VERSION: int = 1
 const CLUE_IDS: Array[String] = ["dispatch_log", "checkpoint_pass"]
 const CLUE_NAMES: Dictionary[String, String] = {"dispatch_log":"线路调度记录", "checkpoint_pass":"封锁通行记录"}
 const INVESTIGATION_KEYS: Array[String] = ["version","mode","run_id","clues","outcome","result_transaction"]
@@ -27,15 +28,21 @@ static func initial_investigation(run_id: String) -> Dictionary:
 		"clues":[], "outcome":"ACTIVE", "result_transaction":""}
 
 
-static func initial_mission(run_id: String) -> Dictionary:
+static func initial_mission(run_id: String, action_choices: bool = false) -> Dictionary:
 	var value: Dictionary = initial_investigation(run_id)
 	value.version = MISSION_VERSION
 	value.mode = MISSION_MODE
+	if action_choices:
+		value.action_policy = ACTION_POLICY_VERSION
 	return value
 
 
 static func is_mission(value: Variant) -> bool:
 	return value is Dictionary and value.get("version") == MISSION_VERSION and value.get("mode") == MISSION_MODE
+
+
+static func action_choices_enabled(value: Variant) -> bool:
+	return is_mission(value) and SurvivalContracts.integer(value.get("action_policy"), ACTION_POLICY_VERSION, ACTION_POLICY_VERSION)
 
 
 static func is_investigation(value: Variant) -> bool:
@@ -70,8 +77,11 @@ static func problem(value: Variant, run_id: String = "") -> String:
 
 static func _investigation_problem(value: Dictionary, run_id: String) -> String:
 	var version: int = MISSION_VERSION if is_mission(value) else INVESTIGATION_VERSION
-	if value.size() != INVESTIGATION_KEYS.size() or not value.has_all(INVESTIGATION_KEYS) or not SurvivalContracts.integer(value.version,version,version):
+	var has_action_policy: bool = value.has("action_policy")
+	if value.size() != INVESTIGATION_KEYS.size() + int(has_action_policy) or not value.has_all(INVESTIGATION_KEYS) or not SurvivalContracts.integer(value.version,version,version):
 		return "INVESTIGATION_FIELDS"
+	if has_action_policy and not action_choices_enabled(value):
+		return "INVESTIGATION_ACTION_POLICY"
 	if not value.run_id is String or not _identity(value.run_id) or (not run_id.is_empty() and run_id != value.run_id):
 		return "INVESTIGATION_IDENTITY"
 	if not value.clues is Array or value.clues.size() > CLUE_IDS.size() or value.outcome not in ["ACTIVE","VICTORY","DEFEAT"] or not value.result_transaction is String:

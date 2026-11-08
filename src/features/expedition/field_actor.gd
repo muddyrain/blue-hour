@@ -24,7 +24,6 @@ var trait_shot_factor: float = 1.0
 var trait_search_factor: float = 1.0
 var persona_work_factor: float = 1.0
 var weapon_instance_id: String = ""
-var toxic_carrier: ToxicCarrierVisualV1
 var combat_view: CombatWeaponVisualV1
 var magazine: WeaponMagazine
 var weapon_definition: WeaponDefinition
@@ -52,9 +51,6 @@ func _ready() -> void:
 		visual.enemy_kind = enemy_behavior.kind
 	visual.variant = actor_id % 2 if is_enemy else int({&"crew_1":0,&"crew_2":1,&"crew_3":2,&"crew_4":3,&"crew_5":4}.get(definition_id,0))
 	add_child(visual)
-	if is_enemy and enemy_behavior!=null and enemy_behavior.kind==CombatEnemyRules.TOXIC:
-		toxic_carrier=ToxicCarrierVisualV1.new()
-		visual.add_child(toxic_carrier)
 	if enemy_behavior!=null:
 		_enemy_tag = Label.new()
 		_enemy_tag.theme = enemy_theme
@@ -174,7 +170,6 @@ func take_damage(amount: float, hit_direction: Vector2 = Vector2.LEFT) -> bool:
 		permanent_death = permanent_death_enabled and damage_gate.is_valid()
 		path.clear()
 		visual.show_defeat()
-		if toxic_carrier!=null: toxic_carrier.hide()
 		if _enemy_tag!=null:
 			_enemy_tag.hide()
 	queue_redraw()

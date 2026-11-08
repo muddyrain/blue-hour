@@ -422,6 +422,12 @@
       "license": "No additional license granted"
     },
     {
+      "path": "assets/infected_v1/toxic/carrier.png",
+      "sha256": "5c04573a58a6216394170f2fa41c849c7d412cf059afb5dea731fde5ee03b5ac",
+      "origin": "AI-assisted original Blue Hour art, M23-ART-TOXIC-01; built-in image_gen, registered five-view pose atlas",
+      "license": "No additional license granted"
+    },
+    {
       "path": "assets/world_v1/convenience_store.png",
       "sha256": "5a10952618115949b88b9a36301b358fbd2cf85d9a6518ddd34591566f8fbf5f",
       "source": "Original built-in image_gen; normalization and source hashes in assets/world_v1/manifest.json"

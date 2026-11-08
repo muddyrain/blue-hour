@@ -162,7 +162,6 @@ func advance_toxic(world: Expedition,delta: float) -> void:
 	toxic=plan.state
 	if int(toxic.sequence)>prior_sequence: world._show_notice("毒气预警 · 离开危险区域。")
 	for actor: FieldActor in world.enemies:
-		if actor.toxic_carrier!=null: actor.toxic_carrier.present(actor.visual._facing,holds(actor),1.0-float(toxic.casters.get(str(actor.actor_id),{}).get("remaining",0.0))/float(ToxicV1.POLICY.windup))
 		if holds(actor) and not world.power_frozen:
 			actor.clear_order()
 			var point: Array=toxic.casters[str(actor.actor_id)].point
@@ -171,11 +170,15 @@ func advance_toxic(world: Expedition,delta: float) -> void:
 		var victim: FieldActor=null
 		for actor: FieldActor in world.survivors:
 			if actor.member_id==hit.member_id: victim=actor
-		if victim==null: _blocked(world); return
+		if victim == null:
+			refresh_toxic(world)
+			_blocked(world)
+			return
 		if victim.health<=0:
 			toxic=ToxicV1.ack(toxic,hit)
 			continue
 		if not victim.take_damage(float(hit.amount)):
+			refresh_toxic(world)
 			_blocked(world)
 			return
 		toxic=ToxicV1.ack(toxic,hit)
@@ -185,15 +188,16 @@ func advance_toxic(world: Expedition,delta: float) -> void:
 		world.combat_feedback.emit({"kind":"toxic_hit","zone_id":hit.zone_id,"tick":hit.tick,"member_id":hit.member_id,"health":victim.health,"elapsed":world.elapsed})
 		print("BH_TOXIC_HIT zone=%s tick=%d member=%d health=%.2f"%[hit.zone_id,hit.tick,hit.member_id,victim.health])
 	refresh_toxic(world)
-	toxic_view.advance(delta,true)
 
 func refresh_toxic(world: Expedition) -> void:
 	toxic_view.present(toxic)
 	for actor: FieldActor in world.enemies:
-		if actor.toxic_carrier!=null:
+		if actor.enemy_behavior != null and actor.enemy_behavior.kind == CombatEnemyRules.TOXIC:
 			var intent: Dictionary=toxic.casters.get(str(actor.actor_id),{})
-			var heading: Vector2=SortieSnapshot._vec(intent.point)-actor.position if intent.get("phase")=="windup" else actor.visual._facing
-			actor.toxic_carrier.present(heading,intent.get("phase")=="windup",1.0-float(intent.get("remaining",0.0))/float(ToxicV1.POLICY.windup))
+			var casting: bool = intent.get("phase") == "windup"
+			var heading: Vector2 = ToxicV1._vec(intent.point) - actor.position if casting else actor.visual._facing
+			var progress: float = 1.0 - float(intent.get("remaining", 0.0)) / float(ToxicV1.POLICY.windup)
+			actor.visual.present_toxic_cast(heading, casting, progress)
 
 func cancel_unavailable(world: Expedition) -> void:
 	for actor: FieldActor in world.survivors:

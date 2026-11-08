@@ -1958,10 +1958,12 @@ func request_airstrike(point: Vector2) -> bool:
 	if not support_available(): return false
 	var before: Dictionary=support_world()
 	var plan: Dictionary=BuildAuthority.plan_airstrike(before,point)
-	if plan.is_empty(): return false
-	var accepted: bool=_accept_support(before,basic_support.request("airstrike",plan))
-	if accepted: support_aiming=false
-	return accepted
+	if plan.is_empty():
+		if support_aiming:
+			_show_notice("空袭无法落在此处 · 请选择射程内无遮挡的地面")
+			_update_ui()
+		return false
+	return _accept_support(before,basic_support.request("airstrike",plan))
 
 func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 	if request.is_empty() or not support_commit.is_valid(): return false
@@ -1985,10 +1987,17 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 	var issue: String=SortieSnapshot.apply(self,after)
 	assert(issue.is_empty(),issue)
 	is_paused=false
-	if request.kind=="airstrike": support_aim.impact(SortieSnapshot._vec(request.payload.point),request.payload.radius)
-	_show_notice("治疗已确认" if request.kind=="heal" else "空袭已确认 · 本次击败来源已保存")
-	if interrupted:
-		combat.screamer.report_cancelled(self)
+	if request.kind=="airstrike":
+		support_aiming=false
+		support_aim.impact(SortieSnapshot._vec(request.payload.point),request.payload.radius)
+		var hits: int=request.payload.targets.size()
+		var notice: String = "空袭命中 · %d 个目标" % hits if hits > 0 else "空袭已落地"
+		if interrupted:
+			combat.screamer.report_cancelled(self, notice)
+		else:
+			_show_notice(notice)
+	else:
+		_show_notice("治疗已确认")
 	_update_ui()
 	return true
 
@@ -2039,7 +2048,7 @@ func support_plan_airstrike(point: Vector2) -> Dictionary:
 		view.survivors.append({"state":{"member_id":actor.member_id,"health":actor.health,"visible":actor.visible,"activity":actor.activity,"position":[actor.position.x,actor.position.y]}})
 	for enemy: FieldActor in enemies:
 		view.enemies.append({"state":{"actor_id":enemy.actor_id,"health":enemy.health,"visible":enemy.visible,"position":[enemy.position.x,enemy.position.y]}})
-	return BuildAuthority.plan_airstrike(view,point,layout)
+	return BuildAuthority.plan_airstrike_on_map(view,point,layout,navigation)
 
 func exploration_mode() -> bool:
 	return supply.generated.get("version")==9

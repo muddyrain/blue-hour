@@ -54,10 +54,11 @@ func removed(world: Expedition, actor_id: int) -> void:
 		report_cancelled(world)
 
 
-func report_cancelled(world: Expedition) -> void:
+func report_cancelled(world: Expedition, hit_notice: String = "") -> void:
 	_feedback(world, "screamer_cancelled")
 	if state.target_id != 0:
-		world._show_notice("尖啸已打断 · 未叫来增援。")
+		var notice: String = "尖啸已打断 · 未叫来增援。"
+		world._show_notice(notice if hit_notice.is_empty() else hit_notice + " · " + notice)
 
 
 static func cancel(value: Dictionary, actor_id: int) -> bool:

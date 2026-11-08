@@ -78,10 +78,14 @@ static func plan_heal(world: Dictionary) -> Dictionary:
 		members.append({"member_id":row.state.member_id,"health":row.state.health,"max_health":row.state.max_health,"present":row.state.activity!=FieldActor.Activity.DOWN})
 	return support.plan_heal(members,factor(world,"heal"))
 
-static func plan_airstrike(world: Dictionary, point: Vector2, supplied_layout: StreetLayout = null) -> Dictionary:
-	var layout: StreetLayout=supplied_layout if supplied_layout!=null else DailyActions.supply(world.generated).layout
+static func plan_airstrike(world: Dictionary, point: Vector2) -> Dictionary:
+	var layout: StreetLayout=DailyActions.supply(world.generated).layout
 	var navigation: FieldNavigation=FieldNavigation.new()
 	navigation.configure(layout.blockers(),layout.world_bounds)
+	return plan_airstrike_on_map(world,point,layout,navigation)
+
+static func plan_airstrike_on_map(world: Dictionary, point: Vector2, layout: StreetLayout,
+		navigation: FieldNavigation) -> Dictionary:
 	if not layout.world_bounds.has_point(point) or not navigation.is_clear(point): return {}
 	var callers: Array[Dictionary]=[]
 	for row: Dictionary in world.survivors:

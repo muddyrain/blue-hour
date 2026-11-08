@@ -234,20 +234,10 @@ func _binding_check() -> Dictionary:
 
 
 func _profiled_binding_check() -> Dictionary:
-	var file: FileAccess = FileAccess.open(_binding_path, FileAccess.READ)
-	if file == null:
-		return _error(ERR_FILE_CORRUPT, "REQUIRED_BINDING_MISSING_OR_UNREADABLE")
-	if file.get_length() == 0 or file.get_length() > 4096:
-		file.close()
-		return _error(ERR_FILE_CORRUPT, "BINDING_SIZE")
-	var bytes: PackedByteArray = file.get_buffer(file.get_length())
-	file.close()
-	var text: String = bytes.get_string_from_utf8()
-	var parser: JSON = JSON.new()
-	var value: Variant = parser.data if text.to_utf8_buffer() == bytes and parser.parse(text) == OK else null
-	if not value is Dictionary or value.size() != 2 or not value.get("payload") is Dictionary or not value.get("sha256") is String or TransactionReceipt.legacy_fingerprint(value.payload) != value.sha256:
-		return _error(ERR_FILE_CORRUPT, "BINDING_HASH")
-	var binding: Dictionary = value.payload
+	var decoded: Dictionary = read_binding(_binding_path)
+	if decoded.error != OK:
+		return _error(decoded.error, decoded.reason)
+	var binding: Dictionary = decoded.payload
 	if binding.size() != 7 or binding.get("binding_version") != 1 or binding.get("run_id") != _run_id or binding.get("root_id") != _root_id or binding.get("journal") != _journal.directory or not SurvivalContracts.integer(binding.get("revision"), 1, 4096):
 		return _error(ERR_INVALID_DATA, "BINDING_IDENTITY")
 	var loaded: Dictionary = _load()
@@ -257,6 +247,23 @@ func _profiled_binding_check() -> Dictionary:
 	if not hashes.has(int(binding.revision)) or hashes.get(1) != binding.get("root_hash") or hashes.get(int(binding.revision)) != binding.get("head_hash"):
 		return _error(ERR_FILE_CORRUPT, "CONFIRMED_JOURNAL_HEAD_MISSING")
 	return {"error":OK}
+
+
+static func read_binding(path: String) -> Dictionary:
+	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return {"error":ERR_FILE_CORRUPT, "reason":"REQUIRED_BINDING_MISSING_OR_UNREADABLE"}
+	if file.get_length() == 0 or file.get_length() > 4096:
+		file.close()
+		return {"error":ERR_FILE_CORRUPT, "reason":"BINDING_SIZE"}
+	var bytes: PackedByteArray = file.get_buffer(file.get_length())
+	file.close()
+	var text: String = bytes.get_string_from_utf8()
+	var parser: JSON = JSON.new()
+	var value: Variant = parser.data if text.to_utf8_buffer() == bytes and parser.parse(text) == OK else null
+	if not value is Dictionary or value.size() != 2 or not value.get("payload") is Dictionary or not value.get("sha256") is String or TransactionReceipt.legacy_fingerprint(value.payload) != value.sha256:
+		return {"error":ERR_FILE_CORRUPT, "reason":"BINDING_HASH"}
+	return {"error":OK, "payload":value.payload}
 
 
 func _remember(loaded: Dictionary) -> Dictionary:

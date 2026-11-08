@@ -22,10 +22,36 @@ func expect(value: bool, label: String) -> void:
 func run() -> void:
 	_test_definitions_and_slots()
 	_test_drop()
+	_test_catalog_pool()
 	print(JSON.stringify({"checks":checks, "failures":failures,
 		"scope":"pure passive definitions, frozen drops, inventory and two-slot factors",
 		"gameplay_acquisition":"A integration acceptance required", "source":"PROJECT_TEMP"}))
 	quit(0 if failures == 0 else 1)
+
+
+func _test_catalog_pool() -> void:
+	var context: Dictionary = _context()
+	var original: Array[String] = BuildItems.ids()
+	var pool: int = BuildItems.CATALOG_POOL
+	var mask: String = BuildItems.FILTER
+	expect(BuildItems.drop(context, []).size() == 2 and BuildItems.drop(context, original).is_empty(),
+		"original pool keeps its candidates and is exhausted after six")
+	context.version = pool
+	expect(BuildItems.drop(context, original).is_empty() and BuildItems.drop(context, original, pool) == [mask],
+		"only an authorized V2 context can roll the seventh item")
+	expect(BuildItems.drop(context, original + [mask], pool).is_empty(), "owned mask cannot roll again")
+	context.version = BuildItems.VERSION
+	var legacy_drops: Array[String] = BuildItems.drop(context, [mask], pool)
+	expect(legacy_drops.size() == 2 and legacy_drops.all(func(id: String) -> bool: return id in original)
+		and BuildItems.drop(context, [], pool) == BuildItems.drop(context, []),
+		"V1 contexts in V2 journeys retain the six candidates")
+	expect(not BuildItems.problem([mask], [mask, ""]).is_empty()
+		and BuildItems.problem([mask], [mask, ""], pool).is_empty(), "only V2 inventory can equip the mask")
+	var equipped: Dictionary = BuildItems.frozen_factors({"version":pool, "slots":[mask, ""]})
+	expect(equipped.get("poison") == 0.5 and BuildItems.factors(["", ""], pool).get("poison", 1.0) == 1.0,
+		"equipping the frozen mask changes the periodic poison factor")
+	equipped.erase("poison")
+	expect(equipped == BuildItems.BASE_FACTORS, "the mask preserves all six historical factors")
 
 
 func _test_definitions_and_slots() -> void:

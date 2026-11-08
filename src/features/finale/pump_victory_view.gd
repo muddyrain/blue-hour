@@ -70,7 +70,8 @@ func _draw() -> void:
 	draw_line(Vector2(left, rule_y), Vector2(_panel.end.x - 26.0 * _measure, rule_y), LINE, 1.0)
 
 
-func present(day: int, returned: int) -> void:
+func present(day: int, returned: int, catalog_notice: String = "") -> void:
+	_durability.text = "结算已保存" if catalog_notice.is_empty() else "结算已保存 · " + catalog_notice
 	_day = day
 	_returned = returned
 	_update_stats()

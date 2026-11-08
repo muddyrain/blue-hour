@@ -121,6 +121,8 @@ var _retry_button: Button
 var _new_game_confirmation: ConfirmationDialog
 var _opening_picker: OpeningBuildPicker
 var _opening_confirm_pending: bool = false
+var _catalog_button: Button
+var _equipment_catalog: EquipmentCatalog
 var pause_menu: SortiePauseMenu
 var _menu_was_paused: bool = false
 var _menu_from_pause: bool = false
@@ -465,6 +467,10 @@ func _exit_tree() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if is_instance_valid(_equipment_catalog) and _equipment_catalog.visible and event.is_action_pressed("return_to_title") and not event.is_echo():
+		_close_equipment_catalog()
+		get_viewport().set_input_as_handled()
+		return
 	if phase==Phase.EXPEDITION and is_instance_valid(expedition) and expedition._hud!=null and expedition._hud.view.persona_details.visible and event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode==KEY_ESCAPE:
 			expedition._hud.view.persona_details.close()
@@ -495,6 +501,9 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if is_instance_valid(_equipment_catalog) and _equipment_catalog.visible:
+		get_viewport().set_input_as_handled()
+		return
 	if is_instance_valid(pause_menu) and pause_menu.root.visible:
 		get_viewport().set_input_as_handled()
 		return
@@ -828,13 +837,17 @@ func _confirm_new_journey() -> void:
 		_new_game()
 	elif _opening_confirm_pending:
 		_opening_confirm_pending = false
+		var catalog: Dictionary = progress_session.refresh_catalog()
+		if catalog.error != OK:
+			_show_equipment_catalog(catalog)
+			return
 		if phase == Phase.RESULT:
 			return_to_title()
 		if phase == Phase.TITLE:
-			_new_game(_opening_picker.selected_plan)
+			_new_game(_opening_picker.selected_plan, {"version":CatalogProgress.VERSION, "unlock":catalog.unlock_hash})
 
 
-func _new_game(opening_plan: String = "") -> void:
+func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}) -> void:
 	if not opening_plan.is_empty() and (not playable_entry or not OpeningBuild.PLANS.has(opening_plan)):
 		return
 	if rescue_mode: _recruits = []
@@ -876,6 +889,8 @@ func _new_game(opening_plan: String = "") -> void:
 			_battle_meta.build.opening = starter
 			_battle_meta.build.owned.append(starter.item_id)
 			_battle_meta.build.slots[0] = starter.item_id
+			if not catalog_policy.is_empty():
+				_battle_meta.build.catalog = catalog_policy.duplicate(true)
 	_initialize_weapons("initial")
 	last_settlement_id = ""
 	_pending_save.clear()
@@ -1227,6 +1242,8 @@ func _close_sound_settings() -> void:
 
 
 func _settings_open() -> bool:
+	if is_instance_valid(_equipment_catalog) and _equipment_catalog.visible:
+		return true
 	if is_instance_valid(_facility_confirmation) and _facility_confirmation.visible:
 		return true
 	return (is_instance_valid(training_panel) and training_panel.visible) or (is_instance_valid(_camp_leave_dialog) and _camp_leave_dialog.visible) or (is_instance_valid(camp_scene) and camp_scene.info_visible()) or (is_instance_valid(migration_panel) and migration_panel.visible) or (is_instance_valid(sound_settings) and sound_settings.visible) or _new_game_confirmation.visible or (is_instance_valid(mission_select) and mission_select.visible) or (is_instance_valid(loadout_panel) and loadout_panel.visible) or (is_instance_valid(roster_panel) and roster_panel.visible) or (is_instance_valid(growth_panel) and growth_panel.visible)
@@ -1718,7 +1735,7 @@ func _show_pump_victory(snapshot: Dictionary) -> void:
 			_pump_victory.record_button.grab_focus())
 		_pump_details_back.hide()
 	var returned: int = battle.member_results.filter(func(member: Dictionary) -> bool: return member.health > 0.0).size()
-	_pump_victory.present(int(snapshot.last_day.day), returned)
+	_pump_victory.present(int(snapshot.last_day.day), returned, _catalog_result_notice(snapshot))
 	_set_pump_victory_visible(true)
 
 
@@ -1849,6 +1866,8 @@ func _setup_progress() -> void:
 		progress_session = ProductionProgress.new(progress_path,battle_mode,survival_mode,hunger_trial,rescue_mode,growth_mode,field_join_mode,trait_mode,training_mode,pool_mode,roster_mode,quality_mode,enemy_mode,playable_entry)
 		progress_session.suspend_enabled = safe_suspend
 		var state: Dictionary = progress_session.inspect()
+		if playable_entry:
+			progress_session.refresh_catalog()
 		if state.error == OK and state.state == "SUSPENDED":
 			_requires_continue = true
 			_progress_message = "已有未完成的出击暂存。继续将恢复原战场并消费本次快照，不返回旧营地。"
@@ -2405,6 +2424,10 @@ func _setup_blue_hour_title() -> void:
 	_blue_hour_title_art.name = "BlueHourTitleArt"
 	_title.add_child(_blue_hour_title_art)
 	_title.move_child(_blue_hour_title_art, 0)
+	_catalog_button = Button.new()
+	_catalog_button.text = "装备图鉴"
+	_catalog_button.pressed.connect(func() -> void: _show_equipment_catalog(progress_session.refresh_catalog()))
+	_title.add_child(_catalog_button)
 	var title_font: SystemFont = SystemFont.new()
 	title_font.font_names = PackedStringArray(["STZhongsong", "SimSun", "Noto Serif CJK SC", "Microsoft YaHei"])
 	title_font.font_weight = 700
@@ -2426,6 +2449,7 @@ func _refresh_blue_hour_title() -> void:
 	_camp_backdrop.visible = _camp_open
 	$Interface/Screen/Brand.hide()
 	if _camp_open:
+		_catalog_button.hide()
 		CampStyle.place(_status, Rect2(64, 646, 1152, 68))
 		return
 	var heading: Label = $Interface/Screen/Title/Heading
@@ -2455,7 +2479,9 @@ func _refresh_blue_hour_title() -> void:
 	CampStyle.place(_continue_button, Rect2(91, 316, 276, 44))
 	CampStyle.place(_home_button, Rect2(91, 316 if live_camp else 367, 276, 44))
 	CampStyle.place(reset, Rect2(91, 367, 276, 44))
-	CampStyle.place(sound, Rect2(91, 418, 276, 44))
+	CampStyle.place(sound, Rect2(91, 418, 126, 44))
+	_catalog_button.show()
+	CampStyle.place(_catalog_button, Rect2(223, 418, 144, 44))
 	CampStyle.place(exit, Rect2(91, 469, 276, 44))
 	CampStyle.place(_backup_button, Rect2(91, 524, 365, 38))
 	CampStyle.place(_retry_button, Rect2(91, 569 if _backup_button.visible else 524, 365, 38))
@@ -2476,7 +2502,7 @@ func _refresh_blue_hour_title() -> void:
 
 func _blue_hour_title_buttons() -> Array[Button]:
 	return [_continue_button, _home_button, $Interface/Screen/Title/Reset, $Interface/Screen/Title/Sound,
-		$Interface/Screen/Title/Quit, _backup_button, _retry_button]
+		_catalog_button, $Interface/Screen/Title/Quit, _backup_button, _retry_button]
 
 
 func _style_blue_hour_title_button(button: Button) -> void:
@@ -2515,6 +2541,9 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	var meal: Dictionary = frozen.get("food",snapshot.last_day)
 	var battle: Dictionary = frozen.get("battle",{})
 	var text: String = "归航结果 · 已入账\n" if durable else "归航预览 · 确认保存后入账\n"
+	var catalog_notice: String = _catalog_result_notice(snapshot) if durable else ""
+	if not catalog_notice.is_empty():
+		text += catalog_notice + "\n"
 	var generated: Dictionary = frozen.get("rules",{}).get("mission",{}).get("generated",{})
 	if PumpStationAction.enabled(generated) and not battle.is_empty():
 		if battle.encounter.defeat.is_empty():
@@ -2546,8 +2575,8 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	if BuildState.enabled(snapshot) and int(frozen.get("rules",{}).get("data_version",0)) in [8,9,10]:
 		var obtained: Array=BuildState.acquired(frozen.rules.mission.generated,battle.site_facts,battle.evacuated)
 		var names: PackedStringArray=[]
-		for item: String in obtained: names.append(BuildItems.definitions()[item].name)
-		text+="本次道具："+("、".join(names) if not names.is_empty() else "无")+" · 本局库存%d/6（"%snapshot.journey.build.owned.size()+("已保存" if durable else "确认后入库")+"）\n"
+		for item: String in obtained: names.append(generated.build.policy.items[item].name)
+		text+="本次道具："+("、".join(names) if not names.is_empty() else "无")+" · 本局库存%d/%d（"%[snapshot.journey.build.owned.size(), BuildItems.ids(BuildState.pool(snapshot)).size()]+("已保存" if durable else "确认后入库")+"）\n"
 	if PowerState.enabled(snapshot) and not battle.is_empty():
 		var sample: String=generated.powers.sample if battle.evacuated and battle.site_facts.get("cash",{}).get("searched",false) else ""
 		text+="本次能力："+(SpecialPowers.POLICY[sample].name if not sample.is_empty() else "无")+" · 本旅程%d/2（"%snapshot.journey.build.powers.owned.size()+("已保存" if durable else "确认后入库")+"）\n"
@@ -2574,13 +2603,53 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	text += "旅程已结束，不能再次出击。" if ended else "确认结算后可回营整备，再次出击。"
 	return text
 
+
+func _catalog_result_notice(snapshot: Dictionary) -> String:
+	if not snapshot.journey.get("build", {}).has("catalog"):
+		return ""
+	var catalog: Dictionary = progress_session.catalog_state()
+	if catalog.get("error", FAILED) != OK:
+		return "装备图鉴待同步 · 可重启补记"
+	if catalog.unlock.get("receipt", {}).get("transaction_id") == snapshot.last_settlement_id:
+		return "已解锁 · 滤毒面罩"
+	return ""
+
+
+func _show_equipment_catalog(state: Dictionary) -> void:
+	if _equipment_catalog == null:
+		_equipment_catalog = EquipmentCatalog.new()
+		_equipment_catalog.theme = CampStyle.blue_hour_theme(_screen.theme)
+		_screen.add_child(_equipment_catalog)
+		_equipment_catalog.closed.connect(_close_equipment_catalog)
+		_equipment_catalog.retry_requested.connect(func() -> void:
+			_equipment_catalog.present(progress_session.refresh_catalog()))
+	_title.hide()
+	_result.hide()
+	_equipment_catalog.show()
+	_equipment_catalog.present(state)
+
+
+func _close_equipment_catalog() -> void:
+	_equipment_catalog.hide()
+	if phase == Phase.TITLE:
+		_title.show()
+		_catalog_button.grab_focus()
+	elif phase == Phase.RESULT:
+		_show_battle_result(camp_snapshot(), true)
+		if _pump_victory != null and _pump_victory.visible:
+			_pump_victory.new_journey_button.grab_focus()
+		else:
+			_battle_new_button.grab_focus()
+
+
 func equip_build_item(slot: int, item: String) -> void:
 	if phase!=Phase.TITLE or not loadout_panel.visible or not BuildState.enabled(camp_snapshot()): return
 	var saved: bool=_accept_transaction(progress_session.edit(camp_snapshot(),{"kind":"build_slot","member_id":slot,"value":item}),true)
 	loadout_panel.refresh(camp_snapshot(),"本局道具配装已保存；下一行动生效。" if saved else _progress_message)
 	if not saved:
 		var build: Dictionary = camp_snapshot().journey.build
-		loadout_panel.build_panel.present(build.owned, build.slots, false, false, build.get("opening", {}).get("plan", ""))
+		loadout_panel.build_panel.present(build.owned, build.slots, false, false,
+			build.get("opening", {}).get("plan", ""), BuildState.pool(camp_snapshot()))
 
 func equip_power(id: String) -> void:
 	if phase!=Phase.TITLE or not loadout_panel.visible or not PowerState.enabled(camp_snapshot()): return

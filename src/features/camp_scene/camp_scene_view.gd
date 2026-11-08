@@ -383,7 +383,7 @@ func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, r
 		var equipped: PackedStringArray = []
 		for item: String in build.slots:
 			if not item.is_empty():
-				equipped.append(BuildItems.DEFINITIONS[item].name)
+				equipped.append(BuildItems.definitions(BuildState.pool(data))[item].name)
 		_shortage_text.text += "   ·   已配 " + ("、".join(equipped) if not equipped.is_empty() else "空槽")
 	_shortage_text.add_theme_color_override("font_color", CampStyle.AMBER if daily.shortage > 0 else CampStyle.MUTED)
 	var last: Dictionary = data.last_day

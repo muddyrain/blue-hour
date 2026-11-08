@@ -33,6 +33,8 @@ var _pending_edit: String = ""
 var _pending_edit_head: String = ""
 var _pending_edit_request: Dictionary = {}
 var _suspend_generation: String = ""
+var _catalog_store: CatalogProgress
+var _catalog_state: Dictionary = {}
 
 
 func _init(save_path: String, battle: bool = false, survival: bool = false, hunger: bool = false, rescue: bool = false, growth: bool = false, field: bool = false, traits: bool = false, training: bool = false, pool: bool = false, roster: bool = false, quality: bool = false, enemy: bool = false, playable: bool = false) -> void:
@@ -81,11 +83,25 @@ func _init(save_path: String, battle: bool = false, survival: bool = false, hung
 	if _writer.acquire() != OK:
 		_problem = _writer.reason
 	_expected = _disk_identity()
+	if playable:
+		_catalog_store = CatalogProgress.new(_path)
 
 
 func close() -> void:
 	if _writer != null:
 		_writer.release()
+
+
+func catalog_state() -> Dictionary:
+	return _catalog_state.duplicate(true)
+
+
+func refresh_catalog() -> Dictionary:
+	if _catalog_store == null or _writer == null or not _writer.owns(_path):
+		_catalog_state = {"error":ERR_UNAVAILABLE, "reason":"CATALOG_WRITER_UNAVAILABLE"}
+	else:
+		_catalog_state = _catalog_store.refresh(_fault)
+	return catalog_state()
 
 
 func death_equipment(camp: Dictionary) -> Dictionary:
@@ -184,6 +200,8 @@ func activate() -> Dictionary:
 	var confirmed: Dictionary = inspect()
 	if confirmed.error == OK:
 		_expected = _disk_identity()
+		if _catalog_store != null:
+			refresh_catalog()
 	return confirmed
 
 
@@ -198,6 +216,12 @@ func create(base: Dictionary) -> Dictionary:
 	if _pending_base.is_empty():
 		if _expected != _disk_identity():
 			return _blocked("NEW_JOURNEY_DISK_CHANGED")
+		if base.get("journey", {}).get("build", {}).has("catalog"):
+			var catalog: Dictionary = refresh_catalog()
+			if catalog.error != OK:
+				return _blocked(catalog.reason)
+			if base.journey.build.catalog.unlock != catalog.unlock_hash:
+				return _blocked("CATALOG_NEW_RUN_POLICY")
 		_pending_base = base.duplicate(true)
 		_new_root = base.journey.root_id if battle_mode else RunSave.new_profile_id()
 	elif not TransactionReceipt.same(_pending_base,base):
@@ -422,7 +446,10 @@ func commit_result() -> Dictionary:
 	if result.error != OK:
 		return result
 	_expected = _disk_identity()
-	return inspect()
+	var committed: Dictionary = inspect()
+	if committed.error == OK and _catalog_store != null:
+		refresh_catalog()
+	return committed
 
 
 func retry() -> Dictionary:

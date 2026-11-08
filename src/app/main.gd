@@ -119,6 +119,8 @@ var _continue_button: Button
 var _backup_button: Button
 var _retry_button: Button
 var _new_game_confirmation: ConfirmationDialog
+var _opening_picker: OpeningBuildPicker
+var _opening_confirm_pending: bool = false
 var pause_menu: SortiePauseMenu
 var _menu_was_paused: bool = false
 var _menu_from_pause: bool = false
@@ -785,6 +787,9 @@ func reset_demo() -> void:
 		_progress_message = "当前保存或冻结结果尚未确认；请先重试，不能切换到新旅程。"
 		_update_camp()
 		return
+	if playable_entry:
+		_open_opening_choice()
+		return
 	if survival_pilot or run_save.has_files() or _progress_dirty or settled_sorties > 0:
 		var preview: Dictionary = _pending_save if _requires_continue and not _pending_save.is_empty() else {"day":day,"cash":cash}
 		_new_game_confirmation.dialog_text = "开始新游戏？\n当前进度：第 %d 天，货币 %d。\n旧档暂时保留；新游戏首次回营或确认营地配装后才替换，并保留有效备份。\n异常文件将原字节归档，不会直接删除。" % [int(preview.day), int(preview.cash)]
@@ -799,10 +804,6 @@ func reset_demo() -> void:
 		if hunger_trial:
 			_new_game_confirmation.title = "Blue Hour 暂行饥饿规则 / 隔离测试"
 			_new_game_confirmation.dialog_text = _hunger_policy_text() + "\n新旅程：两人各200HP / 食物2 / 原初始装备。普通v5不自动转换。\n确认后立即保存独立基础营地；取消不写盘，旧旅程原件保留。"
-		if playable_entry:
-			_new_game_confirmation.title = "开始新的试玩旅程"
-			_new_game_confirmation.ok_button_text = "开始试玩"
-			_new_game_confirmation.dialog_text = _hunger_policy_text() + "\n初始两人各200生命、食物2、货币53及原初始装备。已有试玩进度会保留为历史，确认后开始新旅程。"
 		_new_game_confirmation.popup_centered(Vector2i(650, 240))
 		return
 	_new_game()
@@ -815,7 +816,27 @@ func _pool_initial() -> Dictionary:
 	return EnemyState.initial() if enemy_mode else WeaponState.initial() if quality_mode else RosterState.initial() if roster_mode else RescuePoolState.initial()
 
 
-func _new_game() -> void:
+func _open_opening_choice() -> void:
+	_opening_picker.reset_choice()
+	_opening_confirm_pending = true
+	_new_game_confirmation.popup_centered(Vector2i(740, 372))
+	_opening_picker.link_focus.call_deferred(_new_game_confirmation.get_ok_button(), _new_game_confirmation.get_cancel_button())
+
+
+func _confirm_new_journey() -> void:
+	if not playable_entry:
+		_new_game()
+	elif _opening_confirm_pending:
+		_opening_confirm_pending = false
+		if phase == Phase.RESULT:
+			return_to_title()
+		if phase == Phase.TITLE:
+			_new_game(_opening_picker.selected_plan)
+
+
+func _new_game(opening_plan: String = "") -> void:
+	if not opening_plan.is_empty() and (not playable_entry or not OpeningBuild.PLANS.has(opening_plan)):
+		return
 	if rescue_mode: _recruits = []
 	if transactional_mode and _transactional_new_pending:
 		_progress_message = "新旅程基础尚未确认，请先重试保存或退出。"
@@ -850,6 +871,11 @@ func _new_game() -> void:
 	if playable_entry:
 		_battle_meta.campaign=CampaignRules.initial_mission(profile_id, true, true, true, true)
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true, true)
+		if not opening_plan.is_empty():
+			var starter: Dictionary = OpeningBuild.source(opening_plan, profile_id, _battle_meta.root_id, _battle_meta.seed)
+			_battle_meta.build.opening = starter
+			_battle_meta.build.owned.append(starter.item_id)
+			_battle_meta.build.slots[0] = starter.item_id
 	_initialize_weapons("initial")
 	last_settlement_id = ""
 	_pending_save.clear()
@@ -1780,6 +1806,10 @@ func _hunger_result_text(snapshot: Dictionary, durable: bool) -> String:
 
 
 func _request_battle_new_journey() -> void:
+	if playable_entry and phase == Phase.RESULT:
+		if not _battle_new_button.disabled and not _new_game_confirmation.visible:
+			_open_opening_choice()
+		return
 	if phase == Phase.RESULT:
 		return_to_title()
 	if phase == Phase.TITLE:
@@ -1878,8 +1908,20 @@ func _setup_progress() -> void:
 	_new_game_confirmation.title = "确认新游戏"
 	_new_game_confirmation.ok_button_text = "确认开始新游戏"
 	_new_game_confirmation.cancel_button_text = "保留进度 / 取消"
-	_new_game_confirmation.confirmed.connect(_new_game)
+	_new_game_confirmation.confirmed.connect(_confirm_new_journey)
 	_screen.add_child(_new_game_confirmation)
+	if playable_entry:
+		_new_game_confirmation.title = "开始新旅程"
+		_new_game_confirmation.ok_button_text = "确认开始旅程"
+		_new_game_confirmation.theme = CampStyle.blue_hour_theme(_screen.theme)
+		_new_game_confirmation.theme.set_stylebox("panel", "AcceptDialog", CampStyle.box(CampStyle.INK, Color("48646d")))
+		CampStyle.blue_hour_primary(_new_game_confirmation.get_ok_button())
+		_opening_picker = OpeningBuildPicker.new()
+		_new_game_confirmation.add_child(_opening_picker)
+		_new_game_confirmation.canceled.connect(func() -> void:
+			_opening_confirm_pending = false
+			if phase == Phase.RESULT:
+				_battle_new_button.grab_focus.call_deferred())
 	_hunger_confirmation = ConfirmationDialog.new()
 	_hunger_confirmation.title = "继续试玩前请确认" if playable_entry else "明确选择隔离饥饿试运行"
 	_hunger_confirmation.dialog_text = _hunger_policy_text() + "\n继续当前旅程，不创建新旅程；只提交已有冻结结果，不重新选人。"
@@ -2536,7 +2578,9 @@ func equip_build_item(slot: int, item: String) -> void:
 	if phase!=Phase.TITLE or not loadout_panel.visible or not BuildState.enabled(camp_snapshot()): return
 	var saved: bool=_accept_transaction(progress_session.edit(camp_snapshot(),{"kind":"build_slot","member_id":slot,"value":item}),true)
 	loadout_panel.refresh(camp_snapshot(),"本局道具配装已保存；下一行动生效。" if saved else _progress_message)
-	if not saved: loadout_panel.build_panel.present(camp_snapshot().journey.build.owned,camp_snapshot().journey.build.slots,false,false)
+	if not saved:
+		var build: Dictionary = camp_snapshot().journey.build
+		loadout_panel.build_panel.present(build.owned, build.slots, false, false, build.get("opening", {}).get("plan", ""))
 
 func equip_power(id: String) -> void:
 	if phase!=Phase.TITLE or not loadout_panel.visible or not PowerState.enabled(camp_snapshot()): return

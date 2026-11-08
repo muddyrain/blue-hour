@@ -88,6 +88,9 @@ static func problem(value: Dictionary) -> String:
 			return "CAMP_DEATH_HISTORY"
 		ids.append(int(death.member_id))
 	if value.phase == "CAMP_REGISTERED":
+		var opening_issue: String = OpeningBuild.registration_problem(value.base)
+		if not opening_issue.is_empty():
+			return opening_issue
 		return "" if value.transaction_id == "" and value.deaths.is_empty() and value.envelope.is_empty() and TransactionReceipt.same(value.rules, {"ruleset_id":"camp-registration", "data_version":1}) else "REGISTRATION_FIELDS"
 	var parts: PackedStringArray = String(value.transaction_id).split(":")
 	if parts.size() != 3 or parts[0] != value.base.profile_id or parts[1] != "edit" or parts[2].length() != 32 or not parts[2].is_valid_hex_number(false):

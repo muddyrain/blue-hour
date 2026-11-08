@@ -101,6 +101,7 @@ func run() -> void:
 		check(not TransactionReceipt.camp_problem(bad).is_empty(),"short camp rejects missing "+key+" without attribute errors")
 	_facilities(base)
 	_rare_sorties(base)
+	_opening_build(base)
 	app.audio.shutdown();app.queue_free();await process_frame
 	print("CAMPAIGN_CONTRACTS checks=",checks," failures=",failures)
 	quit(1 if failures else 0)
@@ -213,3 +214,71 @@ func _rare_sorties(fresh: Dictionary) -> void:
 		altered.sites[0].amount += 1
 		check(not DailyActions.problem(altered).is_empty() and not DailyActions.matches(base, altered),
 			"reassigning a frozen reward fails even after authenticating the original")
+
+
+func _opening_build(fresh: Dictionary) -> void:
+	var old: Dictionary = fresh.duplicate(true)
+	old.journey.seed = "m30-opening-4".md5_text()
+	old.journey.build = WorldgenState.initial_build(old.journey.seed, true, true)
+	var base: Dictionary = old.duplicate(true)
+	var build: Dictionary = base.journey.build
+	var starter: String = OpeningBuild.PLANS.scavenge.item_id
+	build.opening = OpeningBuild.source("scavenge", base.profile_id, base.journey.root_id, base.journey.seed)
+	build.owned = [starter]
+	build.slots = [starter, ""]
+	var registration: Dictionary = TransactionReceipt.registration(base, base.journey.root_id)
+	check(TransactionReceipt.problem(registration).is_empty()
+		and TransactionReceipt.problem(TransactionReceipt.registration(old, old.journey.root_id)).is_empty(),
+		"new singleton registration and old no-marker camp each authenticate")
+	for key: String in ["plan", "version", "item_id", "root_id", "run_id", "seed"]:
+		var bad: Dictionary = base.duplicate(true)
+		bad.journey.build.opening[key] = "forged"
+		check(not BuildState.problem(bad).is_empty(), "forged opening " + key + " rejects")
+	var bad: Dictionary = base.duplicate(true)
+	bad.journey.build.owned.append(OpeningBuild.PLANS.firepower.item_id)
+	check(not BuildState.problem(bad).is_empty(), "an unearned second starter rejects")
+	bad = base.duplicate(true)
+	bad.journey.build.erase("opening")
+	check(not BuildState.problem(bad).is_empty(), "an unmarked legacy camp cannot hold an unearned starter")
+	var unequipped: Dictionary = BuildState.equip(base, 0, "")
+	check(not unequipped.is_empty() and unequipped.journey.build.opening == build.opening
+		and not TransactionReceipt.problem(TransactionReceipt.registration(unequipped, base.journey.root_id)).is_empty(),
+		"later slot edits keep the origin and cannot replace the starting registration")
+	var swap: Dictionary = base.duplicate(true)
+	var other: String = OpeningBuild.PLANS.firepower.item_id
+	swap.journey.build.opening = OpeningBuild.source("firepower", base.profile_id, base.journey.root_id, base.journey.seed)
+	swap.journey.build.owned = [other]
+	swap.journey.build.slots = [other, ""]
+	var edit: Dictionary = CampEdit.record(swap, {"kind":"build_slot", "member_id":0, "value":""},
+		base.profile_id + ":edit:" + "0".repeat(32), registration)
+	check(not edit.is_empty() and TransactionReceipt.problem(edit).is_empty()
+		and TransactionReceipt.transition(registration, edit) == "CAMP_HEAD_CONFLICT",
+		"recalculating the fields and edit hashes cannot swap the anchored opening choice")
+	var offers: Array[Dictionary] = DailyActions.offers(base)
+	var old_offers: Array[Dictionary] = DailyActions.offers(old)
+	check(offers.size() == 3 and old_offers.size() == 3, "same seed still generates three cards for old and new")
+	if offers.size() != 3 or old_offers.size() != 3:
+		return
+	var gear: Dictionary = offers[1]
+	check(gear.type == "airdrop" and gear.build.owned == [starter] and gear.build.slots == [starter, ""]
+		and gear.build.drops.size() == 2 and starter not in gear.build.drops
+		and DailyActions.problem(gear).is_empty() and DailyActions.matches(base, gear)
+		and old_offers[1].build.drops.is_empty() and not DailyActions.matches(old, gear),
+		"normal gear freezes current effects and drops only unowned items on the new policy")
+	var forged_gear: Dictionary = gear.duplicate(true)
+	forged_gear.erase("gear_build_policy")
+	check(not DailyActions.problem(forged_gear).is_empty(), "removing the policy cannot reauthenticate the new rewards")
+	var after: Dictionary = _after_food(base, 0, 0)
+	var report: Dictionary = {"sortie_id":base.profile_id + ":1", "evacuated":true,
+		"site_facts":{"cash":{"searched":true}}, "support":{"accepted":[]}, "powers":{"accepted":[]}}
+	after.journey.build = BuildState.settled(base, report, gear)
+	check(BuildState.problem(after).is_empty() and after.journey.build.owned == [starter] + gear.build.drops,
+		"acquisition order starts with the opening item")
+	if after.journey.build.sources.is_empty():
+		return
+	bad = after.duplicate(true)
+	bad.journey.build.sources[0].owned = []
+	check(not BuildState.problem(bad).is_empty(), "old-style empty departure ownership is rejected")
+	bad = after.duplicate(true)
+	bad.journey.build.sources[1] = bad.journey.build.sources[0].duplicate(true)
+	check(not BuildState.problem(bad).is_empty(), "duplicating an acquisition source is rejected")

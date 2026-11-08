@@ -192,6 +192,9 @@ func create(base: Dictionary) -> Dictionary:
 		return _blocked(_problem)
 	if not TransactionReceipt.camp_problem(base).is_empty() or base.settled_sorties != 0 or SurvivalState.is_extended(base) != battle_mode or SurvivalState.is_survival(base) != survival_mode or RescueState.is_family(base) != rescue_mode or GrowthState.is_family(base) != growth_mode or FieldJoinState.is_family(base) != field_join_mode or TraitState.is_family(base) != trait_mode or TrainingState.is_family(base) != training_mode or RescuePoolState.is_family(base) != pool_mode or RosterState.is_family(base) != roster_mode or WeaponState.is_family(base) != quality_mode or EnemyState.is_state(base) != enemy_mode:
 		return _blocked("NEW_BASE_FORMAT")
+	var opening_issue: String = OpeningBuild.registration_problem(base)
+	if not opening_issue.is_empty():
+		return _blocked(opening_issue)
 	if _pending_base.is_empty():
 		if _expected != _disk_identity():
 			return _blocked("NEW_JOURNEY_DISK_CHANGED")

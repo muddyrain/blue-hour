@@ -2111,6 +2111,8 @@ func _exploration_objective_rows() -> Array[Dictionary]:
 			rows[1].hint = "可选，带回用于维修或建设。"
 	elif generated.get("mission_policy") == 1 and generated.type == "airdrop":
 		rows[0].title = "装备 · 露天回收"
+		if generated.has("gear_build_policy") and not generated.build.drops.is_empty():
+			rows[0].title += " · 道具 %d 件" % generated.build.drops.size()
 		rows[0].hint = "一次性增援已触发。" if task_event.started else "首次开工触发一次增援，工作中可受击。"
 	return rows
 

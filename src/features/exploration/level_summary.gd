@@ -176,6 +176,8 @@ static func mission_card_text(value: Dictionary, base: Dictionary = {}, rations:
 						var item: Dictionary = WeaponInventory.site_reward(sortie_id, value, site, false)
 						reward = "损坏%s ×1，先维修再配装" % weapon if item.condition == "damaged" else "%s ×1，可直接配装" % weapon
 					break
+			if value.has("gear_build_policy") and not value.build.drops.is_empty():
+				reward += " · 被动道具 %d 件" % value.build.drops.size()
 			route = "露天单程约 %d 秒，回收 %d 秒" % [outbound, int(level.work_seconds[first])]
 			if value.layout.has("loading_yard"):
 				route = "宽装卸口、折角维修道汇合，回收 %d 秒" % int(level.work_seconds[first])

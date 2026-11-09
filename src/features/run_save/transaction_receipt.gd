@@ -308,6 +308,10 @@ static func _result_problem(receipt: Dictionary) -> String:
 	var facility_issue: String = CampFacilities.result_problem(receipt.base, after, receipt.envelope.result)
 	if not facility_issue.is_empty():
 		return facility_issue
+	var workshop_issue: String = WorkshopV1.result_problem(receipt.base, after,
+		receipt.rules.get("mission", {}).get("generated", {}), receipt.envelope.result.get("battle"))
+	if not workshop_issue.is_empty():
+		return workshop_issue
 	if SurvivalState.is_extended(after):
 		var deaths: Array = []
 		for checkpoint: Dictionary in receipt.deaths:

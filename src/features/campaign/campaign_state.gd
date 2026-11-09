@@ -26,7 +26,7 @@ static func problem(camp: Dictionary) -> String:
 	if value.outcome!="DEFEAT" and camp.journey.state!="ACTIVE": return "CAMPAIGN_LIFE_SOURCE"
 	if value.outcome!="ACTIVE" and value.result_transaction!=camp.last_settlement_id: return "CAMPAIGN_RESULT_SOURCE"
 	if value.outcome=="VICTORY" and ((not CampaignRules.is_investigation(value) and camp.settled_sorties<5) or not camp.last_day.get("evacuated",false)): return "CAMPAIGN_VICTORY_SOURCE"
-	return ""
+	return WorkshopV1.problem(camp)
 
 static func settled(before: Dictionary, after: Dictionary, report: Dictionary, generated: Dictionary) -> Dictionary:
 	var value: Dictionary=before.journey.campaign.duplicate(true)
@@ -43,4 +43,6 @@ static func settled(before: Dictionary, after: Dictionary, report: Dictionary, g
 		if not PumpStationAction.enabled(generated) or PumpStationAction.stopped(report.site_facts):
 			value.outcome = "VICTORY"
 	if value.outcome!="ACTIVE": value.result_transaction=report.sortie_id
+	if WorkshopV1.enabled(before):
+		value.workshop = WorkshopV1.settled(before, generated, report)
 	return value

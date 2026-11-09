@@ -1,13 +1,13 @@
 class_name ExplorationObjectives
 extends VBoxContainer
-## Three read-only objective rows. Only the owner may move a camera or a survivor.
+## Read-only objective rows. Only the owner may move a camera or a survivor.
 
 signal locate_requested(objective_id: String)
 
 var labels: Array[Label] = []
 var locate_buttons: Array[Button] = []
 var _rows: Array[HBoxContainer] = []
-var _ids: Array[String] = ["", "", ""]
+var _ids: Array[String] = ["", "", "", ""]
 var _built: bool = false
 
 
@@ -17,9 +17,11 @@ func _ready() -> void:
 
 func present(rows: Array[Dictionary]) -> void:
 	_build()
-	for index: int in range(3):
-		_rows[index].visible = index < rows.size()
-		if index >= rows.size():
+	var toolbox: bool = rows.any(func(row: Dictionary) -> bool: return row.id == "toolbox")
+	var shown: int = mini(rows.size(), 4 if toolbox else 3)
+	for index: int in range(_ids.size()):
+		_rows[index].visible = index < shown
+		if index >= shown:
 			_ids[index] = ""
 			continue
 		var row: Dictionary = rows[index]
@@ -49,7 +51,7 @@ func _build() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	mouse_force_pass_scroll_events = false
 	add_theme_constant_override("separation", 2)
-	for index: int in range(3):
+	for index: int in range(_ids.size()):
 		var row: HBoxContainer = HBoxContainer.new()
 		row.name = "Objective%d" % (index + 1)
 		row.custom_minimum_size.y = 24

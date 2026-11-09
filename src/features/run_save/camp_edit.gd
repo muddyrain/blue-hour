@@ -35,6 +35,8 @@ static func _propose_valid(before: Dictionary, request: Dictionary) -> Dictionar
 			return BuildState.equip(before,member_id,request.value)
 		"facility":
 			return CampFacilities.build(before, request.value) if member_id == 0 else {}
+		WorkshopV1.EXTENDED, WorkshopV1.QUICK:
+			return WorkshopV1.install(before, request.value, request.kind) if member_id == 0 else {}
 		"train_trait":
 			return TrainingRules.propose(before,request)
 		"rename":

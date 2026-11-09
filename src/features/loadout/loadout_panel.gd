@@ -4,6 +4,7 @@ extends Control
 
 signal equip_requested(member_id: int, instance_id: String)
 signal repair_requested(instance_id: String)
+signal workshop_requested(instance_id: String, mod: String)
 signal build_requested(slot: int, item_id: String)
 signal power_requested(ability_id: String)
 signal closed
@@ -18,6 +19,8 @@ var equip_by_id: Dictionary[int,Button] = {}
 var repair_button: Button
 var back_button: Button
 var confirmation: ConfirmationDialog
+var workshop_buttons: Dictionary[String, Button] = {}
+var workshop_confirmation: ConfirmationDialog
 var message: Label
 var _crew: Label
 var _member_equipment: Dictionary[int,Label] = {}
@@ -29,6 +32,11 @@ var _data: Dictionary = {}
 var _retry_power: bool = false
 var _selected_id: String = ""
 var _confirmation_id: String = ""
+var _workshop: PanelContainer
+var _workshop_heading: Label
+var _workshop_status: Label
+var _workshop_instance_id: String = ""
+var _workshop_mod: String = ""
 
 
 func _ready() -> void:
@@ -70,6 +78,7 @@ func _ready() -> void:
 	_crew_grid.columns = 2
 	_crew_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	crew_row.add_child(_crew_grid)
+	_build_workshop(column)
 	var row: HBoxContainer = HBoxContainer.new()
 	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	row.add_theme_constant_override("separation", 28)
@@ -161,10 +170,15 @@ func refresh(data: Dictionary, feedback: String = "", retry_power: bool = false)
 			"待维修" if item.condition == "damaged" else "可装备", list_owner], weapon.presentation.texture)
 		if WeaponState.is_family(_data):
 			items.set_item_text(index,items.get_item_text(index)+"\n"+WeaponModifiers.description(item))
+		var mod: String = WorkshopV1.mod_for(_data, item.instance_id)
+		if not mod.is_empty():
+			items.set_item_text(index, items.get_item_text(index) + "\n工坊 · " + WorkshopV1.name_for(mod))
 		items.set_item_metadata(index, item.instance_id)
 		items.set_item_tooltip(index, "归属 " + ownership + ("" if player_mode else "\n实例 " + item.instance_id))
 		if WeaponState.is_family(_data):
 			items.set_item_tooltip(index,items.get_item_tooltip(index)+"\n"+WeaponModifiers.description(item)+("\n完整比较见右侧详情" if player_mode else "\nPROJECT_TEMP；完整比较见右侧可滚动详情"))
+		if not mod.is_empty():
+			items.set_item_tooltip(index, items.get_item_tooltip(index) + "\n工坊 · " + WorkshopV1.name_for(mod))
 		items.set_item_custom_fg_color(index, CampStyle.AMBER if item.condition == "damaged" else CampStyle.TEXT)
 		if _selected_id == item.instance_id:
 			items.select(index)
@@ -172,6 +186,9 @@ func refresh(data: Dictionary, feedback: String = "", retry_power: bool = false)
 		items.select(0)
 	if not items.get_selected_items().is_empty():
 		_select(items.get_selected_items()[0])
+	else:
+		_selected_id = ""
+		_refresh_workshop({}, 0)
 	for member: Dictionary in _data.crew:
 		var item: Dictionary = WeaponInventory.for_member(_data, int(member.id))
 		var label: Label = _member_equipment[int(member.id)]
@@ -204,6 +221,8 @@ func _select(index: int) -> void:
 	_preview.texture = weapon.presentation.texture
 	var owner_id: int = WeaponInventory.owner(_data, _selected_id)
 	var ownership: String = SurvivorRoster.member(_data.crew, owner_id).call_sign if owner_id > 0 else "装备仓"
+	var mod: String = WorkshopV1.mod_for(_data, _selected_id)
+	var magazine: Dictionary = WeaponMagazine.parameters(item.weapon_id, mod)
 	_detail.text = "%s · PROJECT_TEMP\n%s · %s\n\n基础伤害 %.0f · 间隔 %.3f秒 · 射程 %.0f" % [weapon.display_name,
 		"损坏 · 须维修" if item.condition == "damaged" else "状态良好", ownership,
 		weapon.damage,weapon.interval,weapon.shot_range]
@@ -223,7 +242,12 @@ func _select(index: int) -> void:
 			_detail.text += "\n" + effect
 		_detail.text += "\n\n武器基础：%.0f伤 · %.3f秒 · %.0f距" % [weapon.damage,weapon.interval,weapon.shot_range]
 		var melee: Dictionary = CombatEquipment.melee_policy(item.weapon_id)
-		_detail.text += "\n近战 · 正面%d° · 最多%d目标 · 起手%.2f秒" % [int(melee.angle_degrees),int(melee.max_targets),float(melee.windup)] if not melee.is_empty() else "\n弹匣 %d发 · 自动换弹 %.1f秒 · 备弹∞"%[weapon.magazine_capacity(),weapon.reload_seconds()]
+		if not melee.is_empty():
+			_detail.text += "\n近战 · 正面%d° · 最多%d目标 · 起手%.2f秒" % [int(melee.angle_degrees), int(melee.max_targets), float(melee.windup)]
+		elif WorkshopV1.enabled(_data):
+			_detail.text += "\n%s · %d 发 · 基础换弹 %.2f 秒 · 备弹∞" % [WorkshopV1.name_for(mod), magazine.capacity, magazine.seconds]
+		else:
+			_detail.text += "\n弹匣 %d发 · 自动换弹 %.1f秒 · 备弹∞" % [weapon.magazine_capacity(), weapon.reload_seconds()]
 		if item.weapon_id=="shotgun_v1": _detail.text+="\n每次扳机9×5弹丸 · 每条射线只命中首个目标 · 近距清群。"
 		var stats: Dictionary = WeaponModifiers.effective(item,TraitRules.factor(SurvivorRoster.member(_data.crew,owner_id),"shot") if owner_id>0 else 1.0)
 		if item.weapon_id=="shotgun_v1": _detail.text+="\n实例单颗 %.2f×5"%stats.damage
@@ -241,7 +265,12 @@ func _select(index: int) -> void:
 		var factors: Dictionary=BuildItems.factors(_data.journey.build.slots, BuildState.pool(_data))
 		var values: Dictionary=WeaponModifiers.effective(item)
 		if item.weapon_id=="shotgun_v1": _detail.text+="\n本局单颗 %.2f×5"%(values.damage*factors.damage)
-		_detail.text+="\n本局道具有效：%.2f伤 · 换弹%.2f秒\n小队移速×%.2f · 搜刮耗时×%.2f\n原属性保留；仅本局已保存两槽生效。"%[values.damage*(1.0 if CombatEquipment.melee(item.weapon_id) else factors.damage),weapon.reload_seconds()*factors.reload,factors.move,factors.work]
+		var damage: float = values.damage * (1.0 if CombatEquipment.melee(item.weapon_id) else factors.damage)
+		if WorkshopV1.enabled(_data) and not magazine.is_empty():
+			_detail.text += "\n本局道具有效：%.2f伤 · %s换弹 %.2f 秒" % [damage, "本人有效" if owner_id > 0 else "含道具", float(magazine.seconds) * _reload_factor(owner_id)]
+		else:
+			_detail.text += "\n本局道具有效：%.2f伤 · 换弹%.2f秒" % [damage, weapon.reload_seconds() * factors.reload]
+		_detail.text += "\n小队移速×%.2f · 搜刮耗时×%.2f\n原属性保留；仅本局已保存两槽生效。" % [factors.move, factors.work]
 	if CombatEquipment.melee(item.weapon_id): _detail.text=_detail.text.replace("本局道具有效：%.2f伤 · 换弹0.00秒"%WeaponModifiers.effective(item).damage,"本局有效：%.2f伤 · 近战无换弹"%WeaponModifiers.effective(item).damage)
 	_detail.tooltip_text = "实例 " + item.instance_id + "\n现有样板固定维修报价，尚无随机词条。"
 	if WeaponState.is_family(_data):
@@ -262,6 +291,109 @@ func _select(index: int) -> void:
 	if player_mode:
 		_detail.text = _detail.text.replace(" · PROJECT_TEMP", "")
 		_detail.tooltip_text = "属性以右侧实际数值和当前持有者为准；维修不会重抽词条。"
+	_refresh_workshop(item, owner_id, index)
+
+
+func _build_workshop(column: VBoxContainer) -> void:
+	_workshop = PanelContainer.new()
+	_workshop.name = "Workshop"
+	_workshop.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.PANEL, Color("5c6863"), 8))
+	column.add_child(_workshop)
+	_workshop.hide()
+	var stack: VBoxContainer = VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 4)
+	_workshop.add_child(stack)
+	var top: HBoxContainer = HBoxContainer.new()
+	stack.add_child(top)
+	_workshop_heading = CampStyle.label("工坊改装", 17, CampStyle.TEAL)
+	_workshop_heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_workshop_heading.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	top.add_child(_workshop_heading)
+	top.add_child(CampStyle.label("工具箱 ×1 + %d 币 / 次" % WorkshopV1.COST, 16, CampStyle.AMBER))
+	var row: HBoxContainer = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	stack.add_child(row)
+	for mod: String in [WorkshopV1.EXTENDED, WorkshopV1.QUICK]:
+		var button: Button = Button.new()
+		button.name = "WorkshopExtended" if mod == WorkshopV1.EXTENDED else "WorkshopQuick"
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.custom_minimum_size.y = 48
+		button.add_theme_font_size_override("font_size", 16)
+		button.pressed.connect(_confirm_workshop.bind(mod))
+		row.add_child(button)
+		workshop_buttons[mod] = button
+	_workshop_status = CampStyle.label("", 15, CampStyle.MUTED)
+	_workshop_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	stack.add_child(_workshop_status)
+	workshop_confirmation = ConfirmationDialog.new()
+	workshop_confirmation.name = "WorkshopConfirmation"
+	workshop_confirmation.title = "确认工坊改装"
+	workshop_confirmation.ok_button_text = "安装并保存"
+	workshop_confirmation.cancel_button_text = "取消"
+	workshop_confirmation.confirmed.connect(func() -> void: workshop_requested.emit(_workshop_instance_id, _workshop_mod))
+	add_child(workshop_confirmation)
+
+
+func _refresh_workshop(item: Dictionary, owner_id: int, index: int = -1) -> void:
+	_workshop.visible = WorkshopV1.enabled(_data)
+	if not _workshop.visible:
+		return
+	var selection: String = "未选择武器" if item.is_empty() else "%02d %s" % [index + 1, WeaponInventory.definition(item.weapon_id).display_name]
+	_workshop_heading.text = "工坊改装 · 工具箱 ×%d · %s" % [WorkshopV1.tools(_data), selection]
+	var factor: float = _reload_factor(owner_id)
+	var problem: String = _workshop_problem(WorkshopV1.EXTENDED)
+	for mod: String in workshop_buttons:
+		var button: Button = workshop_buttons[mod]
+		button.text = WorkshopV1.name_for(mod) + " · " + _magazine_preview(mod, factor, owner_id)
+		button.disabled = not problem.is_empty()
+		button.tooltip_text = problem if button.disabled else "改装随当前枪械实例转配，每把只可安装一次。"
+	var installed: String = WorkshopV1.mod_for(_data, _selected_id)
+	if installed.is_empty():
+		_workshop_status.text = problem if not problem.is_empty() else "安装后随所选实例转配，每把只可改装一次。"
+	else:
+		var magazine: Dictionary = WeaponMagazine.parameters(item.weapon_id, installed)
+		_workshop_status.text = "已安装 %s · %d 发 · %s换弹 %.2f 秒" % [WorkshopV1.name_for(installed), magazine.capacity, "本人有效" if owner_id > 0 else "含道具", float(magazine.seconds) * factor]
+		if _retry_power:
+			_workshop_status.text += " · " + problem
+
+
+func _workshop_problem(mod: String) -> String:
+	if _retry_power:
+		return "本次整备待保存，请先重试。"
+	return WorkshopV1.mod_problem(_data, _selected_id, mod)
+
+
+func _magazine_preview(mod: String, factor: float, owner_id: int) -> String:
+	var stock: Dictionary = WeaponMagazine.parameters("carbine")
+	var option: Dictionary = WeaponMagazine.parameters("carbine", mod)
+	var detail: String = "%d → %d 发\n基础换弹 %.2f → %.2f 秒" % [stock.capacity, option.capacity, stock.seconds, option.seconds]
+	if not is_equal_approx(factor, 1.0):
+		detail += " · %s %.2f → %.2f 秒" % ["本人有效" if owner_id > 0 else "含道具", float(stock.seconds) * factor, float(option.seconds) * factor]
+	return detail
+
+
+func _reload_factor(owner_id: int) -> float:
+	var factor: float = 1.0
+	if BuildState.enabled(_data):
+		factor = float(BuildItems.factors(_data.journey.build.slots, BuildState.pool(_data)).reload)
+	if owner_id > 0 and PersonaState.enabled(_data):
+		var recipe: Dictionary = SurvivorPersona.member(_data.journey.build.persona, owner_id)
+		factor *= float(SurvivorPersona.factors(recipe).get("reload", 1.0))
+	return factor
+
+
+func _confirm_workshop(mod: String) -> void:
+	if not _workshop_problem(mod).is_empty():
+		return
+	_workshop_instance_id = _selected_id
+	_workshop_mod = mod
+	var item: Dictionary = WeaponInventory.find(_data, _workshop_instance_id)
+	var owner_id: int = WeaponInventory.owner(_data, _workshop_instance_id)
+	var number: int = _data.weapons.find(item) + 1
+	workshop_confirmation.dialog_text = "为 %02d %s 安装%s？\n%s\n消耗工具箱 ×1 和 %d 币。每把卡宾枪仅可安装一次。" % [
+		number, WeaponInventory.definition(item.weapon_id).display_name, WorkshopV1.name_for(mod),
+		_magazine_preview(mod, _reload_factor(owner_id), owner_id), WorkshopV1.COST]
+	workshop_confirmation.popup_centered(Vector2i(620, 230))
 
 
 func _confirm_repair() -> void:

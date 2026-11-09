@@ -63,6 +63,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var campaign_pressure: bool = CampaignRules.campaign_pressure_enabled(base.journey.campaign)
 	var content_wave: bool = ContentWaveV1.enabled(base)
 	var night_hound: bool = NightHoundV1.campaign_enabled(base.journey.campaign)
+	var workshop: bool = WorkshopV1.enabled(base) and CampFacilities.selected(base) == CampFacilities.WORKSHOP
 	for index: int in range(result.size()):
 		var candidate: Dictionary = result[index]
 		if screamer and ScreamerPolicyV1.eligible(candidate):
@@ -75,6 +76,8 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 			candidate = ContentWaveV1.freeze_action(candidate)
 		if night_hound and ContentWaveV1.eligible(candidate):
 			candidate.night_hound_policy = NightHoundV1.VERSION
+		if workshop:
+			candidate = WorkshopSiteV1.freeze(candidate)
 		if weapon_affixes and not ContentWaveV1.eligible(candidate) and WeaponInventory.affix_eligible(candidate):
 			candidate.weapon_affix_policy = WeaponInventory.AFFIX_POLICY_VERSION
 		result[index] = candidate

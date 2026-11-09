@@ -284,7 +284,9 @@ func _ready() -> void:
 		actor.visual.set_weapon(actor.weapon_definition.presentation)
 		if combat_mode() and CombatRuntime.patterned(String(actor.weapon_definition.id)): combat.action(actor)
 		if (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9)))):
-			if not CombatEquipment.melee(String(actor.weapon_definition.id)): actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
+			if not CombatEquipment.melee(String(actor.weapon_definition.id)):
+				actor.magazine = WeaponMagazine.new(actor.weapon_instance_id, String(actor.weapon_definition.id),
+					WorkshopV1.mod_for(field_departure, actor.weapon_instance_id))
 		if build_mode(): apply_build(actor)
 		survivors.append(actor)
 	if (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9))):
@@ -560,7 +562,9 @@ func promote_target(event: Dictionary, restoring: bool = false) -> void:
 	actor.weapon_instance_id = gun.instance_id
 	actor.weapon_definition = WeaponModifiers.combat_definition(gun)
 	actor.visual.set_weapon(actor.weapon_definition.presentation)
-	if (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9)))) and not CombatEquipment.melee(String(actor.weapon_definition.id)):actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
+	if int(supply.generated.get("version", 0)) in [5, 6, 7, 8, 9] and not CombatEquipment.melee(String(actor.weapon_definition.id)):
+		actor.magazine = WeaponMagazine.new(actor.weapon_instance_id, String(actor.weapon_definition.id),
+			WorkshopV1.mod_for(action, actor.weapon_instance_id))
 	actor.clear_order()
 	if trait_mode:
 		TraitRules.apply(actor,profile,tuning.survivor_speed)
@@ -693,7 +697,12 @@ func member_site(member_id: int) -> SearchSite:
 
 
 func site_label(site: SearchSite) -> String:
-	return SearchWorkView.short_site(site.prop.title,sites.find(site)+1)
+	return "工具箱点" if String(site.id) == WorkshopSiteV1.site_id(supply.generated) \
+		else SearchWorkView.short_site(site.prop.title,sites.find(site)+1)
+
+
+func _toolbox_site() -> SearchSite:
+	return search_site(StringName(WorkshopSiteV1.site_id(supply.generated)))
 
 
 func _search_log(stage: String, site: SearchSite) -> void:
@@ -1438,6 +1447,8 @@ func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
 	var investigation: Dictionary = supply.generated.get("investigation", {})
 	if supply.generated.get("mission_policy") == 1 and investigation.get("site_id") == String(site.id):
 		_show_notice("已携带线索：%s · 生还归航并确认后登记" % CampaignRules.CLUE_NAMES[investigation.clue_id])
+	if String(site.id) == WorkshopSiteV1.site_id(supply.generated):
+		_show_notice("已携带工具箱 ×1 · 归航确认后入库")
 	print("BH_SEARCH completed kind=%s reward=%d cash=%d food=%d" % [site.kind,reward,loot,food_loot])
 	search_completed.emit(reward)
 	_search_log("completed",site)
@@ -1676,7 +1687,9 @@ func _update_ui() -> void:
 			objective = "提前撤离 · 未达成胜利，可回营再战"
 	elif encounter != null and not encounter.defeat.is_empty() and CampFacilities.enabled(field_departure):
 		objective = "破阵者已倒地 · 集合回车"
+	var toolbox: SearchSite = _toolbox_site()
 	_hud.refresh({
+		"toolbox":int(toolbox.searched) if toolbox != null else -1,
 		"exploration_objectives":_exploration_objective_rows() if exploration_mode() else [],
 		"objective":objective,
 		"mission_title":("交火练习" if is_practice else mission_title) if los_setup == null else mission_title, "members":members,
@@ -1972,6 +1985,9 @@ func _make_world_buildings() -> void:
 			var anchor: Vector2 = Vector2(0, 5) if object_site else Vector2(site.prop.door_offset, 28)
 			if not _supply_entrances.is_empty() and site.prop.loot_landmark.is_empty() and site.prop.primary_target and site.kind == &"food":
 				site.prop.loot_landmark = "近点食品" if def.id == supply.generated.objective.site_ids[0] else "追加食品"
+			if String(site.id) == WorkshopSiteV1.site_id(supply.generated):
+				site.prop.loot_landmark = "工具箱 ×1"
+				site.prop.reward_hint += " · 工具箱 ×1"
 			site.prop.configure_loot_badge(category, anchor)
 		sites.append(site)
 		if site.id==&"cash": _cash_site=site; _shop=site.prop
@@ -2356,6 +2372,11 @@ func _exploration_objective_rows() -> Array[Dictionary]:
 		if generated.has("gear_build_policy") and not generated.build.drops.is_empty():
 			rows[0].title += " · 道具 %d 件" % generated.build.drops.size()
 		rows[0].hint = "一次性增援已触发。" if task_event.started else "首次开工触发一次增援，工作中可受击。"
+	var toolbox: SearchSite = _toolbox_site()
+	if toolbox != null:
+		rows.insert(1, {"id":"toolbox", "title":"工具箱 ×1", "optional":true, "done":int(toolbox.searched),
+			"total":1, "complete":toolbox.searched, "site_ids":[String(toolbox.id)],
+			"hint":"完成此点原搜集即可携带，归航确认后入库。"})
 	return rows
 
 

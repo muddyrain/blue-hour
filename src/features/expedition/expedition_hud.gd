@@ -85,8 +85,13 @@ func refresh(state: Dictionary) -> void:
 			bus_waiting.append("等待救援对象")
 	elif state.get("engine_running", false):
 		bus_waiting.append("请前往巴士旁集合")
+	var resources: String = "货币 %d  ·  食物 %d\n携带：钱%d · 粮%d · 武器%d" % [
+		state["cash"], state["food"], state["loot"], state["food_loot"], int(state.get("weapon_loot", 0))]
+	if int(state.get("toolbox", -1)) >= 0:
+		resources = "货币 %d · 食物 %d\n携带：钱%d 粮%d 武器%d 工具箱%d" % [state["cash"], state["food"],
+			state["loot"], state["food_loot"], int(state.get("weapon_loot", 0)), int(state.toolbox)]
 	view.refresh({
-		"resource_text":"货币 %d  ·  食物 %d\n携带：钱%d · 粮%d · 武器%d"%[state["cash"],state["food"],state["loot"],state["food_loot"],int(state.get("weapon_loot",0))],
+		"resource_text":resources,
 		"objective":state.get("objective",""), "mission_title":state["mission_title"], "day_text":"第 %d 天" % state["day"],
 		"search_progress_text":"%d / %d" % [state["sites_searched"],state["sites_total"]],
 		"defeated_text":str(state["kills"]), "currency_text":str(state["cash"]),

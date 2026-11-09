@@ -145,9 +145,10 @@ static func _investigation_problem(value: Dictionary, run_id: String) -> String:
 	var has_campaign_pressure: bool = value.has("campaign_pressure_policy")
 	var has_content_wave: bool = value.has("content_wave_policy")
 	var has_night_hound: bool = value.has("night_hound_policy")
+	var has_workshop: bool = value.has("workshop")
 	var field_count: int = INVESTIGATION_KEYS.size() + int(has_action_policy) + int(has_midgame) \
 		+ int(has_finale) + int(has_rare) + int(has_screamer) + int(has_affixes) + int(has_first_aid) \
-		+ int(has_sortie_risk) + int(has_campaign_pressure) + int(has_content_wave) + int(has_night_hound)
+		+ int(has_sortie_risk) + int(has_campaign_pressure) + int(has_content_wave) + int(has_night_hound) + int(has_workshop)
 	if value.size() != field_count or not value.has_all(INVESTIGATION_KEYS) or not SurvivalContracts.integer(value.version,version,version):
 		return "INVESTIGATION_FIELDS"
 	if has_action_policy and not action_choices_enabled(value):
@@ -172,6 +173,8 @@ static func _investigation_problem(value: Dictionary, run_id: String) -> String:
 		return "CONTENT_WAVE_CAMPAIGN_POLICY"
 	if has_night_hound and not NightHoundV1.campaign_enabled(value):
 		return "HOUND_CAMPAIGN_POLICY"
+	if has_workshop and (not has_night_hound or not WorkshopV1.marker_problem(value.workshop).is_empty()):
+		return "WORKSHOP_CAMPAIGN_POLICY"
 	if not value.run_id is String or not _identity(value.run_id) or (not run_id.is_empty() and run_id != value.run_id):
 		return "INVESTIGATION_IDENTITY"
 	if not value.clues is Array or value.clues.size() > CLUE_IDS.size() or value.outcome not in ["ACTIVE","VICTORY","DEFEAT"] or not value.result_transaction is String:

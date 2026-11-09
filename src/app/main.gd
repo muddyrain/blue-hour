@@ -888,6 +888,7 @@ func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}) -> vo
 			latest_rules, latest_rules, latest_rules, latest_rules, latest_rules, latest_rules)
 		if latest_rules:
 			_battle_meta.campaign.night_hound_policy = NightHoundV1.VERSION
+			_battle_meta.campaign.workshop = WorkshopV1.initial()
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true, true)
 		_battle_meta.build.powers = PowerState.initial_progression(
 			SpecialPowers.WAVE_VERSION if latest_rules else SpecialPowers.PROGRESSION_VERSION)
@@ -1364,6 +1365,7 @@ func open_loadout() -> void:
 		loadout_panel.power_panel.investment_requested.connect(invest_power)
 		loadout_panel.power_panel.retry_requested.connect(retry_power_edit)
 		loadout_panel.repair_requested.connect(repair_weapon)
+		loadout_panel.workshop_requested.connect(install_workshop_mod)
 		loadout_panel.closed.connect(close_loadout)
 	_title.hide()
 	loadout_panel.show()
@@ -1373,7 +1375,8 @@ func open_loadout() -> void:
 
 
 func close_loadout() -> void:
-	if not is_instance_valid(loadout_panel) or loadout_panel.confirmation.visible or loadout_panel.power_panel.confirmation.visible:
+	if not is_instance_valid(loadout_panel) or loadout_panel.confirmation.visible or loadout_panel.power_panel.confirmation.visible \
+			or loadout_panel.workshop_confirmation.visible:
 		return
 	loadout_panel.hide()
 	_title.show()
@@ -1409,6 +1412,23 @@ func repair_weapon(identity: String) -> void:
 			loadout_panel.power_panel.retry_button.grab_focus()
 		return
 	_commit_loadout(WeaponInventory.repair(camp_snapshot(), identity))
+
+
+func install_workshop_mod(identity: String, mod: String) -> void:
+	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible \
+			or _progress_blocked or not transactional_mode:
+		return
+	var before: Dictionary = camp_snapshot()
+	var issue: String = WorkshopV1.mod_problem(before, identity, mod)
+	if not issue.is_empty():
+		loadout_panel.refresh(before, issue, _progress_dirty)
+		return
+	var saved: bool = _accept_transaction(progress_session.edit(before, {"kind":mod, "member_id":0, "value":identity}), true)
+	if saved:
+		_request_audio(&"ui_confirm")
+	loadout_panel.refresh(camp_snapshot(), "已安装%s · 使用工具箱 ×1、8 币" % WorkshopV1.name_for(mod) if saved else _progress_message, _progress_dirty)
+	if _progress_dirty:
+		loadout_panel.power_panel.retry_button.grab_focus()
 
 
 func _commit_loadout(transaction: Dictionary) -> void:
@@ -2348,7 +2368,8 @@ func _camp_escape() -> bool:
 	elif is_instance_valid(roster_panel) and roster_panel.visible:
 		close_roster()
 	elif is_instance_valid(loadout_panel) and loadout_panel.visible:
-		if loadout_panel.confirmation.visible or loadout_panel.power_panel.confirmation.visible:
+		if loadout_panel.confirmation.visible or loadout_panel.power_panel.confirmation.visible \
+			or loadout_panel.workshop_confirmation.visible:
 			return false
 		close_loadout()
 	elif mission_select.visible:
@@ -2579,6 +2600,9 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 		if meal.food_shortage > 0:
 			text += "本次口粮缺口 %d 粮\n" % meal.food_shortage
 	text += "带回 %d 币 · %d 件武器\n" % [snapshot.last_day.cash_gained, battle.get("weapons", []).size()]
+	if not WorkshopSiteV1.site_id(generated).is_empty():
+		var gained: int = int(WorkshopV1.recovered(generated, battle))
+		text += "本次工具箱 ×%d · %s %d\n" % [gained, "营地库存" if durable else "确认后库存", WorkshopV1.tools(snapshot)]
 	var ended: bool = snapshot.journey.state == "FAILED" or CampaignState.ended(snapshot)
 	if not ended:
 		var next_rations: Dictionary = CampEconomy.rations(snapshot.day, snapshot.crew, snapshot.food, camp_rules)

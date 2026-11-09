@@ -8,6 +8,7 @@ func expect(value: bool,label: String) -> void:
 func run() -> void:
 	if not OS.get_user_data_dir().replace("\\","/").begins_with(ProjectSettings.globalize_path("res://.local/")):quit(2);return
 	_affix_sources()
+	_workshop_parameters()
 	var app: Node=load("res://src/app/main.tscn").instantiate();root.add_child(app)
 	await process_frame
 	app.playable_entry=false # Explicit historical fixture; normal new journeys use short V1.
@@ -77,6 +78,50 @@ func run() -> void:
 	print(JSON.stringify({"checks":checks,"failures":failures,"types":types,"examples":examples,"parameters":WeaponDefinition.MAGAZINES}))
 	app.audio.shutdown();app.queue_free();await process_frame
 	quit(0 if failures==0 else 1)
+
+
+func _workshop_parameters() -> void:
+	var legacy: WeaponMagazine = WeaponMagazine.new("original", "carbine")
+	expect(legacy.capacity() == 12 and legacy.seconds() == 1.60 and not legacy.snapshot().has("mod"),
+		"original carbine keeps its old parameters and record shape")
+	var profiles: Dictionary = {
+		WeaponMagazine.EXTENDED: {"rounds":16, "seconds":2.20},
+		WeaponMagazine.QUICK: {"rounds":9, "seconds":1.05},
+	}
+	for mod: String in profiles:
+		var magazine: WeaponMagazine = WeaponMagazine.new("modified", "carbine", mod)
+		var initial: Dictionary = magazine.snapshot()
+		expect(magazine.rounds == profiles[mod].rounds and magazine.seconds() == profiles[mod].seconds
+			and initial.mod == mod, "confirmed profile sets capacity and base reload " + mod)
+		var overflow: Dictionary = initial.duplicate(true)
+		overflow.rounds += 1
+		expect(not WeaponMagazine.problem(overflow, "modified", "carbine", 1.0, mod).is_empty(),
+			"modified capacity rejects forged overflow " + mod)
+		expect(not WeaponMagazine.problem(initial, "modified", "carbine").is_empty(),
+			"old magazine shape rejects a workshop marker " + mod)
+		expect(not WeaponMagazine.problem(initial, "modified", "long_rifle", 1.0, mod).is_empty(),
+			"non-carbine rejects a workshop marker " + mod)
+		magazine.reload_factor = 0.75
+		for shot: int in range(magazine.capacity()):
+			magazine.commit_shot()
+		var record: Dictionary = magazine.snapshot()
+		expect(magazine.remaining == profiles[mod].seconds * 0.75
+			and WeaponMagazine.problem(record, "modified", "carbine", 0.75, mod).is_empty(),
+			"same reload factor sets the strict modified timer " + mod)
+		var wrong_timer: Dictionary = record.duplicate(true)
+		wrong_timer.remaining += 0.001
+		expect(not WeaponMagazine.problem(wrong_timer, "modified", "carbine", 0.75, mod).is_empty(),
+			"modified timer rejects forged overflow " + mod)
+		var wrong_mod: Dictionary = record.duplicate(true)
+		wrong_mod.mod = WeaponMagazine.QUICK if mod == WeaponMagazine.EXTENDED else WeaponMagazine.EXTENDED
+		expect(not WeaponMagazine.problem(wrong_mod, "modified", "carbine", 0.75, mod).is_empty(),
+			"snapshot cannot choose a different modification " + mod)
+		var restored: WeaponMagazine = WeaponMagazine.new("modified", "carbine", mod)
+		restored.reload_factor = magazine.reload_factor
+		restored.restore(record)
+		restored.advance(record.remaining)
+		expect(restored.can_fire() and restored.rounds == profiles[mod].rounds,
+			"restored modified reload fills its own magazine " + mod)
 
 
 func _affix_sources() -> void:

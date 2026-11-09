@@ -36,7 +36,8 @@ static func camp(base: Dictionary, id: int, scope: String = "camp") -> Dictionar
 			benefit = "在营时武器维修减 %d 币。" % WeaponInventory.MECHANIC_DISCOUNT if WeaponInventory.mechanic_available(base) else "阵亡后不再提供维修折扣。"
 		model.trait_detail = benefit + "与工坊取较高折扣，最低 1 币。\n" + String(model.trait_detail)
 	var item: Dictionary=WeaponInventory.for_member(source,id)
-	_weapon(model,item,personal,passive,TraitRules.factor(member,"shot"))
+	var mod: String = WorkshopV1.mod_for(source, item.get("instance_id", ""))
+	_weapon(model,item,personal,passive,TraitRules.factor(member,"shot"),mod)
 	var speed: float=125.0*TraitRules.factor(member,"move")*personal.move*passive.move
 	model.move_detail="常态 %.2f · 当前 %.2f 像素/秒\n无临时疾行"%[speed,speed]
 	model.work_detail="基准搜刮（30秒室内） %.4f 秒\n不影响救援接纳等待与奖励"%(30.0*TraitRules.factor(member,"search")*personal.work*passive.work)
@@ -70,7 +71,7 @@ static func field(world: Expedition, actor: FieldActor, status: String) -> Dicti
 	var gun: WeaponDefinition=actor.weapon_definition
 	model.weapon_detail=_weapon_text(gun,actor.trait_shot_factor)
 	if actor.magazine!=null:
-		model.reload_detail="%s\n实际换弹 %.3f 秒%s"%[model.ammo,gun.reload_seconds()*actor.magazine.reload_factor,"（工作期间暂停换弹）" if world.has_search_job(actor.member_id) else ""]
+		model.reload_detail="%s\n实际换弹 %.3f 秒%s"%[model.ammo,actor.magazine.seconds(),"（工作期间暂停换弹）" if world.has_search_job(actor.member_id) else ""]
 	model.move_detail="常态 %.2f · 当前 %.2f 像素/秒\n%s"%[actor.speed,actor.effective_speed(),"疾行剩余 %.2f 秒"%SpecialPowers.ability_remaining(world.powers,SpecialPowers.SPEED,world.elapsed) if actor.power_move_factor>1.0 else "无临时疾行"]
 	var site: Expedition.SearchSite=world.member_site(actor.member_id)
 	var seconds: float=world._site_seconds(site) if site!=null else 30.0
@@ -85,7 +86,7 @@ static func _show_first_aid(model: Dictionary) -> void:
 		FirstAidV1.HEALTH_RATIO * 100.0, FirstAidV1.RANGE, FirstAidV1.HEAL_AMOUNT, model.trait_detail]
 
 
-static func _weapon(model: Dictionary, item: Dictionary, personal: Dictionary, passive: Dictionary, shot_factor: float) -> void:
+static func _weapon(model: Dictionary, item: Dictionary, personal: Dictionary, passive: Dictionary, shot_factor: float, mod: String) -> void:
 	if item.is_empty():
 		model.weapon_detail="无当前装备 · 历史武器以归航档案为准"
 		model.reload_detail="无弹匣"
@@ -104,8 +105,11 @@ static func _weapon(model: Dictionary, item: Dictionary, personal: Dictionary, p
 		model.ammo="近战 · 无弹匣"
 		model.reload_detail="近战 · 无弹匣 / 无换弹\n装填特质对当前武器不适用"
 	else:
-		model.ammo="弹匣 %d/%d"%[gun.magazine_capacity(),gun.magazine_capacity()]
-		model.reload_detail="容量 %d · 实际换弹 %.3f 秒\n备弹无限；搜刮期间暂停换弹"%[gun.magazine_capacity(),gun.reload_seconds()*personal.reload*passive.reload]
+		var setup: Dictionary = WeaponMagazine.parameters(String(gun.id), mod)
+		var capacity: int = int(setup.get("capacity", 0))
+		var seconds: float = float(setup.get("seconds", 0.0))
+		model.ammo="弹匣 %d/%d"%[capacity,capacity]
+		model.reload_detail="容量 %d · 实际换弹 %.3f 秒\n备弹无限；搜刮期间暂停换弹"%[capacity,seconds*personal.reload*passive.reload]
 
 static func _weapon_text(gun: WeaponDefinition, shot_factor: float) -> String:
 	var melee: bool=CombatEquipment.melee(String(gun.id))

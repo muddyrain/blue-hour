@@ -382,6 +382,9 @@ func refresh(data: Dictionary, daily: Dictionary, can_depart: bool, reason: Stri
 
 func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, reason: String, feedback: String) -> void:
 	resource_text.text = "第 %d 天     货币 %d     食物 %d     今日需粮 %d" % [data.day, data.cash, data.food, daily.required]
+	var workshop_enabled: bool = WorkshopV1.enabled(data)
+	if workshop_enabled:
+		resource_text.text += "     工具箱 %d" % WorkshopV1.tools(data)
 	var pressure: String = _campaign_pressure(data)
 	_journey_caption.text = "旅程进度" if pressure.is_empty() else pressure
 	_shortage_text.text = "口粮缺口 %d · 可考虑先补给" % daily.shortage if daily.shortage > 0 else "口粮缺口 0 · 库存充足"
@@ -402,10 +405,14 @@ func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, r
 			var button: Button = facility_buttons[choice]
 			var condition: String = ("成功归航供 %d 粮，受库存上限" % CampFacilities.SUPPLY_FOOD if choice == "supply"
 				else "维修少付 %d 币，最低 1 币" % CampFacilities.REPAIR_DISCOUNT)
+			if choice == CampFacilities.WORKSHOP and workshop_enabled:
+				condition = "维修少付 %d 币 · 回收工具箱 / 改装卡宾枪" % CampFacilities.REPAIR_DISCOUNT
 			var state: String = "已建成" if choice == selected else "本旅程额度已用" if not selected.is_empty() else "%d 币" % CampFacilities.BUILD_COST
 			button.text = "%s · %s\n%s" % [FACILITY_NAMES[choice], state, condition]
 			button.disabled = not CampFacilities.can_build(data, choice)
 			button.tooltip_text = condition
+			if choice == CampFacilities.WORKSHOP and workshop_enabled:
+				button.tooltip_text += " · 维修最低 1 币"
 			if selected.is_empty() and button.disabled:
 				button.tooltip_text = "先完成并确认一次成功归航" if not last.get("evacuated", false) else "货币不足"
 	_return_summary.visible = not last.is_empty()

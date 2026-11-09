@@ -214,7 +214,11 @@ static func mission_card_text(value: Dictionary, base: Dictionary = {}, rations:
 			risk = "需要护送同行者生还归航"
 			if not base.is_empty():
 				risk = "现场接纳，生还归航确认入队"
-	return "主收益 · %s%s\n路线 · %s\n风险 · %s" % [reward, decision, route, risk]
+	var tool: String = ""
+	if not WorkshopSiteV1.site_id(value).is_empty():
+		var added: int = ceili(float(level.optional.single.team_return_seconds) - float(level.single.team_return_seconds))
+		tool = "\n可选 · 工具箱 ×1，绕路另约 %d 秒（含搜集）" % added
+	return "主收益 · %s%s\n路线 · %s%s\n风险 · %s" % [reward, decision, route, tool, risk]
 
 
 static func _wave_rewards(value: Dictionary) -> String:
@@ -241,7 +245,8 @@ static func _sortie_risk_card_text(value: Dictionary, level: Dictionary, reward:
 		var source: String = {"optional_building":"可选建筑", "vehicle":"停放车辆", "fruit_tree":"果树"}[site.source]
 		var resource: String = "货币" if site.kind == "cash" else "食物"
 		var added: int = ceili(float(level.optional.single.team_return_seconds) - float(level.single.team_return_seconds))
-		optional = "可选 · %s %s +%d，绕路另约 %d 秒（含搜集）\n" % [source, resource, int(site.amount), added]
+		var toolbox: String = "工具箱 ×1 · " if WorkshopSiteV1.site_id(value) == site.id else ""
+		optional = "可选 · %s%s %s +%d，绕路另约 %d 秒（含搜集）\n" % [toolbox, source, resource, int(site.amount), added]
 		break
 	return "主收益 · %s\n路线 · %s，步行往返约 %d 秒\n%s风险 · 首次最多增援 %d 名，取到即可撤离" % [
 		reward, size, round_trip, optional, int(value.parameters.reinforcements)]

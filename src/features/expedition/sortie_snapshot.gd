@@ -186,6 +186,7 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 		var power_issue: String=PowerAuthority.world_problem(value,receipt)
 		if not power_issue.is_empty(): return power_issue
 	if not value.active_site is String: return "WORLD_WORKER_FIELDS"
+	var action_context: Dictionary = FieldJoinRules.context(receipt)
 	var ids: Array[int] = []
 	var workers: int = 0
 	for row: Variant in value.survivors:
@@ -197,17 +198,23 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 		var id: int = int(state.member_id)
 		var participant: Dictionary = SurvivorRoster.member(FieldJoinRules.participants(receipt),id)
 		var checkpoint: Dictionary = SurvivorRoster.member(receipt.health,id)
-		var member: Dictionary = SurvivorRoster.member(FieldJoinRules.context(receipt).crew,id)
+		var member: Dictionary = SurvivorRoster.member(action_context.crew,id)
 		if participant.is_empty() or id in ids or checkpoint.is_empty() or member.is_empty():
 			return "WORLD_MEMBER_ID"
 		ids.append(id)
 		if state.definition_id != member.definition_id or state.call_sign != member.call_sign or state.health != checkpoint.health or state.weapon_instance_id != participant.weapon_instance_id or state.max_health != SurvivorGrowth.maximum(receipt.base,member) or not state.permanent_death_enabled or state.speed != 125.0 * (TraitRules.factor(member,"move") if TraitState.is_family(receipt.base) else 1.0) * PersonaState.factor(value.get("generated",{}),id,"move") * BuildAuthority.factor(value,"move"):
 			return "WORLD_MEMBER_CHECKPOINT"
-		var is_axe: bool=combat_version(value.version) and CombatEquipment.melee(WeaponInventory.for_member(FieldJoinRules.context(receipt),id).weapon_id)
-		if magazine_version(value.version) and row.has("magazine")==is_axe: return "WORLD_ATTACK_MODE_FIELDS"
-		if magazine_version(value.version) and not is_axe:
-			var magazine_issue: String=WeaponMagazine.problem(row.magazine,state.weapon_instance_id,WeaponInventory.for_member(FieldJoinRules.context(receipt),id).weapon_id,PersonaState.factor(value.get("generated",{}),id,"reload")*BuildAuthority.factor(value,"reload"))
-			if not magazine_issue.is_empty():return magazine_issue
+		if magazine_version(value.version):
+			var weapon: Dictionary = WeaponInventory.for_member(action_context, id)
+			var melee: bool = combat_version(value.version) and CombatEquipment.melee(weapon.weapon_id)
+			if row.has("magazine") == melee:
+				return "WORLD_ATTACK_MODE_FIELDS"
+			if not melee:
+				var mod: String = WorkshopV1.mod_for(action_context, state.weapon_instance_id)
+				var reload_factor: float = PersonaState.factor(value.get("generated",{}),id,"reload")*BuildAuthority.factor(value,"reload")
+				var magazine_issue: String = WeaponMagazine.problem(row.magazine, state.weapon_instance_id, weapon.weapon_id, reload_factor, mod)
+				if not magazine_issue.is_empty():
+					return magazine_issue
 		if (state.health == 0) != state.permanent_death or (state.health == 0) != (state.activity == FieldActor.Activity.DOWN) or state.health + state.damage_received != participant.health_before + BuildAuthority.healed(receipt.get("support",[]),id):
 			return "WORLD_DEATH_OR_DAMAGE"
 		if (value.version==OUTDOOR_VERSION or magazine_version(value.version)) and state.health>0 and state.activity!=FieldActor.Activity.SEARCHING and not state.visible: return "WORLD_WORKER_VISIBILITY"
@@ -425,6 +432,14 @@ static func compatibility(world: Expedition) -> String:
 		data.build += "+"+(EXPLORATION_BUILD if world.exploration_mode() else PERSONA_BUILD if world.persona_mode() else POWER_BUILD if world.power_mode() else SEARCH_BUILD if world.parallel_search else COMBAT_BUILD if world.combat_mode() else BUILD_BUILD if (world.supply.generated.get("version")==7 or (world.supply.generated.get("version")==8 or world.supply.generated.get("version")==9)) else CAMPAIGN_BUILD if world.supply.generated.get("version")==6 else WEAPON_BUILD if world.supply.generated.get("version")==5 else (OUTDOOR_BUILD if TaskActions.outdoor_site(world.supply.generated,&"cash") else TASK_BUILD) if world.supply.generated.get("version")==4 else NEIGHBORHOOD_BUILD if world.supply.generated.get("version")==3 else WORLD_BUILD if world.supply.generated.get("version")==2 else ROGUE_BUILD)
 		data.generated = world.supply.generated.duplicate(true)
 	if (world.supply.generated.get("version")==5 or (world.supply.generated.get("version")==6 or (world.supply.generated.get("version")==7 or (world.supply.generated.get("version")==8 or world.supply.generated.get("version")==9)))):data.magazines=WeaponDefinition.MAGAZINES
+	var workshop_magazines: Dictionary = {}
+	for member: FieldActor in world.survivors:
+		var magazine: WeaponMagazine = member.magazine
+		if magazine != null and not magazine.modification.is_empty():
+			workshop_magazines[magazine.instance_id] = {"mod":magazine.modification,
+				"parameters":WeaponMagazine.parameters(magazine.weapon_id, magazine.modification)}
+	if not workshop_magazines.is_empty():
+		data.workshop_magazines = workshop_magazines
 	if (world.supply.generated.get("version")==6 or (world.supply.generated.get("version")==7 or (world.supply.generated.get("version")==8 or world.supply.generated.get("version")==9))): data.campaign_policy={"version":CampaignRules.VERSION,"preparations":CampaignRules.PREPARATIONS,"pressure":CampaignRules.BREAKOUT_INTERVAL,"boss":BossDefinition.POLICY}
 	if (world.supply.generated.get("version")==7 or (world.supply.generated.get("version")==8 or world.supply.generated.get("version")==9)): data.build_policy=world.supply.generated.build.policy.duplicate(true)
 	data.contact = {"distance":FieldContacts.DISTANCE,"approach":FieldContacts.APPROACH,"rechase":FieldContacts.RECHASE,"step":FieldContacts.STEP_DISTANCE,"steps":FieldContacts.MAX_STEPS,"path_parts":FieldContacts.MAX_PATH_PARTS,"pass_dot":FieldContacts.PASS_DOT,"recovery_speed":FieldContacts.RECOVERY_SPEED,"recovery_cap":FieldContacts.MAX_RECOVERY,"recovery_passes":FieldContacts.RECOVERY_PASSES,"yield_speed":FieldContacts.YIELD_SPEED}

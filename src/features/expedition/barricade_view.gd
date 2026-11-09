@@ -2,7 +2,7 @@ class_name BarricadeView
 extends Node2D
 ## Read-only street marker. The passage itself is owned by the active navigation.
 
-const VAN: Texture2D = preload("res://assets/exploration/van.svg")
+const BARRICADE_VAN: Texture2D = preload("res://assets/exploration/barricade_van.svg")
 const AMBER: Color = Color("ffcf86")
 const TEAL: Color = Color("8be4d2")
 const INK: Color = Color("152b35")
@@ -24,20 +24,16 @@ func present(open_passage: bool, aim_active: bool) -> void:
 
 func _draw() -> void:
 	var center: Vector2 = footprint.get_center()
+	var marker: Vector2 = Vector2(center.x, footprint.end.y + 26.0)
 	if opened:
-		var gate_tint: Color = Color(TEAL, 0.42)
-		draw_rect(footprint, gate_tint, false, 2.0)
-		_label(center - Vector2(0, footprint.size.y * 0.5 + 24.0), "路障已清除 · 近路可通行", TEAL)
+		_label(marker, "近路已通", TEAL)
 		return
-	draw_rect(footprint, Color(0.17, 0.13, 0.08, 0.55))
-	draw_rect(footprint, Color(AMBER, 0.8), false, 2.0)
 	var vertical: bool = footprint.size.y > footprint.size.x
-	var long_side: float = maxf(footprint.size.x, footprint.size.y)
-	var short_side: float = minf(footprint.size.x, footprint.size.y)
+	var art_size: Vector2 = Vector2(footprint.size.y, footprint.size.x) if vertical else footprint.size
 	draw_set_transform(center, PI * 0.5 if vertical else 0.0)
-	draw_texture_rect(VAN, Rect2(-long_side * 0.53, -short_side * 1.12, long_side * 1.06, short_side * 1.78), false)
+	draw_texture_rect(BARRICADE_VAN, Rect2(-art_size * 0.5, art_size), false)
 	draw_set_transform(Vector2.ZERO)
-	_label(center - Vector2(0, footprint.size.y * 0.5 + 34.0), "车辆路障 · 可绕行", AMBER)
+	_label(marker, "车辆路障 · 可绕行", AMBER)
 	if aiming:
 		draw_arc(landing, 13.0, 0.0, TAU, 24, AMBER, 2.0, true)
 		draw_circle(landing, 4.0, AMBER, true, -1.0, true)

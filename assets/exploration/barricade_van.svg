@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="56" viewBox="0 0 160 56">
+  <!-- Overhead silhouette for a vehicle spanning a walkable gap. -->
+  <path d="M4 13 13 7h107l28 7 9 10v18l-10 10H14L4 46Z" fill="#172226" opacity=".7"/>
+  <path d="M5 13 14 5h105l24 7 12 9v15l-11 10-25 5H14L5 44Z" fill="#543630" stroke="#24252a" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M11 16 19 10h91l20 7v21l-20 8H19l-8-6Z" fill="#8b5040"/>
+  <path d="M19 12h82l12 7v16l-12 8H19l-7-7V19Z" fill="#a66045" stroke="#633d32" stroke-width="2"/>
+  <path d="m20 13 13 2-5 8-11-2Zm60 23 16-4 9 5-8 5H79Z" fill="#774437"/>
+  <path d="m106 13 23 6v16l-23 6 8-9V22Z" fill="#334950" stroke="#283238" stroke-width="2"/>
+  <path d="m115 19 8 2 1 6-7 3Zm1 14 10-5v5l-10 4Z" fill="#68797a" opacity=".66"/>
+  <path d="m130 16 13 3 8 6v8l-9 7-12 2 4-10V24Z" fill="#b26e4d" stroke="#724936" stroke-width="2"/>
+  <path d="m146 22 6 3v5l-6-1Zm0 12 6-2v4l-6 4Z" fill="#d7b57a"/>
+  <path d="M5 17h5v7H5Zm0 16h5v7H5Z" fill="#c97862"/>
+  <path d="M21 20h77v16H21Z" fill="#322f2c" stroke="#553b30" stroke-width="3" stroke-linejoin="round"/>
+  <path d="m22 21 8 0 11 14H30Zm17 0h11l11 14H50Zm20 0h11l11 14H70Zm20 0h11l7 9v5h-7Z" fill="#e6b66b"/>
+  <path d="M21 20h77m-77 16h77" fill="none" stroke="#f4cd89" stroke-width="1" opacity=".7"/>
+  <path d="m40 11 39 0m-44 33h29m73-25 7 3m-4 15 4-2" fill="none" stroke="#c58564" stroke-width="1.3" stroke-linecap="round"/>
+</svg>

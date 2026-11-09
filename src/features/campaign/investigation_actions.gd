@@ -42,6 +42,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var gear_build: bool = base.journey.build.has("opening")
 	var sortie_risk: bool = CampaignRules.sortie_risk_enabled(base.journey.campaign)
 	var clue: String = CampaignRules.next_clue(base.journey.campaign)
+	var event_sortie: bool = not clue.is_empty() and CampaignRules.event_sortie_enabled(base.journey.campaign)
 	var result: Array[Dictionary] = []
 	if clue.is_empty():
 		projected.journey.campaign.preparations = CampaignRules.PREPARATIONS
@@ -50,10 +51,10 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 		if not finale.is_empty():
 			var selected: Dictionary = PumpStationAction.freeze(finale[0]) if CampaignRules.pump_station_enabled(base.journey.campaign) else finale[0]
 			if not selected.is_empty():
-				result = _day(projected, clue, mission, industrial, action_choices, midgame, selected, "", gear_build, sortie_risk)
+				result = _day(projected, clue, mission, industrial, action_choices, midgame, selected, "", sortie_risk)
 	else:
 		var rare_type: String = RareSortie.selection(base.journey.seed, int(base.day), RareSortie.SLOT) if CampaignRules.rare_sorties_enabled(base.journey.campaign) else ""
-		result = _day(projected, clue, mission, industrial, action_choices, midgame, {}, rare_type, gear_build, sortie_risk)
+		result = _day(projected, clue, mission, industrial, action_choices, midgame, {}, rare_type, sortie_risk)
 	if result.is_empty():
 		return {}
 	var fingerprints: Dictionary[String, String] = {}
@@ -66,6 +67,12 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var workshop: bool = WorkshopV1.enabled(base) and CampFacilities.selected(base) == CampFacilities.WORKSHOP
 	for index: int in range(result.size()):
 		var candidate: Dictionary = result[index]
+		if event_sortie:
+			var event_offer: Dictionary = EventSortieV1.freeze(candidate)
+			if not event_offer.is_empty():
+				candidate = event_offer
+		if gear_build and candidate.type == "airdrop" and not candidate.campaign.is_finale and not candidate.has("rare_policy"):
+			candidate = BuildActions.with_gear_drops(candidate)
 		if screamer and ScreamerPolicyV1.eligible(candidate):
 			candidate.screamer_policy = ScreamerPolicyV1.VERSION
 		if first_aid and candidate.get("version") == 9:
@@ -115,7 +122,7 @@ static func site_problem(value: Dictionary) -> String:
 
 static func _day(projected: Dictionary, clue: String, mission: bool, industrial: bool,
 		action_choices: bool, midgame: bool, finale: Dictionary = {}, rare_type: String = "",
-		gear_build: bool = false, sortie_risk: bool = false) -> Array[Dictionary]:
+		sortie_risk: bool = false) -> Array[Dictionary]:
 	var original: Array[Dictionary] = PersonaActions.offers(projected)
 	if original.size() != 3:
 		return []
@@ -155,8 +162,6 @@ static func _day(projected: Dictionary, clue: String, mission: bool, industrial:
 			offer = _offer(original[slot], task_type, recruit if task_type == "rescue" else 0, mission, industrial)
 		if offer.is_empty():
 			return []
-		if gear_build and offer.type == "airdrop" and not offer.has("rare_policy"):
-			offer = BuildActions.with_gear_drops(offer)
 		if investigation:
 			var version: int = CampaignRules.MISSION_VERSION if mission else CampaignRules.INVESTIGATION_VERSION
 			offer.investigation = {"version":version, "clue_id":clue, "site_id":SITE_ID}

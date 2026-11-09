@@ -165,16 +165,93 @@ static func supply(value: Dictionary) -> MissionSupply:
 	result.description="主目标：%s\n%s · %s\n可搜获上限：货币%d · 食物%d · 武器%d件\n%s"%[target,{"small":"小型","medium":"中型","large":"大型"}[value.layout["size"]],result.layout.display_name,value.cash,value.food,value.weapons,"首次回收最多引来2名普通感染者；可随时撤离。" if value.type=="airdrop" else NeighborhoodActions.risk(value)]
 	return result
 
-static func empty_event() -> Dictionary:
-	return {"started":false,"resolutions":[]}
+static func empty_event(generated: Dictionary = {}) -> Dictionary:
+	var state: Dictionary = {"started":false,"resolutions":[]}
+	if not EventSortieV1.site_id(generated).is_empty():
+		state.merge({"branch":"", "work_at":-1.0, "first_enemy_id":-1, "first_attempt":-1})
+	return state
 
 static func event_problem(value: Dictionary, facts: Dictionary, event: Variant, spawn_count: int) -> String:
+	var event_site: String = EventSortieV1.site_id(value)
+	if not event_site.is_empty():
+		if not facts.get(event_site) is Dictionary:
+			return "SORTIE_EVENT_SITE"
+		return _sortie_event_problem(value, facts[event_site], event, spawn_count)
 	if spawn_count<0: return "TASK_EVENT_SPAWN_COUNT"
 	if not event is Dictionary or event.size()!=2 or not event.get("started") is bool or not event.get("resolutions") is Array: return "TASK_EVENT_FIELDS"
 	if value.type!="airdrop": return "" if TransactionReceipt.same(event,empty_event()) else "TASK_EVENT_UNEXPECTED"
 	if event.resolutions.size()!=(PARAMETERS.reinforcements if event.started else 0) or (facts.cash.progress>0 and not event.started): return "TASK_EVENT_TRIGGER"
+	return _resolution_problem(event.resolutions, spawn_count)
+
+
+static func _sortie_event_problem(value: Dictionary, site: Dictionary, event: Variant, spawn_count: int) -> String:
+	if not event is Dictionary or event.size() != 6 or not event.has_all(["branch", "started", "resolutions", "work_at", "first_enemy_id", "first_attempt"]) \
+			or not event.branch is String or not event.started is bool or not event.resolutions is Array:
+		return "SORTIE_EVENT_FIELDS"
+	if event.branch not in ["", EventSortieV1.QUIET, EventSortieV1.FORCE]:
+		return "SORTIE_EVENT_BRANCH"
+	if not SurvivalContracts.number(event.work_at) or (event.work_at < 0.0 and event.work_at != -1.0):
+		return "SORTIE_EVENT_WORK_CLOCK"
+	if (site.progress > 0.0 or site.searched) and event.work_at < 0.0:
+		return "SORTIE_EVENT_MISSING_WORK"
+	if event.branch.is_empty() and event.work_at >= 0.0:
+		return "SORTIE_EVENT_UNSELECTED_WORK"
+	if event.started != (event.branch == EventSortieV1.FORCE and event.work_at >= 0.0):
+		return "SORTIE_EVENT_ALARM"
+	if not event.started:
+		return "" if event.resolutions.is_empty() and event.first_enemy_id == -1 and event.first_attempt == -1 else "SORTIE_EVENT_UNSTARTED"
+	if event.resolutions.size() != int(value.event_sortie.requests) \
+			or not SurvivalContracts.integer(event.first_enemy_id, 0, spawn_count) \
+			or not SurvivalContracts.integer(event.first_attempt, int(event.first_enemy_id), RunSave.MAX_COUNTER):
+		return "SORTIE_EVENT_BATCH"
+	var issue: String = _resolution_problem(event.resolutions, spawn_count)
+	if not issue.is_empty():
+		return issue
+	var next_id: int = int(event.first_enemy_id)
+	for row: Dictionary in event.resolutions:
+		if row.reason == "spawned":
+			if row.enemy_id != next_id:
+				return "SORTIE_EVENT_ENEMY_ORDER"
+			next_id += 1
+		elif row.reason == "capacity" and event.resolutions.back().reason != "capacity":
+			return "SORTIE_EVENT_CAPACITY_ORDER"
+	return ""
+
+
+static func event_clock_problem(generated: Dictionary, camp: Dictionary, facts: Dictionary, event: Dictionary, elapsed: float) -> String:
+	var site_id: String = EventSortieV1.site_id(generated)
+	if site_id.is_empty() or event.work_at < 0.0:
+		return ""
+	var fastest: float = INF
+	for member: Dictionary in camp.crew:
+		if member.health > 0.0:
+			fastest = minf(fastest, TraitRules.factor(member, "search") * PersonaState.factor(generated, int(member.id), "work"))
+	var minimum: float = float(facts[site_id].progress) * fastest * float(BuildItems.frozen_factors(generated.build).work)
+	return "SORTIE_EVENT_EARLY_WORK" if event.work_at > elapsed or elapsed - float(event.work_at) + 0.00001 < minimum else ""
+
+
+static func event_transition_problem(previous: Dictionary, next: Dictionary) -> String:
+	var generated: Dictionary = next.rules.get("mission", {}).get("generated", {})
+	if EventSortieV1.site_id(generated).is_empty() or previous.phase != "RESUME_CLAIMED":
+		return ""
+	var before: Dictionary = previous.envelope.world.task_event
+	var after: Dictionary
+	if next.phase == "SUSPEND_READY":
+		after = next.envelope.world.task_event
+	elif next.phase == "RESULT_READY":
+		after = next.envelope.result.battle.task_event
+	else:
+		return ""
+	if before.branch != "" and before.branch != after.branch:
+		return "SORTIE_EVENT_BRANCH_CHANGED"
+	if (before.work_at >= 0.0 and before.work_at != after.work_at) or (before.started and not TransactionReceipt.same(before, after)):
+		return "SORTIE_EVENT_WORK_CHANGED"
+	return ""
+
+
+static func _resolution_problem(resolutions: Array, spawn_count: int) -> String:
 	var ids: Array[int] = []
-	for row: Variant in event.resolutions:
+	for row: Variant in resolutions:
 		if not row is Dictionary or row.size()!=2 or row.get("reason") not in ["spawned","capacity","no_safe_point"] or not SurvivalContracts.integer(row.get("enemy_id"),-1,SurvivalContracts.MAX_ID): return "TASK_EVENT_RESOLUTION"
 		if row.reason=="spawned":
 			if row.enemy_id<0 or int(row.enemy_id) in ids or row.enemy_id>=spawn_count: return "TASK_EVENT_ENEMY"
@@ -183,6 +260,13 @@ static func event_problem(value: Dictionary, facts: Dictionary, event: Variant, 
 	return ""
 
 static func outcome(value: Dictionary, report: Dictionary) -> Dictionary:
+	var event_site: String = EventSortieV1.site_id(value)
+	if not event_site.is_empty():
+		var done: bool = report.site_facts[event_site].searched
+		var reward: Dictionary = WorldSites.event_carry(value, report.site_facts, report.task_event) if report.evacuated else {"food":0, "cash":0}
+		return {"version":2, "task_id":value.id, "type":"event_sortie", "completed":int(done), "total":1,
+			"status":"FAILED" if not report.evacuated else "COMPLETED" if done else "EARLY",
+			"branch":report.task_event.branch, "event_food":reward.food, "event_cash":reward.cash}
 	var count: int = 0
 	var total: int = value.objective.site_ids.size()
 	var lost: bool = false
@@ -201,13 +285,37 @@ static func outcome(value: Dictionary, report: Dictionary) -> Dictionary:
 	return {"version":1,"task_id":value.id,"type":value.type,"completed":count,"total":total,"status":"COMPLETED" if report.evacuated and count==total else "TARGET_LOST" if lost else "EARLY" if report.evacuated else "FAILED"}
 
 static func summary_problem(value: Variant) -> String:
+	if value is Dictionary and value.get("type") == "event_sortie":
+		return _event_summary_problem(value)
 	if not value is Dictionary or value.size()!=6 or not value.has_all(["version","task_id","type","completed","total","status"]): return "TASK_SUMMARY_FIELDS"
 	if value.version!=1 or not value.task_id is String or value.task_id.length()!=64 or not value.task_id.is_valid_hex_number(false) or value.type not in TYPES or not SurvivalContracts.integer(value.total,1,2) or not SurvivalContracts.integer(value.completed,0,int(value.total)) or value.status not in ["COMPLETED","EARLY","TARGET_LOST","FAILED"]: return "TASK_SUMMARY_VALUE"
 	if (value.status=="COMPLETED" and value.completed!=value.total) or (value.status=="TARGET_LOST" and value.type!="rescue"): return "TASK_SUMMARY_STATUS"
 	return ""
 
+static func _event_summary_problem(value: Dictionary) -> String:
+	if value.size() != 9 or not value.has_all(["version","task_id","type","completed","total","status","branch","event_food","event_cash"]):
+		return "TASK_EVENT_SUMMARY_FIELDS"
+	if value.version != 2 or not value.task_id is String or value.task_id.length() != 64 or not value.task_id.is_valid_hex_number(false) \
+			or not SurvivalContracts.integer(value.total,1,1) or not SurvivalContracts.integer(value.completed,0,1) \
+			or value.status not in ["COMPLETED","EARLY","FAILED"] or value.branch not in ["",EventSortieV1.QUIET,EventSortieV1.FORCE]:
+		return "TASK_EVENT_SUMMARY_VALUE"
+	if (value.status == "COMPLETED" and value.completed != 1) or (value.status == "EARLY" and value.completed != 0) \
+			or (value.completed == 1 and value.branch == ""):
+		return "TASK_EVENT_SUMMARY_STATUS"
+	var reward: Dictionary = EventSortieV1.CHOICES.get(value.branch, {}) if value.status == "COMPLETED" else {}
+	var food: int = int(reward.get("food", 0))
+	var cash: int = int(reward.get("cash", 0))
+	if not SurvivalContracts.integer(value.event_food,food,food) or not SurvivalContracts.integer(value.event_cash,cash,cash):
+		return "TASK_EVENT_SUMMARY_REWARD"
+	return ""
+
+
 static func summary_text(value: Dictionary, title: String = "") -> String:
-	var name: String = CONFIG[value.type].name if title.is_empty() else title
+	var name: String = title
+	if value.type == "event_sortie":
+		name = EventSortieV1.TITLE
+	elif title.is_empty():
+		name = CONFIG[value.type].name
 	return "%s · %s（%d/%d）"%[name,{"COMPLETED":"完成主目标","EARLY":"提前撤离未完成","TARGET_LOST":"救援目标阵亡 · 未完成","FAILED":"未能归航 · 未完成"}[value.status],value.completed,value.total]
 
 static func hud(world: Expedition) -> String:

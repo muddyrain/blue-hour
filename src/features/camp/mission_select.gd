@@ -185,7 +185,13 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 		var mission_card: bool = supply.generated.get("mission_policy") == 1
 		var pump_card: bool = PumpStationAction.enabled(supply.generated)
 		var rare_card: bool = supply.generated.has("rare_policy")
-		if rare_card:
+		var event_site: String = EventSortieV1.site_id(supply.generated)
+		if not event_site.is_empty():
+			_titles[index].text = "%02d / %s" % [index + 1, EventSortieV1.TITLE]
+			_descriptions[index].text = _event_card_text(supply.generated)
+			_descriptions[index].custom_minimum_size.y = 100
+			_descriptions[index].add_theme_font_size_override("font_size", 16)
+		elif rare_card:
 			_titles[index].text = "%02d / 稀有行动 · %s" % [index + 1, supply.display_name]
 			_descriptions[index].add_theme_font_size_override("font_size", 16)
 		elif pump_card:
@@ -214,7 +220,8 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 			_titles[index].text = "%02d / 调查 · %s" % [index+1, clue_name]
 			_descriptions[index].text = "搜索标记建筑：%s\n" % clue_name + _descriptions[index].text
 			_pictures[index].custom_minimum_size.y = 40
-		var outdoor: bool = not pump_card and TaskActions.outdoor_site(supply.generated, &"cash")
+		var outdoor: bool = not pump_card and TaskActions.outdoor_site(supply.generated,
+			StringName(event_site) if not event_site.is_empty() else &"cash")
 		var picture: Texture2D = MARKET if supply.id == &"supermarket" else SHOP
 		if pump_card:
 			picture = BuildingLibrary.definition("warehouse").texture
@@ -231,6 +238,14 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 			_refresh_blue_hour_card(index, supply.generated)
 	if player_mode:
 		_link_choices()
+
+
+static func _event_card_text(generated: Dictionary) -> String:
+	var quiet: String = EventSortieV1.QUIET
+	var force: String = EventSortieV1.FORCE
+	return "备选行动 · 到站后现场二选一\n两路基础工时均为 %d 秒\n%s · %s\n%s · %s" % [
+		int(generated.event_sortie.seconds), EventSortiePanel.branch_title(quiet), EventSortiePanel.offer_detail(generated, quiet),
+		EventSortiePanel.branch_title(force), EventSortiePanel.offer_detail(generated, force)]
 
 
 func _rescue_card_text(supply: MissionSupply) -> String:
@@ -439,6 +454,12 @@ class CardMark extends Control:
 				draw_rect(Rect2(-10, -6, 20, 15), accent, false, 1.6)
 				draw_line(Vector2(-10, -1), Vector2(10, -1), accent, 1.6)
 				draw_line(Vector2(0, -6), Vector2(0, 9), accent, 2.6)
+			"event":
+				draw_line(Vector2(0, 10), Vector2(0, 0), accent, 2.0, true)
+				draw_line(Vector2(0, 0), Vector2(-8, -8), accent, 2.0, true)
+				draw_line(Vector2(0, 0), Vector2(8, -8), CampStyle.AMBER, 2.0, true)
+				draw_circle(Vector2(-8, -8), 2.4, accent)
+				draw_circle(Vector2(8, -8), 2.4, CampStyle.AMBER)
 			"investigation":
 				var edge: Color = Color("ecc591") if large else accent
 				var paper: PackedVector2Array = PackedVector2Array([Vector2(-8, -12), Vector2(3, -12),

@@ -151,6 +151,7 @@ var _cash_site: SearchSite = SearchSite.new(&"cash", Vector2.ZERO)
 var _food_site: SearchSite = SearchSite.new(&"food", Vector2.ZERO)
 var sites: Array[SearchSite] = []
 var task_event: Dictionary = TaskActions.empty_event()
+var event_sortie_panel: EventSortiePanel
 var _bus_sprite: Sprite2D
 var bus_view: BusJourney
 var restoring_world: bool=false
@@ -162,6 +163,7 @@ var _active_site: SearchSite:
 
 
 func _ready() -> void:
+	task_event = TaskActions.empty_event(supply.generated)
 	parallel_search = combat_mode()
 	_setup_crew.assign(crew_snapshot.duplicate(true) if not crew_snapshot.is_empty() else SurvivorRoster.new_crew())
 	if crew_snapshot.is_empty() or is_practice:
@@ -623,6 +625,8 @@ func command_move(point: Vector2) -> void:
 	if rescue_target != null: rescue_target.cancel()
 	if phase == Phase.FINISHED:
 		return
+	if event_sortie_panel != null:
+		event_sortie_panel.hide()
 	goal = point
 	for index: int in range(survivors.size()):
 		var actor: FieldActor = survivors[index]
@@ -637,7 +641,10 @@ func request_search(kind: StringName = &"cash") -> void:
 	if (bus_view != null and bus_view.running()) or not field_join_error.is_empty():
 		return
 	var site: SearchSite = search_site(kind)
-	if phase == Phase.FINISHED or site == null or site.searched or (not pump_station_mode() and not supply.supports(site.kind)):
+	if phase == Phase.FINISHED or site == null or site.searched:
+		return
+	var event_site: bool = _is_event_site(site)
+	if not event_site and not pump_station_mode() and not supply.supports(site.kind):
 		return
 	var previous: int = search_assignments.member_for(String(site.id))
 	if previous > 0:
@@ -645,6 +652,9 @@ func request_search(kind: StringName = &"cash") -> void:
 		_show_notice(SearchWorkView.notice("cancelled",site_label(site)))
 		_search_log("cancelled",site)
 		_update_ui()
+		return
+	if event_site and task_event.branch == "" and _near_event_worker(site) != null:
+		event_sortie_panel.present()
 		return
 	if not parallel_search:
 		if rescue_target != null:
@@ -670,14 +680,51 @@ func request_search(kind: StringName = &"cash") -> void:
 	if chosen == 0:
 		_show_notice(SearchWorkView.notice("no_idle" if free_count == 0 else "unreachable",site_label(site)))
 		return
-	if not search_assignments.assign(chosen,String(site.id)):
-		return
-	var actor: FieldActor = search_member(chosen)
-	actor.command_path(paths[chosen])
+	if _assign_search(site, search_member(chosen), paths[chosen]):
+		_update_ui()
+
+
+func _assign_search(site: SearchSite, actor: FieldActor, path: PackedVector2Array) -> bool:
+	if not search_assignments.assign(actor.member_id, String(site.id)):
+		return false
+	actor.command_path(path)
 	_show_notice(SearchWorkView.notice("assigned",site_label(site),actor.call_sign))
 	_search_log("assigned",site)
-	_update_ui()
 	queue_redraw()
+	return true
+
+
+func _is_event_site(site: SearchSite) -> bool:
+	return String(site.id) == EventSortieV1.site_id(supply.generated)
+
+
+func _near_event_worker(site: SearchSite) -> FieldActor:
+	var nearest: FieldActor
+	var limit: float = 14.0
+	for actor: FieldActor in survivors:
+		if actor.health <= 0.0 or not actor.visible or has_search_job(actor.member_id) \
+				or actor.activity not in [FieldActor.Activity.IDLE, FieldActor.Activity.MOVING]:
+			continue
+		var distance: float = actor.position.distance_to(site.door)
+		if distance <= limit:
+			nearest = actor
+			limit = distance
+	return nearest
+
+
+func confirm_event_choice(branch: String) -> bool:
+	if event_sortie_panel == null or not event_sortie_panel.visible or task_event.branch != "" \
+			or phase == Phase.FINISHED or suspend_sealed or not field_join_error.is_empty() \
+			or (bus_view != null and bus_view.running()) or branch not in [EventSortieV1.QUIET, EventSortieV1.FORCE]:
+		return false
+	var site: SearchSite = search_site(StringName(EventSortieV1.site_id(supply.generated)))
+	var worker: FieldActor = _near_event_worker(site)
+	if worker == null or not _assign_search(site, worker, PackedVector2Array([worker.position])):
+		return false
+	task_event.branch = branch
+	event_sortie_panel.hide()
+	_update_ui()
+	return true
 
 
 func has_search_job(member_id: int) -> bool:
@@ -697,6 +744,8 @@ func member_site(member_id: int) -> SearchSite:
 
 
 func site_label(site: SearchSite) -> String:
+	if _is_event_site(site):
+		return EventSortieV1.TITLE
 	return "工具箱点" if String(site.id) == WorkshopSiteV1.site_id(supply.generated) \
 		else SearchWorkView.short_site(site.prop.title,sites.find(site)+1)
 
@@ -802,6 +851,13 @@ func request_bus_gather() -> void:
 		if path.is_empty() or path[-1].distance_to(layout.bus_door) > tuning.boarding_radius:
 			_show_notice("无法到达巴士集合区 · 请检查当前路线。")
 			return
+	# An unconfirmed visit must not hold a worker back from gathering.
+	if event_sortie_panel != null:
+		event_sortie_panel.hide()
+		if task_event.branch == "":
+			var approaching: int = search_assignments.member_for(EventSortieV1.site_id(supply.generated))
+			if approaching > 0:
+				_release_searcher(approaching)
 	# Gathering also releases assistance when the previous group goal was already the bus.
 	if rescue_target != null: rescue_target.cancel()
 	if goal != layout.bus_door:
@@ -962,13 +1018,13 @@ func _visual_contact(enemy: FieldActor) -> Vector2:
 	return nearest
 
 
-func _spawn_enemy(forced_kind: String = "", pressure_point: Vector2 = Vector2.INF) -> Dictionary:
+func _spawn_enemy(forced_kind: String = "", pressure_point: Vector2 = Vector2.INF, provenance: Dictionary = {}) -> Dictionary:
 	if is_practice:
 		_spawn_practice_enemy()
 		return {"reason":"practice","enemy_id":-1}
 	var point: Vector2 = _safe_spawn_point(pressure_point)
 	if not point.is_finite():
-		_record_spawn(&"no_safe_point", point)
+		_record_spawn(&"no_safe_point", point, -1, provenance)
 		return {"reason":"no_safe_point","enemy_id":-1}
 	var enemy: FieldActor = _make_actor(true, _spawn_count, point,{},forced_kind)
 	enemies.append(enemy)
@@ -977,7 +1033,7 @@ func _spawn_enemy(forced_kind: String = "", pressure_point: Vector2 = Vector2.IN
 		combat.screamer.spawned(self, enemy)
 	if combat.burst != null and enemy.enemy_behavior.kind == BurstRuntimeV1.KIND:
 		combat.burst.spawned(self, enemy)
-	_record_spawn(&"spawned", point, enemy.actor_id)
+	_record_spawn(&"spawned", point, enemy.actor_id, provenance)
 
 	return {"reason":"spawned","enemy_id":enemy.actor_id}
 
@@ -1388,6 +1444,11 @@ func _update_search(delta: float) -> void:
 					else:
 						actor.command_path(route)
 				continue
+			if _is_event_site(site) and task_event.branch == "":
+				search_assignments.release_member(actor.member_id)
+				actor.clear_order()
+				event_sortie_panel.present()
+				continue
 			actor.clear_order()
 			actor.activity = FieldActor.Activity.RECOVERING if outdoor else FieldActor.Activity.SEARCHING
 			actor.visible = outdoor
@@ -1403,6 +1464,13 @@ func _update_search(delta: float) -> void:
 			continue
 		var prior_progress: float = site.progress
 		site.progress += delta / (actor.trait_search_factor * actor.persona_work_factor * (BuildItems.frozen_factors(supply.generated.build).work if build_mode() else 1.0))
+		if site.progress > prior_progress and _is_event_site(site) and task_event.work_at < 0.0:
+			task_event.work_at = maxf(0.0, elapsed - delta)
+			if task_event.branch == EventSortieV1.FORCE:
+				task_event.first_enemy_id = _spawn_count
+				task_event.first_attempt = _spawn_attempts
+				_request_task_wave(site, int(supply.generated.event_sortie.requests), {"source":"event_sortie"})
+				_show_notice("强开物资柜 · 警报已触发，留意来袭。")
 		if site.progress >= _site_seconds(site):
 			if not _complete_search(actor,site):
 				site.progress = prior_progress
@@ -1418,6 +1486,17 @@ func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
 	site.searched = true
 	if exploration_mode(): site.progress=_site_seconds(site)
 	var reward: int = site.reward if not layout.world_data.is_empty() else supply.reward(site.kind)
+	if _is_event_site(site):
+		var carried: Dictionary = EventSortieV1.reward(supply.generated, task_event.branch)
+		loot += int(carried.cash)
+		food_loot += int(carried.food)
+		_release_searcher(actor.member_id)
+		site.prop.searched = true
+		site.prop.queue_redraw()
+		_show_notice("应急补给站 · 已携带%s，归航后入库。" % _event_reward_text(carried))
+		search_completed.emit(int(carried.cash) + int(carried.food))
+		_search_log("completed",site)
+		return true
 	if site.kind == &"cash":
 		loot += reward
 		if not is_practice and (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
@@ -1576,6 +1655,11 @@ func _make_ui() -> void:
 	_hud.help_changed.connect(func(expanded: bool) -> void: help_changed.emit(expanded))
 	add_child(_hud)
 	_hud.view.objective_locate_requested.connect(locate_objective)
+	if not EventSortieV1.site_id(supply.generated).is_empty():
+		event_sortie_panel = EventSortiePanel.new()
+		event_sortie_panel.generated = supply.generated
+		event_sortie_panel.choice_confirmed.connect(confirm_event_choice)
+		_hud.view.add_child(event_sortie_panel)
 	if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4 or layout.world_data.get("version")==5):
 		_hud.view.place_help_above_lane()
 	if battle_survival:
@@ -1632,6 +1716,10 @@ func _update_ui() -> void:
 	_present_power()
 	if _hud == null:
 		return
+	if event_sortie_panel != null and event_sortie_panel.visible:
+		var site: SearchSite = search_site(StringName(EventSortieV1.site_id(supply.generated)))
+		if phase == Phase.FINISHED or task_event.branch != "" or _near_event_worker(site) == null:
+			event_sortie_panel.hide()
 	if _readouts != null:
 		if phase == Phase.FINISHED:
 			_readouts.hide()
@@ -1975,6 +2063,9 @@ func _make_world_buildings() -> void:
 		if exploration_mode():
 			site.prop.primary_target=supply.generated.objective.site_ids.has(def.id)
 			site.prop.reward_hint=("货币" if site.kind==&"cash" else "食物")+" +%d"%site.reward
+		if _is_event_site(site):
+			site.prop.loot_landmark = EventSortieV1.TITLE
+			site.prop.reward_hint = "现场二选一"
 		if supply.generated.has("rare_policy"):
 			site.prop.loot_landmark = RareSortie.landmark(supply.generated.type, def.id)
 			if site.weapon:
@@ -1999,16 +2090,22 @@ func _site_seconds(site: SearchSite) -> float:
 
 
 func _trigger_airdrop() -> void:
-	if task_event.started: return
-	task_event.started=true
-	for index: int in range(int(TaskActions.PARAMETERS.reinforcements)):
-		if enemies.size()>=threat.rules.enemy_cap:
-			_record_spawn(&"capacity",Vector2.INF)
-			task_event.resolutions.append({"reason":"capacity","enemy_id":-1})
-		else: task_event.resolutions.append(_spawn_enemy(EnemyRules.NORMAL,search_site(&"cash").door))
-	print("BH_TASK_EVENT "+JSON.stringify(task_event))
+	if task_event.started:
+		return
+	_request_task_wave(search_site(&"cash"), int(TaskActions.PARAMETERS.reinforcements))
 	_show_notice("武器箱开工 · 增援接近；拿到武器即可集合归航。" if supply.generated.has("rare_policy")
 		else "空投信标已启动 · 留意来袭；回收后可直接集合归航。")
+
+
+func _request_task_wave(site: SearchSite, requests: int, provenance: Dictionary = {}) -> void:
+	task_event.started = true
+	for index: int in range(requests):
+		if enemies.size() >= threat.rules.enemy_cap:
+			_record_spawn(&"capacity", Vector2.INF, -1, provenance)
+			task_event.resolutions.append({"reason":"capacity","enemy_id":-1})
+		else:
+			task_event.resolutions.append(_spawn_enemy(EnemyRules.NORMAL, site.door, provenance))
+	print("BH_TASK_EVENT "+JSON.stringify(task_event))
 
 
 func _site_weapon(site: SearchSite) -> Dictionary:
@@ -2353,6 +2450,17 @@ func _exploration_objective_rows() -> Array[Dictionary]:
 			rows[0].title = "破阵者已倒地 · 集合回车"
 		rows[0].done = int(rows[0].complete)
 		rows[0].hint = "右装卸道较近，左检修道有实墙。冲锋锁线后横移。"
+	elif event_sortie_panel != null:
+		var site: SearchSite = search_site(StringName(EventSortieV1.site_id(generated)))
+		var branch: String = task_event.branch
+		if branch.is_empty():
+			rows[0].hint = "左键前往站点，抵达后选取方案。"
+		else:
+			var title: String = EventSortieV1.QUIET_TITLE if branch == EventSortieV1.QUIET else "强开 · 警报" if task_event.started else EventSortieV1.FORCE_TITLE
+			rows[0].title = "%s %.1f/%.0f秒" % [title, site.progress, site.seconds]
+			if site.searched:
+				rows[0].title = "已携带 %s · %s" % [_event_reward_text(EventSortieV1.reward(generated, branch)), "强开警报" if task_event.started else "待归航"]
+			rows[0].hint = "无事件增援" if branch == EventSortieV1.QUIET else "警报已触发" if task_event.started else "选择已锁定 · 待开工"
 	elif not investigation.is_empty():
 		rows[0].title = "%s · %s" % ["已携带" if rows[0].complete else "调查", CampaignRules.CLUE_NAMES[investigation.clue_id]]
 		rows[0].hint = "搜索标记建筑取得线索，生还撤离并确认归航后登记。"
@@ -2378,6 +2486,10 @@ func _exploration_objective_rows() -> Array[Dictionary]:
 			"total":1, "complete":toolbox.searched, "site_ids":[String(toolbox.id)],
 			"hint":"完成此点原搜集即可携带，归航确认后入库。"})
 	return rows
+
+
+func _event_reward_text(reward: Dictionary) -> String:
+	return "%d 粮" % reward.food if reward.food > 0 else "%d 币" % reward.cash
 
 
 func locate_objective(id: String) -> void:

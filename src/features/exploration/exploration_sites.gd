@@ -197,7 +197,7 @@ static func objective_rows(generated: Dictionary, facts: Dictionary, rescue_done
 	var primary: Dictionary = generated.objective
 	var type: String = generated.type
 	var names: Dictionary = {"supply":"搜集标记食品", "equipment":"搜寻主装备点", "airdrop":"回收主空投",
-		"rescue":RescueTarget.ANONYMOUS_NAME}
+		"rescue":RescueTarget.ANONYMOUS_NAME, EventSortieV1.TYPE:EventSortieV1.TITLE}
 	var hint: String = "主目标与实际站点绑定；未全部完成仍可按原条件撤离。"
 	if type == "rescue":
 		hint = "定位并援救，确认接纳后揭晓身份。"

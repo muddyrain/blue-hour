@@ -155,7 +155,7 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 	if (value.version==WORLD_VERSION or value.version==NEIGHBORHOOD_VERSION or task_version(value.version)):
 		var issue: String = WorldSites.problem(value.generated.sites,value.sites,value.version==EXPLORATION_VERSION)
 		if not issue.is_empty(): return issue
-		var carry: Dictionary = WorldSites.carry(value.generated.sites,value.sites,receipt.transaction_id,true,value.generated)
+		var carry: Dictionary = WorldSites.carry(value.generated.sites,value.sites,receipt.transaction_id,true,value.generated,value.get("task_event",{}))
 		if sim.loot!=carry.loot or sim.food_loot!=carry.food or not TransactionReceipt.same({"v":value.weapons},{"v":carry.weapons}): return "WORLD_SITE_CARRY"
 	else:
 		if not value.sites is Dictionary or value.sites.size() != 2 or not value.sites.has_all(["cash","food"]):
@@ -174,6 +174,11 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 	if task_version(value.version):
 		var event_issue: String = TaskActions.event_problem(value.generated,value.sites,value.get("task_event"),int(sim._spawn_count))
 		if not event_issue.is_empty(): return event_issue
+		event_issue = TaskActions.event_clock_problem(value.generated,receipt.base,value.sites,value.task_event,float(sim.elapsed))
+		if not event_issue.is_empty(): return event_issue
+		if not EventSortieV1.site_id(value.generated).is_empty() and value.task_event.started \
+				and int(value.task_event.first_attempt) + value.task_event.resolutions.size() > sim._spawn_attempts:
+			return "SORTIE_EVENT_ATTEMPTS"
 	if not value.survivors is Array or value.survivors.size() != FieldJoinRules.participants(receipt).size() or not value.enemies is Array or value.enemies.size() > ThreatRules.ENEMY_CAP:
 		return "WORLD_ACTOR_COUNTS"
 	if (value.version==BUILD_VERSION or combat_version(value.version)):
@@ -329,6 +334,15 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 		total += int(row.total)
 	if total != sim.kills or sim.kills + value.enemies.size() != sim._spawn_count + deployed.size():
 		return "WORLD_ENEMY_ACCOUNTING"
+	if not EventSortieV1.site_id(value.get("generated", {})).is_empty():
+		var spawned: int = 0
+		for row: Dictionary in value.task_event.resolutions:
+			if row.reason == "spawned":
+				if value.combat.spawns.has(str(int(row.enemy_id))):
+					return "SORTIE_EVENT_AMBIENT_ENEMY"
+				spawned += 1
+		if spawned + value.combat.spawns.size() != sim._spawn_count:
+			return "SORTIE_EVENT_ENEMY_ACCOUNTING"
 	if task_version(value.version):
 		for resolution: Dictionary in value.task_event.resolutions:
 			for enemy: Dictionary in value.enemies:
@@ -644,6 +658,8 @@ static func _jobs_problem(value: Dictionary, ids: Array[int]) -> String:
 		var outdoor: bool = TaskActions.outdoor_site(value.generated,StringName(job.site_id))
 		var door: Vector2 = _work_point(value.generated,job.site_id)
 		if job.phase=="working":
+			if job.site_id == EventSortieV1.site_id(value.generated) and (value.task_event.branch == "" or site.progress <= 0.0):
+				return "SORTIE_EVENT_WORKING"
 			if actor.activity != (FieldActor.Activity.RECOVERING if outdoor else FieldActor.Activity.SEARCHING) or actor.visible != outdoor or _vec(actor.position).distance_to(door)>14.0 or not actor.path.is_empty() or actor._path_index!=0:
 				return "SEARCH_WORKING_STATE"
 		else:

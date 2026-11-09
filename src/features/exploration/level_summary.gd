@@ -17,7 +17,7 @@ static func freeze(layout: Dictionary, sites: Array, objective: Dictionary, type
 
 static func _freeze(layout: Dictionary, sites: Array, objective: Dictionary, type: String, extra_site: String) -> Dictionary:
 	var routing: Dictionary = ExplorationLayout._routing(layout)
-	if routing.is_empty() or type not in TaskActions.TYPES:
+	if routing.is_empty() or (type not in TaskActions.TYPES and type != EventSortieV1.TYPE):
 		return {}
 	var nav: FieldNavigation = routing.nav
 	var points: Dictionary = {"bus":WorldLayout.point(layout.bus.door)}
@@ -129,6 +129,8 @@ static func description(value: Dictionary, for_card: bool = false) -> String:
 			text = "住宅簇单程约%d秒；援救后带其归航。" % ceili(outbound)
 		"airdrop":
 			text = "户外回收12秒，可受击；一次性增援。"
+		EventSortieV1.TYPE:
+			text = "露天站点单程约%d秒。" % ceili(outbound)
 	var source_name: String = {"optional_building":"可选建筑", "vehicle":"停放车辆", "fruit_tree":"果树"}[level.optional.source]
 	if for_card:
 		var assignment: String = "另派一人搜" if level.primary.size() == 1 else "其中一人再搜"
@@ -148,6 +150,11 @@ static func mission_card_text(value: Dictionary, base: Dictionary = {}, rations:
 	var route: String
 	var risk: String
 	match String(value.type):
+		EventSortieV1.TYPE:
+			var quiet: Dictionary = EventSortieV1.reward(value, EventSortieV1.QUIET)
+			var force: Dictionary = EventSortieV1.reward(value, EventSortieV1.FORCE)
+			return "到站后二选一 · 基础工时均 %d 秒\nA %s · %d 粮 · 无额外增援\nB %s · %d 币 · 最多 %d 只额外增援" % [
+				int(value.event_sortie.seconds), EventSortieV1.QUIET_TITLE, quiet.food, EventSortieV1.FORCE_TITLE, force.cash, int(value.event_sortie.requests)]
 		"supply":
 			var food: PackedStringArray = []
 			for site: Dictionary in value.sites:

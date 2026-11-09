@@ -251,6 +251,9 @@ static func _profiled_transition(previous: Dictionary, next: Dictionary) -> Stri
 		issue = BurstAuthorityV1.transition(previous, next)
 		if not issue.is_empty(): return issue
 		burst_added = previous.burst.is_empty() and not next.burst.is_empty()
+	issue = TaskActions.event_transition_problem(previous, next)
+	if not issue.is_empty():
+		return issue
 	if previous.phase == "SUSPEND_READY":
 		return "" if next.phase == "RESUME_CLAIMED" and _same_frozen(previous,next) else "SUSPEND_MUST_BE_CLAIMED"
 	if next.phase == "RESUME_CLAIMED":

@@ -114,13 +114,20 @@ static func capture(world: Expedition) -> Dictionary:
 		captured.active_site=""
 		captured.jobs=world.search_assignments.snapshot()
 	if world.power_mode(): captured.powers=world.powers.duplicate(true)
+	if world.recon_knowledge != null:
+		captured.recon = world.recon_knowledge.snapshot(world.recon_site.progress)
 	return captured
 
 
 static func problem(value: Variant, receipt: Dictionary) -> String:
+	if not value is Dictionary:
+		return "WORLD_FIELDS"
 	var enemy_mode: bool = EnemyState.is_state(receipt.base)
-	var generated: bool = value is Dictionary and (value.get("version")==ROGUE_VERSION or value.get("version")==WORLD_VERSION or value.get("version")==NEIGHBORHOOD_VERSION or task_version(value.get("version")))
-	if not value is Dictionary or value.size() != int(search_version(value.get("version"))) + int(power_version(value.get("version"))) + int(combat_version(value.get("version"))) + KEYS.size() + (2 if RescueState.is_family(receipt.base) else 0) + (1 if GrowthState.is_family(receipt.base) else 0) + int(FieldJoinState.is_family(receipt.base)) + int(TraitState.is_family(receipt.base)) + int(generated) + int(task_version(value.get("version"))) + int((value.get("version")==CAMPAIGN_VERSION or (value.get("version")==BUILD_VERSION or combat_version(value.get("version")))))+int((value.get("version")==BUILD_VERSION or combat_version(value.get("version")))) or not value.has_all(KEYS) or not SurvivalContracts.json_value(value):
+	var generated: bool = (value.get("version")==ROGUE_VERSION or value.get("version")==WORLD_VERSION or value.get("version")==NEIGHBORHOOD_VERSION or task_version(value.get("version")))
+	var recon: bool = generated and value.get("generated") is Dictionary and ReconActionV1.enabled(value.generated)
+	if value.has("recon") != recon:
+		return "WORLD_RECON_BINDING"
+	if value.size() != int(recon) + int(search_version(value.get("version"))) + int(power_version(value.get("version"))) + int(combat_version(value.get("version"))) + KEYS.size() + (2 if RescueState.is_family(receipt.base) else 0) + (1 if GrowthState.is_family(receipt.base) else 0) + int(FieldJoinState.is_family(receipt.base)) + int(TraitState.is_family(receipt.base)) + int(generated) + int(task_version(value.get("version"))) + int((value.get("version")==CAMPAIGN_VERSION or (value.get("version")==BUILD_VERSION or combat_version(value.get("version")))))+int((value.get("version")==BUILD_VERSION or combat_version(value.get("version")))) or not value.has_all(KEYS) or not SurvivalContracts.json_value(value):
 		return "WORLD_FIELDS"
 	var base_build: String = ENEMY_BUILD if enemy_mode else QUALITY_BUILD if WeaponState.is_state(receipt.base) else ROSTER_BUILD if RosterState.is_family(receipt.base) else POOL_BUILD if RescuePoolState.is_family(receipt.base) else TRAINING_BUILD if TrainingState.is_state(receipt.base) else TRAIT_BUILD if TraitState.is_family(receipt.base) else FIELD_BUILD if FieldJoinState.is_family(receipt.base) else (GROWTH_BUILD if GrowthState.is_family(receipt.base) else BUILD)
 	if generated:
@@ -151,10 +158,22 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 		return "WORLD_SIM_RANGE"
 	if (sim.phase == 1 and (sim.elapsed + 0.0001 < 20 or sim._engine_clock <= 0 or sim._engine_clock > 3)) or (sim.phase == 2 and (sim.elapsed + 0.0001 < 23 or sim._engine_clock > 0)):
 		return "WORLD_BUS_CLOCK"
+	var knowledge: ReconKnowledge
+	if recon:
+		knowledge = ReconKnowledge.new(value.generated)
+		var recon_issue: String = knowledge.problem(value.recon, float(sim.elapsed))
+		if not recon_issue.is_empty():
+			return recon_issue
+		knowledge.restore(value.recon)
 	var supply: MissionSupply = supply_for_world(value)
 	if (value.version==WORLD_VERSION or value.version==NEIGHBORHOOD_VERSION or task_version(value.version)):
 		var issue: String = WorldSites.problem(value.generated.sites,value.sites,value.version==EXPLORATION_VERSION)
 		if not issue.is_empty(): return issue
+		if recon:
+			for definition: Dictionary in value.generated.sites:
+				if value.sites[definition.id].progress > 0.0 and not knowledge.site_known(
+						value.generated, definition.id, TaskActions.site_point(value.generated, definition), value.recon.completed):
+					return "RECON_HIDDEN_WORK"
 		var carry: Dictionary = WorldSites.carry(value.generated.sites,value.sites,receipt.transaction_id,true,value.generated,value.get("task_event",{}))
 		if sim.loot!=carry.loot or sim.food_loot!=carry.food or not TransactionReceipt.same({"v":value.weapons},{"v":carry.weapons}): return "WORLD_SITE_CARRY"
 	else:
@@ -239,12 +258,16 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 		participant_order.append(int(row.id))
 	if not _same({"v":ids},{"v":participant_order}):
 		return "WORLD_EXECUTION_ORDER"
+	if knowledge != null:
+		var source_issue: String = knowledge.source_problem(value)
+		if not source_issue.is_empty():
+			return source_issue
 	if (value.worker == 0) != value.active_site.is_empty() or (value.worker != 0 and (int(value.worker) not in ids or value.sites[value.active_site].searched)):
 		return "WORLD_WORKER_SOURCE"
 	if value.worker != 0 and int(_member(value.survivors,int(value.worker)).state.activity) not in ([1,2,4] if value.version==OUTDOOR_VERSION or magazine_version(value.version) else [1,2]):
 		return "WORLD_WORKER_ACTIVITY"
 	if search_version(value.version):
-		var jobs_issue: String = _jobs_problem(value,ids)
+		var jobs_issue: String = _jobs_problem(value, ids, knowledge)
 		if not jobs_issue.is_empty():
 			return jobs_issue
 	var enemy_ids: Array[int] = []
@@ -369,6 +392,8 @@ static func apply(world: Expedition, value: Dictionary) -> String:
 		return "WORLD_CONTACT_BUILD_MISMATCH"
 	if not world.setup_problem.is_empty() or world.survivors.size() != value.survivors.size() or not world.enemies.is_empty():
 		return "WORLD_RECONSTRUCTION_SETUP"
+	if value.has("recon") != (world.recon_knowledge != null):
+		return "WORLD_RECON_BINDING"
 	if compatibility(world) != value.compatibility or _encode(world.get_viewport_rect().size) != value.viewport or world.hunger_trial != value.hunger or world.battle_drill != value.drill.enabled:
 		return "WORLD_BUILD_DATA_VIEWPORT_MISMATCH"
 	if world.bus_view != null: world.bus_view.skip()
@@ -380,6 +405,10 @@ static func apply(world: Expedition, value: Dictionary) -> String:
 		var site: Expedition.SearchSite = world.search_site(StringName(kind))
 		site.progress = value.sites[kind].progress
 		site.searched = value.sites[kind].searched
+	if value.has("recon"):
+		world.recon_knowledge.restore(value.recon)
+		world.recon_site.progress = float(value.recon.progress)
+		world.recon_site.searched = value.recon.completed
 	for actor: FieldActor in world.survivors:
 		var row: Dictionary = _member(value.survivors,actor.member_id)
 		_restore(actor,row.state,ACTOR)
@@ -429,6 +458,8 @@ static func apply(world: Expedition, value: Dictionary) -> String:
 	_restore(world.camera,value.camera,{"position":TYPE_VECTOR2,"zoom":TYPE_VECTOR2})
 	world.camera.force_update_scroll()
 	world.is_paused = true
+	if value.has("recon"):
+		world.refresh_recon_view()
 	world._update_ui()
 	world.queue_redraw()
 	return ""
@@ -638,26 +669,36 @@ static func combat_version(version: Variant) -> bool:
 	return version==COMBAT_VERSION or search_version(version)
 
 
-static func _jobs_problem(value: Dictionary, ids: Array[int]) -> String:
+static func _jobs_problem(value: Dictionary, ids: Array[int], knowledge: ReconKnowledge) -> String:
 	if value.worker != 0 or value.active_site != "":
 		return "SEARCH_LEGACY_SLOT"
 	var site_ids: Array[String] = []
 	for id: String in value.sites:
 		site_ids.append(id)
+	if knowledge != null:
+		site_ids.append(ReconActionV1.SITE_ID)
 	var issue: String = SearchAssignments.problem(value.get("jobs"),ids,site_ids)
 	if not issue.is_empty():
 		return issue
 	var owners: Dictionary = {}
 	for job: Dictionary in value.jobs.assignments:
 		var actor: Dictionary = _member(value.survivors,int(job.member_id)).state
-		var site: Dictionary = value.sites[job.site_id]
-		if actor.health <= 0 or site.searched:
+		var recon_job: bool = knowledge != null and job.site_id == ReconActionV1.SITE_ID
+		var site: Dictionary = value.recon if recon_job else value.sites[job.site_id]
+		if actor.health <= 0 or site.get("completed" if recon_job else "searched"):
 			return "SEARCH_UNAVAILABLE_SOURCE"
 		if value.get("rescue") is Dictionary and value.rescue.get("status")=="IN_PROGRESS" and value.rescue.get("worker")==job.member_id:
 			return "SEARCH_RESCUE_OCCUPIED"
 		var outdoor: bool = TaskActions.outdoor_site(value.generated,StringName(job.site_id))
-		var door: Vector2 = _work_point(value.generated,job.site_id)
+		var door: Vector2 = ReconActionV1.point(value.generated) if recon_job else _work_point(value.generated, job.site_id)
+		if knowledge != null and not recon_job and not knowledge.site_known(value.generated, job.site_id, door, value.recon.completed):
+			return "RECON_HIDDEN_WORK"
 		if job.phase=="working":
+			if recon_job:
+				if site.progress <= 0.0:
+					return "RECON_WORKING_PROGRESS"
+				if site.has("work") and int(site.work.back()[0]) != int(job.member_id):
+					return "RECON_WORK_SOURCE"
 			if job.site_id == EventSortieV1.site_id(value.generated) and (value.task_event.branch == "" or site.progress <= 0.0):
 				return "SORTIE_EVENT_WORKING"
 			if actor.activity != (FieldActor.Activity.RECOVERING if outdoor else FieldActor.Activity.SEARCHING) or actor.visible != outdoor or _vec(actor.position).distance_to(door)>14.0 or not actor.path.is_empty() or actor._path_index!=0:

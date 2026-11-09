@@ -119,6 +119,8 @@ static func problem(value: Variant, camp_source: bool = false) -> String:
 		return "SORTIE_RISK_ACTION_POLICY"
 	if value is Dictionary and value.has("campaign_pressure") and not CampaignPressureV1.enabled(value):
 		return "CAMPAIGN_PRESSURE_ACTION_POLICY"
+	if value is Dictionary and value.has("recon") and not ReconActionV1.enabled(value):
+		return "RECON_ACTION_POLICY"
 	if value is Dictionary and value.has("finale_policy"):
 		return PumpStationAction.problem(value)
 	if value is Dictionary and value.has("investigation"):
@@ -150,6 +152,7 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 	var night_hound: bool = value is Dictionary and value.has("night_hound_policy")
 	var workshop_tool: bool = value is Dictionary and value.has("workshop_tool")
 	var event_sortie: bool = value is Dictionary and value.has("event_sortie")
+	var recon: bool = value is Dictionary and value.has("recon")
 	if event_sortie:
 		var issue: String = EventSortieV1.marker_problem(value.event_sortie)
 		if not issue.is_empty():
@@ -164,7 +167,7 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 		return "GEAR_BUILD_POLICY"
 	var field_count: int = 23 + int(worldgen) + int(mission) + int(rare) + int(gear_build) \
 		+ int(screamer) + int(weapon_affixes) + int(first_aid) + int(sortie_risk) + int(campaign_pressure) + int(content_wave) \
-		+ int(night_hound) + int(workshop_tool) + int(event_sortie)
+		+ int(night_hound) + int(workshop_tool) + int(event_sortie) + int(recon)
 	if not value is Dictionary or not SurvivalContracts.json_value(value) or value.size()!=field_count or value.get("version")!=9 or not value.get("layout") is Dictionary or not value.get("exploration") is Dictionary or not value.get("build") is Dictionary or not value.get("powers") is Dictionary or not value.get("persona") is Dictionary or not value.get("campaign") is Dictionary: return "EXPLORATION_ACTION_FIELDS"
 	if not BuildItems.valid_pool(value.build.get("version")) or content_wave != BuildItems.wave_pool(int(value.build.version)):
 		return "EXPLORATION_BUILD_POOL"
@@ -199,13 +202,20 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 		expected.night_hound_policy = NightHoundV1.VERSION
 	if workshop_tool:
 		expected = WorkshopSiteV1.freeze(expected)
+	if recon:
+		expected = ReconActionV1.freeze(expected, int(value.recon.version))
+		if not expected.has("recon"):
+			return "RECON_ACTION_CONTEXT"
 	var matches: bool = signature == RecordEncoding.fingerprint(expected) if mission else TransactionReceipt.same(value,expected)
 	if not matches and mission and camp_source:
 		# RunSave keeps its historical JSON camp projection. A stored ability source
 		# must match that precise projection, without accepting it in receipt proof.
 		var projected: Dictionary = JSON.parse_string(JSON.stringify(expected, "", true, true))
 		matches = signature == RecordEncoding.fingerprint(projected)
-	if not matches: return "EXPLORATION_ACTION_CANONICAL"
+	if not matches:
+		if recon and RecordEncoding.fingerprint(value.recon) != RecordEncoding.fingerprint(expected.recon):
+			return "RECON_ACTION_CANONICAL"
+		return "EXPLORATION_ACTION_CANONICAL"
 	if _checked.size()>=64: _checked.clear()
 	_checked[proof_key]=true
 	return ""

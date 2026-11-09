@@ -78,6 +78,7 @@ func _profiled_read_all() -> Dictionary:
 	var previous: Dictionary = {}
 	var previous_identity: String = ""
 	var claimed_event: Dictionary = {}
+	var claimed_recon: Dictionary = {}
 	var digest: String = ""
 	var hashes: Dictionary = {}
 	var identities: Array[String] = []
@@ -117,6 +118,7 @@ func _profiled_read_all() -> Dictionary:
 		var receipt: Dictionary = result.receipt
 		if receipt.transaction_id != previous.get("transaction_id", ""):
 			claimed_event = {}
+			claimed_recon = {}
 			if not receipt.transaction_id.is_empty():
 				if receipt.transaction_id in identities:
 					return _error(ERR_FILE_CORRUPT, "TRANSACTION_ID_REUSED")
@@ -128,12 +130,15 @@ func _profiled_read_all() -> Dictionary:
 			return _error(ERR_FILE_CORRUPT, issue)
 		# A death checkpoint has no world. Compare against the last claim outside
 		# the adjacent-record cache, whose key does not include earlier history.
-		if not claimed_event.is_empty() and previous.phase != "RESUME_CLAIMED":
+		if (not claimed_event.is_empty() or not claimed_recon.is_empty()) and previous.phase != "RESUME_CLAIMED":
 			issue = TaskActions.event_history_problem(claimed_event, receipt)
+			if issue.is_empty():
+				issue = ReconKnowledge.history_problem(claimed_recon, receipt)
 			if not issue.is_empty():
 				return _error(ERR_FILE_CORRUPT, issue)
 		if receipt.phase == "RESUME_CLAIMED":
 			claimed_event = TaskActions.claimed_event(receipt)
+			claimed_recon = ReconKnowledge.claimed(receipt)
 		previous = receipt
 		previous_identity = result.raw_identity
 		digest = result.hash
@@ -141,7 +146,7 @@ func _profiled_read_all() -> Dictionary:
 	FreezeProfile.scale("journal_total_bytes",total)
 	# Intermediate chain proofs only read the cached values. Isolate the one receipt
 	# that actually leaves the journal instead of cloning every historical generation.
-	return {"error":OK, "receipt":previous.duplicate(true), "hash":digest, "hashes":hashes, "identities":identities, "unpublished":stages, "bytes":total, "claimed_event":claimed_event.duplicate(true)}
+	return {"error":OK, "receipt":previous.duplicate(true), "hash":digest, "hashes":hashes, "identities":identities, "unpublished":stages, "bytes":total, "claimed_event":claimed_event.duplicate(true), "claimed_recon":claimed_recon.duplicate(true)}
 
 
 func append(next: Dictionary, expected_hash: String) -> Dictionary:
@@ -164,7 +169,8 @@ func _profiled_append(next: Dictionary, expected_hash: String) -> Dictionary:
 		return _error(ERR_INVALID_DATA, "TRANSACTION_ID_REUSED")
 	var receipt: Dictionary = next.duplicate(true)
 	receipt.previous_hash = expected_hash
-	var issue: String = TransactionReceipt.transition(prior.receipt, receipt, prior.get("claimed_event", {}))
+	var issue: String = TransactionReceipt.transition(prior.receipt, receipt,
+		prior.get("claimed_event", {}), prior.get("claimed_recon", {}))
 	if not issue.is_empty():
 		return _error(ERR_INVALID_DATA, issue)
 	var packet: Dictionary = RecordEncoding.pack(receipt)

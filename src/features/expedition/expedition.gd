@@ -152,6 +152,9 @@ var _food_site: SearchSite = SearchSite.new(&"food", Vector2.ZERO)
 var sites: Array[SearchSite] = []
 var task_event: Dictionary = TaskActions.empty_event()
 var event_sortie_panel: EventSortiePanel
+var recon_site: SearchSite
+var recon_knowledge: ReconKnowledge
+var _recon_view: ReconFieldView
 var _bus_sprite: Sprite2D
 var bus_view: BusJourney
 var restoring_world: bool=false
@@ -231,6 +234,15 @@ func _ready() -> void:
 	add_child(_sort)
 	_effects = Node2D.new()
 	add_child(_effects)
+	if ReconActionV1.enabled(supply.generated):
+		recon_site = SearchSite.new(StringName(ReconActionV1.SITE_ID), ReconActionV1.point(supply.generated))
+		recon_site.seconds = ReconActionV1.SECONDS
+		recon_knowledge = ReconKnowledge.new(supply.generated)
+		_recon_view = ReconFieldView.new()
+		_recon_view.world = self
+		_recon_view.z_index = 1
+		_effects.z_index = 2
+		add_child(_recon_view)
 	var bus: Sprite2D = Sprite2D.new()
 	_bus_sprite = bus
 	bus.texture = BusTexture
@@ -291,6 +303,9 @@ func _ready() -> void:
 					WorkshopV1.mod_for(field_departure, actor.weapon_instance_id))
 		if build_mode(): apply_build(actor)
 		survivors.append(actor)
+	if recon_knowledge != null and not restoring_world:
+		recon_knowledge.reveal(layout.bus_door)
+		_update_recon_knowledge()
 	if (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9))):
 		encounter=EncounterRuntime.new();encounter.setup(self,restoring_world)
 	_make_ui()
@@ -316,8 +331,11 @@ func _ready() -> void:
 			camera.pan_by(los_setup.camera_center - camera.position)
 			_show_notice("项目验收演练 · 实墙挡枪，左键绕角后自动恢复；正式进度不改变。")
 	if not is_practice:
-		_show_notice(layout.route_hint if _supply_entrances.is_empty() else
-			"先搜近点食品 · 可回巴士撤离，也可沿街追加第二处。")
+		if recon_site != null:
+			_show_notice("主装备点待发现 · 可沿街探索或先到侦察点。")
+		else:
+			_show_notice(layout.route_hint if _supply_entrances.is_empty() else
+				"先搜近点食品 · 可回巴士撤离，也可沿街追加第二处。")
 		if threat_rehearsal:
 			_show_notice("短时压力演练 · 21秒夜间候选；正常出击105秒，规则均待校准。")
 	if not layout.world_data.is_empty():
@@ -465,6 +483,8 @@ func step(delta: float) -> void:
 	for actor: FieldActor in survivors:
 		actor.advance(delta,false,false)
 	last_contact_metrics = FieldContacts.move(survivors,occupants,navigation,delta,true)
+	if recon_knowledge != null:
+		_update_recon_knowledge()
 	_update_enemy_behaviors(delta)
 	_update_enemy_paths(true)
 	for enemy: FieldActor in enemies:
@@ -641,10 +661,10 @@ func request_search(kind: StringName = &"cash") -> void:
 	if (bus_view != null and bus_view.running()) or not field_join_error.is_empty():
 		return
 	var site: SearchSite = search_site(kind)
-	if phase == Phase.FINISHED or site == null or site.searched:
+	if phase == Phase.FINISHED or site == null or site.searched or not site_discovered(site):
 		return
 	var event_site: bool = _is_event_site(site)
-	if not event_site and not pump_station_mode() and not supply.supports(site.kind):
+	if site != recon_site and not event_site and not pump_station_mode() and not supply.supports(site.kind):
 		return
 	var previous: int = search_assignments.member_for(String(site.id))
 	if previous > 0:
@@ -744,6 +764,8 @@ func member_site(member_id: int) -> SearchSite:
 
 
 func site_label(site: SearchSite) -> String:
+	if site == recon_site:
+		return "侦察点"
 	if _is_event_site(site):
 		return EventSortieV1.TITLE
 	return "工具箱点" if String(site.id) == WorkshopSiteV1.site_id(supply.generated) \
@@ -764,6 +786,8 @@ func _search_log(stage: String, site: SearchSite) -> void:
 
 
 func search_site(kind: StringName) -> SearchSite:
+	if recon_site != null and kind == recon_site.id:
+		return recon_site
 	for site: SearchSite in sites:
 		if site.id == kind: return site
 	if kind == &"cash":
@@ -1419,7 +1443,8 @@ func _clear_dead_worker() -> void:
 		var actor: FieldActor = search_member(int(job.member_id))
 		if actor != null and (actor.health <= 0 or actor.activity == FieldActor.Activity.DOWN):
 			var site: SearchSite = search_site(StringName(job.site_id))
-			site.progress = 0.0
+			if site != recon_site:
+				site.progress = 0.0
 			_release_searcher(actor.member_id)
 			if pump_station_mode():
 				_show_notice("操作员已阵亡 · 控制柜停机中断，可派其他存活者")
@@ -1463,7 +1488,16 @@ func _update_search(delta: float) -> void:
 			_search_log("interrupted",site)
 			continue
 		var prior_progress: float = site.progress
-		site.progress += delta / (actor.trait_search_factor * actor.persona_work_factor * (BuildItems.frozen_factors(supply.generated.build).work if build_mode() else 1.0))
+		if site == recon_site:
+			site.progress += delta
+			if is_equal_approx(site.progress, site.seconds):
+				site.progress = site.seconds
+			var worked: float = minf(site.progress, site.seconds) - prior_progress
+			if worked > 0.0:
+				var start: float = elapsed - delta
+				recon_knowledge.record_work(actor.member_id, actor.position, start, minf(elapsed, start + worked))
+		else:
+			site.progress += delta / (actor.trait_search_factor * actor.persona_work_factor * (BuildItems.frozen_factors(supply.generated.build).work if build_mode() else 1.0))
 		if site.progress > prior_progress and _is_event_site(site) and task_event.work_at < 0.0:
 			task_event.work_at = maxf(0.0, elapsed - delta)
 			if task_event.branch == EventSortieV1.FORCE:
@@ -1478,6 +1512,14 @@ func _update_search(delta: float) -> void:
 
 
 func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
+	if site == recon_site:
+		site.progress = site.seconds
+		site.searched = true
+		_release_searcher(actor.member_id)
+		_show_notice("侦察完成 · 已标记 2 处")
+		refresh_recon_view()
+		_search_log("completed",site)
+		return true
 	if exploration_mode() and site.searched: return false
 	if trait_mode and not trait_inputs.events.any(func(e: Dictionary) -> bool: return e.site == String(site.kind)) and not trait_inputs.accept_search(self,actor,site.kind,site.id):
 		_show_notice("特性搜集来源未确认，已暂停；不会重复发放收益。")
@@ -1745,7 +1787,7 @@ func _update_ui() -> void:
 		if assigned_site != null:
 			status = SearchWorkView.actor_status(search_assignments.phase_for(actor.member_id),site_label(assigned_site),TaskActions.outdoor_site(supply.generated,assigned_site.id))
 		members.append({"id":actor.member_id,"label":"%s · %s" % [actor.call_sign, "阵亡" if actor.permanent_death else status],
-			"call_sign":actor.call_sign,"status":_weapon_status(actor,status),"ammo":_ammo_text(actor),"detail":("%s · %s"%[status,assigned_site.prop.title] if assigned_site!=null else status),
+			"call_sign":actor.call_sign,"status":_weapon_status(actor,status),"ammo":_ammo_text(actor),"detail":("%s · %s"%[status,site_label(assigned_site) if assigned_site == recon_site else assigned_site.prop.title] if assigned_site!=null else status),
 			"colour":SurvivorRoster.definition_by_id(String(actor.definition_id)).colour,
 			"hp":actor.health,"max_hp":actor.max_health})
 	if growth_mode:
@@ -1790,7 +1832,7 @@ func _update_ui() -> void:
 		"food":initial_food,"food_loot":food_loot,"sites_searched":_searched_count(),
 		"sites_total":1 if pump_station_mode() else sites.filter(func(site: SearchSite) -> bool: return supply.supports(site.kind)).size(),
 		"has_food_source":supply.supports(&"food"),
-		"route_hint":layout.route_hint,
+		"route_hint":"可定位侦察点。走近站点后可搜集，侦察完成可提前标记两处。" if recon_site != null else layout.route_hint,
 		"enemy_mode":enemy_mode,
 		"weapon_loot":weapon_loot.size(),
 		"searched": searched, "kills": kills, "engine": engine_text,
@@ -1804,6 +1846,14 @@ func _update_ui() -> void:
 	if station_art != null:
 		station_art.set_stopped(station_stopped())
 	for site: SearchSite in sites:
+		if recon_knowledge != null:
+			var known: bool = site_discovered(site)
+			if site.prop.searchable != known or (site.prop is AirdropProp and site.prop.visible != known):
+				site.prop.searchable = known
+				site.prop.primary_target = known and supply.generated.objective.site_ids.has(String(site.id))
+				if site.prop is AirdropProp:
+					site.prop.visible = known
+				site.prop.queue_redraw()
 		var worker: FieldActor = search_member(search_assignments.member_for(String(site.id)))
 		if site.prop is ExplorationProp:
 			var faded: bool=survivors.any(func(actor: FieldActor) -> bool: return actor.visible and actor.health>0 and actor.position.y<site.prop.position.y and actor.position.distance_to(site.prop.position)<105.0)
@@ -1890,6 +1940,8 @@ func _street_supply_entrances() -> Array[Vector2]:
 
 
 func _street_camera_start() -> Vector2:
+	if ReconActionV1.enabled(supply.generated):
+		return layout.bus_door
 	var view_size: Vector2 = get_viewport_rect().size / camera.zoom
 	var yard: Dictionary = layout.world_data.get("loading_yard", layout.world_data.get("rescue_court", {}))
 	if not yard.is_empty():
@@ -1909,10 +1961,16 @@ func _searched_count() -> int:
 	return sites.filter(func(site: SearchSite) -> bool: return site.searched).size()
 
 func _clicked_site(point: Vector2) -> bool:
+	if recon_site != null and recon_site.door.distance_squared_to(point) <= 32.0 * 32.0:
+		if recon_site.searched:
+			locate_objective("recon")
+		else:
+			request_search(recon_site.id)
+		return true
 	if supply.generated.get("mission_policy") == 1:
 		# The marked work entrance is a precise target even where two facade hit areas overlap.
 		for site: SearchSite in sites:
-			if (site.prop.primary_target or (supply.generated.has("rare_policy") and not site.prop.loot_landmark.is_empty())) \
+			if site_discovered(site) and (site.prop.primary_target or _is_recon_target(site.id) or (supply.generated.has("rare_policy") and not site.prop.loot_landmark.is_empty())) \
 					and site.door.distance_squared_to(point) <= 24.0 * 24.0:
 				if not site.searched:
 					request_search(site.id)
@@ -1929,7 +1987,7 @@ func _clicked_site(point: Vector2) -> bool:
 	if layout.world_data.get("version")==5:
 		candidates.sort_custom(func(a:SearchSite,b:SearchSite)->bool:return a.prop.position.y>b.prop.position.y if a.prop.position.y!=b.prop.position.y else String(a.id)<String(b.id))
 	for site: SearchSite in candidates:
-		if site.hit.has_point(point):
+		if site_discovered(site) and site.hit.has_point(point):
 			if layout.world_data.get("version")==5 and site.prop.world_asset and not site.prop.scaled_hit_contains(point):continue
 			if not site.searched: request_search(site.id)
 			else: command_move(site.door)
@@ -2485,7 +2543,65 @@ func _exploration_objective_rows() -> Array[Dictionary]:
 		rows.insert(1, {"id":"toolbox", "title":"工具箱 ×1", "optional":true, "done":int(toolbox.searched),
 			"total":1, "complete":toolbox.searched, "site_ids":[String(toolbox.id)],
 			"hint":"完成此点原搜集即可携带，归航确认后入库。"})
+	if recon_site != null:
+		_present_recon_objectives(rows)
 	return rows
+
+
+func site_discovered(site: SearchSite) -> bool:
+	return recon_knowledge == null or site == recon_site or recon_knowledge.explored(site.door) \
+		or (recon_site.searched and _is_recon_target(site.id))
+
+
+func _is_recon_target(id: StringName) -> bool:
+	if recon_site == null:
+		return false
+	var marker: Dictionary = supply.generated.recon
+	return String(id) in [marker.primary_id, marker.optional_id]
+
+
+func _update_recon_knowledge() -> void:
+	var changed: bool = false
+	for actor: FieldActor in survivors:
+		if actor.health > 0.0 and actor.visible and actor.activity != FieldActor.Activity.SEARCHING:
+			if recon_knowledge.observe(actor.member_id, actor.position, elapsed):
+				changed = true
+	if changed:
+		refresh_recon_view()
+
+
+func refresh_recon_view() -> void:
+	if _recon_view != null:
+		_recon_view.queue_redraw()
+
+
+func recon_region() -> Rect2:
+	var target: Vector2 = search_site(&"cash").door
+	var origin: Vector2 = layout.world_bounds.position
+	var size: Vector2 = Vector2.ONE * ReconActionV1.REGION
+	var start: Vector2 = origin + ((target - origin) / size).floor() * size
+	return Rect2(start, size).intersection(layout.world_bounds)
+
+
+func _present_recon_objectives(rows: Array[Dictionary]) -> void:
+	var marker: Dictionary = supply.generated.recon
+	var primary: SearchSite = search_site(StringName(marker.primary_id))
+	if not site_discovered(primary):
+		rows[0].title = "装备区域 · 位置待发现"
+		rows[0].hint = "定位到大致区域。走近后发现主点，也可先派工侦察。"
+	var optional: SearchSite = search_site(StringName(marker.optional_id))
+	for index: int in range(rows.size() - 1, 0, -1):
+		var row: Dictionary = rows[index]
+		row.site_ids = row.site_ids.filter(func(id: String) -> bool: return site_discovered(search_site(StringName(id))))
+		if row.site_ids.is_empty() or (row.id == "toolbox" and optional == _toolbox_site()):
+			rows.remove_at(index)
+	rows.insert(1, {"id":"recon", "title":"侦察 · 已标记 2 处" if recon_site.searched else "侦察点 %.1f/6 秒" % recon_site.progress,
+		"optional":true, "complete":recon_site.searched, "done":int(recon_site.searched), "total":1, "site_ids":[ReconActionV1.SITE_ID],
+		"hint":"到点后派一人侦察。只提供目标信息，可随时取消。"})
+	if site_discovered(optional):
+		var title: String = "可搜建筑 · 工具箱" if optional == _toolbox_site() else "已发现 · 可搜建筑"
+		rows.insert(2, {"id":"recon_optional", "title":title, "optional":true, "complete":optional.searched,
+			"done":int(optional.searched), "total":1, "site_ids":[marker.optional_id], "hint":"按原条件搜集此建筑。"})
 
 
 func _event_reward_text(reward: Dictionary) -> String:
@@ -2494,6 +2610,13 @@ func _event_reward_text(reward: Dictionary) -> String:
 
 func locate_objective(id: String) -> void:
 	if not exploration_mode(): return
+	if id == "primary" and recon_site != null and not site_discovered(search_site(&"cash")):
+		camera.position = recon_region().get_center()
+		camera._clamp_position()
+		camera.force_update_scroll()
+		if _locate_marker != null:
+			_locate_marker.hide()
+		return
 	var rows: Array[Dictionary] = _exploration_objective_rows()
 	var target: Vector2=Vector2.INF
 	var target_prop: FieldProp
@@ -2530,13 +2653,15 @@ func locate_objective(id: String) -> void:
 		_locate_label.add_theme_color_override("font_color",Color("ffe5a7"))
 		_locate_marker.add_child(_locate_label)
 	var has_badge: bool = target_prop != null and not target_prop.loot_category.is_empty()
-	_locate_label.visible = not has_badge
+	var recon_pin: bool = recon_site != null and id in ["primary", "recon_optional", "recon"]
+	_locate_label.visible = not has_badge and not recon_pin
 	# Shrink the pulse around the clickable entrance to clear the building badge.
 	var ring_scale: float = 0.5 if has_badge and not target_prop is ExplorationProp else 1.0
 	_locate_ring.scale = Vector2.ONE * ring_scale
 	_locate_ring.width = 3.0 / ring_scale
 	if _locate_tween!=null: _locate_tween.kill()
 	_locate_marker.position=target
+	_locate_marker.show()
 	_locate_marker.modulate.a=1.0
 	_locate_tween=create_tween()
 	_locate_tween.tween_interval(0.6)

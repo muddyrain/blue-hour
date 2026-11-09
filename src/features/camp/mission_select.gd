@@ -202,6 +202,10 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 				title = "装备 · 深入回收" if supply.generated.sortie_risk.tier == SortieRiskV1.DEEP else "装备 · 常规回收"
 			_titles[index].text = "%02d / %s" % [index + 1, title]
 			_descriptions[index].text = LevelSummary.mission_card_text(supply.generated, base if action_choices else {}, rations)
+			if ReconActionV1.enabled(supply.generated):
+				var lines: PackedStringArray = _descriptions[index].text.split("\n")
+				lines.insert(1, "可侦察 · 标记装备点及 1 处可搜建筑")
+				_descriptions[index].text = "\n".join(lines)
 			_descriptions[index].custom_minimum_size.y = 100
 			_descriptions[index].add_theme_font_size_override("font_size", 16)
 			_descriptions[index].add_theme_constant_override("line_spacing", 2 if action_choices else 8)

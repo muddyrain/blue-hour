@@ -102,6 +102,11 @@ static func event_sortie_enabled(value: Variant) -> bool:
 		EventSortieV1.VERSION, EventSortieV1.VERSION)
 
 
+static func recon_enabled(value: Variant) -> bool:
+	return action_choices_enabled(value) and SurvivalContracts.integer(value.get("recon_policy"),
+		ReconActionV1.VERSION, ReconActionV1.SOURCE_VERSION)
+
+
 static func campaign_pressure_enabled(value: Variant) -> bool:
 	return is_mission(value) and SurvivalContracts.integer(value.get("campaign_pressure_policy"),
 		CampaignPressureV1.VERSION, CampaignPressureV1.VERSION)
@@ -152,10 +157,11 @@ static func _investigation_problem(value: Dictionary, run_id: String) -> String:
 	var has_night_hound: bool = value.has("night_hound_policy")
 	var has_workshop: bool = value.has("workshop")
 	var has_event_sortie: bool = value.has("event_sortie_policy")
+	var has_recon: bool = value.has("recon_policy")
 	var field_count: int = INVESTIGATION_KEYS.size() + int(has_action_policy) + int(has_midgame) \
 		+ int(has_finale) + int(has_rare) + int(has_screamer) + int(has_affixes) + int(has_first_aid) \
 		+ int(has_sortie_risk) + int(has_campaign_pressure) + int(has_content_wave) + int(has_night_hound) \
-		+ int(has_workshop) + int(has_event_sortie)
+		+ int(has_workshop) + int(has_event_sortie) + int(has_recon)
 	if value.size() != field_count or not value.has_all(INVESTIGATION_KEYS) or not SurvivalContracts.integer(value.version,version,version):
 		return "INVESTIGATION_FIELDS"
 	if has_action_policy and not action_choices_enabled(value):
@@ -176,6 +182,8 @@ static func _investigation_problem(value: Dictionary, run_id: String) -> String:
 		return "SORTIE_RISK_CAMPAIGN_POLICY"
 	if has_event_sortie and not event_sortie_enabled(value):
 		return "EVENT_SORTIE_CAMPAIGN_POLICY"
+	if has_recon and not recon_enabled(value):
+		return "RECON_CAMPAIGN_POLICY"
 	if has_campaign_pressure and not campaign_pressure_enabled(value):
 		return "CAMPAIGN_PRESSURE_POLICY"
 	if has_content_wave and not ContentWaveV1.campaign_enabled(value):

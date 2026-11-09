@@ -121,7 +121,9 @@ static func _release_dead_targets(world: Dictionary, down: Array[int]) -> void:
 	for index: int in range(jobs.size() - 1, -1, -1):
 		var job: Dictionary = jobs[index]
 		if int(job.member_id) in down:
-			world.sites[job.site_id].progress = 0.0
+			# Recon progress is shared knowledge and survives the loss of its worker.
+			if job.site_id != ReconActionV1.SITE_ID:
+				world.sites[job.site_id].progress = 0.0
 			jobs.remove_at(index)
 	for row: Dictionary in world.enemies:
 		if int(row.behavior.target_id) not in down:

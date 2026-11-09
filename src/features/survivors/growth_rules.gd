@@ -194,7 +194,7 @@ static func result_problem(receipt: Dictionary) -> String:
 	if (receipt.rules.get("data_version")==3 or receipt.rules.get("data_version")==4 or (receipt.rules.get("data_version")==5 or (receipt.rules.get("data_version")==6 or (receipt.rules.get("data_version")==7 or (receipt.rules.get("data_version")==8 or (receipt.rules.get("data_version")==9 or receipt.rules.get("data_version")==10)))))):
 		var site_issue: String = WorldSites.problem(source.generated.sites,report.get("site_facts"))
 		if not site_issue.is_empty(): return site_issue
-		carry=WorldSites.carry(source.generated.sites,report.site_facts,receipt.transaction_id,WeaponState.is_family(receipt.base),source.generated)
+		carry=WorldSites.carry(source.generated.sites,report.site_facts,receipt.transaction_id,WeaponState.is_family(receipt.base),source.generated,report.get("task_event",{}))
 	issue = FrozenSettlement._facts_problem({"before":receipt.base,"report":report,"rules":receipt.rules,"carried":carry,"token":RunTransaction.token_for(receipt)})
 	if not issue.is_empty():
 		return "XP_RESULT_FACTS:"+issue

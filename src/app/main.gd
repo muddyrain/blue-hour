@@ -507,6 +507,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if is_instance_valid(pause_menu) and pause_menu.root.visible:
 		get_viewport().set_input_as_handled()
 		return
+	if event.is_action_pressed("return_to_title") and phase == Phase.EXPEDITION \
+			and expedition.event_sortie_panel != null and expedition.event_sortie_panel.visible:
+		if not event.is_echo():
+			expedition.event_sortie_panel.hide()
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed("return_to_title") and phase == Phase.EXPEDITION and expedition.support_aiming:
 		expedition.support_aiming=false
 		get_viewport().set_input_as_handled()
@@ -889,6 +895,7 @@ func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}) -> vo
 		if latest_rules:
 			_battle_meta.campaign.night_hound_policy = NightHoundV1.VERSION
 			_battle_meta.campaign.workshop = WorkshopV1.initial()
+			_battle_meta.campaign.event_sortie_policy = EventSortieV1.VERSION
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true, true)
 		_battle_meta.build.powers = PowerState.initial_progression(
 			SpecialPowers.WAVE_VERSION if latest_rules else SpecialPowers.PROGRESSION_VERSION)
@@ -2594,7 +2601,15 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 				title = "调查 · " + CampaignRules.CLUE_NAMES[generated.investigation.clue_id]
 			elif generated.type == "airdrop":
 				title = "装备 · 露天回收"
-		text += TaskActions.summary_text(snapshot.last_day.task, title) + "\n"
+		var task: Dictionary = snapshot.last_day.task
+		text += TaskActions.summary_text(task, title) + "\n"
+		if task.type == "event_sortie":
+			var reward: String = "0 粮 · 0 币"
+			if task.branch == EventSortieV1.QUIET:
+				reward = "%s%d 粮" % ["+" if task.event_food > 0 else "", int(task.event_food)]
+			elif task.branch == EventSortieV1.FORCE:
+				reward = "%s%d 币" % ["+" if task.event_cash > 0 else "", int(task.event_cash)]
+			text += "%s · 本次事件收益\n%s · %s\n" % [EventSortieV1.TITLE, EventSortiePanel.branch_title(task.branch), reward]
 	if not meal.is_empty():
 		text += ReturnFeedback.food_text(meal) + "\n"
 		if meal.food_shortage > 0:

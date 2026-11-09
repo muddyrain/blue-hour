@@ -11,7 +11,7 @@ for row in j['files']:
   with Image.open(p) as im:im.verify()
   s=p.with_suffix('.png.import').read_text(encoding='utf-8');assert 'res://'+row['path'] in s
  if p.suffix=='.svg':
-  svg=ET.fromstring(p.read_text());assert svg.tag.endswith('svg') and svg.get('viewBox'),p
+  svg=ET.fromstring(p.read_text(encoding='utf-8'));assert svg.tag.endswith('svg') and svg.get('viewBox'),p
   assert not any(e.tag.split('}')[-1] in ['script','image','foreignObject'] or any(k.endswith('href') for k in e.attrib) for e in svg.iter()),p
  if p.suffix=='.wav':
   with wave.open(str(p)) as w:assert w.getnchannels()==1 and w.getframerate()==44100

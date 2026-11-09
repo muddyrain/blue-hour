@@ -551,15 +551,17 @@ static func _facts_problem(input: Dictionary) -> String:
 		var issue: String = WorldSites.problem(source.generated.sites,report.get("site_facts"),source.generated.get("version")==9)
 		if not issue.is_empty(): return issue
 		if report.searched != (WorldSites.completed(source.generated.sites,report.site_facts,"cash")>0) or report.food_searched != (WorldSites.completed(source.generated.sites,report.site_facts,"food")>0) or report.sites_searched != WorldSites.completed(source.generated.sites,report.site_facts): return "SITE_REPORT_ALIAS"
+	if not SurvivalContracts.number(report.elapsed) or report.elapsed < 0 or report.elapsed*1000.0 > RunSave.MAX_COUNTER:
+		return "REPORT_DURATION"
 	if (input.rules.get("data_version")==5 or (input.rules.get("data_version")==6 or (input.rules.get("data_version")==7 or (input.rules.get("data_version")==8 or (input.rules.get("data_version")==9 or input.rules.get("data_version")==10))))):
 		var spawn_count: Variant = report.get("xp_inputs",{}).get("spawn_count")
 		if not SurvivalContracts.integer(spawn_count,0,RunSave.MAX_COUNTER): return "TASK_EVENT_SPAWN_COUNT"
 		var issue: String = TaskActions.event_problem(source.generated,report.site_facts,report.get("task_event"),int(spawn_count))
 		if not issue.is_empty(): return issue
+		issue = TaskActions.event_clock_problem(source.generated,input.before,report.site_facts,report.task_event,float(report.elapsed))
+		if not issue.is_empty(): return issue
 	if not multi and (not report.searched is bool or not report.food_searched is bool or not SurvivalContracts.integer(report.sites_searched,0,2) or report.sites_searched != int(report.searched)+int(report.food_searched) or (report.searched and source.cash_reward == 0) or (report.food_searched and source.food_reward == 0)):
 		return "SEARCH_FACTS"
-	if not SurvivalContracts.number(report.elapsed) or report.elapsed < 0 or report.elapsed*1000.0 > RunSave.MAX_COUNTER:
-		return "REPORT_DURATION"
 	var carry: Dictionary = input.carried
 	if carry.size() != 3 or not SurvivalContracts.integer(carry.get("loot"),0,RunSave.MAX_COUNTER) or not SurvivalContracts.integer(carry.get("food"),0,RunSave.MAX_COUNTER) or not carry.get("weapons") is Array:
 		return "CARRIED_FIELDS"
@@ -567,7 +569,7 @@ static func _facts_problem(input: Dictionary) -> String:
 		"food":source.food_reward if report.food_searched else 0,"weapons":[]}
 	if report.searched and source.has_weapon_sample:
 		expected.weapons.append(WeaponInventory.reward(input.token.transaction_id,WeaponState.is_family(input.before)))
-	if multi: expected = WorldSites.carry(source.generated.sites,report.site_facts,input.token.transaction_id,WeaponState.is_family(input.before),source.generated)
+	if multi: expected = WorldSites.carry(source.generated.sites,report.site_facts,input.token.transaction_id,WeaponState.is_family(input.before),source.generated,report.get("task_event",{}))
 	if not TransactionReceipt.same(carry, expected):
 		return "CARRIED_SOURCE_MISMATCH"
 	var rewards: Dictionary = carry if report.evacuated else {"loot":0,"food":0,"weapons":[]}

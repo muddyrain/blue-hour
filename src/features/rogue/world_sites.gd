@@ -35,13 +35,27 @@ static func problem(defs: Array, facts: Variant, exploration: bool = false) -> S
 		if not state is Dictionary or state.size()!=2 or not state.get("searched") is bool or not SurvivalContracts.number(state.get("progress")) or state.progress<0 or state.progress>(float(def.seconds) if exploration else 31.0) or state.searched!=(state.progress>=def.seconds): return "SITE_PROGRESS"
 	return ""
 
-static func carry(defs: Array, facts: Dictionary, transaction: String, quality: bool, generated: Dictionary = {}) -> Dictionary:
+static func carry(defs: Array, facts: Dictionary, transaction: String, quality: bool, generated: Dictionary = {}, task_event: Variant = {}) -> Dictionary:
 	var result: Dictionary = {"loot":0,"food":0,"weapons":[]}
 	for def: Dictionary in defs:
 		if facts[def.id].searched:
 			result["loot" if def.kind=="cash" else "food"]+=int(def.amount)
 			if def.weapon: result.weapons.append(WeaponInventory.site_reward(transaction,generated,def,quality))
+	var event_reward: Dictionary = event_carry(generated, facts, task_event)
+	result.loot += int(event_reward.cash)
+	result.food += int(event_reward.food)
 	return result
+
+
+static func event_carry(generated: Dictionary, facts: Dictionary, task_event: Variant) -> Dictionary:
+	var site_id: String = EventSortieV1.site_id(generated)
+	if not site_id.is_empty() and task_event is Dictionary and task_event.get("branch") is String \
+			and facts.get(site_id, {}).get("searched", false):
+		var reward: Dictionary = EventSortieV1.reward(generated, task_event.branch)
+		if not reward.is_empty():
+			return reward
+	return {"food":0, "cash":0}
+
 
 static func completed(defs: Array, facts: Dictionary, kind: String = "") -> int:
 	var count: int = 0

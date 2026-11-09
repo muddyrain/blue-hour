@@ -230,11 +230,16 @@ static func event_clock_problem(generated: Dictionary, camp: Dictionary, facts: 
 	return "SORTIE_EVENT_EARLY_WORK" if event.work_at > elapsed or elapsed - float(event.work_at) + 0.00001 < minimum else ""
 
 
-static func event_transition_problem(previous: Dictionary, next: Dictionary) -> String:
-	var generated: Dictionary = next.rules.get("mission", {}).get("generated", {})
-	if EventSortieV1.site_id(generated).is_empty() or previous.phase != "RESUME_CLAIMED":
+static func claimed_event(receipt: Dictionary) -> Dictionary:
+	if receipt.get("phase") != "RESUME_CLAIMED":
+		return {}
+	var generated: Dictionary = receipt.rules.get("mission", {}).get("generated", {})
+	return {} if EventSortieV1.site_id(generated).is_empty() else receipt.envelope.world.task_event
+
+
+static func event_history_problem(before: Dictionary, next: Dictionary) -> String:
+	if before.is_empty():
 		return ""
-	var before: Dictionary = previous.envelope.world.task_event
 	var after: Dictionary
 	if next.phase == "SUSPEND_READY":
 		after = next.envelope.world.task_event

@@ -249,6 +249,8 @@ func _resume_branch() -> void:
 		_check(world.search_assignments.member_for(String(site.id)) > 0, "T3 can reassign only the locked B branch")
 	else:
 		_check(not world.task_event.started and world.task_event.resolutions.is_empty(), "T3 locked unstarted B returns without an alarm")
+		if not _death_checkpoint_preserves_choice(world, site):
+			return
 		await _timed_work(world, site, func() -> bool: return site.progress > 0.0)
 		_check(world.task_event.started and world.task_event.resolutions.size() == EventSortieV1.REQUESTS,
 			"T3 first real work after restore triggers the alarm exactly once")
@@ -256,6 +258,50 @@ func _resume_branch() -> void:
 	if _phase_name == "b-resume":
 		_check(RecordEncoding.fingerprint(world.task_event) == resumed_event, "T3 cancel, reassign and finish leave original alarm and enemy IDs identical")
 	await _return(world, EventSortieV1.FORCE, 6, 0)
+
+
+func _death_checkpoint_preserves_choice(world: Expedition, site: Expedition.SearchSite) -> bool:
+	var worker_id: int = world.search_assignments.member_for(String(site.id))
+	var victim: FieldActor
+	for actor: FieldActor in world.survivors:
+		if actor.member_id != worker_id and actor.health > 0.0:
+			victim = actor
+			break
+	_check(worker_id > 0 and victim != null and world.living_count() == 2, "R1 has a locked B worker and another living member")
+	if worker_id <= 0 or victim == null or world.living_count() != 2:
+		return false
+	victim.clear_order()
+	var accepted: bool = victim.take_damage(victim.health)
+	var transaction: RunTransaction = app.progress_session._transaction
+	var death: Dictionary = transaction.recover()
+	var confirmed: bool = accepted and death.error == OK and death.receipt.phase == "DEATH_CONFIRMED" \
+		and death.receipt.envelope.is_empty() and world.living_count() == 1
+	_check(confirmed, "R1 original damage gate records one death between claim and next checkpoint")
+	if not confirmed:
+		return false
+
+	world.toggle_pause()
+	var saved: Dictionary = SortieSnapshot.capture(world)
+	_check(app.progress_session.preview_suspend(saved).error == OK, "R1 unchanged B remains suspendable after the death checkpoint")
+	if not saved.has("task_event"):
+		return false
+	var forged: Dictionary = saved.duplicate(true)
+	forged.task_event.branch = EventSortieV1.QUIET
+	_check(SortieSnapshot.problem(forged, death.receipt).is_empty(), "R1 switched A is well formed when inspected without history")
+	var preview: Dictionary = app.progress_session.preview_suspend(forged)
+	_check(preview.error != OK and preview.get("reason") == "SORTIE_EVENT_BRANCH_CHANGED", "R1 suspend preview rejects switching B to A after death")
+
+	var next: Dictionary = death.receipt.duplicate(true)
+	next.phase = "SUSPEND_READY"
+	next.revision += 1
+	next.previous_hash = death.hash
+	next.envelope = SuspendRecord.make(forged, app.progress_session.token, death.hash)
+	_check(TransactionReceipt.transition(death.receipt, next).is_empty(), "R1 adjacent receipts alone cannot detect the switch")
+	var publish: Dictionary = transaction._journal.append(next, death.hash)
+	_check(publish.error != OK and publish.get("reason") == "SORTIE_EVENT_BRANCH_CHANGED" \
+		and transaction.recover().get("hash") == death.hash, "R1 journal rejects publishing the switch and preserves the death receipt")
+	world.toggle_pause()
+	return true
 
 
 func _capacity_case(world: Expedition, site: Expedition.SearchSite) -> void:

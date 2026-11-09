@@ -10,7 +10,6 @@ const DAMAGE: float = 20.0
 const POLICY: Dictionary = {"version":VERSION, "kind":KIND, "windup":WINDUP, "radius":RADIUS, "damage":DAMAGE}
 
 var state: Dictionary = initial()
-var _warning_caption: Node2D
 
 
 static func initial() -> Dictionary:
@@ -22,11 +21,13 @@ func holds(actor: FieldActor) -> bool:
 	return state.actor_id == actor.actor_id and state.phase in ["windup", "confirming"]
 
 
-func attach_warning(world: Expedition) -> void:
-	_warning_caption = Node2D.new()
-	_warning_caption.z_index = 4
-	_warning_caption.draw.connect(_draw_countdown.bind(world))
-	world.add_child(_warning_caption)
+func warning_text() -> String:
+	match state.phase:
+		"windup":
+			return "爆囊冲击 · %.1f 秒" % (ceilf(float(state.remaining) * 10.0) / 10.0)
+		"confirming":
+			return "爆囊冲击 · 确认中"
+	return ""
 
 
 func spawned(world: Expedition, actor: FieldActor) -> void:
@@ -80,7 +81,6 @@ static func cancel(value: Dictionary, actor_id: int) -> bool:
 
 
 func draw_warning(world: Expedition) -> void:
-	_warning_caption.queue_redraw()
 	if world.phase == Expedition.Phase.FINISHED or state.phase not in ["windup", "confirming", "released"]:
 		return
 	var released: bool = state.phase == "released"
@@ -95,17 +95,6 @@ func draw_warning(world: Expedition) -> void:
 		if fraction > 0.0:
 			world.draw_arc(foot, RADIUS - 6.0, -PI / 2.0, -PI / 2.0 + TAU * fraction,
 				64, Color("ffe1a1"), 4.0, true)
-
-
-func _draw_countdown(world: Expedition) -> void:
-	if world.phase == Expedition.Phase.FINISHED or state.phase not in ["windup", "confirming"]:
-		return
-	var font: Font = world.ui_theme.get_font(&"font", &"Label") if world.ui_theme != null else ThemeDB.fallback_font
-	var caption: String = "爆囊 %.1f 秒" % state.remaining
-	var label_origin: Vector2 = SortieSnapshot._vec(state.origin) + Vector2(RADIUS + 14.0, 6.0)
-	var label_width: float = font.get_string_size(caption, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
-	_warning_caption.draw_rect(Rect2(label_origin - Vector2(6.0, 18.0), Vector2(label_width + 12.0, 24.0)), Color("241b19eb"))
-	_warning_caption.draw_string(font, label_origin, caption, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color("ffb44b"))
 
 
 func feedback(world: Expedition, kind: String) -> void:

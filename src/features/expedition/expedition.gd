@@ -1689,6 +1689,7 @@ func _update_ui() -> void:
 		"notice": _notice_text, "notice_visible": _notice_clock > 0.0,
 		"practice": is_practice,
 		"threat":threat_status(),
+		"burst_warning":combat.burst.warning_text() if combat.burst != null and phase != Phase.FINISHED else "",
 	})
 	if drill_panel != null:
 		drill_panel.refresh()

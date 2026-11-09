@@ -2,11 +2,16 @@ extends "res://tests/campaign_flow.gd"
 ## Controlled scope: copies the confirmed M38 common camp and uses one real
 ## signed industrial offer. Positions and time are controlled to isolate combat.
 
+const LOST_ACK_FLAG: String = "--m38-burst-post-publish"
+
 func _resume() -> void:
 	_pure_boundaries()
 	await _tap(app._continue_button)
 	if app._hunger_confirmation.visible:
 		await _tap(app._hunger_confirmation.get_ok_button())
+	if LOST_ACK_FLAG in OS.get_cmdline_user_args() and output.get_file() == "burst-recover":
+		await _recover_published_burst(app.expedition)
+		return
 	if app.expedition == null:
 		await _prepare_burst()
 	else:
@@ -73,6 +78,8 @@ func _prepare_burst() -> void:
 	_check(SpecialPowers.ability_remaining(world.powers, SpecialPowers.SUPPRESSION, world.elapsed) == 12.0 and world.power_frozen,
 		"freeze and suppression are active at the same time with separate clocks")
 	var remaining: float = float(world.combat.burst.state.remaining)
+	if LOST_ACK_FLAG in OS.get_cmdline_user_args():
+		await _capture_burst_warning(world, remaining)
 	world.combat.burst.advance(world, 0.2)
 	_check(world.combat.burst.state.remaining == remaining, "frozen burst clock does not advance")
 	var freeze_end: float = float(SpecialPowers.event_at(world.powers, 1).until)
@@ -117,6 +124,9 @@ func _resume_burst(world: Expedition) -> void:
 		world.toggle_pause()
 	var victim: FieldActor = world.search_member(int(expected.victim))
 	var second: FieldActor = world.search_member(int(expected.second))
+	if LOST_ACK_FLAG in OS.get_cmdline_user_args():
+		_publish_burst_without_ack(world, victim, second)
+		return
 	var second_before: float = second.health
 	_check(victim.take_damage(victim.health - 10.0), "controlled nonlethal injury passes original field damage gate")
 	var prior: Dictionary = app.progress_session._transaction.recover()
@@ -169,11 +179,161 @@ func _resume_burst(world: Expedition) -> void:
 		"direct_damage":[expected.melee, expected.reduced, restored], "pulse_damage":pulse_damage})
 
 
+func _capture_burst_warning(world: Expedition, remaining: float) -> void:
+	var origin: Vector2 = SortieSnapshot._vec(world.combat.burst.state.origin)
+	var saved_camera: Vector2 = world.camera.position
+	var saved_size: Vector2i = viewport.size
+	var warning: Label = world._hud._burst_warning
+	for size: Vector2i in [Vector2i(1280, 720), Vector2i(1024, 576)]:
+		viewport.size = size
+		await _hold(3)
+		world.camera.pan_by(origin - world.camera.position)
+		world.camera.force_update_scroll()
+		world._update_ui()
+		world.queue_redraw()
+		await _hold(2)
+		var label_rect: Rect2 = warning.get_global_rect()
+		var frame: Rect2 = viewport.get_visible_rect()
+		var transform: Transform2D = world.get_global_transform_with_canvas()
+		var radius: Vector2 = transform.get_scale() * BurstRuntimeV1.RADIUS
+		var ring: Rect2 = Rect2(transform * origin - radius, radius * 2.0)
+		var readouts: Array[Dictionary] = world._readouts.entries
+		var clear: bool = readouts.size() == 3 and readouts.all(func(row: Dictionary) -> bool:
+			return frame.encloses(row.rect) and not label_rect.intersects(row.rect))
+		var dimensions: String = "%dx%d" % [size.x, size.y]
+		_check(warning.is_visible_in_tree() and warning.text == "爆囊冲击 · %.1f 秒" % remaining
+			and frame.encloses(label_rect) and frame.encloses(ring) and not label_rect.intersects(ring) and clear,
+			"%s shows the countdown, warning ring and all three team readouts without covering the countdown" % dimensions)
+		await _shot("burst-warning-" + dimensions)
+	viewport.size = saved_size
+	await _hold(3)
+	world.camera.pan_by(saved_camera - world.camera.position)
+	world.camera.force_update_scroll()
+	world._update_ui()
+
+
+func _publish_burst_without_ack(world: Expedition, victim: FieldActor, second: FieldActor) -> void:
+	_check(world.living_count() == 3, "lost-ACK fixture begins with exactly three living actors")
+	if world.living_count() != 3:
+		return
+	var survivor: FieldActor = world.survivors.filter(func(actor: FieldActor) -> bool: return actor != victim and actor != second)[0]
+	var origin: Vector2 = SortieSnapshot._vec(world.combat.burst.state.origin)
+	_check(not BurstRuntimeV1.reaches(origin, survivor.position, world.shot_obstacles), "third actor is out of the pulse")
+	_check(victim.take_damage(victim.health - 10.0) and second.take_damage(second.health - 10.0),
+		"both intended victims reach 10 HP through the existing nonlethal damage gate")
+	var prior: Dictionary = app.progress_session._transaction.recover()
+	_check(prior.error == OK and prior.receipt.burst.is_empty(), "no burst has been published before the fault")
+	if prior.error != OK:
+		return
+	var lost_ack: Dictionary = {"count":0}
+	app.progress_session.fault_hook = func(point: String) -> Error:
+		if point == "after_record_publish":
+			lost_ack.count += 1
+			return ERR_CANT_CREATE
+		return OK
+	var delta: float = float(world.combat.burst.state.remaining) + 0.001
+	world.elapsed += delta
+	world.combat.burst.advance(world, delta)
+	app.progress_session.fault_hook = Callable()
+	_check(lost_ack.count == 1 and world.is_paused and not world.pending_burst.is_empty()
+		and victim.health == 10.0 and second.health == 10.0 and world.living_count() == 3,
+		"publication loses its ACK before claim and applies neither hit to the live actors")
+	_check(world._hud._burst_warning.is_visible_in_tree() and world._hud._burst_warning.text == "爆囊冲击 · 确认中",
+		"pending release shows confirmation status in the warning")
+	var published: Dictionary = app.progress_session._transaction.recover()
+	var receipt: Dictionary = published.get("receipt", {})
+	var event: Dictionary = receipt.get("burst", {})
+	_check(published.error == OK and receipt.get("phase") == "SUSPEND_READY"
+		and receipt.get("revision", -1) == int(prior.receipt.revision) + 1
+		and event.get("source_id") == world.combat.burst.state.actor_id and event.get("sequence") == 1
+		and not event.is_empty(), "one durable release is available for a new process to claim")
+	if event.is_empty():
+		return
+	var victims: Array[int] = [victim.member_id, second.member_id]
+	victims.sort()
+	var death_batch: Array = receipt.deaths.slice(prior.receipt.deaths.size())
+	_check(death_batch.size() == 2 and event.hits.size() == 2, "release contains exactly two hits and two new deaths")
+	if death_batch.size() != 2 or event.hits.size() != 2:
+		return
+	for index: int in range(victims.size()):
+		var death: Dictionary = death_batch[index].death
+		var hit: Dictionary = event.hits[index]
+		_check(death.member_id == victims[index] and death.cause == "BATTLE" and death.transaction_id == receipt.transaction_id
+			and death.death_id == "%s:death:%d" % [receipt.base.profile_id, victims[index]]
+			and hit.member_id == victims[index] and hit.before == 10.0 and hit.after == 0.0,
+			"stable member order binds one lethal hit and BATTLE death to member %d" % victims[index])
+	_write("lost-ack.json", {"pid":OS.get_process_id(), "published_hash":published.hash,
+		"world_hash":receipt.envelope.world_hash, "transaction_id":receipt.transaction_id,
+		"snapshot_hash":RecordEncoding.fingerprint(receipt.envelope.world),
+		"event_id":event.id, "event_hash":RecordEncoding.fingerprint(event),
+		"death_hash":RecordEncoding.fingerprint({"deaths":receipt.deaths}),
+		"death_batch":death_batch, "victims":victims, "survivor":survivor.member_id, "survivor_health":survivor.health})
+	# End this process with the release still available for normal Continue.
+
+
+func _recover_published_burst(world: Expedition) -> void:
+	var path: String = output.get_base_dir().path_join("burst-publish/lost-ack.json")
+	var expected: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	_check(world != null and world.combat.burst != null and expected is Dictionary,
+		"normal Continue restores the released world from the preceding lost-ACK process")
+	if world == null or world.combat.burst == null or not expected is Dictionary:
+		return
+	world.set_process(false)
+	world.set_physics_process(false)
+	world.combat_feedback.connect(func(event: Dictionary) -> void: events.append(event.duplicate(true)))
+	var claimed: Dictionary = app.progress_session._transaction.recover()
+	var receipt: Dictionary = claimed.get("receipt", {})
+	_check(expected.pid != OS.get_process_id() and receipt.get("phase") == "RESUME_CLAIMED"
+		and receipt.get("previous_hash") == expected.published_hash and not world.suspend_sealed
+		and receipt.get("envelope", {}).get("world_hash") == expected.world_hash
+		and RecordEncoding.fingerprint(SortieSnapshot.capture(world)) == expected.snapshot_hash,
+		"fresh process claims the exact published world once")
+	var burst: Dictionary = world.combat.burst.state
+	_check(burst.phase == "released" and burst.event.get("id") == expected.event_id
+		and RecordEncoding.fingerprint(burst.event) == expected.event_hash
+		and RecordEncoding.fingerprint({"deaths":receipt.get("deaths", [])}) == expected.death_hash,
+		"release and its death records survive exactly without reapplying damage")
+	_check(not world._hud._burst_warning.visible, "a restored release has no pending warning")
+	for member_id: Variant in expected.victims:
+		var victim: FieldActor = world.search_member(int(member_id))
+		_check(victim != null and victim.health == 0.0 and victim.permanent_death,
+			"restored actor %d is already permanently down" % int(member_id))
+	var survivor: FieldActor = world.search_member(int(expected.survivor))
+	_check(survivor != null and world.living_count() == 1 and survivor.health == expected.survivor_health,
+		"only the original untouched survivor can board")
+	var settled_before: int = app.settled_sorties
+	await _tap(app.pause_menu.buttons[0])
+	if world.is_paused:
+		world.toggle_pause()
+	await _extract(world)
+	_check(world.living_count() == 1 and not app._pending_settlement.is_empty()
+		and not events.any(func(event: Dictionary) -> bool: return event.kind in ["burst_released", "burst_hit"]),
+		"bus extraction preserves the surviving actor and never releases the pulse again")
+	var token: Dictionary = app.progress_session.token.duplicate(true)
+	await _tap(app.get_node("Interface/Screen/Result/Continue"))
+	var camp: Dictionary = app.camp_snapshot()
+	var committed: Dictionary = app.progress_session._transaction.recover()
+	var final_receipt: Dictionary = committed.get("receipt", {})
+	var repeated: Dictionary = app.progress_session._transaction.commit(token)
+	_check(committed.error == OK and final_receipt.get("phase") == "COMMITTED"
+		and camp.settled_sorties == settled_before + 1 and camp.last_settlement_id == expected.transaction_id
+		and RecordEncoding.fingerprint(final_receipt.get("burst", {})) == expected.event_hash
+		and RecordEncoding.fingerprint({"deaths":final_receipt.get("deaths", [])}) == expected.death_hash
+		and repeated.error == OK and repeated.hash == committed.hash and TransactionReceipt.same(camp, app.camp_snapshot()),
+		"original return and its repeated confirmation preserve one release, two deaths and one settlement")
+	_write("recovered-return.json", {"pid":OS.get_process_id(), "claimed_hash":claimed.get("hash", ""),
+		"committed_hash":committed.get("hash", ""), "repeat_hash":repeated.get("hash", ""),
+		"event":final_receipt.get("burst", {}), "deaths":final_receipt.get("deaths", []), "settled_sorties":camp.settled_sorties})
+
+
 func _clear_pair(world: Expedition) -> Array[Vector2]:
+	var keep_third_safe: bool = LOST_ACK_FLAG in OS.get_cmdline_user_args() and world.survivors.size() == 3
 	for x: int in range(-160, 161, 16):
 		for y: int in range(-160, 161, 16):
 			var origin: Vector2 = world.layout.bus_door + Vector2(x, y)
 			if not world.navigation.is_clear(origin):
+				continue
+			if keep_third_safe and BurstRuntimeV1.reaches(origin, world.survivors[2].position, world.shot_obstacles):
 				continue
 			for direction: Vector2 in [Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP]:
 				var target: Vector2 = origin + direction * 40.0

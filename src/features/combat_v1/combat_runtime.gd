@@ -36,7 +36,6 @@ func setup(world: Expedition) -> void:
 		screamer = ScreamerRuntimeV1.new()
 	if ContentWaveV1.eligible(world.supply.generated):
 		burst = BurstRuntimeV1.new()
-		burst.attach_warning(world)
 
 static func patterned(weapon_id: String) -> bool:
 	return CombatEquipment.melee(weapon_id) or weapon_id == "shotgun_v1"

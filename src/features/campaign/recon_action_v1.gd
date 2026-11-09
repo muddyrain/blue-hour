@@ -3,6 +3,7 @@ extends RefCounted
 ## PROJECT_TEMP. Extends a certified equipment action without changing its sites or rewards.
 
 const VERSION: int = 1
+const SOURCE_VERSION: int = 2
 const SITE_ID: String = "recon"
 const PRIMARY_ID: String = "cash"
 const SECONDS: float = 6.0
@@ -23,7 +24,7 @@ static func enabled(action: Dictionary) -> bool:
 	if not marker is Dictionary or marker.size() != KEYS.size() or not marker.has_all(KEYS):
 		return false
 	var anchor: Variant = marker.point
-	return SurvivalContracts.integer(marker.version, VERSION, VERSION) and marker.primary_id == PRIMARY_ID \
+	return SurvivalContracts.integer(marker.version, VERSION, SOURCE_VERSION) and marker.primary_id == PRIMARY_ID \
 		and marker.optional_id is String and not marker.optional_id.is_empty() and marker.optional_id != PRIMARY_ID \
 		and anchor is Array and anchor.size() == 2 and SurvivalContracts.number(anchor[0]) and SurvivalContracts.number(anchor[1]) \
 		and SurvivalContracts.number(marker.direct) and marker.direct > 0.0 \
@@ -39,7 +40,7 @@ static func cell_rect(bounds: Rect2, cell: Vector2i) -> Rect2:
 	return Rect2(origin, (bounds.end - origin).min(Vector2.ONE * CELL))
 
 
-static func freeze(action: Dictionary) -> Dictionary:
+static func freeze(action: Dictionary, version: int = SOURCE_VERSION) -> Dictionary:
 	if not _eligible(action):
 		return action
 	var toolbox: String = WorkshopSiteV1.site_id(action)
@@ -49,7 +50,8 @@ static func freeze(action: Dictionary) -> Dictionary:
 		return action
 	ValueProofCache.remember(proof, marker)
 	var result: Dictionary = action.duplicate(false)
-	result.recon = marker
+	result.recon = marker.duplicate(false)
+	result.recon.version = version
 	return result
 
 

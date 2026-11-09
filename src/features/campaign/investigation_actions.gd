@@ -89,7 +89,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 		if weapon_affixes and not ContentWaveV1.eligible(candidate) and WeaponInventory.affix_eligible(candidate):
 			candidate.weapon_affix_policy = WeaponInventory.AFFIX_POLICY_VERSION
 		if recon:
-			candidate = ReconActionV1.freeze(candidate)
+			candidate = ReconActionV1.freeze(candidate, int(base.journey.campaign.recon_policy))
 		result[index] = candidate
 		fingerprints[candidate.id] = RecordEncoding.fingerprint(candidate)
 	var frozen: Dictionary = {"offers":result, "fingerprints":fingerprints}

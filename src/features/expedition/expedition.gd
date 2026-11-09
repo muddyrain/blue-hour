@@ -1492,6 +1492,10 @@ func _update_search(delta: float) -> void:
 			site.progress += delta
 			if is_equal_approx(site.progress, site.seconds):
 				site.progress = site.seconds
+			var worked: float = minf(site.progress, site.seconds) - prior_progress
+			if worked > 0.0:
+				var start: float = elapsed - delta
+				recon_knowledge.record_work(actor.member_id, actor.position, start, minf(elapsed, start + worked))
 		else:
 			site.progress += delta / (actor.trait_search_factor * actor.persona_work_factor * (BuildItems.frozen_factors(supply.generated.build).work if build_mode() else 1.0))
 		if site.progress > prior_progress and _is_event_site(site) and task_event.work_at < 0.0:
@@ -2560,7 +2564,7 @@ func _update_recon_knowledge() -> void:
 	var changed: bool = false
 	for actor: FieldActor in survivors:
 		if actor.health > 0.0 and actor.visible and actor.activity != FieldActor.Activity.SEARCHING:
-			if recon_knowledge.reveal(actor.position):
+			if recon_knowledge.observe(actor.member_id, actor.position, elapsed):
 				changed = true
 	if changed:
 		refresh_recon_view()

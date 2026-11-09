@@ -104,7 +104,7 @@ static func event_sortie_enabled(value: Variant) -> bool:
 
 static func recon_enabled(value: Variant) -> bool:
 	return action_choices_enabled(value) and SurvivalContracts.integer(value.get("recon_policy"),
-		ReconActionV1.VERSION, ReconActionV1.VERSION)
+		ReconActionV1.VERSION, ReconActionV1.SOURCE_VERSION)
 
 
 static func campaign_pressure_enabled(value: Variant) -> bool:

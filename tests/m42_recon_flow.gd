@@ -72,6 +72,8 @@ func _resume() -> void:
 	if stage == "hound":
 		await _hound_case(world)
 	elif stage in ["a", "t4-fault"]:
+		if stage == "t4-fault" and not await _source_rejections(world):
+			return
 		await _direct(world)
 	else:
 		await _recon_begin(world)
@@ -122,7 +124,7 @@ func _protected_offers(camp: Dictionary, offers: Array[Dictionary]) -> void:
 		if site.id == ReconActionV1.PRIMARY_ID:
 			site.point = source.layout.bus.door.duplicate()
 	var before: String = RecordEncoding.fingerprint(source)
-	var fallback: Dictionary = ReconActionV1.freeze(source)
+	var fallback: Dictionary = ReconActionV1.freeze(source, ReconActionV1.SOURCE_VERSION)
 	_check(not fallback.has("recon") and before == RecordEncoding.fingerprint(fallback),
 		"T0 directed map with no legal recon anchor retains its source")
 
@@ -455,6 +457,60 @@ func _return_recon(world: Expedition, used_recon: bool) -> void:
 	_write("route-result.json", facts)
 
 
+func _source_rejections(world: Expedition) -> bool:
+	var transaction: RunTransaction = app.progress_session._transaction
+	var token: Dictionary = app.progress_session.token.duplicate(true)
+	var evidence: Dictionary = {}
+	for variant: String in ["all-explored-at-departure", "unworked-completion"]:
+		if variant == "unworked-completion":
+			await _until(world, func() -> bool: return world.elapsed >= 12.36)
+		app.open_pause_menu()
+		var valid: Dictionary = SortieSnapshot.capture(world)
+		var head: Dictionary = transaction.recover()
+		var genuine: bool = not valid.is_empty() and valid.recon.progress == 0.0 and valid.recon.work.is_empty()
+		if variant == "all-explored-at-departure":
+			genuine = genuine and world.elapsed == 0.0
+		else:
+			genuine = genuine and world.elapsed >= RECON_WORK and world.survivors.all(
+				func(actor: FieldActor) -> bool:
+					return actor.position.distance_to(world.recon_site.door) > ReconActionV1.WORK_RANGE)
+		_check(genuine and SortieSnapshot.problem(valid, head.receipt).is_empty(),
+			"T4 genuine idle snapshot provides an exact source for " + variant)
+		if not genuine:
+			return false
+		var forged: Dictionary = valid.duplicate(true)
+		var reason: String = "RECON_WORK_SOURCE"
+		if variant == "all-explored-at-departure":
+			var bitmap: PackedByteArray = String(forged.recon.bits).hex_decode()
+			bitmap.fill(0xff)
+			var tail: int = (world.recon_knowledge.columns * world.recon_knowledge.rows) % 8
+			if tail > 0:
+				bitmap[-1] = (1 << tail) - 1
+			forged.recon.bits = bitmap.hex_encode()
+			reason = "RECON_BITS_SOURCE"
+		else:
+			forged.recon.progress = RECON_WORK
+			forged.recon.completed = true
+		var preview: Dictionary = transaction.preview_suspend(token, forged)
+		var write: Dictionary = transaction.suspend(token, forged)
+		var unchanged: bool = transaction.recover().hash == head.hash
+		_check(preview.error != OK and write.error != OK and preview.get("reason") == reason
+			and write.get("reason") == reason and unchanged,
+			"T4 preview and writer reject " + variant + " with unchanged live head")
+		if not unchanged:
+			return false
+		var destination: String = output.path_join("forged-" + variant)
+		_copy_forged_record(transaction._journal.directory, destination, _forged_receipt(head, token, forged))
+		var replay: Dictionary = ReceiptJournal.new(destination).read_all()
+		_check(replay.error != OK and replay.get("reason") == reason,
+			"T4 readback of exact forged record rejects " + variant)
+		evidence[variant] = {"elapsed":world.elapsed, "actual_progress":valid.recon.progress,
+			"preview":preview.get("reason", ""), "write":write.get("reason", ""), "readback":replay.get("reason", "")}
+		await _unpause(world)
+	_write("recon-source-rejections.json", evidence)
+	return true
+
+
 func _history(world: Expedition) -> void:
 	var station: Expedition.SearchSite = world.recon_site
 	var transaction: RunTransaction = app.progress_session._transaction
@@ -505,30 +561,43 @@ func _history(world: Expedition) -> void:
 	var copied: Array[Dictionary] = []
 	for variant: String in ["bits", "progress"]:
 		var forged: Dictionary = valid.duplicate(true)
-		var expected: String = "RECON_HISTORY_BITS" if variant == "bits" else "RECON_HISTORY_PROGRESS"
+		var expected: String = "RECON_BITS_SOURCE" if variant == "bits" else "RECON_HISTORY_PROGRESS"
 		if variant == "bits":
 			forged.recon.bits = "0".repeat(String(forged.recon.bits).length())
+			_check(SortieSnapshot.problem(forged, death.receipt) == expected,
+				"T4 forged bitmap rollback disagrees with the recorded reveal sources")
 		else:
-			forged.recon.progress = 0.5
-		_check(SortieSnapshot.problem(forged, death.receipt).is_empty(), "T4 adjacency alone accepts locally well-formed rollback of " + variant)
+			# Keep the same worker and ending time so the truncated work still
+			# agrees with the snapshot on its own. Receipt history must reject it.
+			var last_work: Array = forged.recon.work.back()
+			var removed: float = (float(last_work[2]) - float(last_work[1])) * 0.5
+			last_work[1] += removed
+			forged.recon.progress -= removed
+			_check(SortieSnapshot.problem(forged, death.receipt).is_empty(),
+				"T4 truncated work is locally valid before comparing claimed history")
 		var preview: Dictionary = transaction.preview_suspend(token, forged)
 		var write: Dictionary = transaction.suspend(token, forged)
 		_check(preview.error != OK and write.error != OK and preview.get("reason") == expected
 			and write.get("reason") == expected and transaction.recover().hash == death.hash,
 			"T4 real preflight and writer reject " + variant + " rollback without modifying the live head")
-		var next: Dictionary = death.receipt.duplicate(true)
-		next.phase = "SUSPEND_READY"
-		next.revision += 1
-		next.previous_hash = death.hash
-		next.envelope = SuspendRecord.make(forged, token, death.hash)
+		var next: Dictionary = _forged_receipt(death, token, forged)
 		var published: Dictionary = transaction._journal.append(next, death.hash)
 		_check(published.error != OK and published.get("reason") == expected and transaction.recover().hash == death.hash,
-			"T4 writer independently protects claimed history for " + variant)
+			"T4 journal writer rejects " + variant + " rollback")
 		var destination: String = output.path_join("forged-" + variant)
 		_copy_forged_record(transaction._journal.directory, destination, next)
 		copied.append({"directory":destination,"reason":expected})
 	_write("history.json", {"pid":OS.get_process_id(),"death_head":death.hash,"rejections":rejected,"forged":copied})
 	await _save_recon(world, "post-death")
+
+
+func _forged_receipt(head: Dictionary, token: Dictionary, world: Dictionary) -> Dictionary:
+	var next: Dictionary = head.receipt.duplicate(true)
+	next.phase = "SUSPEND_READY"
+	next.revision += 1
+	next.previous_hash = head.hash
+	next.envelope = SuspendRecord.make(world, token, head.hash)
+	return next
 
 
 func _copy_forged_record(source: String, destination: String, next: Dictionary) -> void:

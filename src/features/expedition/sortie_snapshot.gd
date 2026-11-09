@@ -258,6 +258,10 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 		participant_order.append(int(row.id))
 	if not _same({"v":ids},{"v":participant_order}):
 		return "WORLD_EXECUTION_ORDER"
+	if knowledge != null:
+		var source_issue: String = knowledge.source_problem(value)
+		if not source_issue.is_empty():
+			return source_issue
 	if (value.worker == 0) != value.active_site.is_empty() or (value.worker != 0 and (int(value.worker) not in ids or value.sites[value.active_site].searched)):
 		return "WORLD_WORKER_SOURCE"
 	if value.worker != 0 and int(_member(value.survivors,int(value.worker)).state.activity) not in ([1,2,4] if value.version==OUTDOOR_VERSION or magazine_version(value.version) else [1,2]):
@@ -690,8 +694,11 @@ static func _jobs_problem(value: Dictionary, ids: Array[int], knowledge: ReconKn
 		if knowledge != null and not recon_job and not knowledge.site_known(value.generated, job.site_id, door, value.recon.completed):
 			return "RECON_HIDDEN_WORK"
 		if job.phase=="working":
-			if recon_job and site.progress <= 0.0:
-				return "RECON_WORKING_PROGRESS"
+			if recon_job:
+				if site.progress <= 0.0:
+					return "RECON_WORKING_PROGRESS"
+				if site.has("work") and int(site.work.back()[0]) != int(job.member_id):
+					return "RECON_WORK_SOURCE"
 			if job.site_id == EventSortieV1.site_id(value.generated) and (value.task_event.branch == "" or site.progress <= 0.0):
 				return "SORTIE_EVENT_WORKING"
 			if actor.activity != (FieldActor.Activity.RECOVERING if outdoor else FieldActor.Activity.SEARCHING) or actor.visible != outdoor or _vec(actor.position).distance_to(door)>14.0 or not actor.path.is_empty() or actor._path_index!=0:

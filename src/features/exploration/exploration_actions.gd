@@ -203,7 +203,7 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 	if workshop_tool:
 		expected = WorkshopSiteV1.freeze(expected)
 	if recon:
-		expected = ReconActionV1.freeze(expected)
+		expected = ReconActionV1.freeze(expected, int(value.recon.version))
 		if not expected.has("recon"):
 			return "RECON_ACTION_CONTEXT"
 	var matches: bool = signature == RecordEncoding.fingerprint(expected) if mission else TransactionReceipt.same(value,expected)

@@ -66,6 +66,7 @@ static func initial(base: Dictionary, identity: String, rules: Dictionary, previ
 		"deaths":previous.get("deaths", []).duplicate(true), "envelope":{}, "camp_key":"", "root_id":previous.get("root_id", "")}
 	if (rules.get("data_version")==8 or (rules.get("data_version")==9 or rules.get("data_version")==10)): value.support=[]
 	if PowerAuthority.mode(rules): value.powers=[]
+	if BurstAuthorityV1.mode(rules): value.burst={}
 	if FieldJoinState.is_family(base):
 		value.joins = []
 	return value
@@ -102,7 +103,7 @@ static func _profiled_problem(value: Variant) -> String:
 	if not value is Dictionary or not SurvivalContracts.json_value(value, -2):
 		return "RECEIPT_FIELDS"
 	var field: bool = value.get("base") is Dictionary and FieldJoinState.is_family(value.base)
-	if value.size() != KEYS.size()+int(field)+int(PowerAuthority.mode(value.get("rules",{})))+int((value.get("rules",{}).get("data_version")==8 or (value.get("rules",{}).get("data_version")==9 or value.get("rules",{}).get("data_version")==10))) or (field and not value.get("joins") is Array):
+	if value.size() != KEYS.size()+int(field)+int(PowerAuthority.mode(value.get("rules",{})))+int(BurstAuthorityV1.mode(value.get("rules",{})))+int((value.get("rules",{}).get("data_version")==8 or (value.get("rules",{}).get("data_version")==9 or value.get("rules",{}).get("data_version")==10))) or (field and not value.get("joins") is Array):
 		return "RECEIPT_FIELDS"
 	for key: String in KEYS:
 		if not value.has(key):
@@ -158,6 +159,9 @@ static func _profiled_problem(value: Variant) -> String:
 		var at: float=float(value.powers.back().get("at",-1)) if not value.powers.is_empty() and value.powers.back() is Dictionary and SurvivalContracts.number(value.powers.back().get("at")) else 0.0
 		var power_issue: String=SpecialPowers.problem(powers,token_for_compat(value),PowerState.loadout(value.rules.mission.generated.powers),at)
 		if not power_issue.is_empty(): return power_issue
+	if BurstAuthorityV1.mode(value.rules):
+		var burst_issue: String = BurstAuthorityV1.receipt_problem(value)
+		if not burst_issue.is_empty(): return burst_issue
 	var ids: Array[int] = []
 	for row: Variant in value.health:
 		if not row is Dictionary or row.size() != 2 or not SurvivalContracts.integer(row.get("id"), 1, SurvivalContracts.MAX_ID):
@@ -242,6 +246,11 @@ static func _profiled_transition(previous: Dictionary, next: Dictionary) -> Stri
 	if PowerAuthority.mode(next.rules):
 		issue=PowerAuthority.transition(previous,next)
 		if not issue.is_empty(): return issue
+	var burst_added: bool = false
+	if BurstAuthorityV1.mode(next.rules):
+		issue = BurstAuthorityV1.transition(previous, next)
+		if not issue.is_empty(): return issue
+		burst_added = previous.burst.is_empty() and not next.burst.is_empty()
 	if previous.phase == "SUSPEND_READY":
 		return "" if next.phase == "RESUME_CLAIMED" and _same_frozen(previous,next) else "SUSPEND_MUST_BE_CLAIMED"
 	if next.phase == "RESUME_CLAIMED":
@@ -250,7 +259,7 @@ static func _profiled_transition(previous: Dictionary, next: Dictionary) -> Stri
 		return "SUSPEND_HEAD_OR_PHASE"
 	if previous.phase == "COMMITTED" or (previous.phase == "RESULT_READY" and next.phase != "COMMITTED") or next.phase == "STARTED":
 		return "ILLEGAL_TRANSITION"
-	if next.deaths.size() < previous.deaths.size() or next.deaths.size() > previous.deaths.size() + 1:
+	if next.deaths.size() < previous.deaths.size() or (next.deaths.size() > previous.deaths.size() + 1 and not burst_added):
 		return "DEATH_ORDER"
 	for index: int in range(previous.deaths.size()):
 		if not same(next.deaths[index], previous.deaths[index]):
@@ -271,7 +280,7 @@ static func _profiled_transition(previous: Dictionary, next: Dictionary) -> Stri
 	if next.phase == "COMMITTED":
 		return "RESULT_NOT_READY"
 	var added: bool = next.deaths.size() > previous.deaths.size()
-	if added and next.phase != "DEATH_CONFIRMED":
+	if added and next.phase != "DEATH_CONFIRMED" and not burst_added:
 		return "DEATH_NOT_CHECKPOINTED"
 	if added:
 		var checkpoint: Dictionary = next.deaths.back()

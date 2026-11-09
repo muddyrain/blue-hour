@@ -170,18 +170,27 @@ static func mission_card_text(value: Dictionary, base: Dictionary = {}, rations:
 			reward = "损坏武器 1 件，可回营维修"
 			for site: Dictionary in value.sites:
 				if site.id == first and site.weapon:
-					var weapon: String = WeaponInventory.definition(site.drop.weapon_id).display_name
+					var definition: WeaponDefinition = WeaponInventory.definition(site.get("drop", {}).get("weapon_id", ""))
+					if definition == null:
+						break
+					var weapon: String = definition.display_name
 					var damaged: bool = true
+					var item: Dictionary = {}
 					reward = "损坏%s 1 件，可回营维修" % weapon
 					if not base.is_empty():
 						var sortie_id: String = "%s:%d" % [base.profile_id, int(base.settled_sorties) + 1]
-						var item: Dictionary = WeaponInventory.site_reward(sortie_id, value, site, false)
-						damaged = item.condition == "damaged"
+						item = WeaponInventory.site_reward(sortie_id, value, site, WeaponState.is_family(base))
+						damaged = item.get("condition", "damaged") == "damaged"
 						reward = "损坏%s ×1，先维修再配装" % weapon if damaged else "%s ×1，可直接配装" % weapon
 					if sortie_risk:
 						reward = ("损坏" if damaged else "") + "%s ×1" % weapon
+					if not item.is_empty() and damaged and String(definition.id) == CombatEquipment.HAMMER_ID:
+						var quote: Dictionary = WeaponInventory.repair_offer(base, item)
+						reward += " · %s维修 %d 币" % [quote.source, int(quote.cost)]
 					break
-			if value.has("gear_build_policy") and not value.build.drops.is_empty():
+			if ContentWaveV1.marked(value):
+				reward += _wave_rewards(value)
+			elif value.has("gear_build_policy") and not value.build.drops.is_empty():
 				reward += " · 被动道具 %d 件" % value.build.drops.size()
 			if sortie_risk:
 				return _sortie_risk_card_text(value, level, reward)
@@ -190,22 +199,36 @@ static func mission_card_text(value: Dictionary, base: Dictionary = {}, rations:
 				route = "宽装卸口、折角维修道汇合，回收 %d 秒" % int(level.work_seconds[first])
 			risk = "可受击，首次回收最多增援 %d 名" % int(value.parameters.reinforcements)
 		"equipment":
-			reward = CampaignRules.CLUE_NAMES[value.investigation.clue_id]
+			reward = CampaignRules.CLUE_NAMES.get(value.get("investigation", {}).get("clue_id"), "主装备点")
+			if ContentWaveV1.marked(value):
+				reward += _wave_rewards(value)
 			route = "深入约 %d 秒，回车约 %d 秒" % [outbound, _mission_route_seconds(level, first, "bus")]
 			risk = "返程较远，额外搜刮会延后回车"
 		"rescue":
-			var recruit: int = int(value.recruit)
-			reward = "同行者 %s" % SurvivorRoster.definition(recruit).default_display_name
+			reward = RescueTarget.ANONYMOUS_NAME + " ×1"
+			var size: String = {"small":"小型", "medium":"中型", "large":"大型"}[value.layout["size"]]
 			route = "住宅簇单程约 %d 秒，援救 %d 秒" % [outbound, int(level.work_seconds[first])]
 			if value.layout.has("rescue_court"):
 				route = "正门直达、侧巷绕墙，援救 %d 秒" % int(level.work_seconds[first])
+			route = size + "街区 · " + route
 			risk = "需要护送同行者生还归航"
 			if not base.is_empty():
-				reward += "｜主特长 %s" % TraitRules.NAMES[TraitRules.role({"id": recruit}) - 1]
 				risk = "现场接纳，生还归航确认入队"
-				if recruit == FirstAidV1.SOURCE_ID and CampaignRules.first_aid_enabled(base.get("journey", {}).get("campaign")):
-					reward = "%s · 确认入队后下次出击可急救" % SurvivorRoster.definition(recruit).default_display_name
 	return "主收益 · %s%s\n路线 · %s\n风险 · %s" % [reward, decision, route, risk]
+
+
+static func _wave_rewards(value: Dictionary) -> String:
+	var build: Dictionary = value.get("build", {})
+	var items: Dictionary = build.get("policy", {}).get("items", {})
+	var rewards: PackedStringArray = []
+	for id: String in build.get("drops", []):
+		var item: String = items.get(id, {}).get("name", "")
+		if not item.is_empty():
+			rewards.append(item)
+	var power: String = PowerActions.name_for(value.get("powers", {}).get("sample", ""))
+	if not power.is_empty():
+		rewards.append(power)
+	return " · " + " · ".join(rewards) if not rewards.is_empty() else ""
 
 
 static func _sortie_risk_card_text(value: Dictionary, level: Dictionary, reward: String) -> String:

@@ -209,7 +209,7 @@ static func _found(receipt: Dictionary, battle: Dictionary, unlock_hash: String)
 	var before: Dictionary = receipt.base.journey.build
 	var generated: Dictionary = receipt.rules.mission.generated
 	var after: Dictionary = TransactionReceipt.camp(receipt).journey.build
-	return before.catalog.unlock == unlock_hash and generated.get("gear_build_policy") == BuildItems.CATALOG_POOL \
+	return before.catalog.unlock == unlock_hash and BuildItems.has_catalog(int(generated.get("gear_build_policy", 0))) \
 		and BuildItems.FILTER not in before.owned and BuildItems.FILTER in after.owned \
 		and BuildItems.FILTER in BuildState.acquired(generated, battle.site_facts, battle.evacuated)
 

@@ -83,6 +83,27 @@ func _accept_power(before_world: Dictionary, request: Dictionary) -> Dictionary:
 	return _suspend(after,true,{}, {"before":before_world,"request":request})
 
 
+func accept_burst(token: Dictionary, before_world: Dictionary) -> Dictionary:
+	return _execute(_checked.bind(token, _accept_burst.bind(before_world)))
+
+
+func _accept_burst(before_world: Dictionary) -> Dictionary:
+	var loaded: Dictionary = _recover()
+	if loaded.error != OK:
+		return loaded
+	var receipt: Dictionary = loaded.receipt
+	if not BurstAuthorityV1.mode(receipt.rules):
+		return _error(ERR_INVALID_DATA, "BURST_MODE_REQUIRED")
+	if not receipt.burst.is_empty():
+		return loaded if receipt.phase in ["SUSPEND_READY", "RESUME_CLAIMED"] \
+			and BurstAuthorityV1.same_event(before_world, receipt.envelope.get("burst_proposal")) \
+			else _error(ERR_INVALID_DATA, "BURST_RETRY_CONFLICT")
+	var proposal: Dictionary = BurstAuthorityV1.propose(before_world, receipt)
+	if proposal.is_empty():
+		return _error(ERR_INVALID_DATA, "BURST_PROPOSAL_REJECTED")
+	return _suspend(proposal.world, true, {}, {}, {"before":before_world, "deaths":proposal.deaths})
+
+
 func checkpoint(token: Dictionary, health: Array) -> Dictionary:
 	return _execute(_checked.bind(token, _checkpoint.bind(health)))
 
@@ -409,7 +430,7 @@ func _prepare(envelope: Dictionary, camp_key: String = "") -> Dictionary:
 	return _append(next, loaded.hash)
 
 
-func _suspend(world: Dictionary, publish: bool = true, support_proposal: Dictionary = {}, power_proposal: Dictionary = {}) -> Dictionary:
+func _suspend(world: Dictionary, publish: bool = true, support_proposal: Dictionary = {}, power_proposal: Dictionary = {}, burst_proposal: Dictionary = {}) -> Dictionary:
 	var loaded: Dictionary = _recover()
 	if loaded.error != OK:
 		return loaded
@@ -427,10 +448,14 @@ func _suspend(world: Dictionary, publish: bool = true, support_proposal: Diction
 	next.health = health
 	if not support_proposal.is_empty(): next.support=world.support.accepted.duplicate(true)
 	if not power_proposal.is_empty(): next.powers=world.powers.accepted.duplicate(true)
+	if not burst_proposal.is_empty():
+		next.burst = world.combat.burst.event.duplicate(true)
+		next.deaths.append_array(burst_proposal.deaths.duplicate(true))
 	next.phase = "SUSPEND_READY"
 	next.envelope = SuspendRecord.make(world,token_for(next),loaded.hash)
 	if not support_proposal.is_empty(): next.envelope.support_proposal=support_proposal.duplicate(true)
 	if not power_proposal.is_empty(): next.envelope.power_proposal=power_proposal.duplicate(true)
+	if not burst_proposal.is_empty(): next.envelope.burst_proposal = burst_proposal.before.duplicate(true)
 	next.previous_hash = loaded.hash
 	next.revision += 1
 	var issue: String = TransactionReceipt.transition(loaded.receipt,next)

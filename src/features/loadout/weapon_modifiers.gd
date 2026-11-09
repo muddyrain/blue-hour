@@ -40,6 +40,11 @@ static func problem(item: Dictionary) -> String:
 			return "WEAPON_INSTANCE_STRINGS"
 	if item.affixes.size()!=(0 if item.quality=="common" else 1):
 		return "WEAPON_MODIFIER_COUNT"
+	if item.weapon_id == CombatEquipment.HAMMER_ID:
+		var drop: Variant = item.get("drop")
+		if not drop is Dictionary or drop.get("version") != WeaponInventory.HAMMER_DROP_VERSION \
+				or item.weapon_level != 1 or item.quality != "common":
+			return "WEAPON_HAMMER_SOURCE"
 	var affix_drop: bool = _site_affix_drop(item)
 	if affix_drop and item.weapon_id != "long_rifle":
 		return "WEAPON_AFFIX_SOURCE"

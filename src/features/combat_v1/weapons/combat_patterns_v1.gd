@@ -4,6 +4,11 @@ extends RefCounted
 
 const AXE_ID: String = "fire_axe_v1"
 const SHOTGUN_ID: String = "shotgun_v1"
+const HAMMER_ID: String = "rescue_hammer_v1"
+const HAMMER: Dictionary = {
+	"damage":48.0, "interval":1.25, "windup":0.32, "range":54.0,
+	"angle_degrees":75.0, "max_targets":1, "repair_cost":10,
+}
 const POLICY: Dictionary = {
 	"axe":{"damage":34.0, "interval":1.0, "windup":0.18, "range":50.0,
 		"angle_degrees":110.0, "max_targets":3, "repair_cost":10},
@@ -15,12 +20,18 @@ const POLICY: Dictionary = {
 
 static func axe_plan(origin: Vector2, heading: Vector2, targets: Array[Dictionary],
 		obstacles: Array[ShotObstacle], reach: float = 50.0) -> Array[Dictionary]:
+	return melee_plan(AXE_ID, origin, heading, targets, obstacles, reach)
+
+
+static func melee_plan(weapon_id: String, origin: Vector2, heading: Vector2, targets: Array[Dictionary],
+		obstacles: Array[ShotObstacle], reach: float) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
-	if not _valid_frame(origin, heading, reach) or not _valid_targets(targets):
+	var pattern: Dictionary = melee_policy(weapon_id)
+	if pattern.is_empty() or not _valid_frame(origin, heading, reach) or not _valid_targets(targets):
 		return result
 	var direction: Vector2 = heading.normalized()
 	var candidates: Array[Dictionary] = []
-	var threshold: float = cos(deg_to_rad(float(POLICY.axe.angle_degrees) * 0.5))
+	var threshold: float = cos(deg_to_rad(float(pattern.angle_degrees) * 0.5))
 	for target: Dictionary in targets:
 		var offset: Vector2 = target.foot - origin
 		var distance: float = offset.length_squared()
@@ -36,9 +47,15 @@ static func axe_plan(origin: Vector2, heading: Vector2, targets: Array[Dictionar
 	candidates.sort_custom(_nearer)
 	for candidate: Dictionary in candidates:
 		result.append({"id":int(candidate.id), "hits":1})
-		if result.size() == int(POLICY.axe.max_targets):
+		if result.size() == int(pattern.max_targets):
 			break
 	return result
+
+
+static func melee_policy(weapon_id: String) -> Dictionary:
+	if weapon_id == AXE_ID:
+		return POLICY.axe
+	return HAMMER if weapon_id == HAMMER_ID else {}
 
 
 static func shotgun_plan(origin: Vector2, muzzle: Vector2, heading: Vector2,

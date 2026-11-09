@@ -112,6 +112,8 @@ var combat_delta: float=0.0
 var powers: Dictionary = {}
 var power_commit: Callable
 var pending_power: Dictionary = {}
+var burst_commit: Callable
+var pending_burst: Dictionary = {}
 var power_frozen: bool = false
 var power_panel: PowerSlotPanel
 var second_power_panel: PowerSlotPanel
@@ -280,7 +282,7 @@ func _ready() -> void:
 			actor.weapon_instance_id = item.instance_id
 			actor.weapon_definition = WeaponModifiers.combat_definition(item)
 		actor.visual.set_weapon(actor.weapon_definition.presentation)
-		if combat_mode() and String(actor.weapon_definition.id) in ["fire_axe_v1","shotgun_v1"]: combat.action(actor)
+		if combat_mode() and CombatRuntime.patterned(String(actor.weapon_definition.id)): combat.action(actor)
 		if (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9)))):
 			if not CombatEquipment.melee(String(actor.weapon_definition.id)): actor.magazine=WeaponMagazine.new(actor.weapon_instance_id,String(actor.weapon_definition.id))
 		if build_mode(): apply_build(actor)
@@ -335,6 +337,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _draw() -> void:
+	if combat.burst != null:
+		combat.burst.draw_warning(self)
 	for job: Dictionary in search_assignments.ordered():
 		var actor: FieldActor = search_member(int(job.member_id))
 		if actor != null and actor.activity == FieldActor.Activity.MOVING:
@@ -417,6 +421,9 @@ func step(delta: float) -> void:
 	if phase == Phase.FINISHED or is_paused or suspend_sealed:
 		_update_ui()
 		return
+	if combat.burst != null and combat.burst.state.phase == "confirming":
+		accept_burst(support_world())
+		return
 	if combat_mode() and not combat.toxic.pending.is_empty():
 		combat.advance_toxic(self,0.0)
 		if is_paused: return
@@ -488,6 +495,8 @@ func step(delta: float) -> void:
 	# Resolve after the original attacks so a lethal hit on the last windup frame wins.
 	if combat.screamer != null and not is_paused and living_count() > 0:
 		combat.screamer.advance(self, delta)
+	if combat.burst != null and not is_paused and living_count() > 0:
+		combat.burst.advance(self, delta)
 	if combat_mode():
 		for actor: FieldActor in survivors: combat.present(actor)
 	if encounter!=null and not is_paused:
@@ -576,6 +585,9 @@ func promote_target(event: Dictionary, restoring: bool = false) -> void:
 
 
 func toggle_pause() -> void:
+	if not pending_burst.is_empty():
+		accept_burst(pending_burst)
+		return
 	if not pending_power.is_empty():
 		_accept_power(pending_power.before,pending_power.request)
 		return
@@ -951,6 +963,8 @@ func _spawn_enemy(forced_kind: String = "", pressure_point: Vector2 = Vector2.IN
 	_spawn_count += 1
 	if combat.screamer != null and enemy.enemy_behavior.kind == ScreamerPolicyV1.KIND:
 		combat.screamer.spawned(self, enemy)
+	if combat.burst != null and enemy.enemy_behavior.kind == BurstRuntimeV1.KIND:
+		combat.burst.spawned(self, enemy)
 	_record_spawn(&"spawned", point, enemy.actor_id)
 
 	return {"reason":"spawned","enemy_id":enemy.actor_id}
@@ -1100,7 +1114,7 @@ func _nearest_target(actor: FieldActor, candidates: Array[FieldActor], limit: fl
 
 func _update_combat() -> void:
 	for actor: FieldActor in survivors:
-		if combat_mode() and String(actor.weapon_definition.id) in ["fire_axe_v1","shotgun_v1"]:
+		if combat_mode() and CombatRuntime.patterned(String(actor.weapon_definition.id)):
 			combat.attack(self,actor,combat_delta)
 			if is_paused: return
 			continue
@@ -1124,6 +1138,8 @@ func _update_combat() -> void:
 		var target: FieldActor = _nearest_target(enemy, survivors, 28.0)
 		var damage: float = tuning.enemy_damage
 		var behavior: EnemyBehavior = enemy.enemy_behavior
+		if behavior != null and behavior.kind == BurstRuntimeV1.KIND and combat.burst != null and combat.burst.state.phase != "released":
+			continue
 		if behavior!=null and behavior.kind==EnemyRules.RUSH and target!=null and not behavior.legal(self,enemy,target,EnemyRules.POLICY.melee_range):
 			target = null
 		if behavior!=null and behavior.kind==EnemyRules.HEAVY:
@@ -1141,6 +1157,8 @@ func _update_combat() -> void:
 				continue
 			damage = EnemyRules.POLICY.heavy_damage
 		if target != null and enemy.cooldown <= 0.0:
+			if behavior != null:
+				damage = CombatRuntime.direct_melee_damage(behavior.kind, damage, powers, elapsed)
 			var direction: Vector2 = (target.position - enemy.position).normalized()
 			var health_before: float = target.health
 			if not target.take_damage(damage, direction):
@@ -1180,6 +1198,8 @@ func _reap_defeated_enemies() -> void:
 		if enemies[index].activity == FieldActor.Activity.DOWN:
 			if combat.screamer != null:
 				combat.screamer.removed(self, enemies[index].actor_id)
+			if combat.burst != null:
+				combat.burst.removed(self, enemies[index].actor_id)
 			if enemies[index].enemy_behavior!=null:
 				enemies[index].enemy_behavior.cancel(self,enemies[index])
 			_corpses.append(enemies[index])
@@ -1402,8 +1422,8 @@ func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
 	if site.kind == &"cash" and not is_practice and (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
 		_show_notice("获得损坏%s · 回营后入库维修"%WeaponInventory.definition(weapon_loot.back().weapon_id).display_name)
 		print("BH_WEAPON_FOUND %s" % JSON.stringify(weapon_loot.back()))
-	if power_mode() and site.id==&"cash" and supply.generated.type=="equipment":
-		_show_notice("已携带能力样本：%s · 归航确认后入库"%SpecialPowers.POLICY[supply.generated.powers.sample].name if not supply.generated.powers.sample.is_empty() else "特殊能力已集齐。")
+	if power_mode() and site.id == &"cash" and (supply.generated.type == "equipment" or not supply.generated.powers.sample.is_empty()):
+		_show_notice("已携带能力样本：%s · 归航确认后入库"%SpecialPowers.definition(supply.generated.powers.sample).name if not supply.generated.powers.sample.is_empty() else "特殊能力已集齐。")
 	if build_mode() and site.id==&"cash" and not supply.generated.build.drops.is_empty():
 		var names: PackedStringArray=[]
 		for item: String in supply.generated.build.drops: names.append(supply.generated.build.policy.items[item].name)
@@ -1559,7 +1579,7 @@ func _make_ui() -> void:
 		power_panel.position=Vector2(16,300)
 		power_panel.activation_requested.connect(request_power)
 		_hud.view.add_child(power_panel)
-		if powers.get("version") == SpecialPowers.PROGRESSION_VERSION and powers.loadout.slots.size() == 2:
+		if SpecialPowers.progression_version(powers.get("version")) and powers.loadout.slots.size() == 2:
 			second_power_panel = PowerSlotPanel.new()
 			second_power_panel.slot_index = 1
 			second_power_panel.position = Vector2(16, 378)
@@ -1974,7 +1994,7 @@ func _site_weapon(site: SearchSite) -> Dictionary:
 
 
 func _ammo_text(actor: FieldActor) -> String:
-	if CombatEquipment.melee(String(actor.weapon_definition.id)): return "消防斧 · 近战"
+	if CombatEquipment.melee(String(actor.weapon_definition.id)): return actor.weapon_definition.display_name + " · 近战"
 	if actor.magazine==null:return "%s · 旧规则"%actor.weapon_definition.display_name if actor.weapon_definition!=null else ""
 	# Keep the task destination readable; reload feedback uses the ammunition line.
 	if has_search_job(actor.member_id) and actor.magazine.reloading:
@@ -2036,6 +2056,38 @@ func support_world() -> Dictionary:
 	is_paused=paused
 	FreezeProfile.leave("support.capture", stamp)
 	return value
+
+func accept_burst(before: Dictionary) -> bool:
+	var result: Dictionary = burst_commit.call(before) if burst_commit.is_valid() else {"error":ERR_UNAVAILABLE}
+	if result.get("error", ERR_UNAVAILABLE) != OK:
+		pending_burst = before
+		is_paused = true
+		support_aiming = false
+		_show_notice("爆囊冲击待确认 · 已暂停，继续后重试。")
+		print("BH_BURST_PENDING ", result.get("reason", "BURST_COMMIT_UNAVAILABLE"))
+		_update_ui()
+		queue_redraw()
+		return false
+	pending_burst = {}
+	# The damage and original death facts already share the same durable publication.
+	for actor: FieldActor in enemies:
+		actor.free()
+	enemies.clear()
+	var issue: String = SortieSnapshot.apply(self, result.world)
+	assert(issue.is_empty(), issue)
+	is_paused = false
+	var event: Dictionary = combat.burst.state.event
+	for hit: Dictionary in event.hits:
+		var actor: FieldActor = search_member(int(hit.member_id))
+		_hit_effect(actor.position, float(hit.before) - float(hit.after), true)
+		combat_feedback.emit({"kind":"burst_hit", "member_id":int(hit.member_id), "actor":actor.actor_id,
+			"enemy_id":event.source_id, "enemy_type":BurstRuntimeV1.KIND, "health":hit.after,
+			"applied_damage":float(hit.before) - float(hit.after), "elapsed":elapsed})
+	combat.burst.feedback(self, "burst_released")
+	_show_notice("爆囊冲击 · 命中 %d 人。" % event.hits.size() if not event.hits.is_empty() else "爆囊冲击 · 全员避开。")
+	_update_ui()
+	return true
+
 
 func request_heal() -> bool:
 	if not support_available(): return false
@@ -2099,6 +2151,8 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 	var after: Dictionary=result.world
 	var interrupted: bool = before.get("combat", {}).get("screamer", {}).get("phase") == "windup" \
 		and after.get("combat", {}).get("screamer", {}).get("phase") == "cancelled"
+	var burst_interrupted: bool = before.get("combat", {}).get("burst", {}).get("phase") == "windup" \
+		and after.get("combat", {}).get("burst", {}).get("phase") == "cancelled"
 	print("BH_SUPPORT "+JSON.stringify({"kind":request.kind,"status":"ACCEPTED","sequence_before":before.support.sequence,"sequence":after.support.sequence,"cooldowns":after.support.cooldowns,"kills_before":before.sim.kills,"kills":after.sim.kills,"facts":after.support.accepted.back().facts,"elapsed":after.sim.elapsed}))
 	# All fallible validation and I/O preceded this visible state replacement.
 	var preserve_aim: bool = request.kind == FirstAidV1.KIND and support_aiming
@@ -2114,6 +2168,9 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 		support_aim.impact(SortieSnapshot._vec(request.payload.point),request.payload.radius)
 		var hits: int=request.payload.targets.size()
 		var notice: String = "空袭命中 · %d 个目标" % hits if hits > 0 else "空袭已落地"
+		if burst_interrupted:
+			combat.burst.feedback(self, "burst_cancelled")
+			notice += " · 爆囊冲击取消"
 		if interrupted:
 			combat.screamer.report_cancelled(self, notice)
 		else:
@@ -2204,7 +2261,8 @@ func refresh_power_factors() -> void:
 	power_frozen=SpecialPowers.frozen(powers,elapsed) if power_mode() else false
 	for actor: FieldActor in survivors: actor.power_move_factor=factor
 	for actor: FieldActor in enemies:
-		actor.motion_locked = power_frozen or (combat.screamer != null and combat.screamer.holds(actor))
+		actor.motion_locked = power_frozen or (combat.screamer != null and combat.screamer.holds(actor)) \
+			or (combat.burst != null and combat.burst.holds(actor))
 
 func request_power(slot: int = 0) -> bool:
 	if not power_mode() or not support_available() or not pending_power.is_empty() or not survivors.any(func(actor:FieldActor)->bool:return actor.health>0): return false
@@ -2227,7 +2285,7 @@ func _accept_power(before: Dictionary, request: Dictionary) -> bool:
 	powers=result.world.powers.duplicate(true)
 	is_paused=false
 	refresh_power_factors()
-	_show_notice("%s已生效 · 本次使用已保存"%SpecialPowers.POLICY[request.ability_id].name)
+	_show_notice("%s已生效 · 本次使用已保存"%SpecialPowers.definition(request.ability_id).name)
 	print("BH_POWER "+JSON.stringify({"status":"ACCEPTED","event":SpecialPowers.event_at(powers,int(request.get("slot",0))),"elapsed":elapsed}))
 	_update_ui()
 	return true
@@ -2249,16 +2307,18 @@ func _present_power_slot(panel: PowerSlotPanel, slot: int) -> void:
 	var used: bool = not SpecialPowers.event_at(powers, slot).is_empty()
 	var status: String = "营地装配" if id.is_empty() else "持续 %.1f 秒" % remaining if remaining > 0.0 else "已用" if used else "就绪"
 	var upgraded: bool = powers.get("loadout", {}).get("investments", {}).get("freeze", 0) > 0
-	panel.present("特殊能力空槽" if id.is_empty() else SpecialPowers.POLICY[id].name,
+	panel.present("特殊能力空槽" if id.is_empty() else SpecialPowers.definition(id).name,
 		status, remaining, SpecialPowers.duration(id, upgraded) if not id.is_empty() else 0.0,
 		support_available() and not id.is_empty() and not used, id)
 
 
 func _exploration_objective_rows() -> Array[Dictionary]:
 	var generated: Dictionary = supply.generated
+	var rescue_revealed: bool = rescue_target != null and rescue_target.revealed()
 	var rows: Array[Dictionary] = ExplorationSites.objective_rows(
 		{"type":generated.type,"objective":generated.objective,"optional_objectives":generated.exploration.optional_objectives},
-		WorldSites.facts(self),rescue_target!=null and rescue_target.status=="IN_FIELD_JOINED" and rescue_target.npc.health>0)
+		WorldSites.facts(self),rescue_revealed and rescue_target.npc.health > 0.0,
+		rescue_target.candidate_name() if rescue_revealed else "")
 	var investigation: Dictionary = generated.get("investigation", {})
 	if pump_station_mode():
 		var stopped: bool = station_stopped()

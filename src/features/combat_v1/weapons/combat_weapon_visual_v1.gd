@@ -11,17 +11,18 @@ var _grip: Vector2 = Vector2.ZERO
 
 
 func _draw() -> void:
-	if not visible or _mode != CombatPatternsV1.AXE_ID:
+	if not visible or not CombatEquipment.melee(_mode):
 		return
 	var pivot: Vector2 = _grip
 	var alpha: float = 0.0
-	var start: float = _heading.angle() - deg_to_rad(55.0)
+	var arc: float = deg_to_rad(float(CombatEquipment.melee_policy(_mode).angle_degrees))
+	var start: float = _heading.angle() - arc * 0.5
 	var finish: float = start
 	if _phase == "strike":
-		finish = start + deg_to_rad(110.0) * maxf(0.25, _progress)
+		finish = start + arc * maxf(0.25, _progress)
 		alpha = 0.70 * (1.0 - 0.35 * _progress)
 	elif _phase in ["recover", "recovery"] and _progress < 0.20:
-		finish = start + deg_to_rad(110.0)
+		finish = start + arc
 		alpha = 0.55 * (1.0 - _progress / 0.20)
 	if alpha > 0.0:
 		draw_arc(pivot, 34.0, start, finish, 16, Color(0.91, 0.83, 0.58, alpha * 0.25), 8.0, true)
@@ -37,7 +38,7 @@ func present(mode: String, heading: Vector2, phase: String, progress: float) -> 
 	_heading = heading.normalized() if heading.is_finite() and heading.length_squared() > 0.0 else Vector2.RIGHT
 	_phase = phase
 	_progress = clampf(progress, 0.0, 1.0) if is_finite(progress) else 0.0
-	visible = mode in [CombatPatternsV1.AXE_ID, CombatPatternsV1.SHOTGUN_ID]
+	visible = CombatEquipment.melee(mode) or mode == CombatPatternsV1.SHOTGUN_ID
 	if is_instance_valid(_actor):
 		_apply_actor_pose()
 	queue_redraw()
@@ -48,7 +49,7 @@ func pose() -> Dictionary:
 	var twist: float = 0.0
 	var recoil: float = 0.0
 	var support_fraction: float = 0.32
-	if _mode == CombatPatternsV1.AXE_ID:
+	if CombatEquipment.melee(_mode):
 		var mirror: float = -1.0 if _heading.x < -0.1 else 1.0
 		support_fraction = 0.47
 		match _phase:
@@ -92,6 +93,6 @@ func _apply_actor_pose() -> void:
 	arms.queue_redraw()
 	_grip = hold.transform * weapon.position
 	if muzzle != null:
-		muzzle.visible = false if _mode == CombatPatternsV1.AXE_ID else muzzle.visible
+		muzzle.visible = false if CombatEquipment.melee(_mode) else muzzle.visible
 		muzzle.position = weapon.transform * (view.muzzle_pixel - view.grip_pixel)
 		muzzle.rotation = weapon.rotation

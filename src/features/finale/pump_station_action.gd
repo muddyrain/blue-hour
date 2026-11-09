@@ -47,6 +47,8 @@ static func freeze(context: Dictionary) -> Dictionary:
 	value.objective = {"task_id":value.id, "site_ids":[String(CONSOLE)], "member_id":0}
 	value.exploration = {"version":1, "optional_objectives":[]}
 	value.route_length = 0
+	if value.powers.version == SpecialPowers.WAVE_VERSION:
+		value = ContentWaveV1.freeze_action(value)
 	return value
 
 

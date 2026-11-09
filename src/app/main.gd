@@ -717,6 +717,7 @@ func _open_sortie(practice: bool, resume: Dictionary = {}) -> void:
 		expedition.rescue_completed = RescuePoolState.available(expedition.field_departure).is_empty()
 	expedition.support_commit=progress_session.accept_support if transactional_mode else Callable()
 	expedition.power_commit=progress_session.accept_power if transactional_mode else Callable()
+	expedition.burst_commit=progress_session.accept_burst if transactional_mode else Callable()
 	expedition.growth_binding = progress_session.token.duplicate(true) if growth_mode else {}
 	expedition.rescue_mode = rescue_mode
 	expedition.rescue_completed = RescuePoolState.available(expedition.field_departure).is_empty() if pool_mode else not _recruits.is_empty()
@@ -884,9 +885,10 @@ func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}) -> vo
 	if playable_entry:
 		var latest_rules: bool = not catalog_policy.is_empty()
 		_battle_meta.campaign = CampaignRules.initial_mission(profile_id, true, true, true, true,
-			latest_rules, latest_rules, latest_rules, latest_rules, latest_rules)
+			latest_rules, latest_rules, latest_rules, latest_rules, latest_rules, latest_rules)
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true, true)
-		_battle_meta.build.powers = PowerState.initial_progression()
+		_battle_meta.build.powers = PowerState.initial_progression(
+			SpecialPowers.WAVE_VERSION if latest_rules else SpecialPowers.PROGRESSION_VERSION)
 		if not opening_plan.is_empty():
 			var starter: Dictionary = OpeningBuild.source(opening_plan, profile_id, _battle_meta.root_id, _battle_meta.seed)
 			_battle_meta.build.opening = starter
@@ -1387,7 +1389,9 @@ func equip_weapon(member_id: int, identity: String) -> void:
 	if transactional_mode:
 		if _accept_transaction(progress_session.edit(camp_snapshot(),{"kind":"equip","member_id":member_id,"value":identity}),true):
 			_request_audio(&"ui_confirm")
-		loadout_panel.refresh(camp_snapshot(),_progress_message)
+		loadout_panel.refresh(camp_snapshot(),_progress_message,_progress_dirty)
+		if _progress_dirty:
+			loadout_panel.power_panel.retry_button.grab_focus()
 		return
 	_commit_loadout(WeaponInventory.equip(camp_snapshot(), member_id, identity))
 
@@ -1398,7 +1402,9 @@ func repair_weapon(identity: String) -> void:
 	if transactional_mode:
 		if _accept_transaction(progress_session.edit(camp_snapshot(),{"kind":"repair","member_id":0,"value":identity}),true):
 			_request_audio(&"ui_confirm")
-		loadout_panel.refresh(camp_snapshot(),_progress_message)
+		loadout_panel.refresh(camp_snapshot(),_progress_message,_progress_dirty)
+		if _progress_dirty:
+			loadout_panel.power_panel.retry_button.grab_focus()
 		return
 	_commit_loadout(WeaponInventory.repair(camp_snapshot(), identity))
 
@@ -1764,9 +1770,9 @@ func _set_pump_victory_visible(enabled: bool) -> void:
 func _hunger_policy_text() -> String:
 	if playable_entry:
 		return "开发试玩版：战斗阵亡不可恢复；归航时每名原出发存活者消耗1粮。每缺1粮会失去1名队员，最多至全灭。\n新救援同伴本餐不参食，下一次按实际存活者计粮；死者的原武器保留库存。\n搜刮后须发动巴士并集合存活者，确认结算才入账。中途请使用安全暂存；未保存的中断可能无法继续。\n试玩进度独立，旧档不会自动转换。"
-	var rescue: String = "救援试运行：援救10秒，等获救者到达巴士后正常撤离，结算确认才加入。\n林知秋自带一把卡宾枪；本次两人吃2粮，下次三人吃3粮。\n" if rescue_mode else ""
+	var rescue: String = "救援试运行：援救10秒，等获救者到达巴士后正常撤离，结算确认才加入。\n本次两人吃2粮，下次三人吃3粮。\n" if rescue_mode else ""
 	if field_join_mode:
-		rescue = "同场救援：援救10秒后立即参战；存活者全员撤离后登记营地。\n林知秋自有唯一卡宾枪；当餐只计算原出发存活者，下次按实际存活者计粮。\n"
+		rescue = "同场救援：援救10秒后立即参战；存活者全员撤离后登记营地。\n当餐只计算原出发存活者，下次按实际存活者计粮。\n"
 	var growth: String = "个人成长试运行：真实个人击退+10XP，归航且存活才生效。\n每级当前/最大生命+5，保留伤量；Trait和食物训练未开放。\n" if growth_mode else ""
 	if trait_mode:
 		growth = "个人特性试运行：射击、搜集、移动仅影响本人。\n普通XP与Trait进度独立，归航且存活才升级，下次出击生效；食物训练未开放。\n"
@@ -2585,7 +2591,9 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 		text+="本次道具："+("、".join(names) if not names.is_empty() else "无")+" · 本局库存%d/%d（"%[snapshot.journey.build.owned.size(), BuildItems.ids(BuildState.pool(snapshot)).size()]+("已保存" if durable else "确认后入库")+"）\n"
 	if PowerState.enabled(snapshot) and not battle.is_empty():
 		var sample: String=generated.powers.sample if battle.evacuated and battle.site_facts.get("cash",{}).get("searched",false) else ""
-		text+="本次能力："+(SpecialPowers.POLICY[sample].name if not sample.is_empty() else "无")+" · 本旅程%d/2（"%snapshot.journey.build.powers.owned.size()+("已保存" if durable else "确认后入库")+"）\n"
+		var inventory: Dictionary = snapshot.journey.build.powers
+		var count: int = SpecialPowers.policy(int(inventory.version)).size()
+		text+="本次能力："+(PowerActions.name_for(sample) if not sample.is_empty() else "无")+" · 本旅程%d/%d（"%[inventory.owned.size(),count]+("已保存" if durable else "确认后入库")+"）\n"
 	for item: Dictionary in battle.get("weapons",[]):text+="带回武器："+WeaponInventory.loot_description(item)+"\n"
 	if CampaignState.is_short(snapshot):
 		var campaign: Dictionary = snapshot.journey.campaign
@@ -2682,4 +2690,4 @@ func retry_power_edit() -> void:
 	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible or not _progress_dirty:
 		return
 	var saved: bool = _accept_transaction(progress_session.retry(),true)
-	loadout_panel.refresh(camp_snapshot(),"原能力操作已保存；余额与效果已更新。" if saved else _progress_message,not saved)
+	loadout_panel.refresh(camp_snapshot(),"本次整备已保存；余额与状态已更新。" if saved else _progress_message,not saved)

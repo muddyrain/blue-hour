@@ -80,7 +80,8 @@ func _ready() -> void:
 		var card: VBoxContainer = VBoxContainer.new()
 		card.add_theme_constant_override("separation", 10 if player_mode else 12)
 		panel.add_child(card)
-		var title: Label = CampStyle.label("%02d / %s" % [index + 1, supply.display_name if index == 2 else supply.layout.display_name], 24)
+		var rescue: bool = supply.id == &"rescue"
+		var title: Label = CampStyle.label("%02d / %s" % [index + 1, RescueTarget.ACTION_TITLE if rescue else supply.layout.display_name], 24)
 		if player_mode:
 			var top: HBoxContainer = HBoxContainer.new()
 			top.add_theme_constant_override("separation", 10)
@@ -99,9 +100,9 @@ func _ready() -> void:
 		pressure.hide()
 		card.add_child(pressure)
 		_campaign_pressures.append(pressure)
-		var description: String = "援救10秒后立即加入行动；全员撤离后登记营地。新同行本餐不参食，下次按实际存活者计粮。" if field_join_mode and index == 2 else supply.description
+		var description: String = _rescue_card_text(supply) if rescue else supply.description
 		if player_mode:
-			description = ("援助一位幸存者10秒后同行参战，存活归航后正式加入。" if index==2 else supply.description) + "\n搜完货币点可带回%d币；%s。武器以实际搜获为准。\n夜间敌人增援变密；阵亡不可恢复，归航需留足口粮。" % [supply.cash_reward,"食物点%d份" % supply.food_reward if supply.food_reward>0 else "此行没有食物点"]
+			description += "\n搜完货币点可带回%d币；%s。武器以实际搜获为准。\n夜间敌人增援变密；阵亡不可恢复，归航需留足口粮。" % [supply.cash_reward,"食物点%d份" % supply.food_reward if supply.food_reward>0 else "此行没有食物点"]
 		var text: Label = CampStyle.label(description, 17, CampStyle.MUTED)
 		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		text.custom_minimum_size.y = 52
@@ -143,7 +144,7 @@ func refresh_rescue(completed: bool, reason: String = "") -> void:
 	rescue_completed = completed
 	if rescue_enabled and choices.size() > 2:
 		choices[2].disabled = completed
-		choices[2].text = ("救援已结束" if field_join_mode else "林知秋已加入") if completed else "前往救援 →"
+		choices[2].text = "救援已结束" if completed else "前往救援 →"
 		if completed and not reason.is_empty():
 			choices[2].text = reason
 	if player_mode:
@@ -153,7 +154,6 @@ func refresh_rescue(completed: bool, reason: String = "") -> void:
 func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 	daily_offers = DailyActions.offers(base)
 	var action_choices: bool = CampaignRules.action_choices_enabled(base.get("journey", {}).get("campaign"))
-	var first_aid: bool = CampaignRules.first_aid_enabled(base.get("journey", {}).get("campaign"))
 	var has_mission_cards: bool = daily_offers.any(func(offer: Dictionary) -> bool: return offer.get("mission_policy") == 1)
 	_subtitle.text = "比较主收益、路线与风险。物资和线索随生还归航确认。" if has_mission_cards else "选择此行的补给方向，准备好后出发。"
 	_heading.text = "选择行动 · 第 %d 天" % int(base.day) if player_mode else "第%d天 · 选择一项行动" % int(base.day)
@@ -175,8 +175,9 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 		pressure.visible = CampaignPressureV1.enabled(supply.generated)
 		if pressure.visible:
 			pressure.text = CampaignPressureV1.label(int(supply.generated.campaign_pressure.tier))
-		_titles[index].text = "%02d / %s" % [index+1,supply.display_name]
-		_descriptions[index].text = supply.description
+		var rescue: bool = supply.id == &"rescue"
+		_titles[index].text = "%02d / %s" % [index + 1, RescueTarget.ACTION_TITLE if rescue else supply.display_name]
+		_descriptions[index].text = _rescue_card_text(supply) if rescue else supply.description
 		_descriptions[index].custom_minimum_size.y = 52
 		if _descriptions[index].has_theme_constant_override("line_spacing"):
 			_descriptions[index].remove_theme_constant_override("line_spacing")
@@ -190,11 +191,9 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 		elif pump_card:
 			_descriptions[index].add_theme_font_size_override("font_size", 16)
 		elif mission_card:
-			var title: String = {"supply":"补给", "airdrop":"装备", "equipment":"调查", "rescue":"救援"}[supply.generated.type]
+			var title: String = {"supply":"补给", "airdrop":"装备", "equipment":"调查", "rescue":RescueTarget.ACTION_TITLE}[supply.generated.type]
 			if SortieRiskV1.enabled(supply.generated):
 				title = "装备 · 深入回收" if supply.generated.sortie_risk.tier == SortieRiskV1.DEEP else "装备 · 常规回收"
-			elif first_aid and supply.generated.type == "rescue" and int(supply.generated.recruit) == FirstAidV1.SOURCE_ID:
-				title = "救援 · " + FirstAidV1.TITLE
 			_titles[index].text = "%02d / %s" % [index + 1, title]
 			_descriptions[index].text = LevelSummary.mission_card_text(supply.generated, base if action_choices else {}, rations)
 			_descriptions[index].custom_minimum_size.y = 100
@@ -202,8 +201,9 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 			_descriptions[index].add_theme_constant_override("line_spacing", 2 if action_choices else 8)
 		elif supply.generated.get("worldgen",{}).get("version")==2:
 			# The original resource description participates in existing in-flight world compatibility hashes.
-			var frozen_description: String = LevelSummary.description(supply.generated)
-			_descriptions[index].text = supply.description.trim_suffix(frozen_description) + LevelSummary.description(supply.generated, true)
+			if not rescue:
+				var frozen_description: String = LevelSummary.description(supply.generated)
+				_descriptions[index].text = supply.description.trim_suffix(frozen_description) + LevelSummary.description(supply.generated, true)
 			_pictures[index].custom_minimum_size.y = 56
 			_descriptions[index].add_theme_font_size_override("font_size",16)
 		else:
@@ -231,6 +231,17 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 			_refresh_blue_hour_card(index, supply.generated)
 	if player_mode:
 		_link_choices()
+
+
+func _rescue_card_text(supply: MissionSupply) -> String:
+	var size: String = {"small":"小型", "medium":"中型", "large":"大型"}.get(supply.generated.get("layout", {}).get("size"), "")
+	var area: String = (size + "街区 · " if not size.is_empty() else "") + supply.layout.display_name
+	var goal: String = "援救 10 秒后现场接纳，生还归航后登记入营。" if field_join_mode else "援救 10 秒，护送至巴士，生还归航后登记入营。"
+	var route: String = LevelSummary.description(supply.generated, true)
+	var text: String = "%s ×1\n%s\n%s" % [RescueTarget.ANONYMOUS_NAME, area, goal]
+	if not route.is_empty():
+		text += "\n" + route
+	return text
 
 
 func _refresh_blue_hour_card(index: int, generated: Dictionary) -> void:

@@ -196,13 +196,15 @@ func _resume() -> void:
 	world=await _start(rescue_slot)
 	var candidate: int=world.candidate_id()
 	var recipe: Dictionary=PersonaState.recipe(world.supply.generated,candidate)
-	_check(world.rescue_target.persona_card!=null and not recipe.is_empty(),"only revealed candidate presents original fixed recipe")
+	_check(not world.rescue_target.revealed() and not world.rescue_target.npc.visual.visible and not recipe.is_empty(),
+		"pending rescue keeps the original fixed recipe and conceals the actor")
 	world.rescue_target.request()
 	await _until(world,func()->bool:return world.rescue_target.progress>=RescueTarget.SECONDS)
 	world.rescue_target.request()
 	await _until(world,func()->bool:return world.field_joins.size()==1)
 	var joined: FieldActor=world.search_member(candidate)
-	_check(joined!=null and PersonaState.recipe(world.supply.generated,candidate)==recipe,"actual rescue confirms same stable identity recipe")
+	_check(joined!=null and world.rescue_target.revealed() and joined.visual.visible and PersonaState.recipe(world.supply.generated,candidate)==recipe,
+		"actual rescue reveals the actor with the same stable identity recipe")
 	await _collect(world);await _bank(world)
 	_check(not SurvivorRoster.member(app.crew,candidate).is_empty() and TransactionReceipt.same(original_persona,app.camp_snapshot().journey.build.persona),"real rescue returns unchanged recipe through original admission and settlement")
 
@@ -219,14 +221,18 @@ func _rescue(world: Expedition) -> void:
 	var candidate: int=world.candidate_id()
 	var recipe: Dictionary=PersonaState.recipe(world.supply.generated,candidate)
 	var original: Dictionary=world.field_departure.journey.build.persona.duplicate(true)
-	_check(world.rescue_target.persona_card!=null and not recipe.is_empty(),"revealed candidate shows its original recipe")
+	_check(not world.rescue_target.revealed() and not world.rescue_target.npc.visual.visible and not recipe.is_empty(),
+		"continued pending rescue retains a fixed identity behind the anonymous marker")
 	# Cancel jobs through original intentions to free a real rescuer.
 	for job: Dictionary in world.search_assignments.ordered():world.request_search(StringName(job.site_id))
 	world.rescue_target.request()
 	await _until(world,func()->bool:return world.rescue_target.progress>=RescueTarget.SECONDS)
 	world.rescue_target.request()
 	await _until(world,func()->bool:return world.field_joins.size()==1)
-	_check(world.search_member(candidate)!=null and PersonaState.recipe(world.supply.generated,candidate)==recipe and TransactionReceipt.same(original,world.field_departure.journey.build.persona),"real ten-second assistance and confirmation preserve stable recipe")
+	_check(world.search_member(candidate)!=null and world.rescue_target.revealed()
+		and world.rescue_target.npc.visual.visible and PersonaState.recipe(world.supply.generated,candidate)==recipe
+		and TransactionReceipt.same(original,world.field_departure.journey.build.persona),
+		"real ten-second assistance reveals the stable recipe after confirmation")
 
 func _key(code: Key) -> void:
 	for down: bool in [true,false]:

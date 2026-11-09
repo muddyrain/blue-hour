@@ -220,8 +220,10 @@ static func hud(world: Expedition) -> String:
 	if value.get("version")==9: return "" # The new list derives all three rows from actual facts.
 	if value.get("version")!=VERSION and (value.get("version")!=5 and (value.get("version")!=6 and (value.get("version")!=7 and value.get("version")!=8))): return ""
 	if value.type=="rescue":
-		if world.rescue_target!=null and world.rescue_target.status=="IN_FIELD_JOINED": return "主目标：带%s归航"%world.rescue_target.candidate_name() if world.rescue_target.npc.health>0 else "主目标：救援对象已阵亡 · 可撤离"
-		return "主目标：援救%s"%SurvivorRoster.definition(int(value.recruit)).default_display_name
+		if world.rescue_target != null and world.rescue_target.revealed():
+			var name: String = world.rescue_target.candidate_name()
+			return "主目标：带%s归航" % name if world.rescue_target.npc.health > 0 else "主目标：%s已阵亡 · 可撤离" % name
+		return "主目标：援救" + RescueTarget.ANONYMOUS_NAME
 	var done: int = 0
 	for id: String in value.objective.site_ids: done+=int(world.search_site(StringName(id)).searched)
 	if done==value.objective.site_ids.size(): return "主目标已取得 · 带回巴士归航"

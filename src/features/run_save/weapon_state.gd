@@ -52,7 +52,7 @@ static func projected(data: Dictionary) -> Dictionary:
 
 
 static func problem(data: Dictionary, generated_maps: bool = false, build_context: Dictionary = {},
-		weapon_affixes: bool = false) -> String:
+		weapon_affixes: bool = false, wave: bool = false) -> String:
 	if not is_state(data) or not data.get("journey") is Dictionary or data.journey.get("format")!=FORMAT or not data.get("weapons") is Array:
 		return "WEAPON_INSTANCE_CONTAINER"
 	for item: Variant in data.weapons:
@@ -64,8 +64,10 @@ static func problem(data: Dictionary, generated_maps: bool = false, build_contex
 		var drop: Variant = item.get("drop", {})
 		if not drop is Dictionary:
 			return "WEAPON_INSTANCE_PROVENANCE"
-		if drop.get("version") in [2, WeaponInventory.AFFIX_DROP_VERSION] and build_context.get("combat_version") != 1:
+		if drop.get("version") in [2, WeaponInventory.AFFIX_DROP_VERSION, WeaponInventory.HAMMER_DROP_VERSION] and build_context.get("combat_version") != 1:
 			return "COMBAT_DROP_MODE"
+		if drop.get("version") == WeaponInventory.HAMMER_DROP_VERSION and (not wave or item.weapon_id != CombatEquipment.HAMMER_ID):
+			return "HAMMER_DROP_MODE"
 	var legacy: Dictionary=projected(data)
 	if legacy.is_empty():return "WEAPON_DROP_GROWTH_SOURCE"
 	var issue: String = RosterState.problem(legacy,generated_maps,build_context)
@@ -75,7 +77,7 @@ static func problem(data: Dictionary, generated_maps: bool = false, build_contex
 		var old: Dictionary = item.duplicate(true)
 		for key: String in WeaponModifiers.KEYS:
 			old.erase(key)
-		var expected: Dictionary = WeaponInventory.instance_reward(data,item,weapon_affixes) if item.has("drop") else WeaponModifiers.reward(old) if old.get("origin")=="north-cache" else WeaponModifiers.baseline(old)
+		var expected: Dictionary = WeaponInventory.instance_reward(data,item,weapon_affixes,wave) if item.has("drop") else WeaponModifiers.reward(old) if old.get("origin")=="north-cache" else WeaponModifiers.baseline(old)
 		if not TransactionReceipt.same(item,expected):
 			return "WEAPON_INSTANCE_PROVENANCE"
 	return ""

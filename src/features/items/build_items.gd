@@ -4,8 +4,12 @@ extends RefCounted
 
 const VERSION: int = 1
 const CATALOG_POOL: int = 2
+const WAVE_POOL: int = 3
+const WAVE_CATALOG_POOL: int = 4
 const FILTER: String = "filter_mask_v1"
 const FILTER_DEFINITION: Dictionary = {"name":"滤毒面罩", "effect":"毒区周期伤害 ×0.50", "key":"poison", "factor":0.50, "source":"PROJECT_TEMP"}
+const LINER: String = "impact_liner_v1"
+const LINER_DEFINITION: Dictionary = {"name":"缓冲内衬", "effect":"小队所受爆囊脉冲伤害 ×0.65", "key":"burst", "factor":0.65, "source":"PROJECT_TEMP"}
 const SLOT_COUNT: int = 2
 const IDS: Array[String] = [
 	"pressure_rounds_v1", "quick_loader_v1", "light_boots_v1",
@@ -27,16 +31,32 @@ const CONTEXT_KEYS: Array[String] = ["run_id", "seed", "day", "action_id", "site
 
 static func definitions(pool: int = VERSION) -> Dictionary:
 	var result: Dictionary = DEFINITIONS.duplicate(true)
-	if pool == CATALOG_POOL:
+	if has_catalog(pool):
 		result[FILTER] = FILTER_DEFINITION.duplicate(true)
+	if wave_pool(pool):
+		result[LINER] = LINER_DEFINITION.duplicate(true)
 	return result
 
 
 static func ids(pool: int = VERSION) -> Array[String]:
 	var result: Array[String] = IDS.duplicate()
-	if pool == CATALOG_POOL:
+	if has_catalog(pool):
 		result.append(FILTER)
+	if wave_pool(pool):
+		result.append(LINER)
 	return result
+
+
+static func valid_pool(value: Variant) -> bool:
+	return SurvivalContracts.integer(value, VERSION, WAVE_CATALOG_POOL)
+
+
+static func has_catalog(pool: int) -> bool:
+	return pool in [CATALOG_POOL, WAVE_CATALOG_POOL]
+
+
+static func wave_pool(pool: int) -> bool:
+	return pool in [WAVE_POOL, WAVE_CATALOG_POOL]
 
 
 static func drop(context: Dictionary, owned: Array, pool: int = VERSION) -> Array[String]:
@@ -51,10 +71,14 @@ static func drop(context: Dictionary, owned: Array, pool: int = VERSION) -> Arra
 		"run_id":context.run_id, "seed":context.seed, "day":int(context.day),
 		"action_id":context.action_id, "site_id":context.site_id, "version":int(context.version),
 	}
+	if context.has("liner"):
+		canonical_context.liner = true
+		if LINER not in owned:
+			result.append(LINER)
 	var binding: String = JSON.stringify({"context":canonical_context, "owned":canonical_owned}, "", true, true)
 	var candidates: Array[String] = []
 	for id: String in ids(int(context.version)):
-		if id not in owned:
+		if id != LINER and id not in owned:
 			candidates.append(id)
 	# Hash ranking has no shared RNG state and has an explicit tie-break across processes.
 	candidates.sort_custom(func(left: String, right: String) -> bool:
@@ -62,13 +86,13 @@ static func drop(context: Dictionary, owned: Array, pool: int = VERSION) -> Arra
 		var right_rank: String = (binding + ":" + right).sha256_text()
 		return left < right if left_rank == right_rank else left_rank < right_rank
 	)
-	for index: int in range(mini(SLOT_COUNT, candidates.size())):
+	for index: int in range(mini(SLOT_COUNT - result.size(), candidates.size())):
 		result.append(candidates[index])
 	return result
 
 
 static func problem(owned: Variant, slots: Variant, pool: int = VERSION) -> String:
-	if pool not in [VERSION, CATALOG_POOL]:
+	if not valid_pool(pool):
 		return "BUILD_ITEMS_POOL"
 	var allowed: Array[String] = ids(pool)
 	if not owned is Array or owned.size() > allowed.size():
@@ -94,7 +118,7 @@ static func factors(slots: Array, pool: int = VERSION) -> Dictionary:
 	var result: Dictionary = BASE_FACTORS.duplicate(true)
 	for id: String in slots:
 		if not id.is_empty():
-			var definition: Dictionary = FILTER_DEFINITION if id == FILTER else DEFINITIONS[id]
+			var definition: Dictionary = FILTER_DEFINITION if id == FILTER else LINER_DEFINITION if id == LINER else DEFINITIONS[id]
 			result[definition.key] = definition.factor
 	return result
 
@@ -116,15 +140,21 @@ static func _slots_problem(slots: Variant, pool: int) -> String:
 
 
 static func _context_problem(context: Dictionary, pool: int = VERSION) -> String:
-	if context.size() != CONTEXT_KEYS.size() or not context.has_all(CONTEXT_KEYS):
+	var liner: bool = context.has("liner")
+	if context.size() != CONTEXT_KEYS.size() + int(liner) or not context.has_all(CONTEXT_KEYS):
 		return "BUILD_ITEMS_DROP_FIELDS"
-	if not SurvivalContracts.integer(context.version, VERSION, pool):
+	if not valid_pool(context.version):
+		return "BUILD_ITEMS_DROP_VERSION"
+	var version: int = int(context.version)
+	if (version != VERSION and version != pool) or (liner and (not wave_pool(version) or context.liner != true)):
 		return "BUILD_ITEMS_DROP_VERSION"
 	for key: String in ["run_id", "seed"]:
 		if not context[key] is String or context[key].length() != 32 or not context[key].is_valid_hex_number(false):
 			return "BUILD_ITEMS_DROP_IDENTITY"
 	if not SurvivalContracts.integer(context.day, 2, RunSave.MAX_COUNTER):
 		return "BUILD_ITEMS_DROP_DAY"
+	if liner and (int(context.day) < 3 or context.site_id != "cash"):
+		return "BUILD_ITEMS_LINER_SITE"
 	for key: String in ["action_id", "site_id"]:
 		if not context[key] is String or context[key].is_empty() or context[key].length() > 256:
 			return "BUILD_ITEMS_DROP_SITE"

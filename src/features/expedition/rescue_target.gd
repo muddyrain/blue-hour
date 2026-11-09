@@ -4,6 +4,8 @@ extends Node2D
 
 const SECONDS: float = 10.0 # PROJECT_TEMP: assistance time, not an original-game fact.
 const START: Vector2 = Vector2(1344,1120)
+const ANONYMOUS_NAME: String = "待救援幸存者"
+const ACTION_TITLE: String = "救援幸存者"
 var world: Expedition
 var status: String = "AVAILABLE"
 var progress: float = 0.0
@@ -11,7 +13,6 @@ var worker: int = 0
 var npc: FieldActor
 var button: C1HudButton
 var _joined_at_ms: int = -1
-var persona_card: PersonaCard
 var label: Label
 
 
@@ -22,16 +23,17 @@ func _ready() -> void:
 	label = Label.new()
 	label.add_theme_font_size_override("font_size",17)
 	label.add_theme_color_override("font_color",Color("ffd3a8"))
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.custom_minimum_size.x = 200
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	world._sort.add_child(label)
 	button = C1HudButton.new()
-	button.text = "援救"+candidate_name()+" · 10秒"
 	button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	button.offset_left = 16
 	button.offset_right = 296
 	button.offset_top = -116
 	button.offset_bottom = -68
-	if (world.layout.world_data.get("version")==3 or world.layout.world_data.get("version")==4 or world.layout.world_data.get("version")==5):
+	if not world.build_mode() and world.layout.world_data.get("version") in [3,4,5]:
 		button.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 		button.offset_left = 16
 		button.offset_right = 296
@@ -39,21 +41,6 @@ func _ready() -> void:
 		button.offset_bottom = 256
 	button.pressed.connect(request)
 	world._hud.view.add_child(button)
-	if world.persona_mode():
-		button.offset_top=548
-		button.offset_bottom=588
-		button.offset_right=264
-		persona_card=PersonaCard.new()
-		world._hud.view.add_child(persona_card)
-		persona_card.position=Vector2(16,410)
-		persona_card.size.x=248
-		var model: Dictionary=PersonaViewModel.camp(world.field_departure,world.candidate_id(),"candidate")
-		persona_card.present(model,true)
-		persona_card.selected.connect(func(_id: int) -> void:
-			world._hud.view._persona_id=0
-			world._hud.view.persona_details.present(model)
-			world._hud.view.persona_details.grab_focus()
-		)
 	refresh()
 
 
@@ -61,6 +48,11 @@ func _draw() -> void:
 	# Read-only assistance cue. No extra clock, state, interaction rule or save field.
 	if npc != null and status in ["AVAILABLE", "IN_PROGRESS"]:
 		draw_arc(npc.position, 34, 0, TAU, 32, Color("ffca91"), 3, true)
+		var marker: Vector2 = npc.position + Vector2(0, -68)
+		draw_circle(marker, 24.0, Color("22343c"))
+		draw_arc(marker, 24.0, 0, TAU, 24, Color("ffca91"), 2.0, true)
+		draw_circle(marker + Vector2(0, -6), 6.0, Color("ffe2bf"))
+		draw_arc(marker + Vector2(0, 12), 11.0, PI, TAU, 16, Color("ffe2bf"), 4.0, true)
 	if npc == null or status != "IN_PROGRESS":
 		return
 	for actor: FieldActor in world.survivors:
@@ -74,8 +66,18 @@ func _draw() -> void:
 		return
 
 
+func revealed() -> bool:
+	return status in ["IN_FIELD_JOINED", "RESCUED"]
+
+
 func candidate_name() -> String:
-	return SurvivorRoster.definition(world.candidate_id()).default_display_name
+	if not revealed():
+		return ANONYMOUS_NAME
+	var id: int = world.candidate_id()
+	var display_name: String = SurvivorRoster.definition(id).default_display_name
+	if id == WeaponInventory.MECHANIC_ID and ContentWaveV1.marked(world.supply.generated):
+		return WeaponInventory.MECHANIC_TITLE + " " + display_name
+	return display_name
 
 
 func contains(point: Vector2) -> bool:
@@ -161,16 +163,29 @@ func delivered() -> bool:
 
 
 func refresh() -> void:
-	if persona_card!=null: persona_card.visible=status in ["AVAILABLE","IN_PROGRESS"]
+	# Keep the real actor and its visual state for promotion and snapshot replay.
+	npc.visual.visible = revealed()
 	label.visible = not (world.field_join_mode and status == "IN_FIELD_JOINED")
 	label.position = npc.position + Vector2(-100,-132)
-	label.text = candidate_name()+" · 等待援救\n左键 / 10秒援救" if status == "AVAILABLE" else ("援救 %.1f / 10秒" % progress if status == "IN_PROGRESS" else ("已上车 · 归航后加入" if delivered() else "已获救 · 前往巴士"))
-	button.text = "取消援救 · %.1f / 10秒" % progress if status == "IN_PROGRESS" else ("援救"+candidate_name()+" · 10秒" if status == "AVAILABLE" else label.text)
-	if world.field_join_mode and status == "IN_FIELD_JOINED":
-		label.text = candidate_name()+" · 本次行动队员" if npc.health > 0 else candidate_name()+" · 已确认阵亡"
-		button.text = candidate_name()+"已加入 · 全员撤离后登记营地" if npc.health > 0 else candidate_name()+"已阵亡 · 历史保留"
+	var display_name: String = candidate_name()
+	match status:
+		"AVAILABLE":
+			label.text = display_name + "\n左键 / 10秒援救"
+			button.text = "援救 " + display_name + " · 10秒"
+		"IN_PROGRESS":
+			label.text = "%s\n援救 %.1f / 10秒" % [display_name, progress]
+			button.text = "%s · %.1f/10秒 · 取消" % [display_name, progress]
+		"RESCUED":
+			label.text = display_name + (" · 已上车" if delivered() else " · 已获救")
+			button.text = "已上车 · 归航后加入" if delivered() else "已获救 · 前往巴士"
+		"IN_FIELD_JOINED":
+			button.text = display_name + (" · 归航后登记" if npc.health > 0 else " · 已确认阵亡")
+		_:
+			label.text = display_name
+			button.text = "援救结束"
 	if not world.field_join_error.is_empty():
-		button.text = "重试完成援救 / 接纳"+candidate_name()
+		label.text = ANONYMOUS_NAME + "\n接纳待确认"
+		button.text = "重试接纳 " + ANONYMOUS_NAME
 	button.disabled = status in ["RESCUED","FAILED","IN_FIELD_JOINED"] or (world.bus_view!=null and world.bus_view.running())
 	queue_redraw()
 

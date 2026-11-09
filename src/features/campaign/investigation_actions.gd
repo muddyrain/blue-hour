@@ -61,15 +61,20 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var weapon_affixes: bool = CampaignRules.weapon_affix_enabled(base.journey.campaign)
 	var first_aid: bool = CampaignRules.first_aid_enabled(base.journey.campaign) and FirstAidV1.qualified(base)
 	var campaign_pressure: bool = CampaignRules.campaign_pressure_enabled(base.journey.campaign)
-	for candidate: Dictionary in result:
+	var content_wave: bool = ContentWaveV1.enabled(base)
+	for index: int in range(result.size()):
+		var candidate: Dictionary = result[index]
 		if screamer and ScreamerPolicyV1.eligible(candidate):
 			candidate.screamer_policy = ScreamerPolicyV1.VERSION
-		if weapon_affixes and WeaponInventory.affix_eligible(candidate):
-			candidate.weapon_affix_policy = WeaponInventory.AFFIX_POLICY_VERSION
 		if first_aid and candidate.get("version") == 9:
 			candidate.first_aid_policy = FirstAidV1.VERSION
 		if campaign_pressure and candidate.get("version") == 9:
 			candidate.campaign_pressure = CampaignPressureV1.marker(int(base.settled_sorties))
+		if content_wave and candidate.get("version") == 9:
+			candidate = ContentWaveV1.freeze_action(candidate)
+		if weapon_affixes and not ContentWaveV1.eligible(candidate) and WeaponInventory.affix_eligible(candidate):
+			candidate.weapon_affix_policy = WeaponInventory.AFFIX_POLICY_VERSION
+		result[index] = candidate
 		fingerprints[candidate.id] = RecordEncoding.fingerprint(candidate)
 	var frozen: Dictionary = {"offers":result, "fingerprints":fingerprints}
 	if _days.size() >= MAX_DAYS_CACHED:

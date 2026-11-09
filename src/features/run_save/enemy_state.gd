@@ -47,7 +47,7 @@ static func problem(data: Dictionary) -> String:
 	projected.journey.format = WeaponState.FORMAT
 	# Validation context comes from the original campaign, never the projected old shape.
 	var weapon_affixes: bool = CampaignRules.weapon_affix_enabled(data.journey.get("campaign"))
-	var issue: String = WeaponState.problem(projected, true, data.journey.get("build", {}), weapon_affixes)
+	var issue: String = WeaponState.problem(projected, true, data.journey.get("build", {}), weapon_affixes, ContentWaveV1.enabled(data))
 	if not issue.is_empty(): return issue
 	issue=CampaignState.problem(data)
 	return issue if not issue.is_empty() else BuildState.problem(data)

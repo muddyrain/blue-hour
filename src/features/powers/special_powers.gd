@@ -11,16 +11,35 @@ const BINDING_KEYS: Array[String] = ["run_id", "root_id", "transaction_id", "bas
 const REQUEST_KEYS: Array[String] = ["id", "ability_id"]
 const ACCEPTED_KEYS: Array[String] = ["id", "ability_id", "at", "until"]
 const PROGRESSION_VERSION: int = 2
+const WAVE_VERSION: int = 3
 const UPGRADED_FREEZE_SECONDS: float = 7.0
 const FREEZE: String = "map_freeze_v1"
 const SPEED: String = "speed_boost_v1"
+const SUPPRESSION: String = "suppression_pulse_v1"
+const SUPPRESSION_DEFINITION: Dictionary = {"name":"抑制脉冲", "duration":12.0, "move_factor":1.0, "direct_damage_factor":0.5}
+
+
+static func progression_version(version: Variant) -> bool:
+	return SurvivalContracts.integer(version, PROGRESSION_VERSION, WAVE_VERSION)
+
+
+static func policy(version: int) -> Dictionary:
+	if version == WAVE_VERSION:
+		var catalog: Dictionary = POLICY.duplicate()
+		catalog[SUPPRESSION] = SUPPRESSION_DEFINITION
+		return catalog
+	return POLICY
+
+
+static func definition(id: String) -> Dictionary:
+	return SUPPRESSION_DEFINITION if id == SUPPRESSION else POLICY.get(id, {})
 
 
 static func initial(binding: Dictionary, equipped: Variant) -> Dictionary:
 	if equipped is Dictionary:
 		if not _binding_valid(binding) or not loadout_valid(equipped):
 			return {}
-		return {"version":PROGRESSION_VERSION, "binding":binding.duplicate(true),
+		return {"version":equipped.version, "binding":binding.duplicate(true),
 			"loadout":equipped.duplicate(true), "accepted":[]}
 	if not equipped is String or not _binding_valid(binding) or (not equipped.is_empty() and not POLICY.has(equipped)):
 		return {}
@@ -51,7 +70,7 @@ static func problem(value: Variant, binding: Dictionary, equipped: Variant, elap
 
 
 static func request(state: Dictionary, slot: int = 0) -> Dictionary:
-	if state.get("version") == PROGRESSION_VERSION:
+	if progression_version(state.get("version")):
 		if not state.get("binding") is Dictionary or not _binding_valid(state.binding) \
 				or not loadout_valid(state.get("loadout")) or not state.get("accepted") is Array:
 			return {}
@@ -69,7 +88,7 @@ static func request(state: Dictionary, slot: int = 0) -> Dictionary:
 
 
 static func accept(state: Dictionary, proposal: Dictionary, at: float) -> Dictionary:
-	if state.get("version") == PROGRESSION_VERSION:
+	if progression_version(state.get("version")):
 		if not SurvivalContracts.integer(proposal.get("slot"), 0, 1) \
 				or not state.get("binding") is Dictionary or not state.get("loadout") is Dictionary \
 				or not problem(state, state.binding, state.loadout, at).is_empty():
@@ -96,7 +115,7 @@ static func accept(state: Dictionary, proposal: Dictionary, at: float) -> Dictio
 
 
 static func remaining(state: Dictionary, elapsed: float, slot: int = -1) -> float:
-	if state.get("version") == PROGRESSION_VERSION:
+	if progression_version(state.get("version")):
 		var next_expiry: float = INF
 		for event: Dictionary in state.accepted:
 			if (slot == -1 or event.slot == slot) and event.at <= elapsed and event.until > elapsed:
@@ -118,14 +137,14 @@ static func frozen(state: Dictionary, elapsed: float) -> bool:
 
 
 static func ability_remaining(state: Dictionary, id: String, elapsed: float) -> float:
-	if state.get("version") == PROGRESSION_VERSION:
+	if progression_version(state.get("version")):
 		var slot: int = state.loadout.slots.find(id)
 		return remaining(state, elapsed, slot) if slot >= 0 else 0.0
 	return remaining(state, elapsed) if state.get("equipped") == id else 0.0
 
 
 static func equipped_at(state: Dictionary, slot: int) -> String:
-	if state.get("version") == PROGRESSION_VERSION:
+	if progression_version(state.get("version")):
 		var slots: Array = state.loadout.slots
 		return slots[slot] if slot >= 0 and slot < slots.size() else ""
 	return state.get("equipped", "") if slot == 0 else ""
@@ -141,12 +160,12 @@ static func event_at(state: Dictionary, slot: int) -> Dictionary:
 static func duration(id: String, upgraded: bool) -> float:
 	if upgraded and id == FREEZE:
 		return UPGRADED_FREEZE_SECONDS
-	return float(POLICY[id].duration)
+	return float(definition(id).duration)
 
 
 static func loadout_valid(loadout: Variant) -> bool:
 	if not _keys(loadout, ["version", "slots", "investments"]) \
-			or not SurvivalContracts.integer(loadout.version, PROGRESSION_VERSION, PROGRESSION_VERSION) \
+			or not progression_version(loadout.version) \
 			or not _keys(loadout.investments, ["second_slot", "freeze"]) or not loadout.slots is Array:
 		return false
 	for day: Variant in loadout.investments.values():
@@ -154,8 +173,9 @@ static func loadout_valid(loadout: Variant) -> bool:
 			return false
 	if loadout.slots.size() != (2 if loadout.investments.second_slot != 0 else 1):
 		return false
+	var catalog: Dictionary = policy(int(loadout.version))
 	for id: Variant in loadout.slots:
-		if not id is String or (id != "" and (not POLICY.has(id) or loadout.slots.count(id) != 1)):
+		if not id is String or (id != "" and (not catalog.has(id) or loadout.slots.count(id) != 1)):
 			return false
 	return true
 
@@ -163,7 +183,7 @@ static func loadout_valid(loadout: Variant) -> bool:
 static func _progression_problem(value: Variant, binding: Dictionary, loadout: Dictionary, elapsed: float) -> String:
 	if not _keys(value, ["version", "binding", "loadout", "accepted"]) \
 			or not SurvivalContracts.json_value(value) \
-			or not SurvivalContracts.integer(value.version, PROGRESSION_VERSION, PROGRESSION_VERSION):
+			or not progression_version(value.version) or value.version != loadout.get("version"):
 		return "POWER_FIELDS"
 	if not _binding_valid(binding) or not value.binding is Dictionary or not TransactionReceipt.same(value.binding, binding):
 		return "POWER_BINDING"

@@ -6,12 +6,16 @@ var toxic: Dictionary={}
 var spawns: Dictionary={}
 var toxic_view: Node2D
 var screamer: ScreamerRuntimeV1
+var burst: BurstRuntimeV1
 
 func snapshot() -> Dictionary:
 	var value: Dictionary = {"version":1,"actions":actions.duplicate(true),"toxic":toxic.duplicate(true),"spawns":spawns.duplicate(true)}
 	if screamer != null:
 		value.version = 2
 		value.screamer = screamer.state.duplicate(true)
+	if burst != null:
+		value.version = 3
+		value.burst = burst.state.duplicate(true)
 	return value
 
 func restore(value: Dictionary) -> void:
@@ -20,6 +24,8 @@ func restore(value: Dictionary) -> void:
 	spawns=value.spawns.duplicate(true)
 	if screamer != null:
 		screamer.state = value.screamer.duplicate(true)
+	if burst != null:
+		burst.state = value.burst.duplicate(true)
 
 func setup(world: Expedition) -> void:
 	toxic=ToxicV1.initial()
@@ -28,6 +34,18 @@ func setup(world: Expedition) -> void:
 	world.add_child(toxic_view)
 	if ScreamerPolicyV1.enabled(world.supply.generated):
 		screamer = ScreamerRuntimeV1.new()
+	if ContentWaveV1.eligible(world.supply.generated):
+		burst = BurstRuntimeV1.new()
+		burst.attach_warning(world)
+
+static func patterned(weapon_id: String) -> bool:
+	return CombatEquipment.melee(weapon_id) or weapon_id == "shotgun_v1"
+
+static func direct_melee_damage(kind: String, amount: float, powers: Dictionary, elapsed: float) -> float:
+	if kind in [EnemyRules.NORMAL, EnemyRules.RUSH, EnemyRules.HEAVY] \
+			and SpecialPowers.ability_remaining(powers, SpecialPowers.SUPPRESSION, elapsed) > 0.0:
+		return amount * float(SpecialPowers.definition(SpecialPowers.SUPPRESSION).direct_damage_factor)
+	return amount
 
 func action(actor: FieldActor) -> Dictionary:
 	var key: String=str(actor.member_id)
@@ -42,30 +60,31 @@ func rows(actors: Array[FieldActor]) -> Array[Dictionary]:
 
 func attack(world: Expedition,actor: FieldActor,delta: float) -> void:
 	var gun: String=String(actor.weapon_definition.id)
-	if gun not in ["fire_axe_v1","shotgun_v1"]: return
+	if not patterned(gun): return
+	var melee: bool = CombatEquipment.melee(gun)
 	var state: Dictionary=action(actor)
 	var active: bool=actor.health>0 and actor.visible and actor.activity not in [FieldActor.Activity.DOWN,FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING]
 	if not active:
 		state.remaining=0.0
 		return
-	if gun=="fire_axe_v1" and state.remaining>0:
+	if melee and state.remaining>0:
 		state.remaining=maxf(0.0,float(state.remaining)-delta)
 		actor.aim=Vector2(state.heading[0],state.heading[1])
 		if state.remaining==0:
-			var plan: Array[Dictionary]=CombatPatternsV1.axe_plan(actor.position,actor.aim,rows(world.enemies),world.shot_obstacles,actor.weapon_definition.shot_range)
+			var plan: Array[Dictionary]=CombatPatternsV1.melee_plan(gun,actor.position,actor.aim,rows(world.enemies),world.shot_obstacles,actor.weapon_definition.shot_range)
 			if not _commit(world,actor,plan,state): return
 			actor.visual.show_fire(actor.aim)
-			world.combat_feedback.emit({"kind":"axe_swing","member_id":actor.member_id,"sequence":state.sequence,"targets":state.committed.duplicate(),"elapsed":world.elapsed})
+			world.combat_feedback.emit({"kind":"hammer_swing" if gun == CombatEquipment.HAMMER_ID else "axe_swing","member_id":actor.member_id,"sequence":state.sequence,"targets":state.committed.duplicate(),"elapsed":world.elapsed})
 		return
 	if actor.cooldown>0 or (actor.magazine!=null and not actor.magazine.can_fire()): return
 	var target: FieldActor=_target(world,actor)
 	if target==null: return
 	actor.aim=actor.position.direction_to(target.position)
 	state.heading=[actor.aim.x,actor.aim.y]
-	if gun=="fire_axe_v1":
+	if melee:
 		state.sequence+=1
 		state.committed=[]
-		state.remaining=float(CombatPatternsV1.POLICY.axe.windup)
+		state.remaining=float(CombatEquipment.melee_policy(gun).windup)
 		actor.cooldown=actor.weapon_definition.interval
 		return
 	var muzzle: Vector2=actor.position+actor.visual.aimed_shot_offset(actor.aim)
@@ -133,14 +152,16 @@ func _enemy(world: Expedition,id: int) -> FieldActor:
 	return null
 
 func present(actor: FieldActor) -> void:
-	if String(actor.weapon_definition.id) not in ["fire_axe_v1","shotgun_v1"]: return
+	var gun: String = String(actor.weapon_definition.id)
+	if not patterned(gun): return
 	if actor.combat_view==null:
 		actor.combat_view=CombatWeaponVisualV1.new()
 		actor.visual.add_child(actor.combat_view)
 		actor.combat_view.bind_actor_visual(actor.visual)
 	var state: Dictionary=action(actor)
 	var phase: String="windup" if state.remaining>0 else "recover" if actor.cooldown>0 else "idle"
-	var progress: float=1.0-float(state.remaining)/float(CombatPatternsV1.POLICY.axe.windup) if state.remaining>0 else 1.0-actor.cooldown/maxf(actor.weapon_definition.interval-(float(CombatPatternsV1.POLICY.axe.windup) if CombatEquipment.melee(String(actor.weapon_definition.id)) else 0.0),0.001)
+	var windup: float = float(CombatEquipment.melee_policy(gun).get("windup", 0.0))
+	var progress: float=1.0-float(state.remaining)/windup if state.remaining>0 else 1.0-actor.cooldown/maxf(actor.weapon_definition.interval-windup,0.001)
 	if actor.magazine!=null and actor.magazine.reloading:
 		phase="reload"
 		progress=1.0-actor.magazine.remaining/actor.magazine.seconds()
@@ -152,6 +173,9 @@ func pick_spawn(world: Expedition,index: int) -> String:
 	if kind == EnemyRules.NORMAL and screamer != null and screamer.state.actor_id == -1 \
 			and world.threat.stage >= ThreatDirector.Stage.LATE:
 		kind = ScreamerPolicyV1.KIND
+	elif kind == EnemyRules.NORMAL and burst != null and burst.state.actor_id == -1 \
+			and world.threat.stage == ThreatDirector.Stage.LATE:
+		kind = BurstRuntimeV1.KIND
 	if kind==CombatEnemyRules.TOXIC:
 		for actor: FieldActor in world.enemies:
 			if actor.health>0 and actor.enemy_behavior!=null and actor.enemy_behavior.kind==CombatEnemyRules.TOXIC:
@@ -162,7 +186,8 @@ func pick_spawn(world: Expedition,index: int) -> String:
 	return kind
 
 func holds(actor: FieldActor) -> bool:
-	return (screamer != null and screamer.holds(actor)) or toxic.get("casters",{}).get(str(actor.actor_id),{}).get("phase")=="windup"
+	return (screamer != null and screamer.holds(actor)) or (burst != null and burst.holds(actor)) \
+		or toxic.get("casters",{}).get(str(actor.actor_id),{}).get("phase")=="windup"
 
 func advance_toxic(world: Expedition,delta: float) -> void:
 	var casters: Array[Dictionary]=[]
@@ -191,7 +216,7 @@ func advance_toxic(world: Expedition,delta: float) -> void:
 			continue
 		var amount: float = float(hit.amount)
 		var build: Dictionary = world.supply.generated.get("build", {})
-		if build.get("version") == BuildItems.CATALOG_POOL:
+		if BuildItems.has_catalog(int(build.get("version", BuildItems.VERSION))):
 			amount *= float(BuildItems.frozen_factors(build).get("poison", 1.0))
 		if not victim.take_damage(amount):
 			refresh_toxic(world)
@@ -221,7 +246,9 @@ func cancel_unavailable(world: Expedition) -> void:
 
 static func problem(value: Variant,world: Dictionary,receipt: Dictionary) -> String:
 	var screaming: bool = world.get("generated") is Dictionary and ScreamerPolicyV1.enabled(world.generated)
-	if not value is Dictionary or value.size()!=4 + int(screaming) or not value.has_all(["version","actions","toxic","spawns"]) or value.version!=1 + int(screaming) or not value.actions is Dictionary or not value.spawns is Dictionary or value.spawns.size()>GrowthRules.MAX_EVENTS: return "COMBAT_WORLD_FIELDS"
+	var bursting: bool = world.get("generated") is Dictionary and ContentWaveV1.eligible(world.generated)
+	var version: int = 3 if bursting else 1 + int(screaming)
+	if not value is Dictionary or value.size()!=4 + int(screaming) + int(bursting) or not value.has_all(["version","actions","toxic","spawns"]) or value.version!=version or not value.actions is Dictionary or not value.spawns is Dictionary or value.spawns.size()>GrowthRules.MAX_EVENTS: return "COMBAT_WORLD_FIELDS"
 	if not CombatActions.enabled(receipt.base): return "COMBAT_WORLD_MODE"
 	var issue: String=ToxicV1.problem(value.toxic)
 	if not issue.is_empty(): return issue
@@ -231,7 +258,7 @@ static func problem(value: Variant,world: Dictionary,receipt: Dictionary) -> Str
 	var required: Array[String]=[]
 	for row: Dictionary in world.survivors:
 		var gun: Dictionary=WeaponInventory.for_member(FieldJoinRules.context(receipt),int(row.state.member_id))
-		if gun.get("weapon_id") in ["fire_axe_v1","shotgun_v1"]: required.append(str(int(row.state.member_id)))
+		if patterned(gun.get("weapon_id", "")): required.append(str(int(row.state.member_id)))
 	if value.actions.size()!=required.size(): return "COMBAT_ACTION_SET"
 	for key: String in required:
 		if not value.actions.has(key): return "COMBAT_ACTION_MISSING"
@@ -240,13 +267,15 @@ static func problem(value: Variant,world: Dictionary,receipt: Dictionary) -> Str
 		var actor: Dictionary=SortieSnapshot._member(world.survivors,int(id))
 		var state: Variant=value.actions[id]
 		var weapon: Dictionary=WeaponInventory.for_member(FieldJoinRules.context(receipt),int(id))
-		if actor.is_empty() or weapon.is_empty() or weapon.weapon_id not in ["fire_axe_v1","shotgun_v1"] or not state is Dictionary or state.size()!=4 or not state.has_all(["sequence","remaining","heading","committed"]) or not SurvivalContracts.integer(state.sequence,0,RunSave.MAX_COUNTER) or not SurvivalContracts.number(state.remaining) or state.remaining<0 or state.remaining>float(CombatPatternsV1.POLICY.axe.windup) or not SortieSnapshot._vector(state.heading) or not state.committed is Array: return "COMBAT_ACTION_FIELDS"
-		if not Vector2(state.heading[0],state.heading[1]).is_normalized() or (state.remaining>0 and (weapon.weapon_id!="fire_axe_v1" or actor.state.health<=0 or not actor.state.visible or int(actor.state.activity) in [2,3,4] or actor.state.cooldown<=0 or state.sequence==0 or not state.committed.is_empty())): return "COMBAT_ACTION_PHASE"
+		var gun: String = weapon.get("weapon_id", "")
+		var melee_policy: Dictionary = CombatEquipment.melee_policy(gun)
+		if actor.is_empty() or not patterned(gun) or not state is Dictionary or state.size()!=4 or not state.has_all(["sequence","remaining","heading","committed"]) or not SurvivalContracts.integer(state.sequence,0,RunSave.MAX_COUNTER) or not SurvivalContracts.number(state.remaining) or state.remaining<0 or state.remaining>float(melee_policy.get("windup",CombatPatternsV1.POLICY.axe.windup)) or not SortieSnapshot._vector(state.heading) or not state.committed is Array: return "COMBAT_ACTION_FIELDS"
+		if not Vector2(state.heading[0],state.heading[1]).is_normalized() or (state.remaining>0 and (melee_policy.is_empty() or actor.state.health<=0 or not actor.state.visible or int(actor.state.activity) in [2,3,4] or actor.state.cooldown<=0 or state.sequence==0 or not state.committed.is_empty())): return "COMBAT_ACTION_PHASE"
 		var seen: Array[int]=[]
 		for target: Variant in state.committed:
 			if not SurvivalContracts.integer(target,0,int(world.sim._spawn_count)-1) or int(target) in seen: return "COMBAT_ACTION_TARGETS"
 			seen.append(int(target))
-		if seen.size()>(3 if weapon.weapon_id=="fire_axe_v1" else 5): return "COMBAT_ACTION_CAP"
+		if seen.size()>int(melee_policy.get("max_targets",5)): return "COMBAT_ACTION_CAP"
 	var alive_toxic: int=0
 	for row: Dictionary in world.enemies:
 		if row.get("behavior",{}).get("kind")==CombatEnemyRules.TOXIC: alive_toxic+=1
@@ -263,10 +292,16 @@ static func problem(value: Variant,world: Dictionary,receipt: Dictionary) -> Str
 		var replacement: bool = screaming and source.kind == ScreamerPolicyV1.KIND and rolled == EnemyRules.NORMAL \
 			and int(source.stage) >= ThreatDirector.Stage.LATE and source.fallback == -1 \
 			and value.get("screamer") is Dictionary and value.screamer.get("actor_id") == int(key)
+		replacement = replacement or (bursting and source.kind == BurstRuntimeV1.KIND and rolled == EnemyRules.NORMAL \
+			and int(source.stage) == ThreatDirector.Stage.LATE and source.fallback == -1 \
+			and value.get("burst") is Dictionary and value.burst.get("actor_id") == int(key))
 		if source.kind!=rolled and not replacement and not (rolled==CombatEnemyRules.TOXIC and source.kind==EnemyRules.NORMAL and source.fallback>=0 and value.spawns.get(str(int(source.fallback)),{}).get("kind")==CombatEnemyRules.TOXIC): return "COMBAT_SPAWN_SOURCE"
 	if screaming:
 		var screamer_issue: String = ScreamerRuntimeV1.problem(value.get("screamer"), world, receipt, layout)
 		if not screamer_issue.is_empty(): return screamer_issue
+	if bursting:
+		var burst_issue: String = BurstRuntimeV1.problem(value.get("burst"), world, receipt, layout)
+		if not burst_issue.is_empty(): return burst_issue
 
 	for source: Dictionary in value.toxic.releases:
 		if value.spawns.get(str(int(source.source_id)),{}).get("kind")!=CombatEnemyRules.TOXIC or not layout.world_bounds.has_point(SortieSnapshot._vec(source.source_point)) or not layout.world_bounds.has_point(SortieSnapshot._vec(source.point)) or not ToxicV1.line_clear(SortieSnapshot._vec(source.source_point),SortieSnapshot._vec(source.point),layout.shot_obstacles()): return "TOXIC_RELEASE_WORLD_SOURCE"

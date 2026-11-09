@@ -23,6 +23,7 @@ var _role_marks: Array[CardMark] = []
 var _map_marks: Array[CardMark] = []
 var _card_panels: Array[PanelContainer] = []
 var _description_scrolls: Array[ScrollContainer] = []
+var _campaign_pressures: Array[Label] = []
 var _heading: Label
 var _subtitle: Label
 var rescue_enabled: bool = false
@@ -94,6 +95,10 @@ func _ready() -> void:
 			card.add_child(title)
 		_titles.append(title)
 		_build_thumbnail(card, SHOP if index == 0 else MARKET)
+		var pressure: Label = CampStyle.label("", 15, CampStyle.TEAL)
+		pressure.hide()
+		card.add_child(pressure)
+		_campaign_pressures.append(pressure)
 		var description: String = "援救10秒后立即加入行动；全员撤离后登记营地。新同行本餐不参食，下次按实际存活者计粮。" if field_join_mode and index == 2 else supply.description
 		if player_mode:
 			description = ("援助一位幸存者10秒后同行参战，存活归航后正式加入。" if index==2 else supply.description) + "\n搜完货币点可带回%d币；%s。武器以实际搜获为准。\n夜间敌人增援变密；阵亡不可恢复，归航需留足口粮。" % [supply.cash_reward,"食物点%d份" % supply.food_reward if supply.food_reward>0 else "此行没有食物点"]
@@ -166,6 +171,10 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 		if index>=daily_offers.size(): continue
 		var supply: MissionSupply = DailyActions.supply(daily_offers[index])
 		_active[index] = supply
+		var pressure: Label = _campaign_pressures[index]
+		pressure.visible = CampaignPressureV1.enabled(supply.generated)
+		if pressure.visible:
+			pressure.text = CampaignPressureV1.label(int(supply.generated.campaign_pressure.tier))
 		_titles[index].text = "%02d / %s" % [index+1,supply.display_name]
 		_descriptions[index].text = supply.description
 		_descriptions[index].custom_minimum_size.y = 52

@@ -32,6 +32,8 @@ static func freeze(context: Dictionary) -> Dictionary:
 	value.mission_policy = 1
 	if FirstAidV1.enabled(context):
 		value.first_aid_policy = FirstAidV1.VERSION
+	if CampaignPressureV1.enabled(context):
+		value.campaign_pressure = CampaignPressureV1.marker(int(context.day) - 2)
 	value.worldgen = WorldgenLayout.policy(true)
 	value.layout = layout
 	value.cash = 0
@@ -49,6 +51,8 @@ static func freeze(context: Dictionary) -> Dictionary:
 
 
 static func problem(value: Dictionary) -> String:
+	if value.has("campaign_pressure") and not CampaignPressureV1.enabled(value):
+		return "CAMPAIGN_PRESSURE_ACTION_POLICY"
 	if not enabled(value) or not SurvivalContracts.json_value(value) or not _identity(value.get("seed")) \
 			or not SurvivalContracts.integer(value.get("day"), 2, RunSave.MAX_COUNTER) \
 			or not SurvivalContracts.integer(value.get("slot"), 0, 2):

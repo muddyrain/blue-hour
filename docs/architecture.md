@@ -42,6 +42,8 @@ M34 由新旅程和已确认入队的出发身份认证急救资格。FirstAidV1
 
 M35 在显式启用的新旅程中为备选槽普通装备行动冻结风险结果。SortieRiskV1 复用已认证布局和 LevelSummary，按最终往返和可选站点证明决定是否交付大型深入回收。InvestigationActions 继续认证当日完整行动，WorldSites 与 FrozenSettlement 负责原携带和归航确认。[M35 合同](design/m35-sortie-risk-01.md)。
 
+M36 用营地已确认归航数冻结跨日敌情。CampaignPressureV1 提供版本化间隔倍率，Expedition 与 SortieSnapshot 的敌情核验读取同一冻结标记。原昼夜阶段继续由 ThreatDirector 根据现场时钟计算，收据与归航仍由原事务链确认。[M36 合同](design/m36-campaign-loop-01.md)。
+
 TaskActions只生成/校验V4任务描述并投影真实目标进度；DailyActions保留V1/V2/V3认证分支。Expedition沿原站点/刷怪owner推进空投工作和有界一次性压力，SortieSnapshot世界6保存同一task_event及原敌人事实；FrozenSettlement从报告计算任务摘要，EnemyState只对111开放经校验的last_day.task。没有新保存或收益owner；见[任务合同](design/m6-rogue-02.md)。
 
 RogueActions只拥有每日V1配置与确定性描述，RogueLayout只拼装/校验值布局并构造StreetLayout；现有Main/ProductionProgress/FrozenSettlement/Snapshot继续拥有选择、写入、结果和恢复。data_version2与世界version3显式绑定完整generated；旧规则与旧历史认证独立保留，普通入口在消费前拒绝旧途中。空间描述统一驱动原绘制、寻路、遮挡和交互，详情见[生成合同](design/m6-rogue-01.md)。

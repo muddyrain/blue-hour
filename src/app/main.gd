@@ -884,7 +884,7 @@ func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}) -> vo
 	if playable_entry:
 		var latest_rules: bool = not catalog_policy.is_empty()
 		_battle_meta.campaign = CampaignRules.initial_mission(profile_id, true, true, true, true,
-			latest_rules, latest_rules, latest_rules, latest_rules)
+			latest_rules, latest_rules, latest_rules, latest_rules, latest_rules)
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true, true)
 		if not opening_plan.is_empty():
 			var starter: Dictionary = OpeningBuild.source(opening_plan, profile_id, _battle_meta.root_id, _battle_meta.seed)

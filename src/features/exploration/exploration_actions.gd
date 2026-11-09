@@ -104,6 +104,8 @@ static func problem(value: Variant, camp_source: bool = false) -> String:
 		return "FIRST_AID_ACTION_POLICY"
 	if value is Dictionary and value.has("sortie_risk") and not SortieRiskV1.enabled(value):
 		return "SORTIE_RISK_ACTION_POLICY"
+	if value is Dictionary and value.has("campaign_pressure") and not CampaignPressureV1.enabled(value):
+		return "CAMPAIGN_PRESSURE_ACTION_POLICY"
 	if value is Dictionary and value.has("finale_policy"):
 		return PumpStationAction.problem(value)
 	if value is Dictionary and value.has("investigation"):
@@ -130,6 +132,7 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 	var weapon_affixes: bool = value is Dictionary and value.has("weapon_affix_policy")
 	var first_aid: bool = value is Dictionary and value.has("first_aid_policy")
 	var sortie_risk: bool = value is Dictionary and value.has("sortie_risk")
+	var campaign_pressure: bool = value is Dictionary and value.has("campaign_pressure")
 	if worldgen and (not value.worldgen is Dictionary or not TransactionReceipt.same(value.worldgen,WorldgenLayout.policy(level, industrial, residential_rescue))): return "WORLDGEN_ACTION_POLICY"
 	if mission and (not level or not SurvivalContracts.integer(value.mission_policy, 1, 1)): return "MISSION_ACTION_POLICY"
 	if rare and (not mission or not SurvivalContracts.integer(value.rare_policy, RareSortie.VERSION, RareSortie.VERSION)): return "RARE_ACTION_POLICY"
@@ -137,7 +140,7 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 			or not SurvivalContracts.integer(value.gear_build_policy, BuildItems.VERSION, BuildItems.CATALOG_POOL)):
 		return "GEAR_BUILD_POLICY"
 	var field_count: int = 23 + int(worldgen) + int(mission) + int(rare) + int(gear_build) \
-		+ int(screamer) + int(weapon_affixes) + int(first_aid) + int(sortie_risk)
+		+ int(screamer) + int(weapon_affixes) + int(first_aid) + int(sortie_risk) + int(campaign_pressure)
 	if not value is Dictionary or not SurvivalContracts.json_value(value) or value.size()!=field_count or value.get("version")!=9 or not value.get("layout") is Dictionary or not value.get("exploration") is Dictionary or not value.get("build") is Dictionary or not value.get("powers") is Dictionary or not value.get("persona") is Dictionary or not value.get("campaign") is Dictionary: return "EXPLORATION_ACTION_FIELDS"
 	if not SurvivalContracts.integer(value.build.get("version"), BuildItems.VERSION, BuildItems.CATALOG_POOL):
 		return "EXPLORATION_BUILD_POOL"
@@ -161,6 +164,8 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 		expected.weapon_affix_policy = WeaponInventory.AFFIX_POLICY_VERSION
 	if first_aid:
 		expected.first_aid_policy = FirstAidV1.VERSION
+	if campaign_pressure:
+		expected.campaign_pressure = CampaignPressureV1.marker(int(value.day) - 2)
 	var matches: bool = signature == RecordEncoding.fingerprint(expected) if mission else TransactionReceipt.same(value,expected)
 	if not matches and mission and camp_source:
 		# RunSave keeps its historical JSON camp projection. A stored ability source

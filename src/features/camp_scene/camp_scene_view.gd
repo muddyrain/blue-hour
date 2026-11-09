@@ -42,6 +42,7 @@ var _facilities: PanelContainer
 var _facility_heading: Label
 var _team_scroll: ScrollContainer
 var _team_count: Label
+var _journey_caption: Label
 
 
 func _ready() -> void:
@@ -143,7 +144,8 @@ func _build_blue_hour_header() -> void:
 	investigation.custom_minimum_size.x = 218
 	investigation.add_theme_constant_override("separation", 2)
 	row.add_child(investigation)
-	investigation.add_child(CampStyle.label("旅程进度", 14, CampStyle.MUTED))
+	_journey_caption = CampStyle.label("旅程进度", 14, CampStyle.MUTED)
+	investigation.add_child(_journey_caption)
 	eligibility_text = CampStyle.label("", 17, CampStyle.TEAL)
 	eligibility_text.clip_text = true
 	eligibility_text.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -341,6 +343,9 @@ func refresh(data: Dictionary, daily: Dictionary, can_depart: bool, reason: Stri
 		_refresh_blue_hour(data, daily, can_depart, reason, feedback)
 		return
 	resource_text.text = "第%d天   货币%d   食物%d   在营%d人" % [data.day, data.cash, data.food, world.visible_member_ids.size()]
+	var pressure: String = _campaign_pressure(data)
+	if not pressure.is_empty():
+		resource_text.text += "   " + pressure
 	eligibility_text.text = "%s · 今日需%d粮%s" % [reason, daily.required, " / 缺口%d" % int(daily.shortage) if daily.shortage > 0 else " / 库存足够"]
 	if data.last_day.has("task"):
 		var found: int = data.weapons.filter(func(item: Dictionary) -> bool:return item.get("acquired_sortie")==data.last_settlement_id).size()
@@ -377,6 +382,8 @@ func refresh(data: Dictionary, daily: Dictionary, can_depart: bool, reason: Stri
 
 func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, reason: String, feedback: String) -> void:
 	resource_text.text = "第 %d 天     货币 %d     食物 %d     今日需粮 %d" % [data.day, data.cash, data.food, daily.required]
+	var pressure: String = _campaign_pressure(data)
+	_journey_caption.text = "旅程进度" if pressure.is_empty() else pressure
 	_shortage_text.text = "口粮缺口 %d · 可考虑先补给" % daily.shortage if daily.shortage > 0 else "口粮缺口 0 · 库存充足"
 	var build: Dictionary = data.get("journey", {}).get("build", {})
 	if build.has("opening"):
@@ -434,6 +441,13 @@ func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, r
 		if button.visible:
 			_refresh_blue_hour_member(button, data, id)
 	_link_focus()
+
+
+func _campaign_pressure(data: Dictionary) -> String:
+	var campaign: Dictionary = data.get("journey", {}).get("campaign", {})
+	if not CampaignRules.campaign_pressure_enabled(campaign) or campaign.outcome != "ACTIVE":
+		return ""
+	return CampaignPressureV1.label(CampaignPressureV1.tier_for(int(data.settled_sorties)))
 
 
 func _refresh_blue_hour_member(button: Button, data: Dictionary, id: int) -> void:

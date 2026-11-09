@@ -69,7 +69,15 @@ func _accept_power(before_world: Dictionary, request: Dictionary) -> Dictionary:
 	if not PowerAuthority.mode(loaded.receipt.rules): return _error(ERR_INVALID_DATA,"POWER_MODE_REQUIRED")
 	for event: Dictionary in loaded.receipt.powers:
 		if event.id==request.get("id"):
-			return loaded if event.ability_id==request.get("ability_id") and TransactionReceipt.same({"id":event.id,"ability_id":event.ability_id},request) and loaded.receipt.envelope.has("world") and TransactionReceipt.same(loaded.receipt.envelope.get("power_proposal",{}).get("before",{}),before_world) else _error(ERR_INVALID_DATA,"POWER_RETRY_CONFLICT")
+			var expected: Dictionary = {"id":event.id,"ability_id":event.ability_id}
+			if event.has("slot"):
+				expected.slot = event.slot
+			var proof: Variant = loaded.receipt.envelope.get("power_proposal")
+			if proof is Dictionary and loaded.receipt.envelope.has("world") \
+					and TransactionReceipt.same(expected,request) and TransactionReceipt.same(proof.get("request",{}),request) \
+					and TransactionReceipt.same(proof.get("before",{}),before_world):
+				return loaded
+			return _error(ERR_INVALID_DATA,"POWER_RETRY_CONFLICT")
 	var after: Dictionary=PowerAuthority.propose(before_world,request)
 	if after.is_empty(): return _error(ERR_INVALID_DATA,"POWER_REQUEST_REJECTED")
 	return _suspend(after,true,{}, {"before":before_world,"request":request})

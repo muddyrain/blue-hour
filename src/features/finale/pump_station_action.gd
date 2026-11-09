@@ -67,7 +67,7 @@ static func problem(value: Dictionary) -> String:
 	if not campaign is Dictionary or not _identity(campaign.get("run_id")) \
 			or not SurvivalContracts.integer(campaign.get("preparations"), CampaignRules.PREPARATIONS, CampaignRules.PREPARATIONS) \
 			or not build is Dictionary or not build.get("owned") is Array or not build.get("slots") is Array \
-			or not powers is Dictionary or not powers.get("owned") is Array or not powers.get("slot") is String \
+			or not powers is Dictionary or not powers.get("owned") is Array or not PowerState.action_inventory_valid(powers.owned, PowerState.loadout(powers), int(value.day)) \
 			or not persona is Dictionary or not persona.get("facts") is Dictionary:
 		return "PUMP_ACTION_CONTEXT"
 	var expected: Dictionary = freeze(value)

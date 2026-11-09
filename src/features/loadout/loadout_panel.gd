@@ -137,13 +137,13 @@ func _ready() -> void:
 	add_child(confirmation)
 
 
-func refresh(data: Dictionary, feedback: String = "") -> void:
+func refresh(data: Dictionary, feedback: String = "", retry_power: bool = false) -> void:
 	_data = data.duplicate(true)
-	power_panel.present(data,not CampaignState.ended(data))
+	power_panel.present(data,not CampaignState.ended(data) and not retry_power,retry_power)
 	build_panel.visible=BuildState.enabled(data)
 	if build_panel.visible:
 		var build: Dictionary = data.journey.build
-		build_panel.present(build.owned, build.slots, true, not CampaignState.ended(data), build.get("opening", {}).get("plan", ""), BuildState.pool(data))
+		build_panel.present(build.owned, build.slots, true, not CampaignState.ended(data) and not retry_power, build.get("opening", {}).get("plan", ""), BuildState.pool(data))
 	items.max_text_lines = 3 if WeaponState.is_family(_data) else 1
 	_sync_members()
 	for id: int in _member_equipment:

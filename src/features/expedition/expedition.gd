@@ -113,8 +113,8 @@ var powers: Dictionary = {}
 var power_commit: Callable
 var pending_power: Dictionary = {}
 var power_frozen: bool = false
-var _power_effect_visible: bool = false
 var power_panel: PowerSlotPanel
+var second_power_panel: PowerSlotPanel
 var power_view: PowerEffectView
 var basic_support: BasicSupport = BasicSupport.new()
 var support_commit: Callable
@@ -181,7 +181,7 @@ func _ready() -> void:
 	if growth_mode:
 		xp_inputs.configure(growth_binding)
 	if build_mode(): basic_support.configure(growth_binding, FirstAidV1.enabled(supply.generated))
-	if power_mode(): powers=SpecialPowers.initial(growth_binding,supply.generated.powers.slot)
+	if power_mode(): powers=SpecialPowers.initial(growth_binding,PowerState.loadout(supply.generated.powers))
 	if combat_mode(): combat.setup(self)
 	if trait_mode:
 		trait_inputs.configure(growth_binding)
@@ -1559,6 +1559,12 @@ func _make_ui() -> void:
 		power_panel.position=Vector2(16,300)
 		power_panel.activation_requested.connect(request_power)
 		_hud.view.add_child(power_panel)
+		if powers.get("version") == SpecialPowers.PROGRESSION_VERSION and powers.loadout.slots.size() == 2:
+			second_power_panel = PowerSlotPanel.new()
+			second_power_panel.slot_index = 1
+			second_power_panel.position = Vector2(16, 378)
+			second_power_panel.activation_requested.connect(request_power.bind(1))
+			_hud.view.add_child(second_power_panel)
 		power_view=PowerEffectView.new()
 		_effects.add_child(power_view)
 	_update_ui()
@@ -2133,9 +2139,10 @@ func toggle_support_aim() -> void:
 
 func _support_input(event: InputEvent) -> bool:
 	if not build_mode(): return false
-	if _hud.view.persona_details.visible and event is InputEventKey and event.keycode in [KEY_Q,KEY_E,KEY_3]: return true
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode==KEY_3 and power_mode():
-		if get_viewport().gui_get_focus_owner()==null: request_power()
+	if _hud.view.persona_details.visible and event is InputEventKey and event.keycode in [KEY_Q,KEY_E,KEY_3,KEY_4]: return true
+	if event is InputEventKey and event.pressed and not event.echo and power_mode() \
+			and (event.keycode == KEY_3 or (event.keycode == KEY_4 and second_power_panel != null)):
+		if get_viewport().gui_get_focus_owner()==null: request_power(0 if event.keycode == KEY_3 else 1)
 		return true
 	if event is InputEventKey and event.pressed and not event.echo and get_viewport().gui_get_focus_owner()==null:
 		if support_aiming and event.keycode in [KEY_ESCAPE,KEY_E]: support_aiming=false; return true
@@ -2199,9 +2206,9 @@ func refresh_power_factors() -> void:
 	for actor: FieldActor in enemies:
 		actor.motion_locked = power_frozen or (combat.screamer != null and combat.screamer.holds(actor))
 
-func request_power() -> bool:
+func request_power(slot: int = 0) -> bool:
 	if not power_mode() or not support_available() or not pending_power.is_empty() or not survivors.any(func(actor:FieldActor)->bool:return actor.health>0): return false
-	var request: Dictionary=SpecialPowers.request(powers)
+	var request: Dictionary=SpecialPowers.request(powers,slot)
 	if request.is_empty(): return false
 	return _accept_power(support_world(),request)
 
@@ -2220,24 +2227,31 @@ func _accept_power(before: Dictionary, request: Dictionary) -> bool:
 	powers=result.world.powers.duplicate(true)
 	is_paused=false
 	refresh_power_factors()
-	_show_notice("%s已生效 · 今日一次已保存"%SpecialPowers.POLICY[request.ability_id].name)
-	print("BH_POWER "+JSON.stringify({"status":"ACCEPTED","event":powers.accepted[0],"elapsed":elapsed}))
+	_show_notice("%s已生效 · 本次使用已保存"%SpecialPowers.POLICY[request.ability_id].name)
+	print("BH_POWER "+JSON.stringify({"status":"ACCEPTED","event":SpecialPowers.event_at(powers,int(request.get("slot",0))),"elapsed":elapsed}))
 	_update_ui()
 	return true
 
 func _present_power() -> void:
 	if not power_mode() or power_panel==null: return
-	var id: String=supply.generated.powers.slot
-	var remaining: float=SpecialPowers.remaining(powers,elapsed)
-	if _power_effect_visible and remaining==0.0: _show_notice("特殊能力效果结束 · 今日已用")
-	_power_effect_visible=remaining>0.0
-	var status: String="营地装配 · 每日一次" if id.is_empty() else "持续 %.1f 秒"%remaining if remaining>0 else "今日已用" if not powers.accepted.is_empty() else "就绪 · 每日一次"
-	power_panel.present("特殊能力空槽" if id.is_empty() else SpecialPowers.POLICY[id].name,status,remaining,float(SpecialPowers.POLICY[id].duration) if not id.is_empty() else 1.0,support_available() and not SpecialPowers.request(powers).is_empty(),id)
+	_present_power_slot(power_panel, 0)
+	if second_power_panel != null:
+		_present_power_slot(second_power_panel, 1)
 	var members: Array[Dictionary]=[]
 	var foes: Array[Dictionary]=[]
 	for actor: FieldActor in survivors: members.append({"position":actor.position,"moving":actor.activity==FieldActor.Activity.MOVING,"alive":actor.health>0 and actor.visible})
 	for actor: FieldActor in enemies: foes.append({"position":actor.position,"moving":actor.activity==FieldActor.Activity.MOVING,"alive":actor.health>0 and actor.visible})
-	power_view.present(members,foes,id=="speed_boost_v1" and remaining>0,id=="map_freeze_v1" and remaining>0,elapsed)
+	power_view.present(members,foes,SpecialPowers.ability_remaining(powers,SpecialPowers.SPEED,elapsed)>0,power_frozen,elapsed)
+
+func _present_power_slot(panel: PowerSlotPanel, slot: int) -> void:
+	var id: String = SpecialPowers.equipped_at(powers, slot)
+	var remaining: float = SpecialPowers.remaining(powers, elapsed, slot)
+	var used: bool = not SpecialPowers.event_at(powers, slot).is_empty()
+	var status: String = "营地装配" if id.is_empty() else "持续 %.1f 秒" % remaining if remaining > 0.0 else "已用" if used else "就绪"
+	var upgraded: bool = powers.get("loadout", {}).get("investments", {}).get("freeze", 0) > 0
+	panel.present("特殊能力空槽" if id.is_empty() else SpecialPowers.POLICY[id].name,
+		status, remaining, SpecialPowers.duration(id, upgraded) if not id.is_empty() else 0.0,
+		support_available() and not id.is_empty() and not used, id)
 
 
 func _exploration_objective_rows() -> Array[Dictionary]:

@@ -39,6 +39,10 @@ static func problem(data: Dictionary) -> String:
 	if projected.get("last_day") is Dictionary:
 		projected.last_day.erase("task")
 		CampFacilities.project_legacy_food(projected.last_day)
+		if PowerState.opening_spend_valid(data):
+			# The legacy validator has no opening purchase. Only project a verified V2 debit.
+			projected.cash = CampRules.INITIAL_CASH
+			projected.camp_spending = 0
 	projected.schema_version = WeaponState.SCHEMA
 	projected.journey.format = WeaponState.FORMAT
 	# Validation context comes from the original campaign, never the projected old shape.

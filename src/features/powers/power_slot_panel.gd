@@ -12,6 +12,7 @@ const ICONS: Dictionary = {
 
 var activation_button: Button
 var duration_bar: ProgressBar
+var slot_index: int = 0
 
 
 func _ready() -> void:
@@ -20,14 +21,17 @@ func _ready() -> void:
 
 func present(title: String, status: String, remaining: float, duration: float, enabled: bool, ability_id: String) -> void:
 	_build()
-	activation_button.text = "3  " + ("空槽" if ability_id.is_empty() else "%.1fs" % remaining if remaining > 0.0 else "已用" if status.contains("已用") else "就绪" if enabled else "—")
+	var key: String = str(3 + slot_index)
+	var short_name: String = "冻结" if ability_id == SpecialPowers.FREEZE else "疾行"
+	var state: String = "%.1fs" % remaining if remaining > 0.0 else status
+	activation_button.text = key + "  空槽" if ability_id.is_empty() else "%s  %s\n%s" % [key,short_name,state]
 	activation_button.icon = ICONS.get(ability_id, ICONS[""])
 	var effect: String = "空槽：先完成装备行动并归航确认，再到营地装配。"
 	if ability_id == "speed_boost_v1":
 		effect = "全队有效移动速度 ×%s，持续 %s 秒；不加速攻击、换弹或工作。" % [str(SpecialPowers.POLICY[ability_id].move_factor), str(duration)]
 	elif ability_id == "map_freeze_v1":
 		effect = "全场活敌人暂停行动 %s 秒，期间新敌人同样受冻；已落地毒区继续生效。" % str(duration)
-	activation_button.tooltip_text = title + "\n" + effect + "\n" + status + "\n每天一次；营地装配，出击中不可更换。\n3 或点击立即释放，不需要地面瞄准。"
+	activation_button.tooltip_text = title + "\n" + effect + "\n" + status + "\n每次出击一次；营地装配。\n" + key + " 或点击立即释放。"
 	activation_button.disabled = not enabled
 	activation_button.focus_mode = Control.FOCUS_ALL if enabled else Control.FOCUS_NONE
 	if not enabled:

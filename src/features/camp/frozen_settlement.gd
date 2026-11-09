@@ -428,7 +428,7 @@ static func _prepare(transaction: RunTransaction, packet: Dictionary, scope: Str
 	if FieldJoinState.is_family(receipt.base) and not TransactionReceipt.same({"v":packet.input.report.get("field_joins")},{"v":receipt.joins}):
 		return _blocked("FIELD_JOIN_NOT_DURABLE")
 	if (receipt.rules.get("data_version")==8 or (receipt.rules.get("data_version")==9 or receipt.rules.get("data_version")==10)) and not TransactionReceipt.same({"v":packet.input.report.get("support",{}).get("accepted")},{"v":receipt.support}): return _blocked("SUPPORT_NOT_DURABLE")
-	if PowerAuthority.mode(receipt.rules) and not TransactionReceipt.same({"v":packet.input.report.get("powers",{}).get("accepted")},{"v":receipt.powers}): return _blocked("POWER_NOT_DURABLE")
+	if PowerAuthority.mode(receipt.rules) and not PowerAuthority.same_events(packet.input.report.get("powers",{}).get("accepted"),receipt.powers,receipt.rules.mission.generated.powers): return _blocked("POWER_NOT_DURABLE")
 	var issue: String = validate(packet)
 	if not issue.is_empty():
 		return _blocked(issue)
@@ -543,7 +543,7 @@ static func _facts_problem(input: Dictionary) -> String:
 		if not support_issue.is_empty(): return support_issue
 	var source: Dictionary = input.rules.mission
 	if PowerState.enabled(input.before):
-		var power_issue: String=SpecialPowers.problem(report.get("powers"),input.token,input.rules.mission.generated.powers.slot,float(report.elapsed))
+		var power_issue: String=SpecialPowers.problem(report.get("powers"),input.token,PowerState.loadout(input.rules.mission.generated.powers),float(report.elapsed))
 		if not power_issue.is_empty(): return power_issue
 	var multi: bool = (input.rules.get("data_version")==3 or input.rules.get("data_version")==4 or (input.rules.get("data_version")==5 or (input.rules.get("data_version")==6 or (input.rules.get("data_version")==7 or (input.rules.get("data_version")==8 or (input.rules.get("data_version")==9 or input.rules.get("data_version")==10))))))
 	if multi:

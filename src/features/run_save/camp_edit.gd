@@ -7,7 +7,7 @@ static func propose(before: Dictionary, request: Dictionary) -> Dictionary:
 	if request.size() != 3 or not request.get("kind") is String or not request.get("value") is String or not SurvivalContracts.integer(request.get("member_id"), 0, SurvivalContracts.MAX_ID):
 		return {}
 	if RescueState.is_family(before):
-		if not SurvivalState.extended_problem(before).is_empty() or before.journey.state != "ACTIVE" or (request.kind not in ["build_slot","power_slot"] and request.member_id > 0 and not WeaponInventory._living(before,int(request.member_id))):
+		if not SurvivalState.extended_problem(before).is_empty() or before.journey.state != "ACTIVE" or (request.kind not in ["build_slot","power_slot","power_equip"] and request.member_id > 0 and not WeaponInventory._living(before,int(request.member_id))):
 			return {}
 		return _propose_valid(before,request)
 	if SurvivalState.is_extended(before):
@@ -27,6 +27,10 @@ static func _propose_valid(before: Dictionary, request: Dictionary) -> Dictionar
 	match request.kind:
 		"power_slot":
 			return PowerState.equip(before,request.value) if member_id==0 else {}
+		"power_equip":
+			return PowerState.equip_progression(before, member_id, request.value)
+		"power_invest":
+			return PowerState.invest(before, request.value) if member_id == 0 else {}
 		"build_slot":
 			return BuildState.equip(before,member_id,request.value)
 		"facility":
@@ -91,6 +95,9 @@ static func problem(value: Dictionary) -> String:
 		var opening_issue: String = OpeningBuild.registration_problem(value.base)
 		if not opening_issue.is_empty():
 			return opening_issue
+		var power_issue: String = PowerState.registration_problem(value.base)
+		if not power_issue.is_empty():
+			return power_issue
 		return "" if value.transaction_id == "" and value.deaths.is_empty() and value.envelope.is_empty() and TransactionReceipt.same(value.rules, {"ruleset_id":"camp-registration", "data_version":1}) else "REGISTRATION_FIELDS"
 	var parts: PackedStringArray = String(value.transaction_id).split(":")
 	if parts.size() != 3 or parts[0] != value.base.profile_id or parts[1] != "edit" or parts[2].length() != 32 or not parts[2].is_valid_hex_number(false):

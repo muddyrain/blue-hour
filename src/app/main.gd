@@ -1382,7 +1382,7 @@ func close_loadout() -> void:
 
 
 func equip_weapon(member_id: int, identity: String) -> void:
-	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible:
+	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible or _progress_blocked:
 		return
 	if transactional_mode:
 		if _accept_transaction(progress_session.edit(camp_snapshot(),{"kind":"equip","member_id":member_id,"value":identity}),true):
@@ -1393,7 +1393,7 @@ func equip_weapon(member_id: int, identity: String) -> void:
 
 
 func repair_weapon(identity: String) -> void:
-	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible:
+	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible or _progress_blocked:
 		return
 	if transactional_mode:
 		if _accept_transaction(progress_session.edit(camp_snapshot(),{"kind":"repair","member_id":0,"value":identity}),true):
@@ -2649,7 +2649,7 @@ func _close_equipment_catalog() -> void:
 
 
 func equip_build_item(slot: int, item: String) -> void:
-	if phase!=Phase.TITLE or not loadout_panel.visible or not BuildState.enabled(camp_snapshot()): return
+	if phase!=Phase.TITLE or not loadout_panel.visible or _progress_blocked or not BuildState.enabled(camp_snapshot()): return
 	var saved: bool=_accept_transaction(progress_session.edit(camp_snapshot(),{"kind":"build_slot","member_id":slot,"value":item}),true)
 	loadout_panel.refresh(camp_snapshot(),"本局道具配装已保存；下一行动生效。" if saved else _progress_message)
 	if not saved:

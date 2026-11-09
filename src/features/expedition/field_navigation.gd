@@ -14,6 +14,16 @@ var _grid: AStarGrid2D = AStarGrid2D.new()
 func configure(blockers: Array[Rect2], world_bounds: Rect2 = BOUNDS) -> void:
 	bounds = world_bounds
 	obstacles = blockers.duplicate()
+	_prepare_grid()
+	for x: int in range(_grid.region.size.x):
+		for y: int in range(_grid.region.size.y):
+			var id: Vector2i = Vector2i(x, y)
+			var point: Vector2 = _grid.get_point_position(id)
+			if not is_clear(point):
+				_grid.set_point_solid(id, true)
+
+
+func _prepare_grid() -> void:
 	_grid.region = Rect2i(0, 0, int(bounds.size.x / CELL), int(bounds.size.y / CELL))
 	_grid.cell_size = Vector2(CELL, CELL)
 	_grid.offset = bounds.position + Vector2.ONE * CELL * 0.5
@@ -21,12 +31,41 @@ func configure(blockers: Array[Rect2], world_bounds: Rect2 = BOUNDS) -> void:
 	_grid.default_compute_heuristic = AStarGrid2D.HEURISTIC_OCTILE
 	_grid.default_estimate_heuristic = AStarGrid2D.HEURISTIC_OCTILE
 	_grid.update()
-	for x: int in range(_grid.region.size.x):
-		for y: int in range(_grid.region.size.y):
+
+
+func copy_navigation() -> FieldNavigation:
+	# The cached base certificate is immutable. Copy its grid once, then modify
+	# only the cells affected by the proposed overlay on the private copy.
+	var copy: FieldNavigation = FieldNavigation.new()
+	copy.bounds = bounds
+	copy.obstacles = obstacles.duplicate()
+	copy._prepare_grid()
+	for y: int in range(_grid.region.size.y):
+		for x: int in range(_grid.region.size.x):
 			var id: Vector2i = Vector2i(x, y)
-			var point: Vector2 = _grid.get_point_position(id)
-			if not is_clear(point):
-				_grid.set_point_solid(id, true)
+			if _grid.is_point_solid(id):
+				copy._grid.set_point_solid(id, true)
+	return copy
+
+
+func set_private_blocker(base: FieldNavigation, blocker: Rect2) -> void:
+	if obstacles.size() > base.obstacles.size():
+		_paint_blocker(base, obstacles[-1], false)
+		obstacles.pop_back()
+	if blocker.has_area():
+		obstacles.append(blocker)
+		_paint_blocker(base, blocker, true)
+
+
+func _paint_blocker(base: FieldNavigation, blocker: Rect2, solid: bool) -> void:
+	var area: Rect2 = blocker.grow(FOOT_RADIUS + CELL * 0.5)
+	var first: Vector2i = Vector2i(((area.position - _grid.offset) / CELL).floor()).max(Vector2i.ZERO)
+	var end: Vector2i = Vector2i(((area.end - _grid.offset) / CELL).ceil()).min(_grid.region.end)
+	for y: int in range(first.y, end.y):
+		for x: int in range(first.x, end.x):
+			var id: Vector2i = Vector2i(x, y)
+			if area.has_point(_grid.get_point_position(id)):
+				_grid.set_point_solid(id, solid or base._grid.is_point_solid(id))
 
 
 func is_clear(point: Vector2) -> bool:

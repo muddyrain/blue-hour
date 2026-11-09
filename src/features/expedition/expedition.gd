@@ -155,6 +155,8 @@ var event_sortie_panel: EventSortiePanel
 var recon_site: SearchSite
 var recon_knowledge: ReconKnowledge
 var _recon_view: ReconFieldView
+var barricade_open: bool = false
+var _barricade_view: BarricadeView
 var _bus_sprite: Sprite2D
 var bus_view: BusJourney
 var restoring_world: bool=false
@@ -203,8 +205,12 @@ func _ready() -> void:
 	_supply_entrances = _street_supply_entrances()
 	_cash_site.door = layout.cash_door
 	_food_site.door = layout.food_door
-	if exploration_mode() and not pump_station_mode(): navigation=ExplorationLayout._routing(layout.world_data).nav
-	else: navigation.configure(layout.blockers(),layout.world_bounds)
+	if supply.generated.has("barricade"):
+		navigation = BarricadeV1.navigation(supply.generated, false)
+	elif exploration_mode() and not pump_station_mode():
+		navigation = ExplorationLayout._routing(layout.world_data).nav
+	else:
+		navigation.configure(layout.blockers(), layout.world_bounds)
 	shot_obstacles = layout.shot_obstacles()
 	if is_practice and los_practice:
 		los_setup = LosPracticeSetup.for_layout(layout, los_range_case)
@@ -234,6 +240,13 @@ func _ready() -> void:
 	add_child(_sort)
 	_effects = Node2D.new()
 	add_child(_effects)
+	if supply.generated.has("barricade"):
+		_barricade_view = BarricadeView.new()
+		_barricade_view.footprint = BarricadeV1.rect(supply.generated)
+		_barricade_view.landing = WorldLayout.point(supply.generated.barricade.landing)
+		_barricade_view.label_font = ui_theme.default_font if ui_theme != null else null
+		_barricade_view.z_index = 1
+		add_child(_barricade_view)
 	if ReconActionV1.enabled(supply.generated):
 		recon_site = SearchSite.new(StringName(ReconActionV1.SITE_ID), ReconActionV1.point(supply.generated))
 		recon_site.seconds = ReconActionV1.SECONDS
@@ -2302,6 +2315,17 @@ func request_first_aid() -> bool:
 	var before: Dictionary = support_world()
 	return _accept_support(before, basic_support.request(FirstAidV1.KIND, plan))
 
+func apply_barricade_history(accepted: Array) -> void:
+	var opened: bool = BarricadeState.opened(supply.generated, accepted, layout)
+	if opened == barricade_open:
+		return
+	var stamp: int = FreezeProfile.enter("barricade.navigation")
+	navigation = BarricadeV1.navigation(supply.generated, opened)
+	barricade_open = opened
+	_barricade_view.present(opened, support_aiming and not opened)
+	FreezeProfile.leave("barricade.navigation", stamp)
+
+
 func request_airstrike(point: Vector2) -> bool:
 	if not support_available(): return false
 	var before: Dictionary=support_world()
@@ -2335,6 +2359,7 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 	print("BH_SUPPORT "+JSON.stringify({"kind":request.kind,"status":"ACCEPTED","sequence_before":before.support.sequence,"sequence":after.support.sequence,"cooldowns":after.support.cooldowns,"kills_before":before.sim.kills,"kills":after.sim.kills,"facts":after.support.accepted.back().facts,"elapsed":after.sim.elapsed}))
 	# All fallible validation and I/O preceded this visible state replacement.
 	var preserve_aim: bool = request.kind == FirstAidV1.KIND and support_aiming
+	var was_open: bool = barricade_open
 	var application: int = FreezeProfile.enter("support.apply")
 	for enemy: FieldActor in enemies: enemy.free()
 	enemies.clear()
@@ -2347,6 +2372,8 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 		support_aim.impact(SortieSnapshot._vec(request.payload.point),request.payload.radius)
 		var hits: int=request.payload.targets.size()
 		var notice: String = "空袭命中 · %d 个目标" % hits if hits > 0 else "空袭已落地"
+		if barricade_open and not was_open:
+			notice += " · 路障已清除"
 		if burst_interrupted:
 			combat.burst.feedback(self, "burst_cancelled")
 			notice += " · 爆囊冲击取消"
@@ -2402,9 +2429,14 @@ func _present_support() -> void:
 	var heal_text: String="Q 治疗 · %.1fs"%state.cooldowns.heal if state.cooldowns.heal>0 else "Q 治疗 · 队员%d +%.0fHP"%[plan.member_id,plan.amount] if not plan.is_empty() else "Q 治疗 · 无受伤存活者"
 	var strike_text: String="E 空袭 · %.1fs"%state.cooldowns.airstrike if state.cooldowns.airstrike>0 else "左键确认 · 右键/Esc取消" if support_aiming else "E 空袭 · 就绪"
 	if not support_available(): heal_text="治疗 · 当前阶段不可用"; strike_text="空袭 · 当前阶段不可用"
-	support_panel.present(heal_text,strike_text,support_available() and state.cooldowns.heal==0 and not plan.is_empty(),support_available() and state.cooldowns.airstrike==0)
 	var point: Vector2=get_global_mouse_position()
-	var legal: bool=not support_plan_airstrike(point).is_empty() if support_aiming else false
+	var aim_plan: Dictionary = support_plan_airstrike(point) if support_aiming else {}
+	var legal: bool = not aim_plan.is_empty()
+	if _barricade_view != null:
+		_barricade_view.present(barricade_open, support_aiming and not barricade_open)
+		if not barricade_open and legal and BarricadeState.hits(supply.generated, aim_plan, layout):
+			strike_text = "可炸开路障 · 左键确认"
+	support_panel.present(heal_text,strike_text,support_available() and state.cooldowns.heal==0 and not plan.is_empty(),support_available() and state.cooldowns.airstrike==0)
 	if support_aiming:
 		var caller: FieldActor=null
 		for actor: FieldActor in survivors:

@@ -45,6 +45,8 @@ static func support_problem(value: Variant, token: Dictionary, generated: Dictio
 				return aid_issue
 		else:
 			if facts.size()!=4 or not facts.get("targets") is Array or not event.payload.has_all(["member_id","point","radius","targets"]) or event.payload.member_id!=facts.member_id or event.payload.radius!=BasicSupport.POLICY.airstrike_radius*BuildItems.frozen_factors(generated.build).blast: return "AIRSTRIKE_FACT_FIELDS"
+			if generated.has("barricade") and (event.payload.size() != 4 or not SortieSnapshot._vector(event.payload.point)):
+				return "AIRSTRIKE_REQUEST_POINT"
 			var seen: Array[int]=[]
 			for target: Variant in facts.targets:
 				if not target is Dictionary or target.size()!=4 or not target.has_all(["enemy_id","health_before","health_after","amount"]) or not SurvivalContracts.integer(target.enemy_id,0,RunSave.MAX_COUNTER) or int(target.enemy_id) in seen: return "AIRSTRIKE_TARGET_FIELDS"
@@ -122,7 +124,10 @@ static func plan_airstrike(world: Dictionary, point: Vector2) -> Dictionary:
 	var map_stamp: int = FreezeProfile.enter("support.airstrike_map")
 	var layout: StreetLayout = DailyActions.supply(world.generated).layout
 	var navigation: FieldNavigation
-	if world.generated.get("version") == 9 and not PumpStationAction.enabled(world.generated):
+	if BarricadeV1.enabled(world.generated):
+		var opened: bool = BarricadeState.opened(world.generated, world.support.accepted, layout)
+		navigation = BarricadeV1.navigation(world.generated, opened)
+	elif world.generated.get("version") == 9 and not PumpStationAction.enabled(world.generated):
 		# The same validated final geometry certifies the field and receipt replay.
 		navigation = ExplorationLayout._routing(layout.world_data).nav
 		FreezeProfile.count("airstrike_navigation_reuses")

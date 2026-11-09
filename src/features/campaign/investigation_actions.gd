@@ -66,6 +66,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var night_hound: bool = NightHoundV1.campaign_enabled(base.journey.campaign)
 	var workshop: bool = WorkshopV1.enabled(base) and CampFacilities.selected(base) == CampFacilities.WORKSHOP
 	var recon: bool = CampaignRules.recon_enabled(base.journey.campaign)
+	var barricade: bool = CampaignRules.barricade_enabled(base.journey.campaign)
 	for index: int in range(result.size()):
 		var candidate: Dictionary = result[index]
 		if event_sortie:
@@ -90,6 +91,8 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 			candidate.weapon_affix_policy = WeaponInventory.AFFIX_POLICY_VERSION
 		if recon:
 			candidate = ReconActionV1.freeze(candidate, int(base.journey.campaign.recon_policy))
+		if barricade:
+			candidate = BarricadeV1.freeze(candidate)
 		result[index] = candidate
 		fingerprints[candidate.id] = RecordEncoding.fingerprint(candidate)
 	var frozen: Dictionary = {"offers":result, "fingerprints":fingerprints}

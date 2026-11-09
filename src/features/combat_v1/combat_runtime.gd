@@ -175,6 +175,10 @@ func pick_spawn(world: Expedition,index: int) -> String:
 	elif kind == EnemyRules.NORMAL and burst != null and burst.state.actor_id == -1 \
 			and world.threat.stage == ThreatDirector.Stage.LATE:
 		kind = BurstRuntimeV1.KIND
+	elif kind == EnemyRules.NORMAL and world.threat.stage >= ThreatDirector.Stage.NIGHT \
+			and NightHoundV1.enabled(world.supply.generated) \
+			and not spawns.values().any(func(source: Dictionary) -> bool: return source.kind == NightHoundV1.KIND):
+		kind = NightHoundV1.KIND
 	if kind==CombatEnemyRules.TOXIC:
 		for actor: FieldActor in world.enemies:
 			if actor.health>0 and actor.enemy_behavior!=null and actor.enemy_behavior.kind==CombatEnemyRules.TOXIC:
@@ -284,6 +288,9 @@ static func problem(value: Variant,world: Dictionary,receipt: Dictionary) -> Str
 	var supply: MissionSupply=SortieSnapshot.supply_for_world(world)
 	if supply==null: return "COMBAT_WORLD_GENERATION"
 	var layout: StreetLayout=supply.layout
+	var hounding: bool = NightHoundV1.enabled(world.generated)
+	var first_hound_slot: int = -1
+	var hound_id: int = -1
 	for key: Variant in value.spawns:
 		var source: Variant=value.spawns[key]
 		if not key is String or not key.is_valid_int() or key!=str(int(key)) or int(key)<0 or int(key)>=world.sim._spawn_count or not source is Dictionary or source.size()!=3 or not source.has_all(["kind","stage","fallback"]) or not SurvivalContracts.integer(source.stage,0,int(world.threat.stage)) or not source.kind is String or not SurvivalContracts.integer(source.fallback,-1,int(key)-1): return "COMBAT_SPAWN_FIELDS"
@@ -294,7 +301,14 @@ static func problem(value: Variant,world: Dictionary,receipt: Dictionary) -> Str
 		replacement = replacement or (bursting and source.kind == BurstRuntimeV1.KIND and rolled == EnemyRules.NORMAL \
 			and int(source.stage) == ThreatDirector.Stage.LATE and source.fallback == -1 \
 			and value.get("burst") is Dictionary and value.burst.get("actor_id") == int(key))
+		if hounding and NightHoundV1.ordinary_slot(rolled, source.kind, int(source.stage)):
+			first_hound_slot = int(key) if first_hound_slot < 0 else mini(first_hound_slot, int(key))
+			if source.kind == NightHoundV1.KIND and source.fallback == -1 and hound_id == -1:
+				hound_id = int(key)
+				replacement = true
 		if source.kind!=rolled and not replacement and not (rolled==CombatEnemyRules.TOXIC and source.kind==EnemyRules.NORMAL and source.fallback>=0 and value.spawns.get(str(int(source.fallback)),{}).get("kind")==CombatEnemyRules.TOXIC): return "COMBAT_SPAWN_SOURCE"
+	if hound_id != first_hound_slot:
+		return "HOUND_SPAWN_PRIORITY"
 	if screaming:
 		var screamer_issue: String = ScreamerRuntimeV1.problem(value.get("screamer"), world, receipt, layout)
 		if not screamer_issue.is_empty(): return screamer_issue

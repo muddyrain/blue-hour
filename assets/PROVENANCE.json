@@ -2,6 +2,12 @@
   "status": "PROJECT_TEMP",
   "files": [
     {
+      "path": "assets/combat_v1/hound/night_hound_v1.svg",
+      "sha256": "07200f6eac71c641edf860a490b8a1cf7b8c1d07a823b530329fe510c00d589b",
+      "origin": "Original project vector animation atlas, drawn for M39 from the in-game silhouette study",
+      "license": "No additional license granted"
+    },
+    {
       "path": "assets/combat_v1/weapons/rescue_hammer_v1.svg",
       "sha256": "c7831df028d432535e22338e0b30231e4cfe8d44d12b04006caa4d36065d3348",
       "origin": "Original project vector illustration",

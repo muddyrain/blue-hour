@@ -468,7 +468,10 @@ func step(delta: float) -> void:
 	var enemy_motion: Dictionary = FieldContacts.move(enemies,occupants,navigation,0.0 if power_frozen else delta,false,_hold_enemy_approach)
 	last_contact_metrics.enemy_substeps = enemy_motion.substeps
 	last_contact_metrics.motion_deviation_max = maxf(last_contact_metrics.motion_deviation_max,enemy_motion.motion_deviation_max)
-	for actor: FieldActor in occupants: actor.present_motion(delta,previous[actor])
+	for actor: FieldActor in occupants:
+		if power_frozen and actor.enemy_behavior != null and actor.enemy_behavior.kind == NightHoundV1.KIND:
+			continue
+		actor.present_motion(delta,previous[actor])
 	for index: int in range(_corpses.size() - 1, -1, -1):
 		_corpses[index].advance(delta)
 		_corpse_times[index] -= delta
@@ -1142,8 +1145,12 @@ func _update_combat() -> void:
 			continue
 		if behavior!=null and behavior.kind==EnemyRules.RUSH and target!=null and not behavior.legal(self,enemy,target,EnemyRules.POLICY.melee_range):
 			target = null
-		if behavior!=null and behavior.kind==EnemyRules.HEAVY:
+		var hound: bool = behavior != null and behavior.kind == NightHoundV1.KIND
+		var timed_attack: bool = hound or (behavior != null and behavior.kind == EnemyRules.HEAVY)
+		if timed_attack:
 			if behavior.state=="windup":
+				if hound and behavior.windup_remaining > 0.0:
+					continue
 				target = behavior.locked_target(self)
 				if target==null or not behavior.legal(self,enemy,target,EnemyRules.POLICY.melee_range):
 					behavior.cancel(self,enemy,true)
@@ -1155,7 +1162,7 @@ func _update_combat() -> void:
 				continue
 			else:
 				continue
-			damage = EnemyRules.POLICY.heavy_damage
+			damage = NightHoundV1.DAMAGE if hound else EnemyRules.POLICY.heavy_damage
 		if target != null and enemy.cooldown <= 0.0:
 			if behavior != null:
 				damage = CombatRuntime.direct_melee_damage(behavior.kind, damage, powers, elapsed)
@@ -1169,8 +1176,8 @@ func _update_combat() -> void:
 			if battle_survival and target.health == 0:
 				_show_notice("%02d %s 已阵亡 · 战斗死亡已持久确认" % [target.member_id,target.call_sign])
 			_clear_dead_worker()
-			enemy.cooldown = tuning.enemy_interval
-			if behavior!=null and behavior.kind==EnemyRules.HEAVY:
+			enemy.cooldown = behavior.attack_interval(tuning.enemy_interval) if hound else tuning.enemy_interval
+			if timed_attack:
 				behavior.reset(enemy,tuning.enemy_speed)
 			enemy.visual.show_attack(direction)
 			_hit_effect(target.position, damage, true)
@@ -2263,7 +2270,8 @@ func refresh_power_factors() -> void:
 	for actor: FieldActor in survivors: actor.power_move_factor=factor
 	for actor: FieldActor in enemies:
 		actor.motion_locked = power_frozen or (combat.screamer != null and combat.screamer.holds(actor)) \
-			or (combat.burst != null and combat.burst.holds(actor))
+			or (combat.burst != null and combat.burst.holds(actor)) \
+			or (actor.enemy_behavior != null and actor.enemy_behavior.kind == NightHoundV1.KIND and actor.enemy_behavior.state == "windup")
 
 func request_power(slot: int = 0) -> bool:
 	if not power_mode() or not support_available() or not pending_power.is_empty() or not survivors.any(func(actor:FieldActor)->bool:return actor.health>0): return false

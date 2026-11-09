@@ -20,7 +20,7 @@ static func eligible(generated: Dictionary) -> bool:
 	return generated.get("version") == 9 and generated.get("type") == "airdrop" \
 		and SurvivalContracts.integer(generated.get("day"), 3, RunSave.MAX_COUNTER) \
 		and SurvivalContracts.integer(generated.get("mission_policy"), 1, 1) \
-		and SurvivalContracts.integer(generated.get("gear_build_policy"), BuildItems.VERSION, BuildItems.CATALOG_POOL) \
+		and BuildItems.valid_pool(generated.get("gear_build_policy")) \
 		and not generated.has("rare_policy") and not generated.has("investigation") \
 		and not generated.has("finale_policy") and campaign is Dictionary and campaign.get("is_finale") == false \
 		and worldgen is Dictionary and worldgen.get("version") == 2 and worldgen.get("revision") == 2 \

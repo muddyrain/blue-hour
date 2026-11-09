@@ -7,6 +7,10 @@ const Definitions: Array[WeaponDefinition] = [preload("res://src/features/loadou
 const AFFIX_POLICY_VERSION: int = 1
 const AFFIX_DROP_VERSION: int = 3
 const AFFIX_SLOT: int = 2
+const HAMMER_DROP_VERSION: int = 4
+const MECHANIC_ID: int = 5
+const MECHANIC_TITLE: String = "整备工"
+const MECHANIC_DISCOUNT: int = 3
 
 
 static func definition(id: String) -> WeaponDefinition:
@@ -62,8 +66,21 @@ static func affix_enabled(generated: Dictionary) -> bool:
 		AFFIX_POLICY_VERSION) and affix_eligible(generated)
 
 
+static func hammer_site_drop(generated: Dictionary, site: Dictionary) -> Dictionary:
+	if not ContentWaveV1.eligible(generated) or site.get("id") != "cash" or site.get("kind") != "cash" \
+			or site.get("work_mode") != "outdoor" or site.get("weapon") != true:
+		return {}
+	return {"version":HAMMER_DROP_VERSION, "weapon_id":CombatEquipment.HAMMER_ID}
+
+
 static func site_reward(sortie_id: String, generated: Dictionary, site: Dictionary, quality: bool) -> Dictionary:
 	if (generated.get("version")!=5 and (generated.get("version")!=6 and (generated.get("version")!=7 and (generated.get("version")!=8 and generated.get("version")!=9)))):return reward(sortie_id,quality)
+	if site.drop.get("version") == HAMMER_DROP_VERSION:
+		var expected: Dictionary = hammer_site_drop(generated, site)
+		if not quality or expected.is_empty() or not TransactionReceipt.same(site.drop, expected) \
+				or sortie_id != "%s:%d" % [generated.campaign.get("run_id", ""), int(generated.day) - 1]:
+			return {}
+		return _hammer_reward(sortie_id, generated.id)
 	var value: Dictionary=reward(sortie_id)
 	value.weapon_id=site.drop.weapon_id
 	value.drop={"version":2 if (generated.get("version")==8 or generated.get("version")==9) else 1,"slot":generated.slot,"site_id":site.id}
@@ -73,13 +90,22 @@ static func site_reward(sortie_id: String, generated: Dictionary, site: Dictiona
 	return WeaponModifiers.reward(value) if quality else value
 
 
-static func instance_reward(data: Dictionary, item: Dictionary, affix_policy: bool = false) -> Dictionary:
+static func instance_reward(data: Dictionary, item: Dictionary, affix_policy: bool = false, wave: bool = false) -> Dictionary:
 	var drop: Variant=item.get("drop")
-	if not drop is Dictionary or drop.size()!=3 or not drop.has_all(["version","slot","site_id"]) or not SurvivalContracts.integer(drop.version,1,AFFIX_DROP_VERSION) or not SurvivalContracts.integer(drop.slot,0,2) or drop.site_id!="cash" or item.origin!="north-cache":return {}
+	if not drop is Dictionary or not drop.has_all(["version","slot","site_id"]) or not SurvivalContracts.integer(drop.version,1,HAMMER_DROP_VERSION) or not SurvivalContracts.integer(drop.slot,0,2) or drop.site_id!="cash" or item.origin!="north-cache":return {}
+	var hammer: bool = drop.version == HAMMER_DROP_VERSION
+	if drop.size() != (4 if hammer else 3) or (hammer and not wave):
+		return {}
 	var parts: PackedStringArray=item.acquired_sortie.split(":")
 	if parts.size()!=2 or not parts[1].is_valid_int():return {}
 	# RunSave authenticates day == settled_sorties + 2; sortie N starts on day N+1.
 	var action: String=("daily-v4:%s:%d:%d"%[data.journey.seed,int(parts[1])+1,int(drop.slot)]).sha256_text()
+	if hammer:
+		if parts[0] != data.get("profile_id") or not SurvivalContracts.integer(int(parts[1]), 2, int(data.get("settled_sorties", 0))) \
+				or item.acquired_sortie != "%s:%d" % [parts[0], int(parts[1])] \
+				or drop.slot != AFFIX_SLOT or drop.get("action_id") != action:
+			return {}
+		return _with_condition(_hammer_reward(item.acquired_sortie, action), item.condition)
 	var value: Dictionary=reward(item.acquired_sortie)
 	value.weapon_id=CombatActions.drop(data.journey.seed,action,drop.site_id,int(parts[1])==1) if drop.version>=2 else drop_weapon(data.journey.seed,action,drop.site_id)
 	value.drop=drop.duplicate(true);value.condition=item.condition
@@ -88,6 +114,13 @@ static func instance_reward(data: Dictionary, item: Dictionary, affix_policy: bo
 			return {}
 		return WeaponModifiers.site_affix_reward(value, data.journey.seed, action, drop.site_id)
 	return WeaponModifiers.reward(value)
+
+
+static func _hammer_reward(sortie_id: String, action_id: String) -> Dictionary:
+	var value: Dictionary = reward(sortie_id)
+	value.weapon_id = CombatEquipment.HAMMER_ID
+	value.drop = {"version":HAMMER_DROP_VERSION, "slot":AFFIX_SLOT, "site_id":"cash", "action_id":action_id}
+	return WeaponModifiers.baseline(value)
 
 
 static func find(data: Dictionary, identity: String) -> Dictionary:
@@ -226,10 +259,33 @@ static func equip(data: Dictionary, member_id: int, identity: String) -> Diction
 
 
 static func repair_quote(data: Dictionary, item: Dictionary) -> int:
-	var cost: int = definition(item.weapon_id).repair_cost
+	return int(repair_offer(data, item).cost)
+
+
+static func mechanic_available(data: Dictionary) -> bool:
+	if not ContentWaveV1.enabled(data) or not _living(data, MECHANIC_ID):
+		return false
+	for record: Dictionary in data.get("recruits", []):
+		if record.member_id != MECHANIC_ID or record.field_status != "RETURNED":
+			continue
+		var parts: PackedStringArray = String(record.settlement_id).split(":")
+		return parts.size() == 2 and parts[0] == data.profile_id and parts[1].is_valid_int() \
+			and SurvivalContracts.integer(int(parts[1]), 1, int(data.settled_sorties))
+	return false
+
+
+static func repair_offer(data: Dictionary, item: Dictionary) -> Dictionary:
+	var base: int = definition(item.weapon_id).repair_cost
+	var discount: int = 0
+	var source: String = ""
 	if CampFacilities.selected(data) == CampFacilities.WORKSHOP:
-		return maxi(1, cost - CampFacilities.REPAIR_DISCOUNT)
-	return cost
+		discount = CampFacilities.REPAIR_DISCOUNT
+		source = "工坊"
+	elif mechanic_available(data):
+		discount = MECHANIC_DISCOUNT
+		source = MECHANIC_TITLE
+	var cost: int = maxi(1, base - discount)
+	return {"base":base, "source":source, "discount":base - cost, "cost":cost}
 
 
 static func repair(data: Dictionary, identity: String) -> Dictionary:

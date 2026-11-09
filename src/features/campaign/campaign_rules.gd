@@ -31,12 +31,14 @@ static func initial_investigation(run_id: String) -> Dictionary:
 static func initial_mission(run_id: String, action_choices: bool = false, midgame: bool = false,
 		pump_station: bool = false, rare_sorties: bool = false, screamer: bool = false,
 		weapon_affixes: bool = false, first_aid: bool = false, sortie_risk: bool = false,
-		campaign_pressure: bool = false) -> Dictionary:
+		campaign_pressure: bool = false, content_wave: bool = false) -> Dictionary:
 	var value: Dictionary = initial_investigation(run_id)
 	value.version = MISSION_VERSION
 	value.mode = MISSION_MODE
 	if campaign_pressure:
 		value.campaign_pressure_policy = CampaignPressureV1.VERSION
+	if content_wave:
+		value.content_wave_policy = ContentWaveV1.VERSION
 	if action_choices or midgame:
 		value.action_policy = ACTION_POLICY_VERSION
 		if sortie_risk:
@@ -141,9 +143,10 @@ static func _investigation_problem(value: Dictionary, run_id: String) -> String:
 	var has_first_aid: bool = value.has("first_aid_policy")
 	var has_sortie_risk: bool = value.has("sortie_risk_policy")
 	var has_campaign_pressure: bool = value.has("campaign_pressure_policy")
+	var has_content_wave: bool = value.has("content_wave_policy")
 	var field_count: int = INVESTIGATION_KEYS.size() + int(has_action_policy) + int(has_midgame) \
 		+ int(has_finale) + int(has_rare) + int(has_screamer) + int(has_affixes) + int(has_first_aid) \
-		+ int(has_sortie_risk) + int(has_campaign_pressure)
+		+ int(has_sortie_risk) + int(has_campaign_pressure) + int(has_content_wave)
 	if value.size() != field_count or not value.has_all(INVESTIGATION_KEYS) or not SurvivalContracts.integer(value.version,version,version):
 		return "INVESTIGATION_FIELDS"
 	if has_action_policy and not action_choices_enabled(value):
@@ -164,6 +167,8 @@ static func _investigation_problem(value: Dictionary, run_id: String) -> String:
 		return "SORTIE_RISK_CAMPAIGN_POLICY"
 	if has_campaign_pressure and not campaign_pressure_enabled(value):
 		return "CAMPAIGN_PRESSURE_POLICY"
+	if has_content_wave and not ContentWaveV1.campaign_enabled(value):
+		return "CONTENT_WAVE_CAMPAIGN_POLICY"
 	if not value.run_id is String or not _identity(value.run_id) or (not run_id.is_empty() and run_id != value.run_id):
 		return "INVESTIGATION_IDENTITY"
 	if not value.clues is Array or value.clues.size() > CLUE_IDS.size() or value.outcome not in ["ACTIVE","VICTORY","DEFEAT"] or not value.result_transaction is String:

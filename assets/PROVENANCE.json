@@ -2,6 +2,24 @@
   "status": "PROJECT_TEMP",
   "files": [
     {
+      "path": "assets/combat_v1/weapons/rescue_hammer_v1.svg",
+      "sha256": "c7831df028d432535e22338e0b30231e4cfe8d44d12b04006caa4d36065d3348",
+      "origin": "Original project vector illustration",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/powers/suppression_pulse_v1.svg",
+      "sha256": "23c99cb1420af49c9d257b084dc5a4ca2ba74e5ffb5067bd8002933e60b78c9d",
+      "origin": "Original project vector illustration",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/ui/m38/impact-liner.svg",
+      "sha256": "f9958ffc3e38651d5597b915027d775ff308747eb9f8e8654e11a4c1938ac82f",
+      "origin": "Original project vector illustration",
+      "license": "No additional license granted"
+    },
+    {
       "path": "assets/ui/m31/filter-mask.svg",
       "sha256": "bc76031d9591a7079984326953a798f68fe8bbeca99e61ccec3b893e5333896e",
       "origin": "Original project vector illustration",

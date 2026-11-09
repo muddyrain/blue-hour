@@ -9,15 +9,21 @@ static func initial() -> Dictionary:
 
 
 static func pool(camp: Dictionary) -> int:
-	var catalog: Dictionary = camp.get("journey", {}).get("build", {}).get("catalog", {})
-	return BuildItems.CATALOG_POOL if not catalog.get("unlock", "").is_empty() else BuildItems.VERSION
+	var build: Dictionary = camp.get("journey", {}).get("build", {})
+	var catalog: Dictionary = build.get("catalog", {})
+	var catalog_unlocked: bool = not catalog.get("unlock", "").is_empty()
+	if build.get("powers", {}).get("version") == SpecialPowers.WAVE_VERSION:
+		return BuildItems.WAVE_CATALOG_POOL if catalog_unlocked else BuildItems.WAVE_POOL
+	return BuildItems.CATALOG_POOL if catalog_unlocked else BuildItems.VERSION
 
 
 static func problem(camp: Dictionary) -> String:
 	if not enabled(camp): return ""
 	var build: Variant = camp.journey.build
-	if not build is Dictionary or not build.has("opening"):
-		return _problem(camp, "", BuildItems.VERSION)
+	if not build is Dictionary:
+		return "BUILD_FIELDS"
+	if not build.has("opening"):
+		return _problem(camp, "", pool(camp))
 	var issue: String = OpeningBuild.problem(camp)
 	if not issue.is_empty():
 		return issue
@@ -94,6 +100,8 @@ static func _problem(camp: Dictionary, opening_item: String, item_pool: int) -> 
 		var action_ids: Array[String]=[]
 		for slot: int in range(3): action_ids.append(("daily-v4:%s:%d:%d"%[camp.journey.seed,int(parts[1])+1,slot]).sha256_text())
 		if source.context.get("action_id") not in action_ids: return "BUILD_ACQUISITION_ACTION"
+		if source.context.has("liner") and source.context.action_id != action_ids[2]:
+			return "BUILD_ACQUISITION_LINER_ACTION"
 		if source.transaction_id!=group:
 			if not group.is_empty() and int(parts[1])<=int(group.get_slice(":",1)): return "BUILD_ACQUISITION_ORDER"
 			group=source.transaction_id

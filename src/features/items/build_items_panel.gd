@@ -4,6 +4,8 @@ extends VBoxContainer
 
 signal requested(slot: int, item_id: String)
 
+const LINER_ICON: Texture2D = preload("res://assets/ui/m38/impact-liner.svg")
+
 var slot_choices: Array[OptionButton] = []
 var status: Label
 var inventory: Label
@@ -53,7 +55,11 @@ func present(owned: Array, slots: Array, saved: bool, enabled: bool = true, open
 			if id not in owned:
 				continue
 			var index: int = choice.item_count
-			choice.add_item("槽 %d · %s" % [slot + 1, definitions[id].name])
+			var title: String = "槽 %d · %s" % [slot + 1, definitions[id].name]
+			if id == BuildItems.LINER:
+				choice.add_icon_item(LINER_ICON, title)
+			else:
+				choice.add_item(title)
 			choice.set_item_metadata(index, id)
 			choice.set_item_tooltip(index, definitions[id].effect)
 			choice.set_item_disabled(index, id == slots[1 - slot])

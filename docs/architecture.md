@@ -46,6 +46,8 @@ M36 用营地已确认归航数冻结跨日敌情。CampaignPressureV1 提供版
 
 M37 用能力版本 2 冻结槽位和购买日。CampEdit 在原营地事务内核验资格并记账，PowerAuthority 在原世界提案中追加单槽事件，原收据校验事件顺序、槽位、时间和前态。Expedition 从模拟时钟派生两种效果，在较早的到期点切分推进。归航仍由 FrozenSettlement 处理，M37 营地内的能力时钟使用已有精确编码。历史版本继续按原字段、签名和单次规则认证。[M37 合同](design/m37-build-progression-01.md)。
 
+M38 由新旅程的 `content_wave_policy` 启用。能力 V3 冻结三项目录，槽位和旧报价沿用 M37。ContentWaveV1 在已认证的工业装备行动冻结救援锤与内衬来源，武器、道具与成员仍由原 CampEdit 和 FrozenSettlement 记账。只有玩家界面读取救援揭晓状态，签名候选继续沿原事务认证。爆囊的蓄势随世界保存，释放前由 BurstAuthorityV1 冻结有序命中和原死亡记录，随同一次世界暂存发布和确认。抑制只在普通、疾奔和重压的直接近战命中取倍率。历史能力、装备、世界与收据继续按冻结版本认证。[M38 合同](design/m38-content-wave-01.md)。
+
 TaskActions只生成/校验V4任务描述并投影真实目标进度；DailyActions保留V1/V2/V3认证分支。Expedition沿原站点/刷怪owner推进空投工作和有界一次性压力，SortieSnapshot世界6保存同一task_event及原敌人事实；FrozenSettlement从报告计算任务摘要，EnemyState只对111开放经校验的last_day.task。没有新保存或收益owner；见[任务合同](design/m6-rogue-02.md)。
 
 RogueActions只拥有每日V1配置与确定性描述，RogueLayout只拼装/校验值布局并构造StreetLayout；现有Main/ProductionProgress/FrozenSettlement/Snapshot继续拥有选择、写入、结果和恢复。data_version2与世界version3显式绑定完整generated；旧规则与旧历史认证独立保留，普通入口在消费前拒绝旧途中。空间描述统一驱动原绘制、寻路、遮挡和交互，详情见[生成合同](design/m6-rogue-01.md)。

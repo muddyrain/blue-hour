@@ -429,6 +429,11 @@ static func compatibility(world: Expedition) -> String:
 	if (world.supply.generated.get("version")==7 or (world.supply.generated.get("version")==8 or world.supply.generated.get("version")==9)): data.build_policy=world.supply.generated.build.policy.duplicate(true)
 	data.contact = {"distance":FieldContacts.DISTANCE,"approach":FieldContacts.APPROACH,"rechase":FieldContacts.RECHASE,"step":FieldContacts.STEP_DISTANCE,"steps":FieldContacts.MAX_STEPS,"path_parts":FieldContacts.MAX_PATH_PARTS,"pass_dot":FieldContacts.PASS_DOT,"recovery_speed":FieldContacts.RECOVERY_SPEED,"recovery_cap":FieldContacts.MAX_RECOVERY,"recovery_passes":FieldContacts.RECOVERY_PASSES,"yield_speed":FieldContacts.YIELD_SPEED}
 	if world.combat_mode(): data.combat_policy={"weapons":CombatEquipment.policy(),"definitions":[_resource(CombatEquipment.definition("fire_axe_v1")),_resource(CombatEquipment.definition("shotgun_v1"))],"toxic":ToxicV1.POLICY}
+	if ContentWaveV1.marked(world.supply.generated):
+		data.combat_policy.hammer = {"pattern":CombatEquipment.melee_policy(CombatEquipment.HAMMER_ID),
+			"definition":_resource(CombatEquipment.definition(CombatEquipment.HAMMER_ID))}
+	if ContentWaveV1.eligible(world.supply.generated):
+		data.burst_policy = BurstRuntimeV1.POLICY
 	if ScreamerPolicyV1.enabled(world.supply.generated):
 		data.screamer_policy = {"version":ScreamerPolicyV1.VERSION, "range":ScreamerPolicyV1.RANGE,
 			"windup":ScreamerPolicyV1.WINDUP, "max_reinforcements":ScreamerPolicyV1.MAX_REINFORCEMENTS}
@@ -442,7 +447,7 @@ static func compatibility(world: Expedition) -> String:
 			"range":FirstAidV1.RANGE, "health_ratio":FirstAidV1.HEALTH_RATIO, "amount":FirstAidV1.HEAL_AMOUNT}
 	if world.parallel_search:
 		data.search_policy={"version":SearchAssignments.VERSION,"occupancy":"one_member_one_site","order":"site_id"}
-	if world.power_mode(): data.power_policy=SpecialPowers.POLICY
+	if world.power_mode(): data.power_policy=SpecialPowers.policy(int(world.supply.generated.powers.version))
 	if world.persona_mode(): data.persona_policy=SurvivorPersona.policy()
 	if world.exploration_mode(): data.exploration_policy=ExplorationLayout.policy()
 	return SurvivalContracts.fingerprint(data)

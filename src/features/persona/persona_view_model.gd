@@ -28,6 +28,13 @@ static func camp(base: Dictionary, id: int, scope: String = "camp") -> Dictionar
 			model.status = "确认归航入队后，下次出击生效"
 		elif scope == "camp" and FirstAidV1.qualified(base):
 			_show_first_aid(model)
+	if id == WeaponInventory.MECHANIC_ID and scope != "candidate" and ContentWaveV1.enabled(base):
+		model.primary = WeaponInventory.MECHANIC_TITLE
+		model.primary_short = WeaponInventory.MECHANIC_TITLE
+		var benefit: String = "生还归航并登记后，武器维修减 %d 币。" % WeaponInventory.MECHANIC_DISCOUNT
+		if scope == "camp":
+			benefit = "在营时武器维修减 %d 币。" % WeaponInventory.MECHANIC_DISCOUNT if WeaponInventory.mechanic_available(base) else "阵亡后不再提供维修折扣。"
+		model.trait_detail = benefit + "与工坊取较高折扣，最低 1 币。\n" + String(model.trait_detail)
 	var item: Dictionary=WeaponInventory.for_member(source,id)
 	_weapon(model,item,personal,passive,TraitRules.factor(member,"shot"))
 	var speed: float=125.0*TraitRules.factor(member,"move")*personal.move*passive.move
@@ -55,6 +62,10 @@ static func field(world: Expedition, actor: FieldActor, status: String) -> Dicti
 			_show_first_aid(model)
 			model.first_aid_status = first_aid
 			model.status = "%s · %s" % [first_aid, model.status]
+		elif (not world.field_joins.is_empty() and world.field_joins[0].member_id == actor.member_id
+				and CampaignRules.first_aid_enabled(world.field_departure.journey.get("campaign"))):
+			_show_first_aid(model)
+			model.trait_detail = "生还归航并登记后，下次出击可用。\n" + String(model.trait_detail)
 	model.ammo=world._ammo_text(actor)
 	var gun: WeaponDefinition=actor.weapon_definition
 	model.weapon_detail=_weapon_text(gun,actor.trait_shot_factor)

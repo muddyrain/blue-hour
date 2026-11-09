@@ -14,12 +14,12 @@ static func initial_build() -> Dictionary:
 	build.powers={"version":1,"owned":[],"slot":"","sources":[],"uses":[]}
 	return build
 
-static func initial_progression() -> Dictionary:
-	return {"version":SpecialPowers.PROGRESSION_VERSION, "owned":[], "slots":[""],
+static func initial_progression(version: int = SpecialPowers.PROGRESSION_VERSION) -> Dictionary:
+	return {"version":version, "owned":[], "slots":[""],
 		"investments":{SECOND_SLOT:0, FREEZE:0}, "sources":[], "uses":[]}
 
 static func progression(inventory: Dictionary) -> bool:
-	return inventory.get("version") == SpecialPowers.PROGRESSION_VERSION
+	return SpecialPowers.progression_version(inventory.get("version"))
 
 static func loadout(inventory: Dictionary) -> Variant:
 	if progression(inventory):
@@ -29,7 +29,7 @@ static func loadout(inventory: Dictionary) -> Variant:
 static func action_inventory_valid(owned: Variant, equipment: Variant, day: int) -> bool:
 	if not equipment is Dictionary:
 		return inventory_valid(owned, equipment)
-	if not inventory_valid(owned, "") or not SpecialPowers.loadout_valid(equipment):
+	if not SpecialPowers.loadout_valid(equipment) or not inventory_valid(owned, "", int(equipment.version)):
 		return false
 	for id: String in equipment.slots:
 		if id != "" and id not in owned:
@@ -37,17 +37,20 @@ static func action_inventory_valid(owned: Variant, equipment: Variant, day: int)
 	return equipment.investments.second_slot <= day and equipment.investments.freeze <= day \
 		and (equipment.investments.freeze == 0 or SpecialPowers.FREEZE in owned)
 
-static func inventory_valid(owned: Variant, slot: Variant) -> bool:
-	if not owned is Array or owned.size()>2 or not slot is String or (slot!="" and slot not in owned): return false
+static func inventory_valid(owned: Variant, slot: Variant, version: int = 1) -> bool:
+	var catalog: Dictionary = SpecialPowers.policy(version)
+	if not owned is Array or owned.size()>catalog.size() or not slot is String or (slot!="" and slot not in owned): return false
 	var seen: Array[String]=[]
 	for id: Variant in owned:
-		if not id is String or not SpecialPowers.POLICY.has(id) or id in seen: return false
+		if not id is String or not catalog.has(id) or id in seen: return false
 		seen.append(id)
 	return true
 
 static func problem(camp: Dictionary) -> String:
 	if not camp.get("journey") is Dictionary or not camp.journey.get("build") is Dictionary or not camp.get("profile_id") is String or not camp.journey.get("seed") is String or not camp.journey.get("root_id") is String or not SurvivalContracts.integer(camp.get("settled_sorties"),0,RunSave.MAX_COUNTER) or not SurvivalContracts.integer(camp.get("day"),2,RunSave.MAX_COUNTER): return "POWER_CAMP_CONTEXT"
 	var value: Variant=camp.journey.build.get("powers")
+	if ContentWaveV1.enabled(camp) != (value is Dictionary and value.get("version") == SpecialPowers.WAVE_VERSION):
+		return "POWER_CATALOG_MODE"
 	if value is Dictionary and progression(value):
 		return _progression_problem(camp, value)
 	if not value is Dictionary or value.size()!=5 or not value.has_all(["version","owned","slot","sources","uses"]) or value.version!=1 or not inventory_valid(value.owned,value.slot) or not value.sources is Array or value.sources.size()!=value.owned.size() or not value.uses is Array or value.uses.size()>camp.settled_sorties: return "POWER_CAMP_FIELDS"
@@ -118,7 +121,8 @@ static func invest(before: Dictionary, choice: String) -> Dictionary:
 static func registration_problem(camp: Dictionary) -> String:
 	if not enabled(camp) or not progression(camp.journey.build.powers):
 		return ""
-	return "" if TransactionReceipt.same(camp.journey.build.powers, initial_progression()) else "POWER_PROGRESSION_REGISTRATION"
+	var version: int = SpecialPowers.WAVE_VERSION if ContentWaveV1.enabled(camp) else SpecialPowers.PROGRESSION_VERSION
+	return "" if TransactionReceipt.same(camp.journey.build.powers, initial_progression(version)) else "POWER_PROGRESSION_REGISTRATION"
 
 static func opening_spend_valid(camp: Dictionary) -> bool:
 	var value: Dictionary = camp.journey.get("build", {}).get("powers", {})
@@ -182,7 +186,7 @@ static func _progression_problem(camp: Dictionary, value: Dictionary) -> String:
 	return ""
 
 static func _historical_loadout(equipment: Dictionary, inventory: Dictionary, day: int, acquired: Dictionary) -> bool:
-	if not progression(equipment):
+	if not progression(equipment) or equipment.version != inventory.version:
 		return false
 	for choice: String in [SECOND_SLOT, FREEZE]:
 		var purchase_day: int = int(inventory.investments[choice])

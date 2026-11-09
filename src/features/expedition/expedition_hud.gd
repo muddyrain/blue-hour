@@ -18,6 +18,7 @@ var view: C1ExpeditionHud
 var _root: Control
 var _time_bar: ProgressBar
 var _time_fill: StyleBoxFlat
+var _burst_warning: Label
 var _base_help: String
 
 
@@ -31,6 +32,10 @@ func _ready() -> void:
 	view.bus_start_requested.connect(func() -> void: extraction_requested.emit())
 	view._help_button.pressed.connect(func() -> void: help_changed.emit(view._help.visible))
 	_base_help = (view._help.get_node("HelpText") as Label).text
+	_burst_warning = view._label(view._time_box, "BurstWarning", 14)
+	_burst_warning.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_burst_warning.add_theme_color_override("font_color", Color("ffb44b"))
+	_burst_warning.hide()
 	# Preserve M2-01's ratio and gradient beside C's independent sortie time text.
 	_time_bar = ProgressBar.new()
 	_time_bar.name = "SortieTimeRatio"
@@ -97,6 +102,8 @@ func refresh(state: Dictionary) -> void:
 		"bus_action_label":action, "bus_action_enabled":enabled or gathering,
 		"status_hint":state["notice"] if state["notice_visible"] else "",
 	})
+	_burst_warning.text = state.get("burst_warning", "")
+	_burst_warning.visible = not _burst_warning.text.is_empty()
 	var fraction: float = state["time_fraction"]
 	# Existing TMP-114 interpolation is a display choice, not night rules.
 	var colour: Color = Color("ed9682").lerp(Color("f1d18e"), fraction * 2.0) if fraction < 0.5 else Color("f1d18e").lerp(Color("9acbdc"), (fraction - 0.5) * 2.0)

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="WeaponPresentation" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/features/expedition/weapon_presentation.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/combat_v1/weapons/rescue_hammer_v1.svg" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"rescue_hammer_v1"
+display_name = "救援锤"
+texture = ExtResource("2")
+grip_pixel = Vector2(43, 49)
+muzzle_pixel = Vector2(127, 49)
+display_scale = 0.34
+direction_layers = PackedInt32Array(2, 2, 2)

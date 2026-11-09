@@ -37,7 +37,7 @@ static func legacy(v: Dictionary) -> Dictionary:
 
 static func problem(v: Variant) -> String:
 	if not v is Dictionary or v.get("version")!=7 or not v.get("build") is Dictionary or not v.build.get("owned") is Array or not v.build.get("slots") is Array: return "BUILD_ACTION_FIELDS"
-	if not SurvivalContracts.integer(v.build.get("version"), BuildItems.VERSION, BuildItems.CATALOG_POOL): return "BUILD_ACTION_POOL"
+	if not BuildItems.valid_pool(v.build.get("version")): return "BUILD_ACTION_POOL"
 	var pool: int = int(v.build.version)
 	var issue: String=BuildItems.problem(v.build.owned,v.build.slots,pool)
 	if not issue.is_empty(): return issue

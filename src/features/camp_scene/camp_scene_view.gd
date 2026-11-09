@@ -461,6 +461,8 @@ func _refresh_blue_hour_member(button: Button, data: Dictionary, id: int) -> voi
 	if id == FirstAidV1.SOURCE_ID and CampaignRules.first_aid_enabled(data.get("journey", {}).get("campaign")) \
 			and FirstAidV1.qualified(data):
 		specialty.text = FirstAidV1.TITLE
+	elif id == WeaponInventory.MECHANIC_ID and WeaponInventory.mechanic_available(data):
+		specialty.text = WeaponInventory.MECHANIC_TITLE
 	specialty.add_theme_color_override("font_color", definition.colour)
 	var call_sign: Label = button.find_child("CallSign", true, false) as Label
 	call_sign.text = member.call_sign

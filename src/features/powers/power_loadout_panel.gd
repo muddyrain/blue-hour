@@ -42,7 +42,7 @@ func _ready() -> void:
 		else:
 			_investment_row.add_child(button)
 	retry_button = Button.new()
-	retry_button.text = "重试保存这次能力操作"
+	retry_button.text = "重试保存本次整备"
 	retry_button.custom_minimum_size.y = 40
 	retry_button.pressed.connect(func() -> void: retry_requested.emit())
 	add_child(retry_button)
@@ -61,10 +61,11 @@ func _slot_row(title: Label, choice_requested: Signal) -> Dictionary[String, But
 	add_child(row)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(title)
-	for id: String in ["speed_boost_v1","map_freeze_v1",""]:
+	for id: String in [SpecialPowers.SPEED, SpecialPowers.FREEZE, SpecialPowers.SUPPRESSION, ""]:
 		var button: Button=Button.new()
-		button.text=SpecialPowers.POLICY[id].name if not id.is_empty() else "卸下"
+		button.text=PowerActions.name_for(id) if not id.is_empty() else "卸下"
 		button.custom_minimum_size=Vector2(130,40)
+		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		if not id.is_empty():
 			button.icon=load("res://assets/powers/%s.svg"%id)
 			button.expand_icon=true
@@ -78,6 +79,7 @@ func present(camp: Dictionary, editable: bool, retry: bool = false) -> void:
 	visible=PowerState.enabled(camp)
 	if not visible: return
 	var value: Dictionary=camp.journey.build.powers
+	var catalog: Dictionary = SpecialPowers.policy(int(value.version))
 	var progression: bool = PowerState.progression(value)
 	var slots: Array = value.slots if progression else [value.slot]
 	var upgraded: bool = progression and value.investments.freeze != 0
@@ -86,33 +88,40 @@ func present(camp: Dictionary, editable: bool, retry: bool = false) -> void:
 	_second_row.visible = progression
 	_investment_row.visible = progression
 	_first.text = "第一槽 · " + _equipped(slots[0], upgraded) if progression else "特殊能力 · 独立1槽"
-	_present_choices(choices, value.owned, slots[0], slots[1] if slots.size() == 2 else "", editable)
-	status.text = "已拥有 %d/2 · 装备行动主点搜获，归航确认后入库。每个已装能力每次出击可用一次。" % value.owned.size()
+	_present_choices(choices, catalog, value.owned, slots[0], slots[1] if slots.size() == 2 else "", editable)
+	status.text = "已拥有 %d/%d · 装备行动主点搜获，归航确认后入库。每个已装能力每次出击可用一次。" % [value.owned.size(),catalog.size()]
 	if not progression:
 		return
 	var second_open: bool = slots.size() == 2
 	_balance.text = "特殊能力  /  余额 %d 币" % int(camp.cash)
 	_second.text = "第二槽 · " + (_equipped(slots[1], upgraded) if second_open else "未解锁")
-	for button: Button in second_choices.values():
-		button.visible = second_open
 	if second_open:
-		_present_choices(second_choices, value.owned, slots[1], slots[0], editable)
+		_present_choices(second_choices, catalog, value.owned, slots[1], slots[0], editable)
+	else:
+		for button: Button in second_choices.values():
+			button.hide()
 	_freeze.text = "全域冻结 · %d 秒 → %d 秒" % [int(SpecialPowers.duration(SpecialPowers.FREEZE,false)), int(SpecialPowers.UPGRADED_FREEZE_SECONDS)]
 	_present_purchase(camp, PowerState.SECOND_SLOT, "开启", editable)
 	_present_purchase(camp, PowerState.FREEZE, "强化", editable)
 
-func _present_choices(buttons: Dictionary[String, Button], owned: Array, equipped: String,
+func _present_choices(buttons: Dictionary[String, Button], catalog: Dictionary, owned: Array, equipped: String,
 		other: String, editable: bool) -> void:
+	var three_choices: bool = catalog.has(SpecialPowers.SUPPRESSION)
 	for id: String in buttons:
 		var button: Button = buttons[id]
+		button.visible = id.is_empty() or catalog.has(id)
 		var available: bool = id.is_empty() or id in owned
 		var elsewhere: bool = not id.is_empty() and id == other
-		var caption: String = SpecialPowers.POLICY[id].name if not id.is_empty() else "卸下"
-		button.text = caption + (" · 已装配" if id == equipped and not id.is_empty() else " · 另一槽" if elsewhere else " · 未拥有" if not available else "")
+		var caption: String = PowerActions.name_for(id) if not id.is_empty() else "卸下"
+		var detail: String = caption + (" · 已装配" if id == equipped and not id.is_empty() else " · 另一槽" if elsewhere else " · 未拥有" if not available else "")
+		button.text = caption if three_choices else detail
+		button.tooltip_text = detail
+		if id == SpecialPowers.SUPPRESSION:
+			button.tooltip_text += "\n12 秒内普通、疾奔、重压感染者的直接近战伤害减半。"
 		_enable(button, editable and available and id != equipped and not elsewhere)
 
 func _equipped(id: String, upgraded: bool) -> String:
-	return "空槽" if id.is_empty() else "%s · %d 秒" % [SpecialPowers.POLICY[id].name,int(SpecialPowers.duration(id,upgraded))]
+	return "空槽" if id.is_empty() else "%s · %d 秒" % [PowerActions.name_for(id),int(SpecialPowers.duration(id,upgraded))]
 
 func _present_purchase(camp: Dictionary, choice: String, verb: String, editable: bool) -> void:
 	var problem: String = PowerState.investment_problem(camp, choice)

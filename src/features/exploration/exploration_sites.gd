@@ -191,15 +191,23 @@ static func site_point(layout: Dictionary, site: Dictionary) -> Vector2:
 	return Vector2.INF
 
 
-static func objective_rows(generated: Dictionary, facts: Dictionary, rescue_done: bool = false) -> Array[Dictionary]:
+static func objective_rows(generated: Dictionary, facts: Dictionary, rescue_done: bool = false,
+		rescue_name: String = "") -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
 	var primary: Dictionary = generated.objective
 	var type: String = generated.type
-	var names: Dictionary = {"supply":"搜集标记食品", "equipment":"搜寻主装备点", "airdrop":"回收主空投", "rescue":"援救幸存者并生还"}
+	var names: Dictionary = {"supply":"搜集标记食品", "equipment":"搜寻主装备点", "airdrop":"回收主空投",
+		"rescue":RescueTarget.ANONYMOUS_NAME}
+	var hint: String = "主目标与实际站点绑定；未全部完成仍可按原条件撤离。"
+	if type == "rescue":
+		hint = "定位并援救，确认接纳后揭晓身份。"
+		if not rescue_name.is_empty():
+			names.rescue = rescue_name
+			hint = "已接纳 · 生还归航后登记入营。" if rescue_done else "同行者已阵亡 · 可按原条件撤离。"
 	var done: int = int(rescue_done) if type == "rescue" else _done(primary.site_ids, facts)
 	var total: int = 1 if type == "rescue" else primary.site_ids.size()
 	rows.append({"id":"primary", "title":names[type], "optional":false, "done":done, "total":total, "complete":done == total,
-		"site_ids":primary.site_ids.duplicate(), "hint":"主目标与实际站点绑定；未全部完成仍可按原条件撤离。"})
+		"site_ids":primary.site_ids.duplicate(), "hint":hint})
 	for objective: Dictionary in generated.optional_objectives:
 		done = _done(objective.site_ids, facts)
 		total = objective.site_ids.size()

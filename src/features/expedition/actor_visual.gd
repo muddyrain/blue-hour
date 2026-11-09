@@ -137,6 +137,10 @@ func _normal_enemy() -> bool:
 	return is_enemy and enemy_kind == EnemyRules.NORMAL
 
 
+func _night_hound() -> bool:
+	return is_enemy and enemy_kind == NightHoundV1.KIND
+
+
 func _toxic_enemy() -> bool:
 	return is_enemy and enemy_kind == CombatEnemyRules.TOXIC
 
@@ -320,21 +324,25 @@ func _apply_pose() -> void:
 			_body.scale = Vector2.ONE * ToxicCarrierVisualV1.DISPLAY_SCALE
 		elif _screamer_enemy():
 			_body.scale = Vector2.ONE * ScreamerVisualV1.DISPLAY_SCALE
+		elif _night_hound():
+			_body.scale = Vector2.ONE * NightHoundVisualV1.DISPLAY_SCALE
 		# Presentation spacing only. Logical feet, navigation, LOS and melee range stay put.
-		_body.position += _contact_offset()
+		_body.position = Vector2.ZERO if _night_hound() else _body.position + _contact_offset()
 	_body.self_modulate = tint
 	if _is_defeated:
 		motion_state = &"defeated"
 		_pose_body(_facing, 7 if is_enemy else 6)
 		_body.material = null
-		_body.position = _contact_offset() if is_enemy else Vector2.ZERO
+		_body.position = _contact_offset() if is_enemy and not _night_hound() else Vector2.ZERO
 		_body.self_modulate = Color(0.70, 0.77, 0.78, clampf(1.0 - (_defeat_clock - 0.50) / 0.45, 0.0, 1.0))
 	_update_hold(tint, moving, upper_action)
 	queue_redraw()
 
 
 func _pose_body(direction: Vector2, action: int) -> void:
-	if _toxic_enemy():
+	if _night_hound():
+		NightHoundVisualV1.pose(_body, direction, motion_state, _walk_clock, _attack_clock, _defeat_clock)
+	elif _toxic_enemy():
 		ToxicCarrierVisualV1.pose(_body, direction, motion_state, _walk_clock,
 			_attack_clock, _defeat_clock, _toxic_progress)
 	elif _screamer_enemy():

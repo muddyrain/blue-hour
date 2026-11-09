@@ -17,14 +17,20 @@ static func pick(identity: String, index: int, stage: int) -> String:
 
 
 static func health(kind: String, normal: float) -> float:
+	if kind == NightHoundV1.KIND:
+		return NightHoundV1.HP
 	return 64.0 if kind==CombatEnemyRules.TOXIC else POLICY.rush_hp if kind==RUSH else POLICY.heavy_hp if kind==HEAVY else normal
 
 
 static func speed(kind: String, rushing: bool, normal: float) -> float:
+	if kind == NightHoundV1.KIND:
+		return NightHoundV1.SPEED
 	return 26.0 if kind==CombatEnemyRules.TOXIC else POLICY.heavy_speed if kind==HEAVY else POLICY.rush_speed if rushing else normal
 
 
 static func name_for(kind: String) -> String:
+	if kind == NightHoundV1.KIND:
+		return "夜间感染犬"
 	if kind == BurstRuntimeV1.KIND:
 		return "爆囊感染者"
 	if kind == ScreamerPolicyV1.KIND:

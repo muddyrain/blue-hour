@@ -434,6 +434,8 @@ static func compatibility(world: Expedition) -> String:
 			"definition":_resource(CombatEquipment.definition(CombatEquipment.HAMMER_ID))}
 	if ContentWaveV1.eligible(world.supply.generated):
 		data.burst_policy = BurstRuntimeV1.POLICY
+	if NightHoundV1.enabled(world.supply.generated):
+		data.night_hound_policy = NightHoundV1.POLICY
 	if ScreamerPolicyV1.enabled(world.supply.generated):
 		data.screamer_policy = {"version":ScreamerPolicyV1.VERSION, "range":ScreamerPolicyV1.RANGE,
 			"windup":ScreamerPolicyV1.WINDUP, "max_reinforcements":ScreamerPolicyV1.MAX_REINFORCEMENTS}

@@ -886,6 +886,8 @@ func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}) -> vo
 		var latest_rules: bool = not catalog_policy.is_empty()
 		_battle_meta.campaign = CampaignRules.initial_mission(profile_id, true, true, true, true,
 			latest_rules, latest_rules, latest_rules, latest_rules, latest_rules, latest_rules)
+		if latest_rules:
+			_battle_meta.campaign.night_hound_policy = NightHoundV1.VERSION
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true, true)
 		_battle_meta.build.powers = PowerState.initial_progression(
 			SpecialPowers.WAVE_VERSION if latest_rules else SpecialPowers.PROGRESSION_VERSION)

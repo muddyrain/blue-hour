@@ -12,6 +12,8 @@ static func snapshot_problem(row: Dictionary,world: Dictionary,receipt: Dictiona
 	if not SurvivalContracts.integer(behavior.spawn_stage,0,int(world.threat.stage)) or behavior.state not in ["chase","rush","windup"] or not SurvivalContracts.integer(behavior.target_id,0,5) or not SurvivalContracts.number(behavior.windup_remaining): return "COMBAT_ENEMY_STATE"
 	for resolution: Dictionary in world.task_event.resolutions:
 		if resolution.reason=="spawned" and resolution.enemy_id==state.actor_id: summoned=true
+	if behavior.kind == NightHoundV1.KIND:
+		return NightHoundV1.enemy_problem(row, world, summoned)
 	if world.combat.has("burst") and behavior.kind == BurstRuntimeV1.KIND:
 		var source: Dictionary = world.combat.spawns.get(str(int(state.actor_id)), {})
 		if summoned or state.actor_id != world.combat.burst.actor_id or source.get("stage") != behavior.spawn_stage \

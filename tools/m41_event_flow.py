@@ -47,12 +47,12 @@ def input_desktop_name():
         user32.CloseDesktop(handle)
 
 
-def run_phase(godot, out, phase, profile, seed, *, resume=True, native=True):
+def run_phase(godot, out, phase, profile, seed, *, resume=True, native=True, script=SCRIPT):
     args = [godot, "--path", str(ROOT), "--audio-driver", "Dummy",
             "--rendering-method", "gl_compatibility"]
     if not native:
         args.append("--headless")
-    args += ["--script", SCRIPT, "--", "--flow-output=" + (out / phase).as_posix(),
+    args += ["--script", script, "--", "--flow-output=" + (out / phase).as_posix(),
              "--bh-rescue-seed=" + seed]
     if resume:
         args.append("--flow-resume")

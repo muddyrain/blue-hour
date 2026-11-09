@@ -203,14 +203,16 @@ static func _profiled_problem(value: Variant) -> String:
 	return ""
 
 
-static func transition(previous: Dictionary, next: Dictionary, claimed_event: Dictionary = {}) -> String:
+static func transition(previous: Dictionary, next: Dictionary, claimed_event: Dictionary = {},
+		claimed_recon: Dictionary = {}) -> String:
 	var stamp: int = FreezeProfile.enter("receipt.transition")
-	var result: String = _profiled_transition(previous, next, claimed_event)
+	var result: String = _profiled_transition(previous, next, claimed_event, claimed_recon)
 	FreezeProfile.leave("receipt.transition", stamp)
 	return result
 
 
-static func _profiled_transition(previous: Dictionary, next: Dictionary, claimed_event: Dictionary) -> String:
+static func _profiled_transition(previous: Dictionary, next: Dictionary, claimed_event: Dictionary,
+		claimed_recon: Dictionary) -> String:
 	var issue: String = problem(next)
 	if not issue.is_empty():
 		return issue
@@ -253,6 +255,10 @@ static func _profiled_transition(previous: Dictionary, next: Dictionary, claimed
 		burst_added = previous.burst.is_empty() and not next.burst.is_empty()
 	issue = TaskActions.event_history_problem(
 		TaskActions.claimed_event(previous) if claimed_event.is_empty() else claimed_event, next)
+	if not issue.is_empty():
+		return issue
+	issue = ReconKnowledge.history_problem(
+		ReconKnowledge.claimed(previous) if claimed_recon.is_empty() else claimed_recon, next)
 	if not issue.is_empty():
 		return issue
 	if previous.phase == "SUSPEND_READY":

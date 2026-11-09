@@ -458,7 +458,8 @@ func _suspend(world: Dictionary, publish: bool = true, support_proposal: Diction
 	if not burst_proposal.is_empty(): next.envelope.burst_proposal = burst_proposal.before.duplicate(true)
 	next.previous_hash = loaded.hash
 	next.revision += 1
-	var issue: String = TransactionReceipt.transition(loaded.receipt, next, loaded.get("claimed_event", {}))
+	var issue: String = TransactionReceipt.transition(loaded.receipt, next,
+		loaded.get("claimed_event", {}), loaded.get("claimed_recon", {}))
 	if issue.is_empty():
 		var serialized: String = RecordEncoding.stringify(next)
 		issue = ReceiptJournal.capacity_problem(int(next.revision),next.phase,serialized.to_utf8_buffer().size(),int(loaded.bytes),loaded.unpublished.size())

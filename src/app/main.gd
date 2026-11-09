@@ -857,7 +857,7 @@ func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}) -> vo
 		return
 	_camp_open = true
 	_hunger_consented = hunger_trial
-	cash = 53
+	cash = CampRules.INITIAL_CASH
 	day = 2
 	crew = SurvivorRoster.new_crew()
 	if growth_mode:
@@ -886,6 +886,7 @@ func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}) -> vo
 		_battle_meta.campaign = CampaignRules.initial_mission(profile_id, true, true, true, true,
 			latest_rules, latest_rules, latest_rules, latest_rules, latest_rules)
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true, true)
+		_battle_meta.build.powers = PowerState.initial_progression()
 		if not opening_plan.is_empty():
 			var starter: Dictionary = OpeningBuild.source(opening_plan, profile_id, _battle_meta.root_id, _battle_meta.seed)
 			_battle_meta.build.opening = starter
@@ -1355,6 +1356,9 @@ func open_loadout() -> void:
 		loadout_panel.equip_requested.connect(equip_weapon)
 		loadout_panel.build_requested.connect(equip_build_item)
 		loadout_panel.power_requested.connect(equip_power)
+		loadout_panel.power_panel.second_requested.connect(equip_power.bind(1))
+		loadout_panel.power_panel.investment_requested.connect(invest_power)
+		loadout_panel.power_panel.retry_requested.connect(retry_power_edit)
 		loadout_panel.repair_requested.connect(repair_weapon)
 		loadout_panel.closed.connect(close_loadout)
 	_title.hide()
@@ -1365,7 +1369,7 @@ func open_loadout() -> void:
 
 
 func close_loadout() -> void:
-	if not is_instance_valid(loadout_panel) or loadout_panel.confirmation.visible:
+	if not is_instance_valid(loadout_panel) or loadout_panel.confirmation.visible or loadout_panel.power_panel.confirmation.visible:
 		return
 	loadout_panel.hide()
 	_title.show()
@@ -1378,7 +1382,7 @@ func close_loadout() -> void:
 
 
 func equip_weapon(member_id: int, identity: String) -> void:
-	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible:
+	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible or _progress_blocked:
 		return
 	if transactional_mode:
 		if _accept_transaction(progress_session.edit(camp_snapshot(),{"kind":"equip","member_id":member_id,"value":identity}),true):
@@ -1389,7 +1393,7 @@ func equip_weapon(member_id: int, identity: String) -> void:
 
 
 func repair_weapon(identity: String) -> void:
-	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible:
+	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible or _progress_blocked:
 		return
 	if transactional_mode:
 		if _accept_transaction(progress_session.edit(camp_snapshot(),{"kind":"repair","member_id":0,"value":identity}),true):
@@ -2336,7 +2340,7 @@ func _camp_escape() -> bool:
 	elif is_instance_valid(roster_panel) and roster_panel.visible:
 		close_roster()
 	elif is_instance_valid(loadout_panel) and loadout_panel.visible:
-		if loadout_panel.confirmation.visible:
+		if loadout_panel.confirmation.visible or loadout_panel.power_panel.confirmation.visible:
 			return false
 		close_loadout()
 	elif mission_select.visible:
@@ -2645,7 +2649,7 @@ func _close_equipment_catalog() -> void:
 
 
 func equip_build_item(slot: int, item: String) -> void:
-	if phase!=Phase.TITLE or not loadout_panel.visible or not BuildState.enabled(camp_snapshot()): return
+	if phase!=Phase.TITLE or not loadout_panel.visible or _progress_blocked or not BuildState.enabled(camp_snapshot()): return
 	var saved: bool=_accept_transaction(progress_session.edit(camp_snapshot(),{"kind":"build_slot","member_id":slot,"value":item}),true)
 	loadout_panel.refresh(camp_snapshot(),"本局道具配装已保存；下一行动生效。" if saved else _progress_message)
 	if not saved:
@@ -2653,7 +2657,29 @@ func equip_build_item(slot: int, item: String) -> void:
 		loadout_panel.build_panel.present(build.owned, build.slots, false, false,
 			build.get("opening", {}).get("plan", ""), BuildState.pool(camp_snapshot()))
 
-func equip_power(id: String) -> void:
-	if phase!=Phase.TITLE or not loadout_panel.visible or not PowerState.enabled(camp_snapshot()): return
-	var saved: bool=_accept_transaction(progress_session.edit(camp_snapshot(),{"kind":"power_slot","member_id":0,"value":id}),true)
-	loadout_panel.refresh(camp_snapshot(),"特殊能力装配已保存；下次出击生效。" if saved else _progress_message)
+func equip_power(id: String, slot: int = 0) -> void:
+	var camp: Dictionary = camp_snapshot()
+	if not PowerState.enabled(camp):
+		return
+	var kind: String = "power_equip" if PowerState.progression(camp.journey.build.powers) else "power_slot"
+	_edit_power({"kind":kind,"member_id":slot,"value":id}, "特殊能力装配已保存；下次出击生效。")
+
+
+func invest_power(choice: String) -> void:
+	_edit_power({"kind":"power_invest","member_id":0,"value":choice}, "能力投资已保存；余额与效果已更新。")
+
+
+func _edit_power(request: Dictionary, success: String) -> void:
+	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible or _progress_blocked:
+		return
+	var saved: bool = _accept_transaction(progress_session.edit(camp_snapshot(),request),true)
+	loadout_panel.refresh(camp_snapshot(),success if saved else _progress_message,_progress_dirty)
+	if _progress_dirty:
+		loadout_panel.power_panel.retry_button.grab_focus()
+
+
+func retry_power_edit() -> void:
+	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible or not _progress_dirty:
+		return
+	var saved: bool = _accept_transaction(progress_session.retry(),true)
+	loadout_panel.refresh(camp_snapshot(),"原能力操作已保存；余额与效果已更新。" if saved else _progress_message,not saved)

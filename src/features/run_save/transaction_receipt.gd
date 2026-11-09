@@ -153,10 +153,10 @@ static func _profiled_problem(value: Variant) -> String:
 		if not support_issue.is_empty(): return support_issue
 	if PowerAuthority.mode(value.rules):
 		if not value.get("powers") is Array or (value.phase=="STARTED" and not value.powers.is_empty()): return "POWER_RECEIPT_FIELDS"
-		var powers: Dictionary=SpecialPowers.initial(token_for_compat(value),value.rules.mission.generated.powers.slot)
+		var powers: Dictionary=SpecialPowers.initial(token_for_compat(value),PowerState.loadout(value.rules.mission.generated.powers))
 		powers.accepted=value.powers
 		var at: float=float(value.powers.back().get("at",-1)) if not value.powers.is_empty() and value.powers.back() is Dictionary and SurvivalContracts.number(value.powers.back().get("at")) else 0.0
-		var power_issue: String=SpecialPowers.problem(powers,token_for_compat(value),powers.equipped,at)
+		var power_issue: String=SpecialPowers.problem(powers,token_for_compat(value),PowerState.loadout(value.rules.mission.generated.powers),at)
 		if not power_issue.is_empty(): return power_issue
 	var ids: Array[int] = []
 	for row: Variant in value.health:

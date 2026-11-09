@@ -171,9 +171,9 @@ static func result_problem(receipt: Dictionary) -> String:
 		if not join_issue.is_empty():
 			return join_issue
 	if PowerAuthority.mode(receipt.rules):
-		var power_issue: String=SpecialPowers.problem(report.get("powers"),RunTransaction.token_for(receipt),receipt.rules.mission.generated.powers.slot,float(report.elapsed))
+		var power_issue: String=SpecialPowers.problem(report.get("powers"),RunTransaction.token_for(receipt),PowerState.loadout(receipt.rules.mission.generated.powers),float(report.elapsed))
 		if not power_issue.is_empty(): return power_issue
-		if not TransactionReceipt.same({"v":report.powers.accepted},{"v":receipt.powers}): return "POWER_RESULT_NOT_DURABLE"
+		if not PowerAuthority.same_events(report.powers.accepted,receipt.powers,receipt.rules.mission.generated.powers): return "POWER_RESULT_NOT_DURABLE"
 	if BuildState.enabled(receipt.base)!=BuildState.enabled(result.camp): return "BUILD_MODE_CHANGED"
 	if BuildState.enabled(receipt.base):
 		if (receipt.rules.get("data_version")!=8 and (receipt.rules.get("data_version")!=9 and receipt.rules.get("data_version")!=10)) or not TransactionReceipt.same(actual_build(receipt),BuildState.settled(receipt.base,report,receipt.rules.mission.generated)): return "BUILD_RESULT_TRANSITION"

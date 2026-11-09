@@ -9,9 +9,10 @@ static func drop(generated: Dictionary, owned: Array) -> String:
 	missing.sort()
 	return missing[("BH_POWER_DROP_V1:%s:%s:cash"%[generated.seed,generated.id]).sha256_text().substr(0,8).hex_to_int()%missing.size()] if not missing.is_empty() else ""
 
-static func upgrade(old: Dictionary, owned: Array, slot: String) -> Dictionary:
+static func upgrade(old: Dictionary, owned: Array, loadout: Variant) -> Dictionary:
 	var value: Dictionary=old.duplicate(true)
-	value.powers={"version":1,"owned":owned.duplicate(),"slot":slot,"sample":drop(old,owned),"policy":SpecialPowers.POLICY}
+	value.powers=loadout.duplicate(true) if loadout is Dictionary else {"version":1,"slot":loadout}
+	value.powers.merge({"owned":owned.duplicate(),"sample":drop(old,owned),"policy":SpecialPowers.POLICY},true)
 	return value
 
 static func legacy(value: Dictionary) -> Dictionary:
@@ -21,16 +22,24 @@ static func legacy(value: Dictionary) -> Dictionary:
 
 static func offers(base: Dictionary) -> Array[Dictionary]:
 	var result: Array[Dictionary]=[]
-	for old: Dictionary in CombatActions.offers(base): result.append(upgrade(old,base.journey.build.powers.owned,base.journey.build.powers.slot))
+	var inventory: Dictionary = base.journey.build.powers
+	for old: Dictionary in CombatActions.offers(base):
+		result.append(upgrade(old,inventory.owned,PowerState.loadout(inventory)))
 	return result
 
 static func problem(value: Variant) -> String:
 	if not value is Dictionary or not value.get("powers") is Dictionary: return "POWER_ACTION_FIELDS"
 	var power: Dictionary=value.powers
-	if power.size()!=5 or not power.has_all(["version","owned","slot","sample","policy"]) or power.version!=1 or not PowerState.inventory_valid(power.owned,power.slot): return "POWER_ACTION_INVENTORY"
+	var loadout: Variant = PowerState.loadout(power)
+	if PowerState.progression(power):
+		if power.size() != 6 or not power.has_all(["version","owned","slots","investments","sample","policy"]) \
+				or not SurvivalContracts.integer(value.get("day"),2,RunSave.MAX_COUNTER) \
+				or not PowerState.action_inventory_valid(power.owned,loadout,int(value.day)):
+			return "POWER_ACTION_INVENTORY"
+	elif power.size()!=5 or not power.has_all(["version","owned","slot","sample","policy"]) or power.version!=1 or not PowerState.inventory_valid(power.owned,power.slot): return "POWER_ACTION_INVENTORY"
 	var issue: String=CombatActions.problem(legacy(value))
 	if not issue.is_empty(): return issue
-	return "" if TransactionReceipt.same(value,upgrade(legacy(value),power.owned,power.slot)) else "POWER_ACTION_BINDING"
+	return "" if TransactionReceipt.same(value,upgrade(legacy(value),power.owned,loadout)) else "POWER_ACTION_BINDING"
 
 static func matches(base: Dictionary, value: Variant) -> bool:
 	if not PowerState.enabled(base) or not problem(value).is_empty(): return false

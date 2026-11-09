@@ -93,5 +93,28 @@ func run() -> void:
 	malformed_binding = BINDING.duplicate(true)
 	malformed_binding.transaction_id = "foreign:1"
 	expect(SpecialPowers.initial(malformed_binding, "speed_boost_v1").is_empty(), "binding action belongs to journey")
+	_progression()
 	print(JSON.stringify({"suite":"special_powers", "checks":checks, "failures":failures, "policy_source":"PROJECT_TEMP", "scope":"PURE_COMPONENT_ONLY"}))
 	quit(0 if failures == 0 else 1)
+
+
+func _progression() -> void:
+	var equipment: Dictionary = {"version":2, "slots":[SpecialPowers.FREEZE,SpecialPowers.SPEED],
+		"investments":{"second_slot":3,"freeze":4}}
+	var state: Dictionary = SpecialPowers.initial(BINDING,equipment)
+	var first: Dictionary = SpecialPowers.accept(state,SpecialPowers.request(state,1),10.125)
+	var both: Dictionary = SpecialPowers.accept(first,SpecialPowers.request(first,0),11.25)
+	expect(both.accepted.size()==2 and same(both.accepted[0],first.accepted[0]),"second proposal appends without changing original event")
+	expect(SpecialPowers.request(both).is_empty() and SpecialPowers.request(both,1).is_empty(),"each slot is spent separately")
+	expect(SpecialPowers.remaining(both,12.0,0)==6.25 and SpecialPowers.remaining(both,12.0,1)==6.125,"overlap has two exact intervals")
+	expect(SpecialPowers.remaining(both,12.0)==6.125,"step splits at earliest expiry")
+	expect(SpecialPowers.frozen(both,18.125) and SpecialPowers.move_factor(both,18.125)==1.0,"one effect survives the other's expiry")
+	var changed: Dictionary = both.duplicate(true)
+	changed.accepted[1].slot = 1
+	expect(SpecialPowers.problem(changed,BINDING,equipment,12.0)=="POWER_ACTIVATION_ID","slot cannot be reassigned")
+	changed = both.duplicate(true)
+	changed.accepted[1].until = 15.25
+	expect(SpecialPowers.problem(changed,BINDING,equipment,12.0)=="POWER_EFFECT_INTERVAL","duration is derived from frozen upgrade")
+	expect(SpecialPowers.problem(both,BINDING,SpecialPowers.FREEZE,12.0)=="POWER_FIELDS","historical action rejects V2 state")
+	equipment.slots[1] = SpecialPowers.FREEZE
+	expect(SpecialPowers.initial(BINDING,equipment).is_empty(),"duplicate loadout rejected")

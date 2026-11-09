@@ -26,6 +26,7 @@ var _actions: HBoxContainer
 var _detail: Label
 var _preview: TextureRect
 var _data: Dictionary = {}
+var _retry_power: bool = false
 var _selected_id: String = ""
 var _confirmation_id: String = ""
 
@@ -137,13 +138,14 @@ func _ready() -> void:
 	add_child(confirmation)
 
 
-func refresh(data: Dictionary, feedback: String = "") -> void:
+func refresh(data: Dictionary, feedback: String = "", retry_power: bool = false) -> void:
 	_data = data.duplicate(true)
-	power_panel.present(data,not CampaignState.ended(data))
+	_retry_power = retry_power
+	power_panel.present(data,not CampaignState.ended(data) and not retry_power,retry_power)
 	build_panel.visible=BuildState.enabled(data)
 	if build_panel.visible:
 		var build: Dictionary = data.journey.build
-		build_panel.present(build.owned, build.slots, true, not CampaignState.ended(data), build.get("opening", {}).get("plan", ""), BuildState.pool(data))
+		build_panel.present(build.owned, build.slots, true, not CampaignState.ended(data) and not retry_power, build.get("opening", {}).get("plan", ""), BuildState.pool(data))
 	items.max_text_lines = 3 if WeaponState.is_family(_data) else 1
 	_sync_members()
 	for id: int in _member_equipment:
@@ -245,8 +247,8 @@ func _select(index: int) -> void:
 		equip_by_id[member_id].text = "配给 %s / 交换" % (name.left(4)+"…" if RescuePoolState.is_family(_data) and name.length()>5 else name)
 
 	for member_id: int in equip_by_id:
-		equip_by_id[member_id].disabled = item.condition != "ready" or not WeaponInventory._living(_data, member_id)
-	repair_button.disabled = item.condition != "damaged"
+		equip_by_id[member_id].disabled = _retry_power or item.condition != "ready" or not WeaponInventory._living(_data, member_id)
+	repair_button.disabled = _retry_power or item.condition != "damaged"
 	if BattleState.is_state(_data) and _data.journey.state == "FAILED":
 		repair_button.disabled = true
 	repair_button.text = "维修 %d 货币…" % repair_quote if item.condition == "damaged" else "无需维修"

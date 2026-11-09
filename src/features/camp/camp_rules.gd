@@ -3,6 +3,7 @@ extends Resource
 ## TMP-115/116: sample seed and historical one-ration candidate; see source table.
 
 const FOOD_LIMIT: int = 1_000_000_000
+const INITIAL_CASH: int = 53
 
 @export_range(0, 1000) var initial_food: int = 2
 @export_range(0, 1000) var v1_migration_food: int = 2

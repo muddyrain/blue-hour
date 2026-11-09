@@ -60,7 +60,7 @@ static func field(world: Expedition, actor: FieldActor, status: String) -> Dicti
 	model.weapon_detail=_weapon_text(gun,actor.trait_shot_factor)
 	if actor.magazine!=null:
 		model.reload_detail="%s\n实际换弹 %.3f 秒%s"%[model.ammo,gun.reload_seconds()*actor.magazine.reload_factor,"（工作期间暂停换弹）" if world.has_search_job(actor.member_id) else ""]
-	model.move_detail="常态 %.2f · 当前 %.2f 像素/秒\n%s"%[actor.speed,actor.effective_speed(),"疾行剩余 %.2f 秒"%SpecialPowers.remaining(world.powers,world.elapsed) if actor.power_move_factor>1.0 else "无临时疾行"]
+	model.move_detail="常态 %.2f · 当前 %.2f 像素/秒\n%s"%[actor.speed,actor.effective_speed(),"疾行剩余 %.2f 秒"%SpecialPowers.ability_remaining(world.powers,SpecialPowers.SPEED,world.elapsed) if actor.power_move_factor>1.0 else "无临时疾行"]
 	var site: Expedition.SearchSite=world.member_site(actor.member_id)
 	var seconds: float=world._site_seconds(site) if site!=null else 30.0
 	var effective: float=seconds*actor.trait_search_factor*actor.persona_work_factor*BuildItems.frozen_factors(world.supply.generated.build).work

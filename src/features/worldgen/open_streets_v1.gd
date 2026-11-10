@@ -5,7 +5,9 @@ extends RefCounted
 const WIDE_VERSION: int = 1
 const COMPACT_VERSION: int = 2
 const DISTRICT_VERSION: int = 3
-const VERSION: int = 4
+const DRESSING_VERSION: int = 4
+const SEEDED_VERSION: int = 5
+const VERSION: int = SEEDED_VERSION
 const BOUNDS: Array[int] = [0, 0, 12288, 8192]
 const WIDE_ARTERIAL_WIDTH: int = 480
 const ARTERIAL_WIDTH: int = 224
@@ -22,6 +24,10 @@ const STOP_JUNCTION_GAP: float = 80.0
 
 static func supported(version: Variant) -> bool:
 	return SurvivalContracts.integer(version, WIDE_VERSION, VERSION)
+
+
+static func warehouse(version: int, topology: String, special_yard: bool) -> bool:
+	return version >= DISTRICT_VERSION and topology == "industrial" and not special_yard
 
 
 static func skeleton(seed: String, topology: String, attempt: int, fallback: bool, version: int) -> Dictionary:

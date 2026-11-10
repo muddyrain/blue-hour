@@ -28,16 +28,20 @@ static func source_from_task(task: Dictionary, context: Dictionary) -> Dictionar
 
 static func upgrade(source: Dictionary, worldgen: bool = false, level: bool = false,
 		mission_policy: int = 0, industrial: bool = false, residential_rescue: bool = false,
-		rare_policy: int = 0, billboard_target: Dictionary = {}, open_streets: int = 0) -> Dictionary:
+		rare_policy: int = 0, billboard_target: Dictionary = {}, open_streets: int = 0,
+		trace: Array[String] = []) -> Dictionary:
 	if mission_policy != 0 and (mission_policy != 1 or not worldgen or not level):
 		return {}
 	if industrial and (mission_policy != 1 or source.type != "airdrop" or source.layout.topology != "industrial"):
 		return {}
 	if residential_rescue and (mission_policy != 1 or source.type != "rescue" or source.layout.topology != "residential"):
 		return {}
-	if open_streets > 0 and (mission_policy != 1 or source.layout["size"] != "large" or rare_policy != 0 or not billboard_target.is_empty()):
+	if open_streets > 0 and (mission_policy != 1 or (source.layout["size"] != "large" and open_streets != OpenStreetsV1.SEEDED_VERSION) or rare_policy != 0 or not billboard_target.is_empty()):
 		return {}
-	if open_streets >= OpenStreetsV1.DISTRICT_VERSION and (source.layout.topology != "industrial" or industrial):
+	if open_streets in [OpenStreetsV1.DISTRICT_VERSION, OpenStreetsV1.DRESSING_VERSION] \
+			and (source.layout.topology != "industrial" or industrial):
+		return {}
+	if open_streets == OpenStreetsV1.SEEDED_VERSION and (industrial or residential_rescue):
 		return {}
 	var value: Dictionary=source.duplicate(true)
 	value.version=9
@@ -59,7 +63,7 @@ static func upgrade(source: Dictionary, worldgen: bool = false, level: bool = fa
 	if level:
 		var map: Dictionary
 		if billboard_target.is_empty():
-			map = level_map(source, value.id, mission_policy, industrial, residential_rescue, rare_policy, false, open_streets)
+			map = level_map(source, value.id, mission_policy, industrial, residential_rescue, rare_policy, false, open_streets, trace)
 		else:
 			if mission_policy != 1 or rare_policy != 0 or source.type != "supply" or source.slot != BillboardActionV1.SLOT \
 					or source.layout["size"] != billboard_target.get("size") or source.layout.topology != billboard_target.get("topology"):
@@ -99,20 +103,22 @@ static func upgrade(source: Dictionary, worldgen: bool = false, level: bool = fa
 
 static func level_map(source: Dictionary, id: String, mission_policy: int, industrial: bool,
 		residential_rescue: bool, rare_policy: int, require_supermarket: bool = false,
-		open_streets: int = 0) -> Dictionary:
+		open_streets: int = 0, trace: Array[String] = []) -> Dictionary:
 	for attempt: int in range(4):
 		var layout: Dictionary = WorldgenLayout._assemble("BH_LEVEL_V1:" + id, source.layout["size"],
-			source.layout.topology, mini(attempt, 2), attempt == 3, source.type, industrial, residential_rescue, open_streets)
+			source.layout.topology, mini(attempt, 2), attempt == 3, source.type, industrial, residential_rescue, open_streets, trace)
 		if layout.is_empty():
 			continue
 		var content: Dictionary = ExplorationSites.generate(layout, source.type, int(source.cash),
 			int(source.food), int(source.weapons), id, mission_policy, rare_policy)
 		if content.is_empty() or (require_supermarket and not BillboardActionV1.is_supermarket(layout, content.sites)):
+			trace.append("task_sites")
 			continue
 		var extra: String = "" if rare_policy == 0 else "food_2" if source.type == "supply" else "cash_2"
 		content.level = LevelSummary.freeze(layout, content.sites, content.objective, source.type, extra)
 		if not content.level.is_empty() and (extra != "food_2" or RareSortie.cold_route_fits(content.level)):
 			return {"layout":layout, "content":content}
+		trace.append("task_route_summary")
 	return {}
 
 

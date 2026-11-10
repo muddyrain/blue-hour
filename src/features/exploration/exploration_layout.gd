@@ -66,7 +66,7 @@ static func _assemble(seed: String, size: String, topology: String, attempt: int
 	return complete(data)
 
 
-static func complete(data: Dictionary) -> Dictionary:
+static func complete(data: Dictionary, trace: Array[String] = []) -> Dictionary:
 	var size: String = data["size"]
 	# Complete original geometry and policy form the cache identity, including all collisions.
 	var origin_key: String = RecordEncoding.fingerprint({"geometry":data, "policy":policy()})
@@ -74,16 +74,19 @@ static func complete(data: Dictionary) -> Dictionary:
 		var prior: Dictionary = _built[origin_key]
 		if _certificates.has(RecordEncoding.fingerprint(prior)):
 			return prior.duplicate(true)
-	if not _geometry_problem(data).is_empty():
+	var issue: String = _geometry_problem(data)
+	if not issue.is_empty():
+		trace.append(issue)
 		return {}
 	var street: StreetLayout = NeighborhoodLayout.resource(data)
 	var base_nav: FieldNavigation = FieldNavigation.new()
 	base_nav.configure(street.blockers(), street.world_bounds)
 	var prop_anchors: Array[String] = []
-	if data.has("warehouse_district"):
+	if data.has("warehouse_district") or data.has("themed_district"):
 		prop_anchors = WarehouseDistrict.prop_anchors(data.entities)
-	var before: Dictionary = _door_routes(data, base_nav, prop_anchors)
+	var before: Dictionary = _door_routes(data, base_nav, prop_anchors, trace)
 	if before.is_empty():
+		trace.append("prop_anchor_access")
 		return {}
 	var reserved: Array[Rect2] = _reserved(data)
 	var occupied: Array[String] = []
@@ -92,6 +95,7 @@ static func complete(data: Dictionary) -> Dictionary:
 		for index: int in range(count):
 			var object: Dictionary = _place_object(data, kind, index, base_nav, street.blockers(), reserved, occupied, before)
 			if object.is_empty():
+				trace.append("prop_placement")
 				return {}
 			occupied.append(object.anchor)
 			object.erase("anchor")
@@ -100,15 +104,26 @@ static func complete(data: Dictionary) -> Dictionary:
 	street = NeighborhoodLayout.resource(data)
 	if data.has("open_streets"):
 		if not OpenStreetsV1.certify(data, street.blockers()):
+			trace.append("bus_sweep")
 			return {}
 	var nav: FieldNavigation = FieldNavigation.new()
 	nav.configure(street.blockers(), street.world_bounds)
-	var certificate: Dictionary = _door_routes(data, nav)
-	if certificate.is_empty() or not _all_routes(data, nav):
+	var certificate: Dictionary = _door_routes(data, nav, [], trace)
+	if certificate.is_empty() or not _all_routes(data, nav, trace):
+		trace.append("final_access")
 		return {}
 	if data.version==5 and not WorldgenLayout.content_reachable(data,certificate):
+		trace.append("building_categories")
 		return {}
-	if data.has("warehouse_district") and not WarehouseDistrict.certified(data.warehouse_district, data.gates, nav, street.bus_door):
+	if data.has("warehouse_district"):
+		var district: Dictionary = data.warehouse_district
+		var certified: bool = SeededWarehouseDistrict.certified(district, nav, street.bus_door) if district.has("family") \
+			else WarehouseDistrict.certified(district, data.gates, nav, street.bus_door)
+		if not certified:
+			trace.append("warehouse_approach")
+			return {}
+	if data.has("themed_district") and not SeededWarehouseDistrict.certified(data.themed_district, nav, street.bus_door):
+		trace.append("themed_approach")
 		return {}
 	if data.has("loading_yard") and not IndustrialYard.certified(data, nav):
 		return {}
@@ -175,6 +190,14 @@ static func _reserved(data: Dictionary) -> Array[Rect2]:
 	var zones: Array[Rect2] = OpenStreetsV1.swept_rects(data.bus, 32.0)
 	if data.get("warehouse_district", {}).has("alley"):
 		zones.append_array(WarehouseScenery.reserved_walks(data))
+	var district: Dictionary = data.get("warehouse_district", data.get("themed_district", {}))
+	if district.has("family"):
+		for route: Array in district.approaches.values():
+			var from: Vector2 = WorldLayout.point(data.bus.door)
+			for value: Array in route:
+				var to: Vector2 = WorldLayout.point(value)
+				zones.append(SeededWarehouseDistrict.corridor(from, to))
+				from = to
 	zones.append(WorldLayout.rect(data.bus.rect).grow(40.0))
 	for value: Array in [data.bus.door, data.bus.passenger_door]:
 		zones.append(Rect2(WorldLayout.point(value) - Vector2(112, 112), Vector2(224, 224)))
@@ -249,7 +272,8 @@ static func _object_clear(data: Dictionary, collision: Rect2, work: Vector2, nav
 	return true
 
 
-static func _door_routes(data: Dictionary, nav: FieldNavigation, anchors: Array[String] = []) -> Dictionary:
+static func _door_routes(data: Dictionary, nav: FieldNavigation, anchors: Array[String] = [],
+		trace: Array[String] = []) -> Dictionary:
 	var start: Vector2 = WorldLayout.point(data.bus.door)
 	if not nav.is_clear(start):
 		return {}
@@ -261,6 +285,7 @@ static func _door_routes(data: Dictionary, nav: FieldNavigation, anchors: Array[
 		var target: Vector2 = WorldLayout.point(entity.door)
 		var path: PackedVector2Array = nav.path_between(start, target) if nav.is_clear(target) else PackedVector2Array()
 		if path.is_empty() or path[-1].distance_to(target) > 14.0:
+			trace.append("door:" + String(entity.id))
 			return {}
 		var length: float = _length(path)
 		doors[entity.id] = {"point":entity.door.duplicate(), "length":length}
@@ -268,7 +293,7 @@ static func _door_routes(data: Dictionary, nav: FieldNavigation, anchors: Array[
 	return {"dmax":dmax, "doors":doors} if dmax > 0.0 else {}
 
 
-static func _all_routes(data: Dictionary, nav: FieldNavigation) -> bool:
+static func _all_routes(data: Dictionary, nav: FieldNavigation, trace: Array[String] = []) -> bool:
 	var start: Vector2 = WorldLayout.point(data.bus.door)
 	var goals: Array = data.arrivals.duplicate(true)
 	goals.append(data.rescue)
@@ -285,9 +310,11 @@ static func _all_routes(data: Dictionary, nav: FieldNavigation) -> bool:
 	for point: Array in goals:
 		var target: Vector2 = WorldLayout.point(point)
 		if not nav.is_clear(target):
+			trace.append("blocked_point:" + str(point))
 			return false
 		var path: PackedVector2Array = nav.path_between(start, target)
 		if path.is_empty() or path[-1].distance_to(target) > 14.0:
+			trace.append("unreachable_point:" + str(point))
 			return false
 	return true
 

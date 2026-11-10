@@ -212,13 +212,23 @@ static func _offer(source: Dictionary, type: String, recruit: int, mission: bool
 	var size: String = source.layout["size"]
 	var yard: bool = industrial and type == "airdrop" and topology == "industrial"
 	var candidate: Dictionary = _with_type(source, type, recruit, topology, size)
-	if open_streets > 0 and mission and size == "large" and not candidate.is_empty():
-		var revision: int = open_streets if topology == "industrial" and not yard \
+	var fitted: bool = open_streets == OpenStreetsV1.SEEDED_VERSION and not yard and not residential_rescue
+	if open_streets > 0 and mission and (size == "large" or fitted) and not candidate.is_empty():
+		var revision: int = open_streets if (topology == "industrial" and not yard) \
+				or fitted \
 			else mini(open_streets, OpenStreetsV1.COMPACT_VERSION)
-		var pilot: Dictionary = ExplorationActions.upgrade(candidate, true, true, 1, yard, residential_rescue, 0, {}, revision)
+		var trace: Array[String] = []
+		var pilot: Dictionary = ExplorationActions.upgrade(candidate, true, true, 1, yard, residential_rescue, 0, {}, revision, trace)
+		if revision == OpenStreetsV1.SEEDED_VERSION and not trace.is_empty():
+			print("BH_SEEDED_DISTRICT_ATTEMPTS action=%s theme=%s task=%s selected_revision=%d reasons=%s" %
+				[candidate.id, topology, type, revision if not pilot.is_empty() else 0, JSON.stringify(trace)])
 		if not pilot.is_empty():
 			return pilot
 		for prior: int in range(revision - 1, OpenStreetsV1.COMPACT_VERSION - 1, -1):
+			if size != "large":
+				break
+			if prior >= OpenStreetsV1.DISTRICT_VERSION and (topology != "industrial" or yard):
+				continue
 			print("BH_WAREHOUSE_DISTRICT_FALLBACK revision=%d seed=%s task=%s" % [prior, candidate.seed, type])
 			pilot = ExplorationActions.upgrade(candidate, true, true, 1, yard, residential_rescue, 0, {}, prior)
 			if not pilot.is_empty():

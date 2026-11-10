@@ -5,6 +5,17 @@ const SIZES: Array[String] = ["small","medium","large"]
 const TOPOLOGIES: Array[String] = ["commercial","residential","industrial"]
 const DIMENSIONS: Dictionary = {"small":[1920,1440],"medium":[2560,1920],"large":[3584,2688]}
 const THEMES: Dictionary = {"commercial":"贯通商业街","residential":"错巷住宅区","industrial":"仓储院落"}
+const DISTRICT_GUIDE: Dictionary = {
+	"street_axis":["临街仓储主轴", "沿巴士前方路口过街，从装卸院边进主仓。"],
+	"loop_court":["仓储环路围院", "可直取主仓，也可沿外环绕行。另一处补给在仓后。"],
+	"offset_lanes":["仓储错位支路", "沿路缘绕过配套房，在装卸边转进主仓。"],
+	"through_market":["贯通商街", "从相邻街口过街，沿连续门面搜刮。"],
+	"market_square":["市集侧街", "从侧街进入市场，沿广场两侧往返。"],
+	"supermarket_service":["超市后勤街区", "从卸货侧巷接近超市，后街可以绕回主门。"],
+	"row_courts":["住宅连排院落", "从同侧门前进入，沿院口连接两处工位。"],
+	"offset_alley":["住宅错位侧巷", "过街后沿院墙侧巷转入住宅组团。"],
+	"enclosed_group":["住宅围合组团", "由院墙两端进入，绕到社区补给点。"],
+}
 const MAX_ATTEMPTS: int = 3
 static var _checked: Dictionary = {}
 
@@ -171,4 +182,9 @@ static func resource(data: Dictionary) -> StreetLayout:
 	result.cash_door=WorldLayout.point(data.entities[0].door);result.food_door=WorldLayout.point(data.entities[1].door)
 	result.rescue_point=WorldLayout.point(data.rescue);result.camera_start=result.bus_door+Vector2(360,-220)
 	result.route_hint={"commercial":"沿主街选店搜刮，侧后通道可绕行。","residential":"庭院砖墙留有错位巷口和侧门，注意往返路线。","industrial":"经装卸院口或外围服务路绕行，留意长墙遮挡。"}[data.topology]
+	var district: Dictionary = data.get("warehouse_district", data.get("themed_district", {}))
+	var guide: Array = DISTRICT_GUIDE.get(district.get("family", ""), [])
+	if not guide.is_empty():
+		result.display_name = guide[0]
+		result.route_hint = guide[1]
 	return result

@@ -155,7 +155,8 @@ static func _service_court(parcel: Dictionary) -> void:
 		_court(parcel, area, "loading", area.position + Vector2(32.0, 24.0))
 
 
-static func _infill(parcel: Dictionary, entities: Array, reserved: Array[Rect2], random: RandomNumberGenerator) -> void:
+static func _infill(parcel: Dictionary, entities: Array, reserved: Array[Rect2], random: RandomNumberGenerator,
+		limit: int = -1) -> void:
 	var plot: Rect2 = WorldLayout.rect(parcel.rect)
 	var interior: Rect2 = plot.grow(-PERIMETER)
 	var occupied: Array[Rect2] = []
@@ -175,7 +176,7 @@ static func _infill(parcel: Dictionary, entities: Array, reserved: Array[Rect2],
 		free = _subtract(free, area)
 
 	var added: int = 0
-	while not free.is_empty():
+	while not free.is_empty() and (limit < 0 or added < limit):
 		var area: Rect2 = free.pop_back()
 		if area.size.x < MIN_LOT.x or area.size.y < MIN_LOT.y:
 			continue
@@ -195,7 +196,8 @@ static func _infill(parcel: Dictionary, entities: Array, reserved: Array[Rect2],
 			occupied.append(used)
 			free.append_array(_subtract([area], used))
 			break
-	_fill_across_cuts(parcel, entities, interior, occupied)
+	if limit < 0:
+		_fill_across_cuts(parcel, entities, interior, occupied)
 
 
 static func _fill_across_cuts(parcel: Dictionary, entities: Array, interior: Rect2,

@@ -53,8 +53,9 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 			var far: Dictionary = _choose(groceries, routing, "far", action_id)
 			if routing.doors[far.id].length - routing.doors[near.id].length >= 750.0:
 				supply_pair = [near, far]
-		elif layout.has("warehouse_district"):
-			var planned: Array = layout.warehouse_district.food
+		elif layout.has("warehouse_district") or layout.has("themed_district"):
+			var district: Dictionary = layout.get("warehouse_district", layout.get("themed_district", {}))
+			var planned: Array = district.food
 			groceries = groceries.filter(func(entity: Dictionary) -> bool: return entity.id in planned)
 			if LevelPolicy.mission_supply_pair(groceries, routing, 2000.0).size() == 2:
 				for id: String in planned:
@@ -83,7 +84,13 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 						entity = candidate
 						break
 			elif open_streets and type in ["equipment", "airdrop"] and kind == "cash" and index == 0:
+				var district: Dictionary = layout.get("warehouse_district", layout.get("themed_district", {}))
 				entity = _open_gear_target(candidates, routing)
+				if district.has("family"):
+					for candidate: Dictionary in candidates:
+						if candidate.id == district.food[0]:
+							entity = candidate
+							break
 			elif mission_policy == 1 and type == "equipment" and kind == "cash" and index == 0:
 				entity = LevelPolicy.mission_investigation_target(candidates, routing)
 			elif layout.has("level_task") and type!="airdrop":

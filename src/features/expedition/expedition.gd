@@ -2087,7 +2087,8 @@ func _make_world_buildings() -> void:
 		var yard: Dictionary = layout.world_data.get("loading_yard", layout.world_data.get("rescue_court", {}))
 		var yard_bounds: Rect2 = WorldLayout.rect(yard.bounds) if not yard.is_empty() else Rect2()
 		for wall: Rect2 in layout.fences:
-			if layout.world_data.has("warehouse_district") or (not yard.is_empty() and yard_bounds.encloses(wall)):
+			if layout.world_data.has("warehouse_district") or layout.world_data.has("themed_district") \
+					or (not yard.is_empty() and yard_bounds.encloses(wall)):
 				var masonry: IndustrialYardWall = IndustrialYardWall.new()
 				masonry.footprint = wall
 				masonry.position = Vector2(wall.get_center().x, wall.end.y)

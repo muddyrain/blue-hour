@@ -27,6 +27,7 @@ func _draw() -> void:
 	var junction: Rect2 = OpenStreetsV1.turn_junction(layout.roads[0], layout.roads[1]) \
 		if compact and layout.world_data.topology != "commercial" else Rect2()
 	var warehouse: bool = layout.world_data.has("warehouse_district")
+	var seeded_warehouse: bool = layout.world_data.get("warehouse_district", {}).has("family")
 	var loading_yard: Dictionary = layout.world_data.get("loading_yard", {})
 	var rescue_court: Dictionary = layout.world_data.get("rescue_court", {})
 	var grass: Color = Color(0.59, 0.72, 0.76, 0.56) if blue_hour else Color(0.93, 0.94, 0.81, 0.58) if street_material else Color(0.77, 0.88, 0.76, 0.42)
@@ -36,10 +37,20 @@ func _draw() -> void:
 		var area: Rect2=WorldLayout.rect(parcel.rect)
 		draw_rect(area, Color("3c514b") if blue_hour else Color("62694f") if street_material else Color("56664e"))
 		draw_texture_rect(StreetBlock.GrassTexture, area, true, grass if blue_hour else Color(0.93, 0.94, 0.8, 0.60) if street_material else Color(0.7, 0.84, 0.66, 0.5))
-		if warehouse:
+		if warehouse and not seeded_warehouse:
 			var service_area: Rect2 = area.grow(-WarehouseDistrict.PERIMETER)
 			draw_rect(service_area, Color("4d5657"))
 			draw_texture_rect(StreetBlock.ConcreteTexture, service_area, true, Color(0.66, 0.73, 0.77, 0.46))
+		if seeded_warehouse:
+			# Separate working concrete from unpaved setbacks. Load pads and paths
+			# are drawn below from their actual footprints.
+			var buildings: Array = parcel.buildings
+			for entity: Dictionary in layout.world_data.entities:
+				if entity.id not in buildings:
+					continue
+				var pad: Rect2 = WorldgenScale.visible_rect(entity).grow_individual(20.0, 12.0, 20.0, 72.0).intersection(area)
+				draw_rect(pad, Color("475557"))
+				draw_texture_rect(StreetBlock.ConcreteTexture, pad, true, Color(0.65, 0.72, 0.76, 0.44))
 		if parcel.id == loading_yard.get("parcel"):
 			_loading_yard_floor(loading_yard)
 		if parcel.id == rescue_court.get("parcel"):

@@ -23,31 +23,46 @@ static func generate(seed: String, size: String, topology: String, task: String 
 	return _assemble(seed,size,topology,0,true,task)
 
 static func _assemble(seed: String,size: String,topology: String,attempt: int,fallback: bool,
-		task: String = "", industrial: bool = false, residential_rescue: bool = false, open_streets: int = 0) -> Dictionary:
-	var data: Dictionary = WorldgenGeometry.assemble(seed, size, topology, attempt, fallback, task, industrial, residential_rescue, open_streets)
+		task: String = "", industrial: bool = false, residential_rescue: bool = false, open_streets: int = 0, trace: Array[String] = []) -> Dictionary:
+	var compact_fit: bool = size != "large" and open_streets == OpenStreetsV1.SEEDED_VERSION
+	var data: Dictionary = WorldgenGeometry.assemble(seed, size, topology, attempt, fallback, task,
+		industrial, residential_rescue, 0 if compact_fit else open_streets)
 	if data.is_empty():
+		trace.append("parcel_geometry")
 		return {}
-	var dressed: bool = open_streets == OpenStreetsV1.VERSION
+	var dressed: bool = open_streets == OpenStreetsV1.DRESSING_VERSION
 	if dressed and not WarehouseScenery.attach(data):
 		return {}
 	WorldgenDressing.freeze(data)
 	if dressed and not WarehouseScenery.dress(data):
 		return {}
-	return ExplorationLayout.complete(data)
+	if compact_fit:
+		data.scenery_revision = open_streets
+	if open_streets == OpenStreetsV1.SEEDED_VERSION:
+		ParcelScenery.fit(data)
+	return ExplorationLayout.complete(data, trace)
 
 static func validate(value: Variant,cached: bool=true) -> String:
-	if not value is Dictionary or value.size()!=KEYS.size()+int(value.has("level_task"))+int(value.has("loading_yard"))+int(value.has("rescue_court"))+int(value.has("open_streets"))+int(value.has("warehouse_district")) or not value.has_all(KEYS) or not SurvivalContracts.json_value(value): return "WORLDGEN_LAYOUT_FIELDS"
+	if not value is Dictionary or value.size()!=KEYS.size()+int(value.has("level_task"))+int(value.has("loading_yard"))+int(value.has("rescue_court"))+int(value.has("open_streets"))+int(value.has("warehouse_district"))+int(value.has("themed_district"))+int(value.has("scenery_revision")) or not value.has_all(KEYS) or not SurvivalContracts.json_value(value): return "WORLDGEN_LAYOUT_FIELDS"
 	if value.version!=5 or not value.seed is String or value.seed.is_empty() or value.seed.length()>128 or value["size"] not in NeighborhoodLayout.SIZES or value.topology not in NeighborhoodLayout.TOPOLOGIES or not SurvivalContracts.integer(value.attempt,0,2) or not value.fallback is bool or not is_map_id(value.id): return "WORLDGEN_LAYOUT_IDENTITY"
 	if value.has("level_task") and value.level_task not in TaskActions.TYPES:
 		return "LEVEL_TASK_IDENTITY"
 	if value.has("open_streets") and (value["size"] != "large" or not value.has("level_task") \
 			or not OpenStreetsV1.supported(value.open_streets)):
 		return "OPEN_STREETS_LAYOUT_POLICY"
-	var open_streets: int = int(value.get("open_streets", 0))
+	if value.has("scenery_revision") and (value.has("open_streets") or value["size"] == "large" or not value.has("level_task") \
+			or not SurvivalContracts.integer(value.scenery_revision, OpenStreetsV1.SEEDED_VERSION, OpenStreetsV1.SEEDED_VERSION)):
+		return "SCENERY_LAYOUT_POLICY"
+	var open_streets: int = int(value.get("open_streets", value.get("scenery_revision", 0)))
 	var industrial: bool = value.has("loading_yard")
 	var residential_rescue: bool = value.has("rescue_court")
-	var warehouse: bool = open_streets >= OpenStreetsV1.DISTRICT_VERSION
-	if warehouse != value.has("warehouse_district") or (warehouse and (value.topology != "industrial" or industrial)):
+	var warehouse: bool = value.has("open_streets") and OpenStreetsV1.warehouse(open_streets, value.topology, industrial)
+	var themed: bool = value.has("open_streets") and open_streets == OpenStreetsV1.SEEDED_VERSION and ThemedDistrict.FAMILIES.has(value.topology)
+	if themed != value.has("themed_district"):
+		return "THEMED_DISTRICT_CONTEXT"
+	if warehouse != value.has("warehouse_district") \
+			or (open_streets in [OpenStreetsV1.DISTRICT_VERSION, OpenStreetsV1.DRESSING_VERSION] and not warehouse) \
+			or (open_streets == OpenStreetsV1.SEEDED_VERSION and (industrial or residential_rescue)):
 		return "WAREHOUSE_DISTRICT_CONTEXT"
 	if industrial and (value.topology != "industrial" or value.get("level_task") != "airdrop" or not value.loading_yard is Dictionary):
 		return "INDUSTRIAL_YARD_CONTEXT"

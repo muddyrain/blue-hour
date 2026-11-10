@@ -16,7 +16,9 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 	var height: int = int(dimensions[1])
 	var rank: int = NeighborhoodLayout.SIZES.find(size)
 	var compact: bool = open_streets >= OpenStreetsV1.COMPACT_VERSION
-	var warehouse: bool = open_streets >= OpenStreetsV1.DISTRICT_VERSION
+	var warehouse: bool = OpenStreetsV1.warehouse(open_streets, topology, industrial)
+	var seeded_warehouse: bool = warehouse and open_streets == OpenStreetsV1.SEEDED_VERSION
+	var themed: bool = open_streets == OpenStreetsV1.SEEDED_VERSION and ThemedDistrict.FAMILIES.has(topology)
 	var main_y: int = int(round(float(height) * random.randf_range(0.40,0.61) / 32.0)) * 32
 	var main_width: int = WorldgenScale.MAIN_WIDTH
 	var segments: Array = [[0,main_y+main_width/2,width,main_y+main_width/2,main_width]]
@@ -30,7 +32,13 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 			return {}
 		segments = skeleton.segments
 		leaves = skeleton.leaves
-	if compact and topology == "industrial":
+	var district_plan: Dictionary = {}
+	if seeded_warehouse:
+		district_plan = SeededWarehouseDistrict.partition(leaves, segments, skeleton.bus, seed, attempt, fallback)
+	elif themed:
+		district_plan = ThemedDistrict.partition(leaves, segments, skeleton.bus, seed, attempt, topology)
+		district_plan.plots = {}
+	elif compact and topology == "industrial":
 		_service_frontages(leaves, segments, random, skeleton.bus)
 	var target: int = (28 if open_streets > 0 else [5,8,11][rank]) + random.randi_range(-1,1)
 	# Each cut joins at least one existing road edge. Both children retain that edge.
@@ -39,6 +47,8 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 		var options: Array[Dictionary] = []
 		for index: int in range(leaves.size()):
 			var parcel: Dictionary = leaves[index]
+			if parcel.has("district_role"):
+				continue
 			var box: Rect2 = WorldLayout.rect(parcel.rect)
 			if box.size.x >= MIN_WIDTH * 2 + 128 and (parcel.edges[0] or parcel.edges[1]):
 				options.append({"index":index,"vertical":true,"score":box.get_area()*random.randf_range(0.7,1.3)})
@@ -64,7 +74,7 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 		if compact and topology == "industrial":
 			kinds = ["service", "service", "service", "service", "loading"]
 		var kind: String = kinds[random.randi_range(0,kinds.size()-1)]
-		var stub: bool = index == random.randi_range(0,leaves.size()-1) and box.size.x >= 1000 and box.size.y >= 600 and (leaf.edges[0] or leaf.edges[1])
+		var stub: bool = index == random.randi_range(0,leaves.size()-1) and box.size.x >= 1000 and box.size.y >= 600 and (leaf.edges[0] or leaf.edges[1]) and not leaf.has("district_role")
 		if stub:
 			var x: int = int(box.end.x - 176)
 			var from_y: int = _connect(int(box.end.y if leaf.edges[1] else box.position.y),x,true,segments)
@@ -76,6 +86,8 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 			else:
 				stub = false
 		parcels.append({"id":"p%02d"%index,"rect":leaf.rect.duplicate(),"kind":kind,"road_edges":leaf.edges.duplicate(),"buildings":[],"entrance":[],"dead_end":stub,"courtyards":[],"walks":[],"frontage":{"available":0.0,"occupied":0.0,"coverage":0.0}})
+		if leaf.has("district_role"):
+			district_plan.plots[leaf.district_role] = parcels[-1]
 	roads = _roads(segments,width,height)
 	if compact:
 		var junction: Rect2 = skeleton.junction
@@ -119,13 +131,23 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 		court = rescue_plan.frozen
 		yard_parcel = court.parcel
 	var district: Dictionary = {}
+	var themed_district: Dictionary = {}
 	if warehouse:
-		district = WarehouseDistrict.populate(parcels, roads, bus, seed)
+		district = SeededWarehouseDistrict.populate(parcels, roads, bus, seed, district_plan, task) if seeded_warehouse \
+			else WarehouseDistrict.populate(parcels, roads, bus, seed)
 		if district.is_empty():
 			return {}
 		entities = district.entities
 	else:
+		if themed:
+			var landmark: Dictionary = district_plan.plots.main
+			themed_district = ThemedDistrict.populate(landmark, entities, roads, bus, district_plan, topology, task)
+			if themed_district.is_empty():
+				return {}
+			yard_parcel = landmark.id
 		for parcel: Dictionary in parcels:
+			if themed and parcel.id == yard_parcel:
+				continue
 			if parcel.id == yard_parcel:
 				var filled: bool = _populate_rescue_court(parcel, rescue_plan, entities, roads, bus) if residential_rescue \
 					else _populate_yard(parcel, yard_plan, entities, roads, bus)
@@ -136,7 +158,7 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 				if open_streets > 0:
 					rows = 2 if topology == "commercial" and parcel.kind == "shopfront" else 1
 				if compact:
-					rows = 3 if float(parcel.rect[3]) >= 900.0 else 2
+					rows = 2 if themed else 3 if float(parcel.rect[3]) >= 900.0 else 2
 				_populate(parcel, topology, random, entities, roads, bus, rows, compact)
 		# Food and equipment are actual parcels, not rewards granted to every building.
 		_ensure_categories(entities,parcels,roads,bus,yard_parcel)
@@ -148,7 +170,10 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 		if distance > furthest:
 			furthest=distance
 			rescue=entity.door.duplicate()
-	var walls: Dictionary = district if warehouse else _walls(parcels,entities,roads,bus)
+	var walls: Dictionary = district if warehouse else _walls(parcels,entities,roads,bus, yard_parcel if themed else "")
+	if themed:
+		walls.barriers.append_array(themed_district.barriers)
+		themed_district.erase("barriers")
 	if not yard.is_empty():
 		walls.barriers.append_array(yard_plan.barriers)
 		walls.gates.append(yard.loading.gate)
@@ -165,6 +190,8 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 		data.enemy_points = skeleton.enemy_points
 	if warehouse:
 		data.warehouse_district = district.district
+	if themed:
+		data.themed_district = themed_district
 	if not yard.is_empty():
 		data.loading_yard = yard
 	if not task.is_empty():
@@ -465,11 +492,11 @@ static func _update_frontages(parcels: Array, entities: Array, yard_parcel: Stri
 		# Other first rows serve an internal court, and cannot prove street coverage.
 		parcel.frontage.scope="street" if parcel.road_edges[1] else "internal"
 
-static func _walls(parcels: Array, entities: Array, roads: Array, bus: Dictionary) -> Dictionary:
+static func _walls(parcels: Array, entities: Array, roads: Array, bus: Dictionary, skip: String = "") -> Dictionary:
 	var barriers: Array=[]
 	var gates: Array=[]
 	for parcel: Dictionary in parcels:
-		if parcel.kind not in ["garden","courtyard","loading"]:continue
+		if parcel.id == skip or parcel.kind not in ["garden","courtyard","loading"]:continue
 		var box: Rect2=WorldLayout.rect(parcel.rect)
 		var wall: Rect2=Rect2(box.position.x+36,box.end.y-280,minf(240,box.size.x*0.3),16)
 		var gate: Vector2=Vector2(wall.end.x+52,wall.get_center().y)

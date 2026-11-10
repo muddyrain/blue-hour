@@ -12,8 +12,8 @@ func _journey() -> void:
 		var action: Dictionary = app.mission_select.daily_offers[index]
 		if action.layout.has("open_streets"):
 			selected = index
-			var warehouse: bool = action.layout.topology == "industrial" and not action.layout.has("loading_yard")
-			var revision: int = OpenStreetsV1.VERSION if warehouse else OpenStreetsV1.COMPACT_VERSION
+			var special: bool = action.layout.has("loading_yard") or action.layout.has("rescue_court")
+			var revision: int = OpenStreetsV1.COMPACT_VERSION if special else OpenStreetsV1.VERSION
 			_check(action.layout.open_streets == revision, "open-street offer uses the theme's geometry revision")
 			_check(DailyActions.problem(action).is_empty(), "frozen M45 action authenticates")
 		elif action.layout["size"] != "large":
@@ -35,17 +35,23 @@ func _journey() -> void:
 		"blocks":layout.parcels.size(), "loops":road_stats.loops, "bus":layout.bus})
 	_check(layout.bounds == OpenStreetsV1.BOUNDS and OpenStreetsV1.certify(layout, world.layout.blockers()),
 		"frozen continuous arterial, parking lane, clear turn and doorway")
-	if layout.has("warehouse_district"):
-		_check(layout.warehouse_district.roles.size() == 4 and WarehouseDistrict.certified(
-			layout.warehouse_district, layout.gates, world.navigation, world.layout.bus_door),
-			"four warehouse blocks retain both approaches and the yard passage")
-	if layout.open_streets == OpenStreetsV1.VERSION:
+	var district: Dictionary = layout.get("warehouse_district", {})
+	if district.has("family"):
+		_check(SeededWarehouseDistrict.FAMILIES.has(district.family)
+			and SeededWarehouseDistrict.certified(district, world.navigation, world.layout.bus_door),
+			"seeded task block retains its certified approach after scenery and interactive props")
 		var annexes: Array = layout.entities.filter(func(entity: Dictionary) -> bool:
-			return WarehouseSlots.BUILDINGS.has(entity.art) and entity.id.ends_with("_annex"))
+			return WarehouseSlots.BUILDINGS.has(entity.get("art", "")))
 		var blockers: Array[Rect2] = world.layout.blockers()
-		_check(layout.warehouse_district.has("alley") and annexes.size() >= 2 and annexes.all(func(entity: Dictionary) -> bool:
+		_check(not annexes.is_empty() and annexes.all(func(entity: Dictionary) -> bool:
 			return entity.service_only and blockers.has(WorldLayout.rect(entity.rect))),
-			"dressed warehouse retains the side alley and real non-searchable annex footprints")
+			"site-fit annexes have real collision and no independent loot")
+		if world.supply.generated.type == "supply":
+			_check(world.supply.generated.sites[0].building == district.food[0],
+				"primary supply work is bound to the selected family hall")
+	if layout.open_streets == OpenStreetsV1.SEEDED_VERSION:
+		_check(layout.parcels.all(func(parcel: Dictionary) -> bool: return parcel.has("site_fit")),
+			"all parcels have the same geometry fit pass")
 	await _advance(world, func() -> bool: return world.bus_view.stage == "disembarking", 1200)
 	_check(world._bus_sprite.position == WorldLayout.point(layout.bus.stop), "bus drives to the in-lane stop")
 	await _advance(world, func() -> bool: return not world.bus_view.running(), 180)

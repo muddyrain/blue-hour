@@ -5,7 +5,7 @@ extends RefCounted
 const VERSION: int = 1
 const OPTIONAL_SOURCES: Array[String] = ["optional_building", "vehicle", "fruit_tree"]
 const SOURCE_CACHE_LIMIT: int = 128
-static var _sources: ActionMemo = ActionMemo.new(SOURCE_CACHE_LIMIT)
+static var _sources: Dictionary[String, String] = {}
 
 
 static func site_id(action: Dictionary) -> String:
@@ -47,7 +47,7 @@ static func source_problem(camp: Dictionary, entry: Dictionary) -> String:
 
 static func _source_site(seed: String, day: int, identity: String, size: String, yard: bool) -> String:
 	var key: String = "%s:%s:%d" % [identity, size, int(yard)]
-	var cached: Variant = _sources.lookup(key)
+	var cached: Variant = ActionMemo.lookup(_sources, key)
 	if cached != null:
 		return String(cached)
 	# Existing day rewards and level geometry are independent of equipment and survivors.
@@ -55,7 +55,7 @@ static func _source_site(seed: String, day: int, identity: String, size: String,
 	var task: Dictionary = TaskActions._make(seed, day, SortieRiskV1.SLOT, "airdrop", "industrial", size, 0)
 	var action: Dictionary = ExplorationActions.upgrade(WeaponActions._upgrade(task), true, true, 1, yard)
 	var optional: String = _optional_site(action)
-	_sources.store(key, optional)
+	ActionMemo.store(_sources, key, optional, SOURCE_CACHE_LIMIT)
 	return optional
 
 

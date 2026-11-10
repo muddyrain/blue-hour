@@ -6,7 +6,7 @@ const OPEN_PRIMARY_LIMIT: float = 3800.0
 const OPEN_GEAR_PREFERRED: float = 2400.0
 const OPTIONAL_IDS: Array[String] = ["optional_buildings_all", "searchable_vehicles_all", "fruit_trees_all"]
 const OPTIONAL_TITLES: Dictionary = {"optional_buildings_all":"搜完可选建筑", "searchable_vehicles_all":"搜完停放车辆", "fruit_trees_all":"采完本图果树"}
-static var _generated: ActionMemo = ActionMemo.new(96)
+static var _generated: Dictionary = {}
 
 
 static func generate(layout: Dictionary, type: String, cash: int, food: int, weapons: int, action_id: String,
@@ -22,7 +22,7 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 	var cold_store: bool = rare_policy == RareSortie.VERSION and type == "supply"
 	var armory: bool = rare_policy == RareSortie.VERSION and type == "airdrop"
 	var key: String = RecordEncoding.fingerprint({"layout":layout, "type":type, "cash":cash, "food":food, "weapons":weapons, "action_id":action_id, "policy":ExplorationLayout.policy(), "mission_policy":mission_policy, "rare_policy":rare_policy})
-	var cached: Variant = _generated.lookup(key)
+	var cached: Variant = ActionMemo.lookup(_generated, key)
 	if cached != null:
 		return cached.duplicate(true)
 	var routing: Dictionary = ExplorationLayout._routing(layout)
@@ -196,7 +196,7 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 		"optional_objectives":objectives, "metrics":{"dmax":routing.dmax, "routes":routes}}
 	if sites.size() > 15:
 		return {}
-	_generated.store(key, result.duplicate(true))
+	ActionMemo.store(_generated, key, result.duplicate(true), 96)
 	return result
 
 

@@ -7,12 +7,12 @@ const CONFIG: Dictionary = {
 	"supply":{"mission":"supermarket","name":"食物补给","cash":[2,4],"food":[4,6],"weapons":[0,1]},
 	"equipment":{"mission":"scavenge","name":"装备搜寻","cash":[4,7],"food":[0,2],"weapons":[1,1]},
 	"rescue":{"mission":"rescue","name":"街角救援","cash":[2,4],"food":[2,4],"weapons":[0,0]}}
-static var _checked: ActionMemo = ActionMemo.new(128)
-static var _offers: ActionMemo = ActionMemo.new(128)
+static var _checked: Dictionary = {}
+static var _offers: Dictionary = {}
 
 static func offers(base: Dictionary) -> Array[Dictionary]:
 	var cache_key: String=SurvivalContracts.fingerprint({"seed":base.journey.seed,"day":base.day,"eligible":RescuePoolState.available(base)})
-	var stored: Variant = _offers.lookup(cache_key)
+	var stored: Variant = ActionMemo.lookup(_offers, cache_key)
 	if stored != null:
 		var cached: Array[Dictionary] = []
 		cached.assign(stored.duplicate(true))
@@ -30,7 +30,7 @@ static func offers(base: Dictionary) -> Array[Dictionary]:
 	var result: Array[Dictionary]=[]
 	var candidate: int=RescuePoolState.choice(base,"%s:%d"%[base.profile_id,int(base.settled_sorties)+1])
 	for slot: int in range(3):result.append(_make(String(base.journey.seed),int(base.day),slot,types[slot],bones[slot],sizes[slot],candidate if types[slot]=="rescue" else 0))
-	_offers.store(cache_key, result.duplicate(true))
+	ActionMemo.store(_offers, cache_key, result.duplicate(true), 128)
 	return result
 
 static func _make(seed: String, day: int, slot: int, type: String, bone: String, size: String, recruit: int) -> Dictionary:
@@ -60,11 +60,11 @@ static func _profiled_problem(value: Variant) -> String:
 	var issue: String=NeighborhoodLayout.validate(value.layout)
 	if not issue.is_empty():return issue
 	var signature: String=SurvivalContracts.fingerprint(value)
-	if _checked.lookup(signature) == true:return ""
+	if ActionMemo.lookup(_checked, signature) == true:return ""
 	var expected: Dictionary=_make(value.seed,int(value.day),int(value.slot),value.type,value.layout.topology,value.layout["size"],int(value.recruit))
 	if not TransactionReceipt.same(value,expected):return "DAILY_CANONICAL"
 	if (value.type=="rescue" and int(value.recruit) not in [3,4,5]) or (value.type!="rescue" and value.recruit!=0):return "DAILY_RECRUIT"
-	_checked.store(signature, true)
+	ActionMemo.store(_checked, signature, true, 128)
 	return ""
 
 static func matches(base: Dictionary, value: Variant) -> bool:
@@ -90,10 +90,10 @@ static func supply(value: Dictionary) -> MissionSupply:
 	if value.type=="rescue":result.description+="\n援救%s10秒后同行参战。"%SurvivorRoster.definition(int(value.recruit)).default_display_name
 	return result
 
-static var _routes: ActionMemo = ActionMemo.new(129)
+static var _routes: Dictionary = {}
 static func route_metrics(value: Dictionary) -> Dictionary:
 	var key: String = SurvivalContracts.fingerprint({"layout":value.layout,"sites":value.sites,"rescue":value.recruit})
-	var cached: Variant = _routes.lookup(key)
+	var cached: Variant = ActionMemo.lookup(_routes, key)
 	if cached != null:
 		return cached.duplicate(true)
 	var layout: StreetLayout = NeighborhoodLayout.resource(value.layout)
@@ -106,7 +106,7 @@ static func route_metrics(value: Dictionary) -> Dictionary:
 	var maximum: int = 0
 	for length: int in lengths.values(): maximum=maxi(maximum,length)
 	var result: Dictionary = {"maximum":maximum,"paths":lengths,"speed":125,"work_seconds":30}
-	_routes.store(key, result.duplicate(true))
+	ActionMemo.store(_routes, key, result.duplicate(true), 129)
 	return result
 static func _length(path: PackedVector2Array) -> int:
 	var length: float = 0

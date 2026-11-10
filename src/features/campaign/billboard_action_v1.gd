@@ -13,7 +13,7 @@ const TARGET_CACHE_SIZE: int = 12
 const TARGET_SIZES: Array[String] = ["medium", "large"]
 const TARGET_TOPOLOGIES: Array[String] = ["commercial", "residential"]
 
-static var _targets: ActionMemo = ActionMemo.new(TARGET_CACHE_SIZE, true)
+static var _targets: Dictionary[String, Dictionary] = {}
 
 
 static func action_id(seed: String, day: int, slot: int) -> String:
@@ -119,11 +119,11 @@ static func _certificate(seed: String, day: int) -> Dictionary:
 			or seed != seed.to_lower() or not seed.is_valid_hex_number(false):
 		return {}
 	var id: String = action_id(seed, day, SLOT)
-	var cached: Variant = _targets.lookup(id)
+	var cached: Variant = ActionMemo.lookup(_targets, id)
 	if cached != null:
 		return cached
 	var certified: Dictionary = _certify_target(seed, day, id)
-	_targets.store(id, certified)
+	ActionMemo.store(_targets, id, certified, TARGET_CACHE_SIZE, true)
 	return certified
 
 

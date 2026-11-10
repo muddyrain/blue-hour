@@ -5,7 +5,7 @@ const VERSION: int = 1
 const MAX_ATTEMPTS: int = 3
 const BONES: Array[String] = ["straight","fork","ring"]
 const NAMES: Array[String] = ["长街","三岔街","环院街"]
-static var _valid: ActionMemo = ActionMemo.new(128)
+static var _valid: Dictionary = {}
 
 static func rng(identity: String) -> RandomNumberGenerator:
 	var result: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -115,7 +115,7 @@ static func validate(value: Variant) -> String:
 		if not _rect(road): return "LAYOUT_ROAD"
 	if not is_map_id(value.id) or value.id!="rogue_v1_"+geometry_hash(value).substr(0,32): return "LAYOUT_IDENTITY"
 	var signature: String = SurvivalContracts.fingerprint(value)
-	if _valid.lookup(signature) == true:return ""
+	if ActionMemo.lookup(_valid, signature) == true:return ""
 	var nav: FieldNavigation = FieldNavigation.new()
 	nav.configure(blockers)
 	var bus: Vector2
@@ -140,7 +140,7 @@ static func validate(value: Variant) -> String:
 		var gap: float = minf(tuning.squad_spacing,tuning.boarding_radius*1.2/3.0)
 		var goal: Vector2 = bus+Vector2.ONE*((i-1.5)*gap)
 		if not nav.is_clear(goal) or nav.path_between(start,goal).is_empty():return "LAYOUT_BOARDING_SPACE"
-	_valid.store(signature, true)
+	ActionMemo.store(_valid, signature, true, 128)
 	return ""
 
 static func resource(data: Dictionary) -> StreetLayout:

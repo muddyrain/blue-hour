@@ -5,7 +5,7 @@ extends RefCounted
 const INVESTIGATION_SLOT: int = 1
 const SITE_ID: String = "cash"
 const MAX_DAYS_CACHED: int = 8
-static var _days: ActionMemo = ActionMemo.new(MAX_DAYS_CACHED, true)
+static var _days: Dictionary[String, Dictionary] = {}
 
 
 static func offers(base: Dictionary) -> Array[Dictionary]:
@@ -29,7 +29,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var identity: String = RecordEncoding.fingerprint(base)
 	if identity.is_empty():
 		return {}
-	var cached: Variant = _days.lookup(identity)
+	var cached: Variant = ActionMemo.lookup(_days, identity)
 	if cached != null:
 		return cached
 	# The original task/boss generators consume their original frozen phase format.
@@ -106,7 +106,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 		result[index] = candidate
 		fingerprints[candidate.id] = RecordEncoding.fingerprint(candidate)
 	var frozen: Dictionary = {"offers":result, "fingerprints":fingerprints}
-	_days.store(identity, frozen)
+	ActionMemo.store(_days, identity, frozen, MAX_DAYS_CACHED, true)
 	return frozen
 
 

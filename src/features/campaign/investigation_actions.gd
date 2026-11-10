@@ -43,6 +43,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var sortie_risk: bool = CampaignRules.sortie_risk_enabled(base.journey.campaign)
 	var clue: String = CampaignRules.next_clue(base.journey.campaign)
 	var event_sortie: bool = not clue.is_empty() and CampaignRules.event_sortie_enabled(base.journey.campaign)
+	var open_streets: int = int(base.journey.campaign.get("open_streets_policy", 0))
 	var result: Array[Dictionary] = []
 	if clue.is_empty():
 		projected.journey.campaign.preparations = CampaignRules.PREPARATIONS
@@ -51,10 +52,10 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 		if not finale.is_empty():
 			var selected: Dictionary = PumpStationAction.freeze(finale[0]) if CampaignRules.pump_station_enabled(base.journey.campaign) else finale[0]
 			if not selected.is_empty():
-				result = _day(projected, clue, mission, industrial, action_choices, midgame, selected, "", sortie_risk)
+				result = _day(projected, clue, mission, industrial, action_choices, midgame, selected, "", sortie_risk, open_streets)
 	else:
 		var rare_type: String = RareSortie.selection(base.journey.seed, int(base.day), RareSortie.SLOT) if CampaignRules.rare_sorties_enabled(base.journey.campaign) else ""
-		result = _day(projected, clue, mission, industrial, action_choices, midgame, {}, rare_type, sortie_risk)
+		result = _day(projected, clue, mission, industrial, action_choices, midgame, {}, rare_type, sortie_risk, open_streets)
 	if result.is_empty():
 		return {}
 	var fingerprints: Dictionary[String, String] = {}
@@ -136,7 +137,7 @@ static func site_problem(value: Dictionary) -> String:
 
 static func _day(projected: Dictionary, clue: String, mission: bool, industrial: bool,
 		action_choices: bool, midgame: bool, finale: Dictionary = {}, rare_type: String = "",
-		sortie_risk: bool = false) -> Array[Dictionary]:
+		sortie_risk: bool = false, open_streets: int = 0) -> Array[Dictionary]:
 	var original: Array[Dictionary] = PersonaActions.offers(projected)
 	if original.size() != 3:
 		return []
@@ -171,9 +172,9 @@ static func _day(projected: Dictionary, clue: String, mission: bool, industrial:
 				if not source.is_empty():
 					offer = ExplorationActions.upgrade(source, true, true, 1, yard, false, RareSortie.VERSION)
 			if offer.is_empty():
-				offer = _choice_offer(projected, original[slot], industrial, midgame, sortie_risk)
+				offer = _choice_offer(projected, original[slot], industrial, midgame, sortie_risk, open_streets)
 		else:
-			offer = _offer(original[slot], task_type, recruit if task_type == "rescue" else 0, mission, industrial)
+			offer = _offer(original[slot], task_type, recruit if task_type == "rescue" else 0, mission, industrial, false, open_streets)
 		if offer.is_empty():
 			return []
 		if investigation:
@@ -186,13 +187,13 @@ static func _day(projected: Dictionary, clue: String, mission: bool, industrial:
 
 
 static func _choice_offer(base: Dictionary, source: Dictionary, industrial: bool, midgame: bool,
-		sortie_risk: bool) -> Dictionary:
+		sortie_risk: bool, open_streets: int) -> Dictionary:
 	var key: String = "m25-action-choice:%s:%d" % [base.journey.seed, int(base.day)]
 	if key.sha256_text().left(1).hex_to_int() % 2 == 0:
 		var transaction: String = "%s:%d" % [base.profile_id, int(base.settled_sorties) + 1]
 		var recruit: int = RescuePoolState.choice(base, transaction)
 		if recruit > 0:
-			var rescue: Dictionary = _offer(source, "rescue", recruit, true, industrial, midgame)
+			var rescue: Dictionary = _offer(source, "rescue", recruit, true, industrial, midgame, open_streets)
 			if not rescue.is_empty():
 				return rescue
 	if sortie_risk and not SortieRiskV1.selection(source.seed, int(source.day), int(source.slot)).is_empty():
@@ -200,17 +201,39 @@ static func _choice_offer(base: Dictionary, source: Dictionary, industrial: bool
 		var risk_offer: Dictionary = SortieRiskV1.freeze(source, topology, industrial and topology == "industrial")
 		if not risk_offer.is_empty():
 			return risk_offer
-	return _offer(source, "airdrop", 0, true, industrial)
+	return _offer(source, "airdrop", 0, true, industrial, false, open_streets)
 
 
 static func _offer(source: Dictionary, type: String, recruit: int, mission: bool,
-		industrial: bool, residential_rescue: bool = false) -> Dictionary:
+		industrial: bool, residential_rescue: bool = false, open_streets: int = 0) -> Dictionary:
 	var topology: String = "industrial" if type == "equipment" and source.layout.topology == "residential" else source.layout.topology
 	if residential_rescue:
 		topology = "residential"
 	var size: String = source.layout["size"]
 	var yard: bool = industrial and type == "airdrop" and topology == "industrial"
 	var candidate: Dictionary = _with_type(source, type, recruit, topology, size)
+	var fitted: bool = open_streets == OpenStreetsV1.SEEDED_VERSION and not yard and not residential_rescue
+	if open_streets > 0 and mission and (size == "large" or fitted) and not candidate.is_empty():
+		var revision: int = open_streets if (topology == "industrial" and not yard) \
+				or fitted \
+			else mini(open_streets, OpenStreetsV1.COMPACT_VERSION)
+		var trace: Array[String] = []
+		var pilot: Dictionary = ExplorationActions.upgrade(candidate, true, true, 1, yard, residential_rescue, 0, {}, revision, trace)
+		if revision == OpenStreetsV1.SEEDED_VERSION and not trace.is_empty():
+			print("BH_SEEDED_DISTRICT_ATTEMPTS action=%s theme=%s task=%s selected_revision=%d reasons=%s" %
+				[candidate.id, topology, type, revision if not pilot.is_empty() else 0, JSON.stringify(trace)])
+		if not pilot.is_empty():
+			return pilot
+		for prior: int in range(revision - 1, OpenStreetsV1.COMPACT_VERSION - 1, -1):
+			if size != "large":
+				break
+			if prior >= OpenStreetsV1.DISTRICT_VERSION and (topology != "industrial" or yard):
+				continue
+			print("BH_WAREHOUSE_DISTRICT_FALLBACK revision=%d seed=%s task=%s" % [prior, candidate.seed, type])
+			pilot = ExplorationActions.upgrade(candidate, true, true, 1, yard, residential_rescue, 0, {}, prior)
+			if not pilot.is_empty():
+				return pilot
+		print("BH_OPEN_STREETS_FALLBACK theme=%s task=%s seed=%s" % [topology, type, candidate.seed])
 	var offer: Dictionary = ExplorationActions.upgrade(candidate, true, true, int(mission), yard, residential_rescue) if not candidate.is_empty() else {}
 	if not mission or not offer.is_empty():
 		return offer

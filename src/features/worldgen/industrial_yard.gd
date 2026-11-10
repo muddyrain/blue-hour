@@ -36,10 +36,11 @@ static func plan(parcels: Array, roads: Array, bus: Dictionary, seed: String) ->
 			if road.size.x > road.size.y and road.has_point(service_street) and road.has_point(loading_street):
 				front_road = true
 			overlap = overlap or road.intersects(bounds)
-		if not front_road or overlap or bounds.intersects(WorldLayout.rect(bus.sweep)):
+		if not front_road or overlap or OpenStreetsV1.intersects_sweep(bus, bounds):
 			continue
 		# Prefer useful destinations, while seeded parcel topology and tie variation choose the yard.
-		var score: float = bus_point.distance_to(bounds.get_center()) + random.randf_range(0.0, 128.0)
+		var distance: float = bus_point.distance_to(bounds.get_center())
+		var score: float = (-absf(distance - 2300.0) if bus.has("stop") else distance) + random.randf_range(0.0, 128.0)
 		if score > best_score:
 			best_score = score
 			best = _plan_parcel(parcel.id, bounds, front)

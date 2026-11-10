@@ -6,6 +6,7 @@ const ShopTexture: Texture2D = preload("res://assets/candidates/shop_02.png")
 const LootTheme: Theme = preload("res://assets/ui/c1/hud_theme.tres")
 var primary_target: bool = false
 var calibrated: bool = false
+var fixed_roof: bool = false
 var roof_cut: int = 512
 var body_depth: float = 112
 var door_offset: float = 0
@@ -112,6 +113,10 @@ func obscures(world_point: Vector2) -> bool:
 		# A roof can cover legs while the head is already above its silhouette.
 		for height: float in [0.0,32.0,64.0]:
 			var pixel: Vector2=(world_point-global_position-Vector2(0,height))/(front_width/reference_width)+render_anchor
+			if fixed_roof:
+				if Rect2(Vector2.ZERO, Vector2(native_size.x, roof_cut)).has_point(pixel):
+					return true
+				continue
 			if pixel.x>=0 and pixel.x<native_size.x and pixel.y>=0 and pixel.y<roof_cut and _alpha!=null and _alpha.get_pixel(int(pixel.x),int(pixel.y)).a>0.15:return true
 		return false
 	var factor: float = front_width / 448.0

@@ -6,13 +6,13 @@ ROOT=Path(__file__).resolve().parents[1]
 LOCK=(ROOT/'.godot-version').read_text(encoding='utf-8').strip()
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('action',choices=['check','run']);p.add_argument('--godot');entry=p.add_mutually_exclusive_group();entry.add_argument('--enemy-trial',action='store_true');entry.add_argument('--legacy-entry',action='store_true');p.add_argument('--profile',type=Path);p.add_argument('--output',type=Path);a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('action',choices=['check','run']);p.add_argument('--godot');entry=p.add_mutually_exclusive_group();entry.add_argument('--enemy-trial',action='store_true');entry.add_argument('--legacy-entry',action='store_true');entry.add_argument('--open-streets',action='store_true');p.add_argument('--profile',type=Path);p.add_argument('--output',type=Path);a=p.parse_args()
  exe=a.godot or os.environ.get('GODOT_BIN') or shutil.which('godot') or shutil.which('godot4')
  if not exe:raise RuntimeError('Specify --godot or GODOT_BIN with the pinned engine')
  version=subprocess.check_output([exe,'--version'],text=True,timeout=15).strip();assert version==LOCK,(version,LOCK)
  if a.action=='run':
-  env=dict(os.environ);flags=['--bh-enemy-trial','--bh-safe-suspend','--bh-camp-prototype'] if a.enemy_trial else ['--bh-legacy-entry'] if a.legacy_entry else []
-  profile=a.profile or (ROOT/'.local/developer-enemy' if a.enemy_trial else None)
+  env=dict(os.environ);flags=['--bh-enemy-trial','--bh-safe-suspend','--bh-camp-prototype'] if a.enemy_trial else ['--bh-legacy-entry'] if a.legacy_entry else ['--bh-open-streets'] if a.open_streets else []
+  profile=a.profile or (ROOT/'.local/developer-enemy' if a.enemy_trial else ROOT/'.local/m45-open-streets' if a.open_streets else None)
   if profile is not None:
    profile=profile.resolve();assert profile.is_relative_to(ROOT/'.local'),'Use a project-local isolated profile';profile.mkdir(parents=True,exist_ok=True)
    env.update(HOME=str(profile/'home'),APPDATA=str(profile/'user'),XDG_DATA_HOME=str(profile/'user'))

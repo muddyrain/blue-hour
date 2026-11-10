@@ -8,7 +8,7 @@ const MISSION_SUPPLY_LIMIT: float = 1125.0
 const MISSION_INVESTIGATION_DEPTH: float = 0.55
 
 
-static func prepare(parcels: Array, type: String, seed: String) -> void:
+static func prepare(parcels: Array, type: String, seed: String, bus: Vector2 = Vector2.INF) -> void:
 	if type not in ["supply", "equipment", "rescue"]:
 		return
 	var candidates: Array[Dictionary] = []
@@ -17,6 +17,15 @@ static func prepare(parcels: Array, type: String, seed: String) -> void:
 		if box.size.x >= 736.0 and box.size.y >= 432.0:
 			candidates.append(parcel)
 	if candidates.is_empty():
+		return
+	if bus.is_finite() and type == "supply":
+		# Seeded service blocks still need a real food frontage within walking range.
+		candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			var da: float = _frontage_distance(a, bus)
+			var db: float = _frontage_distance(b, bus)
+			return da < db if da != db else a.id < b.id)
+		for index: int in range(mini(2, candidates.size())):
+			candidates[index].kind = "shopfront"
 		return
 	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		# A food frontage needs two real shop widths; a rescue court needs room for a house.
@@ -31,6 +40,12 @@ static func prepare(parcels: Array, type: String, seed: String) -> void:
 	# Garden uses the existing house pool in every surrounding theme; commercial
 	# courtyards alone may legitimately contain only shops.
 	candidates[0].kind = {"supply":"shopfront", "equipment":"loading", "rescue":"garden"}[type]
+
+
+static func _frontage_distance(parcel: Dictionary, bus: Vector2) -> float:
+	var plot: Rect2 = WorldLayout.rect(parcel.rect)
+	var entrance: Vector2 = Vector2(clampf(bus.x, plot.position.x + 144.0, plot.end.x - 144.0), plot.end.y - 64.0)
+	return bus.distance_squared_to(entrance)
 
 
 static func choose(candidates: Array[Dictionary], routing: Dictionary, type: String, kind: String, index: int, chosen: Array[Dictionary], layout: Dictionary) -> Dictionary:
@@ -59,8 +74,8 @@ static func choose(candidates: Array[Dictionary], routing: Dictionary, type: Str
 	return ranked[0]
 
 
-static func mission_supply_pair(candidates: Array[Dictionary], routing: Dictionary) -> Array[Dictionary]:
-	var limit: float = minf(MISSION_SUPPLY_LIMIT, float(routing.dmax) * 0.45)
+static func mission_supply_pair(candidates: Array[Dictionary], routing: Dictionary, max_distance: float = MISSION_SUPPLY_LIMIT) -> Array[Dictionary]:
+	var limit: float = minf(max_distance, float(routing.dmax) * 0.45)
 	var near: Array[Dictionary] = candidates.filter(func(entity: Dictionary) -> bool:
 		return float(routing.doors[entity.id].length) <= limit)
 	near.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
@@ -116,8 +131,11 @@ static func rescue_point(data: Dictionary) -> Array:
 	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		var a_distance: float = WorldLayout.point(a.door).distance_squared_to(bus)
 		var b_distance: float = WorldLayout.point(b.door).distance_squared_to(bus)
+		if data.has("open_streets"):
+			a_distance = absf(sqrt(a_distance) - 1800.0)
+			b_distance = absf(sqrt(b_distance) - 1800.0)
 		if a_distance != b_distance:
-			return a_distance > b_distance
+			return a_distance < b_distance if data.has("open_streets") else a_distance > b_distance
 		return String(a.id) < String(b.id)
 	)
 	# A real cluster door is already part of the generator's reserved clearance set.

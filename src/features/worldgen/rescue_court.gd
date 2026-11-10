@@ -37,7 +37,7 @@ static func plan(parcels: Array, roads: Array, bus: Dictionary, seed: String, wo
 			if road.size.x > road.size.y and road.has_point(side_street) and road.has_point(front_street):
 				connected = true
 			overlap = overlap or road.intersects(bounds)
-		if not connected or overlap or bounds.intersects(WorldLayout.rect(bus.sweep)):
+		if not connected or overlap or OpenStreetsV1.intersects_sweep(bus, bounds):
 			continue
 		var distance: float = bus_point.distance_to(Vector2(left + 460.0, front - 192.0))
 		var score: float = -absf(distance - preferred_distance) + random.randf_range(0.0, 80.0)

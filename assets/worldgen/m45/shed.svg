@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="352" height="224" viewBox="0 0 352 224">
+<path d="M10 8H338L349 64L343 159H4L7 64Z" fill="#293f4d" stroke="#263740" stroke-width="4"/>
+<path d="M12 10H336L348 64H8Z" fill="#293f4d"/>
+<path d="M8 64H348L342 154H5Z" fill="#526d76"/>
+<path d="M8 64H348" stroke="#90a2a6" stroke-width="3"/>
+<path d="M10 144H340" stroke="#354652" stroke-width="4"/>
+<path d="M22 12l-2 131 M34 12l-2 131 M46 12l-2 131 M58 12l-2 131 M70 12l-2 131 M82 12l-2 131 M94 12l-2 131 M106 12l-2 131 M118 12l-2 131 M130 12l-2 131 M142 12l-2 131 M154 12l-2 131 M166 12l-2 131 M178 12l-2 131 M190 12l-2 131 M202 12l-2 131 M214 12l-2 131 M226 12l-2 131 M238 12l-2 131 M250 12l-2 131 M262 12l-2 131 M274 12l-2 131 M286 12l-2 131 M298 12l-2 131 M310 12l-2 131 M322 12l-2 131" stroke="#172e3d" stroke-opacity=".49" fill="none" stroke-width="2"/>
+<path d="M26 68l-2 74 M38 68l-2 74 M50 68l-2 74 M62 68l-2 74 M74 68l-2 74 M86 68l-2 74 M98 68l-2 74 M110 68l-2 74 M122 68l-2 74 M134 68l-2 74 M146 68l-2 74 M158 68l-2 74 M170 68l-2 74 M182 68l-2 74 M194 68l-2 74 M206 68l-2 74 M218 68l-2 74 M230 68l-2 74 M242 68l-2 74 M254 68l-2 74 M266 68l-2 74 M278 68l-2 74 M290 68l-2 74 M302 68l-2 74 M314 68l-2 74 M326 68l-2 74" stroke="#94a6ab" stroke-opacity=".23" fill="none"/>
+<rect x="60" y="88" width="62" height="24" rx="2" fill="#283e4a" stroke="#9aabad" stroke-width="2"/>
+<path d="M64 95h54m-54 7h54" stroke="#687f8a" stroke-width="3"/>
+<rect x="230" y="88" width="62" height="24" rx="2" fill="#283e4a" stroke="#9aabad" stroke-width="2"/>
+<path d="M234 95h54m-54 7h54" stroke="#687f8a" stroke-width="3"/>
+<path d="M8 154H342V219H8Z" fill="#8d8778" stroke="#35414a" stroke-width="4"/>
+<path d="M7 154H343" stroke="#293b46" stroke-width="9"/>
+<path d="M10 209H340" stroke="#5b625e" stroke-width="5"/>
+<path d="M22 161v52 M36 161v52 M50 161v52 M64 161v52 M78 161v52 M92 161v52 M106 161v52 M120 161v52 M134 161v52 M148 161v52 M162 161v52 M176 161v52 M190 161v52 M204 161v52 M218 161v52 M232 161v52 M246 161v52 M260 161v52 M274 161v52 M288 161v52 M302 161v52 M316 161v52 M330 161v52" stroke="#606963" stroke-opacity=".55" fill="none"/>
+<rect x="103" y="176" width="140" height="44" fill="#515950"/>
+<rect x="108" y="181" width="130" height="38" fill="#324958" stroke="#243642" stroke-width="3"/>
+<path d="M101 218h144" stroke="#a0a7a0" stroke-width="6"/>
+<path d="M111 190h124 M111 198h124 M111 206h124 M111 214h124" fill="none" stroke="#6c8286" stroke-width="2"/>
+<rect x="157.0" y="168" width="32" height="5" rx="2" fill="#ffd494"/>
+</svg>

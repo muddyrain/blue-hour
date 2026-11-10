@@ -4,6 +4,13 @@ extends Node2D
 var detail: Dictionary
 
 func _draw() -> void:
+	if detail.has("slot"):
+		var sprite: Texture2D = WarehouseDressingArt.texture(detail.slot)
+		if sprite != null:
+			var width: float = float(detail.get("width", sprite.get_width()))
+			var height: float = width * sprite.get_height() / sprite.get_width()
+			draw_texture_rect(sprite, Rect2(-width * 0.5, -height, width, height), false)
+		return
 	var texture: Texture2D=WorldgenArt.texture(detail.kind)
 	var width: float=float(detail.width)
 	if detail.kind == "courtyard_edge":

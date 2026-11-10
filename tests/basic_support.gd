@@ -307,6 +307,10 @@ func _aid_broadcast() -> void:
 		and working_outside.health == 100.0, "proposal heals only its canonical target in the candidate world")
 	if after.is_empty():
 		return
+	var serialized: String = RecordEncoding.stringify({"before":world, "request":request})
+	var decoded: Dictionary = RecordEncoding.unpack(JSON.parse_string(serialized)).payload
+	expect(same(BuildAuthority.propose(decoded.before, decoded.request), after),
+		"broadcast replays the same target and health after exact receipt decoding")
 	var accepted: Array = after.support.accepted
 	expect(BuildAuthority.healed(accepted, 1) == 24.0 and BuildAuthority.healed(accepted, 2) == 0.0,
 		"health authority includes the broadcast amount once")

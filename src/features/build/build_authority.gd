@@ -132,7 +132,10 @@ static func plan_radio(world: Dictionary) -> Dictionary:
 		var state: Dictionary = row.state
 		# Indoor search hides its worker. Bus boarding closes field support
 		# before any passenger leaves the deployed roster.
-		var outdoors: bool = state.get("visible") == true and state.get("activity") in [
+		var activity: Variant = state.get("activity")
+		if not SurvivalContracts.integer(activity, FieldActor.Activity.IDLE, FieldActor.Activity.RECOVERING):
+			return {}
+		var outdoors: bool = state.get("visible") == true and int(activity) in [
 			FieldActor.Activity.IDLE, FieldActor.Activity.MOVING, FieldActor.Activity.RECOVERING]
 		members.append({"member_id":state.get("member_id"), "health":state.get("health"),
 			"max_health":state.get("max_health"), "present":outdoors})

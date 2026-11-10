@@ -9,9 +9,6 @@ const RECORD_PREFIX: String = "specialty-"
 const ARCHIVE_PREFIX: String = ".txn.previous-m47-"
 const MAX_VERIFIED_SETTLEMENTS: int = 128
 
-static var _verified_settlements: Dictionary[String, bool] = {}
-
-
 static func initial() -> Dictionary:
 	return {"scavenge":0, "firepower":0, "support":0}
 
@@ -28,7 +25,7 @@ static func eligible_for(experience: Dictionary, plan: String) -> Array[String]:
 	return result
 
 
-static func derive(history: Dictionary, slot_hash: String) -> Dictionary:
+static func derive(history: Dictionary, slot_hash: String, verified_settlements: Dictionary[String, bool]) -> Dictionary:
 	var event: Dictionary = {}
 	var discoveries: Dictionary = {}
 	var returns: Array[Dictionary] = []
@@ -57,7 +54,7 @@ static func derive(history: Dictionary, slot_hash: String) -> Dictionary:
 		var campaign: Dictionary = camp.journey.campaign
 		var returned: bool = battle.get("evacuated") == true and battle.get("mission_outcome") == "EXTRACTED"
 		if campaign.outcome != "ACTIVE":
-			if not event.is_empty() or not _verified_settlement(receipt, battle, row.hash):
+			if not event.is_empty() or not _verified_settlement(receipt, battle, row.hash, verified_settlements):
 				return {"reason":"CATALOG_SPECIALTY_SETTLEMENT"}
 			var outcome: String = _terminal_outcome(receipt, camp, battle)
 			if outcome.is_empty():
@@ -70,10 +67,10 @@ static func derive(history: Dictionary, slot_hash: String) -> Dictionary:
 				"outcome":outcome, "delta":delta, "receipt":ref, "returns":returns.duplicate(true)}
 		elif returned and returns.size() < CatalogProgress.REQUIRED_RETURNS:
 			if returns.any(func(prior: Dictionary) -> bool: return prior.transaction_id == ref.transaction_id) \
-					or not _verified_settlement(receipt, battle, row.hash):
+					or not _verified_settlement(receipt, battle, row.hash, verified_settlements):
 				return {"reason":"CATALOG_SPECIALTY_RETURN_SOURCE"}
 			returns.append(ref)
-		if returned and not _record_discoveries(discoveries, eligible, receipt, camp, ref, battle):
+		if returned and not _record_discoveries(discoveries, eligible, receipt, camp, ref, battle, verified_settlements):
 			return {"reason":"CATALOG_SPECIALTY_DISCOVERY_SOURCE"}
 	return {"event":event, "discoveries":discoveries}
 
@@ -84,9 +81,10 @@ static func _same_opening(camp: Dictionary, opening: Dictionary, streets: int) -
 		and TransactionReceipt.same(journey.get("build", {}).get("opening", {}), opening)
 
 
-static func _verified_settlement(receipt: Dictionary, battle: Dictionary, hash_value: String) -> bool:
+static func _verified_settlement(receipt: Dictionary, battle: Dictionary, hash_value: String,
+		verified_settlements: Dictionary[String, bool]) -> bool:
 	# The caller has re-read and verified the exact record hash and binding revision.
-	if _verified_settlements.has(hash_value):
+	if verified_settlements.has(hash_value):
 		return true
 	var generated: Dictionary = receipt.rules.get("mission", {}).get("generated", {})
 	var facts: Variant = battle.get("site_facts")
@@ -100,9 +98,9 @@ static func _verified_settlement(receipt: Dictionary, battle: Dictionary, hash_v
 		"prior_deaths":receipt.base.journey.deaths, "completion":"COMPLETED", "searching_member_ids":[]}
 	if not FrozenSettlement.validate({"input":input, "envelope":receipt.envelope}).is_empty():
 		return false
-	if _verified_settlements.size() == MAX_VERIFIED_SETTLEMENTS:
-		_verified_settlements.erase(_verified_settlements.keys().front())
-	_verified_settlements[hash_value] = true
+	if verified_settlements.size() == MAX_VERIFIED_SETTLEMENTS:
+		verified_settlements.erase(verified_settlements.keys().front())
+	verified_settlements[hash_value] = true
 	return true
 
 
@@ -122,14 +120,15 @@ static func _terminal_outcome(receipt: Dictionary, camp: Dictionary, battle: Dic
 	return ""
 
 
-static func _record_discoveries(discoveries: Dictionary, eligible: Array[String], receipt: Dictionary, camp: Dictionary, ref: Dictionary, battle: Dictionary) -> bool:
+static func _record_discoveries(discoveries: Dictionary, eligible: Array[String], receipt: Dictionary,
+		camp: Dictionary, ref: Dictionary, battle: Dictionary, verified_settlements: Dictionary[String, bool]) -> bool:
 	var before: Dictionary = receipt.base.journey.build
 	var after: Dictionary = camp.journey.build
 	var old_owned: Array = before.owned + before.powers.owned
 	var new_owned: Array = after.owned + after.powers.owned
 	for id: String in eligible:
 		if id in new_owned and id not in old_owned and not discoveries.has(id):
-			if not _verified_settlement(receipt, battle, ref.hash):
+			if not _verified_settlement(receipt, battle, ref.hash, verified_settlements):
 				return false
 			discoveries[id] = {"run_id":camp.profile_id, "root_id":receipt.root_id, "receipt":ref}
 	return true

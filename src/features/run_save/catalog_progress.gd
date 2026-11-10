@@ -10,6 +10,7 @@ const MILESTONES: Array[String] = ["unlock", "discovery"]
 var _slot: String
 var _folder: String
 var _slot_hash: String
+var _verified_specialty_settlements: Dictionary[String, bool] = {}
 
 
 func _init(slot: String) -> void:
@@ -159,7 +160,7 @@ func _specialty_records() -> Dictionary:
 
 
 func _specialty_history(history: Dictionary, names: Dictionary, live: bool, fault: Callable) -> Dictionary:
-	var projection: Dictionary = SpecializationProgress.derive(history, _slot_hash)
+	var projection: Dictionary = SpecializationProgress.derive(history, _slot_hash, _verified_specialty_settlements)
 	if projection.has("reason"):
 		return _blocked(projection.reason)
 	var kind: String = SpecializationProgress.RECORD_PREFIX + history.run_id

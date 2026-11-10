@@ -897,6 +897,7 @@ func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}) -> vo
 			_battle_meta.campaign.workshop = WorkshopV1.initial()
 			_battle_meta.campaign.event_sortie_policy = EventSortieV1.VERSION
 			_battle_meta.campaign.recon_policy = ReconActionV1.SOURCE_VERSION
+			_battle_meta.campaign.barricade_policy = BarricadeV1.VERSION
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true, true)
 		_battle_meta.build.powers = PowerState.initial_progression(
 			SpecialPowers.WAVE_VERSION if latest_rules else SpecialPowers.PROGRESSION_VERSION)

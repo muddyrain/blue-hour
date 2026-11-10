@@ -203,6 +203,9 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 	if (value.version==BUILD_VERSION or combat_version(value.version)):
 		var support_issue: String=BuildAuthority.world_problem(value,receipt)
 		if not support_issue.is_empty(): return support_issue
+	var closed_barricade: Rect2
+	if generated and BarricadeV1.enabled(value.generated) and not BarricadeState.opened(value.generated, value.support.accepted, supply.layout):
+		closed_barricade = BarricadeV1.rect(value.generated).grow(FieldNavigation.FOOT_RADIUS)
 	if generated and (power_version(value.version)!=value.generated.has("powers")): return "POWER_MODE_BINDING"
 	if generated and ((value.version==PERSONA_VERSION or value.version==EXPLORATION_VERSION)!=value.generated.has("persona")): return "PERSONA_MODE_BINDING"
 	if generated and ((value.version==EXPLORATION_VERSION)!=(value.generated.get("version")==9)): return "EXPLORATION_MODE_BINDING"
@@ -241,6 +244,8 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 					return magazine_issue
 		if (state.health == 0) != state.permanent_death or (state.health == 0) != (state.activity == FieldActor.Activity.DOWN) or state.health + state.damage_received != participant.health_before + BuildAuthority.healed(receipt.get("support",[]),id):
 			return "WORLD_DEATH_OR_DAMAGE"
+		if closed_barricade.has_area() and state.health > 0.0 and state.visible and _crosses_barricade(state, closed_barricade):
+			return "WORLD_BARRICADE_SURVIVOR"
 		if (value.version==OUTDOOR_VERSION or magazine_version(value.version)) and state.health>0 and state.activity!=FieldActor.Activity.SEARCHING and not state.visible: return "WORLD_WORKER_VISIBILITY"
 		if int(state.activity) in [FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING]:
 			workers += 1
@@ -274,6 +279,8 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 	for row: Variant in value.enemies:
 		if not _actor_shape(row,enemy_mode,contact_build) or not row.state.is_enemy or row.state.health <= 0 or int(row.state.activity) not in [0,1] or row.state.member_id != 0 or (row.state.actor_id >= sim._spawn_count and int(row.state.actor_id)-10000 not in deployed) or int(row.state.actor_id) in enemy_ids or (not enemy_mode and (row.state.max_health != 54 or row.state.speed != 34)):
 			return "WORLD_ENEMY_ID_OR_STATE"
+		if closed_barricade.has_area() and _crosses_barricade(row.state, closed_barricade):
+			return "WORLD_BARRICADE_ENEMY"
 		enemy_ids.append(int(row.state.actor_id))
 	if not _shape(value.threat,{"stage":TYPE_INT,"interval":TYPE_FLOAT,"transitions":TYPE_INT}) or int(value.threat.stage) not in [0,1,2,3] or value.threat.transitions < 0 or value.threat.transitions > 3:
 		return "WORLD_THREAT"
@@ -409,6 +416,8 @@ static func apply(world: Expedition, value: Dictionary) -> String:
 		world.recon_knowledge.restore(value.recon)
 		world.recon_site.progress = float(value.recon.progress)
 		world.recon_site.searched = value.recon.completed
+	if BarricadeV1.enabled(world.supply.generated):
+		world.apply_barricade_history(value.support.accepted)
 	for actor: FieldActor in world.survivors:
 		var row: Dictionary = _member(value.survivors,actor.member_id)
 		_restore(actor,row.state,ACTOR)
@@ -606,6 +615,21 @@ static func _actor_shape(row: Variant, enemy_mode: bool = false, contact: bool =
 	if contact and row.visual._walk_rest < 0.0: return false
 	var state: Dictionary = row.state
 	return int(state.activity) in ([0,1,2,3,4] if outdoor else [0,1,2,3]) and state.health >= 0 and state.health <= state.max_health and state.cooldown >= 0 and state.damage_received >= 0 and (state._path_index <= state.path.size() or state.activity == 3) and row.visual._is_defeated == (state.activity == 3)
+
+
+static func _crosses_barricade(state: Dictionary, footprint: Rect2) -> bool:
+	var previous: Vector2 = _vec(state.position)
+	if footprint.has_point(previous):
+		return true
+	if state.activity != FieldActor.Activity.MOVING:
+		return false
+	# Consumed waypoints no longer describe the actor's movement intent.
+	for index: int in range(int(state._path_index), state.path.size()):
+		var point: Vector2 = _vec(state.path[index])
+		if AttackRules._segment_entry(previous, point, footprint) < INF:
+			return true
+		previous = point
+	return false
 
 
 static func _vector(value: Variant) -> bool:

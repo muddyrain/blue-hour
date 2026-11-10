@@ -598,6 +598,12 @@
       "license": "No additional license granted"
     },
     {
+      "path": "assets/exploration/barricade_van.svg",
+      "sha256": "eec527ebe8397d3d18c0f0d8781eec27c33a6d721edb40ddad3c0ba33f3c1257",
+      "origin": "original hand-authored SVG for the M43 vehicle barricade; no external assets",
+      "license": "No additional license granted"
+    },
+    {
       "path": "assets/exploration/van.svg",
       "sha256": "5a1b80484d59d1cacd4bfd7d1dae4016df985a12f4dd2961ebce7bc6707cd14f",
       "origin": "original hand-authored lightweight SVG for M13 exploration; no external assets",

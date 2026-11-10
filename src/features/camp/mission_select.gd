@@ -206,6 +206,10 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 				var lines: PackedStringArray = _descriptions[index].text.split("\n")
 				lines.insert(1, "可侦察 · 标记装备点及 1 处可搜建筑")
 				_descriptions[index].text = "\n".join(lines)
+			elif BarricadeV1.enabled(supply.generated):
+				var lines: PackedStringArray = _descriptions[index].text.split("\n")
+				lines.insert(1, "有车辆路障 · 可绕行或用空袭开路")
+				_descriptions[index].text = "\n".join(lines)
 			_descriptions[index].custom_minimum_size.y = 100
 			_descriptions[index].add_theme_font_size_override("font_size", 16)
 			_descriptions[index].add_theme_constant_override("line_spacing", 2 if action_choices else 8)

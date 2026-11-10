@@ -1,5 +1,7 @@
 BuildItems与BasicSupport只作纯定义/规划/只读组件；BuildActions显式generated7冻结出发构筑，BuildState推演原营地库存。BuildAuthority生成完整支援前/后态证明，原RunTransaction journal原子持久化后由Expedition应用，FrozenSettlement仍是唯一归航结果owner。旧模式独立认证；详见[构筑合同](design/m8-build-01.md)。
 
+M43 用 `BarricadeV1` 在原普通补给行动上冻结一处车体和路线证书。闭态导航在私有网格覆盖车体，开态复用不可变的原地图导航。首个命中路障的原空袭受理记录决定通行状态。回放与预览消费同一有效状态，恢复在还原角色路线前应用该状态。归航仍沿原支援与唯一结算收据。[M43 合同](design/m43-barricade-01.md)。
+
 ReceiptJournal的R1缓存仅复用完整原文和相邻原文的纯认证证明；每次仍重读真实文件、检查全链与binding，不缓存当前营地/ACK权威。FreezeProfile仅为默认关闭的聚合计时；没有新保存格式或异步owner。
 
 NeighborhoodActions/Layout/Art提供V3尺寸、主题和每类门尺度；实体院墙与所有空间消费者读取同一StreetLayout。DailyActions保留V1/V2认证，新增规则4/世界5，不另造保存或奖励owner。见[尺度与拓扑](design/m6-world-02.md)。

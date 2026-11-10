@@ -23,6 +23,7 @@ func run() -> void:
 	_test_definitions_and_slots()
 	_test_drop()
 	_test_catalog_pool()
+	_test_specialty_gear()
 	print(JSON.stringify({"checks":checks, "failures":failures,
 		"scope":"pure passive definitions, frozen drops, inventory and two-slot factors",
 		"gameplay_acquisition":"A integration acceptance required", "source":"PROJECT_TEMP"}))
@@ -52,6 +53,63 @@ func _test_catalog_pool() -> void:
 		"equipping the frozen mask changes the periodic poison factor")
 	equipped.erase("poison")
 	expect(equipped == BuildItems.BASE_FACTORS, "the mask preserves all six historical factors")
+
+
+func _test_specialty_gear() -> void:
+	var pool: int = BuildItems.SPECIALTY_POOL
+	var context: Dictionary = _context()
+	var action: Dictionary = BuildActions.with_gear_drops({
+		"version":9, "type":"airdrop", "slot":2, "mission_policy":1, "campaign":{"is_finale":false},
+		"layout":{"topology":"commercial"}, "objective":{"site_ids":["cash"]},
+		"sites":[{"id":"cash", "source":"primary", "weapon":true, "work_mode":"outdoor", "seconds":12.0}],
+		"build":{"version":pool, "drop_context":context, "owned":[]},
+		"powers":{"version":SpecialPowers.M47_VERSION, "owned":[], "sample":""},
+	})
+	var policy: Dictionary = {"plan":"scavenge", "eligible":[SpecialPowers.RADIO, BuildItems.GUIDED_MAG, BuildItems.STRIDE_HARNESS]}
+	var preferred: Dictionary = BuildActions.with_specialization_drop(action, policy)
+	expect(BuildActions.specialization_candidate(preferred) == BuildItems.STRIDE_HARNESS
+		and preferred.build.drops.size() == action.build.drops.size() and preferred.sites == action.sites,
+		"own specialty replaces exactly one normal item on the same site")
+	var owned: Dictionary = action.duplicate(true)
+	owned.build.owned = [BuildItems.STRIDE_HARNESS]
+	var radio: Dictionary = BuildActions.with_specialization_drop(owned, policy)
+	expect(BuildActions.specialization_candidate(radio) == SpecialPowers.RADIO
+		and radio.build.drops.size() + 1 == action.build.drops.size() and radio.sites == action.sites,
+		"first shared ID occupies an existing gear position as a power sample")
+	owned.powers.owned = [SpecialPowers.RADIO]
+	var next: Dictionary = BuildActions.with_specialization_drop(owned, policy)
+	expect(BuildActions.specialization_candidate(next) == BuildItems.GUIDED_MAG,
+		"both passive and power ownership remove candidates in stable shared order")
+	for flag: String in ["rare_policy", "investigation", "event_sortie", "finale_policy", "billboard_target"]:
+		var dedicated: Dictionary = action.duplicate(true)
+		dedicated[flag] = true
+		expect(BuildActions.with_specialization_drop(dedicated, policy) == dedicated, "dedicated source excluded " + flag)
+	var industrial: Dictionary = action.duplicate(true)
+	industrial.layout.topology = "industrial"
+	industrial.layout.loading_yard = {}
+	expect(BuildActions.with_specialization_drop(industrial, policy) == industrial, "industrial yard keeps its reward")
+	var mask_only: Dictionary = action.duplicate(true)
+	mask_only.build.drops = [BuildItems.FILTER]
+	expect(BuildActions.with_specialization_drop(mask_only, policy) == mask_only, "mask does not open a replaceable position")
+	var depleted: Dictionary = action.duplicate(true)
+	depleted.build.drops = []
+	expect(BuildActions.with_specialization_drop(depleted, policy) == depleted, "no normal position retains original rewards")
+	expect(BuildActions.with_specialization_drop(action, {"plan":"scavenge", "eligible":[]}) == action,
+		"opening choice without catalog eligibility keeps original rewards")
+	expect(BuildState.acquired(preferred, {"cash":{"searched":true}}, true) == preferred.build.drops
+		and BuildState.acquired(preferred, {"cash":{"searched":true}}, false).is_empty()
+		and BuildState.acquired(preferred, {"cash":{"searched":false}}, true).is_empty(),
+		"only a successful return with the real cash work fact acquires the specialty item")
+	expect(is_equal_approx(BuildItems.factors(["quick_loader_v1", BuildItems.GUIDED_MAG], pool).reload, 0.75 * 0.90)
+		and is_equal_approx(BuildItems.factors([BuildItems.GUIDED_MAG, "quick_loader_v1"], pool).reload, 0.75 * 0.90),
+		"guided magazine multiplies original reload independently of slot order")
+	expect(is_equal_approx(BuildItems.factors([BuildItems.STRIDE_HARNESS, ""], pool).move, 1.10)
+		and BuildItems.factors([BuildItems.STRIDE_HARNESS, ""], pool).work == 1.0,
+		"stride changes movement without changing work")
+	expect(is_equal_approx(BuildItems.factors([BuildItems.AID_KIT, ""], pool).heal, 1.20)
+		and BuildItems.factors(["", ""], pool).heal == 1.0
+		and BuildItems.factors([BuildItems.AID_KIT, ""], BuildItems.WAVE_POOL).is_empty(),
+		"support starter applies only while equipped in the new pool")
 
 
 func _test_definitions_and_slots() -> void:

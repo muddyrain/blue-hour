@@ -12,6 +12,66 @@ static func with_gear_drops(action: Dictionary) -> Dictionary:
 	return value
 
 
+static func specialization_policy(camp: Dictionary) -> Dictionary:
+	if not OpeningBuild.is_m47(camp):
+		return {}
+	return {"plan":OpeningBuild.plan(camp), "eligible":OpeningBuild.eligible(camp)}
+
+
+static func signed_specialization_policy(action: Dictionary) -> Dictionary:
+	var build: Variant = action.get("build")
+	var context: Variant = build.get("drop_context") if build is Dictionary else null
+	var policy: Variant = context.get("specialty") if context is Dictionary else null
+	if not policy is Dictionary:
+		return {}
+	return {"plan":policy.get("plan"), "eligible":policy.get("eligible")}
+
+
+static func specialization_candidate(action: Dictionary) -> String:
+	var drops: Array = action.get("build", {}).get("drops", [])
+	for item: String in [BuildItems.STRIDE_HARNESS, BuildItems.GUIDED_MAG]:
+		if item in drops:
+			return item
+	return SpecialPowers.RADIO if action.get("powers", {}).get("sample") == SpecialPowers.RADIO else ""
+
+
+static func with_specialization_drop(action: Dictionary, policy: Dictionary) -> Dictionary:
+	if policy.is_empty() or not _specialization_site(action) or BuildItems.replaceable_slot(action.build.drops) < 0:
+		return action
+	var frozen: Dictionary = policy.duplicate(true)
+	frozen.radio_owned = SpecialPowers.RADIO in action.powers.owned
+	var candidate: String = BuildItems.specialty_candidate(frozen, action.build.owned)
+	if candidate.is_empty():
+		return action
+	# A radio uses the same cash work, carrying fact and settlement as an ordinary
+	# ability sample. Release one passive position before occupying it as a power.
+	var value: Dictionary = action.duplicate(false)
+	value.build = action.build.duplicate(false)
+	value.build.drop_context = action.build.drop_context.duplicate(false)
+	value.build.drop_context.specialty = frozen
+	value.build.drops = BuildItems.drop(value.build.drop_context, value.build.owned, int(value.build.version))
+	if candidate == SpecialPowers.RADIO:
+		value.powers = action.powers.duplicate(false)
+		value.powers.sample = candidate
+	return value
+
+
+static func _specialization_site(action: Dictionary) -> bool:
+	if action.get("type") != "airdrop" or action.get("mission_policy") != 1 or action.get("slot") != 2 \
+			or action.get("campaign", {}).get("is_finale") != false or not action.has("gear_build_policy") \
+			or not BuildItems.specialty_pool(int(action.build.version)) or action.powers.version != SpecialPowers.M47_VERSION \
+			or not action.powers.sample.is_empty() or action.has("rare_policy") or action.has("event_sortie") \
+			or action.has("investigation") or action.has("finale_policy") or action.has("billboard_target") \
+			or action.layout.topology == "industrial" or action.layout.has("loading_yard") \
+			or action.get("sortie_risk", {}).get("yard", false) or action.objective.site_ids != ["cash"]:
+		return false
+	for site: Dictionary in action.sites:
+		if site.id == "cash" and site.get("source") == "primary" and site.get("weapon") == true \
+				and site.get("work_mode") == "outdoor":
+			return true
+	return false
+
+
 static func offers(base: Dictionary) -> Array[Dictionary]:
 	var result: Array[Dictionary]=[]
 	for old: Dictionary in CampaignActions.offers(base):

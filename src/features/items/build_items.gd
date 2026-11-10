@@ -6,10 +6,23 @@ const VERSION: int = 1
 const CATALOG_POOL: int = 2
 const WAVE_POOL: int = 3
 const WAVE_CATALOG_POOL: int = 4
+const SPECIALTY_POOL: int = 5
+const SPECIALTY_CATALOG_POOL: int = 6
 const FILTER: String = "filter_mask_v1"
 const FILTER_DEFINITION: Dictionary = {"name":"滤毒面罩", "effect":"毒区周期伤害 ×0.50", "key":"poison", "factor":0.50, "source":"PROJECT_TEMP"}
 const LINER: String = "impact_liner_v1"
 const LINER_DEFINITION: Dictionary = {"name":"缓冲内衬", "effect":"小队所受爆囊脉冲伤害 ×0.65", "key":"burst", "factor":0.65, "source":"PROJECT_TEMP"}
+const AID_KIT: String = "aid_kit_v1"
+const STRIDE_HARNESS: String = "stride_harness_v1"
+const GUIDED_MAG: String = "guided_mag_v1"
+const SPECIALTY_REWARDS: Dictionary = {
+	"scavenge": STRIDE_HARNESS, "firepower": GUIDED_MAG, "support": "aid_broadcast_v1",
+}
+const SPECIALTY_DEFINITIONS: Dictionary = {
+	AID_KIT: {"name":"急救绑包", "effect":"基础治疗 Q 恢复上限 ×1.20", "key":"heal", "factor":1.20, "source":"PROJECT_TEMP"},
+	STRIDE_HARNESS: {"name":"轻行束带", "effect":"队员步行速度 ×1.10", "key":"move", "factor":1.10, "source":"PROJECT_TEMP"},
+	GUIDED_MAG: {"name":"导向弹匣套", "effect":"枪械最终换弹时长 ×0.90", "key":"reload", "factor":0.90, "source":"PROJECT_TEMP"},
+}
 const SLOT_COUNT: int = 2
 const IDS: Array[String] = [
 	"pressure_rounds_v1", "quick_loader_v1", "light_boots_v1",
@@ -35,6 +48,8 @@ static func definitions(pool: int = VERSION) -> Dictionary:
 		result[FILTER] = FILTER_DEFINITION.duplicate(true)
 	if wave_pool(pool):
 		result[LINER] = LINER_DEFINITION.duplicate(true)
+	if specialty_pool(pool):
+		result.merge(SPECIALTY_DEFINITIONS.duplicate(true))
 	return result
 
 
@@ -44,19 +59,31 @@ static func ids(pool: int = VERSION) -> Array[String]:
 		result.append(FILTER)
 	if wave_pool(pool):
 		result.append(LINER)
+	if specialty_pool(pool):
+		result.append_array([AID_KIT, STRIDE_HARNESS, GUIDED_MAG])
 	return result
 
 
 static func valid_pool(value: Variant) -> bool:
-	return SurvivalContracts.integer(value, VERSION, WAVE_CATALOG_POOL)
+	return SurvivalContracts.integer(value, VERSION, SPECIALTY_CATALOG_POOL)
 
 
 static func has_catalog(pool: int) -> bool:
-	return pool in [CATALOG_POOL, WAVE_CATALOG_POOL]
+	return pool in [CATALOG_POOL, WAVE_CATALOG_POOL, SPECIALTY_CATALOG_POOL]
 
 
 static func wave_pool(pool: int) -> bool:
-	return pool in [WAVE_POOL, WAVE_CATALOG_POOL]
+	return pool in [WAVE_POOL, WAVE_CATALOG_POOL] or specialty_pool(pool)
+
+
+static func specialty_pool(pool: int) -> bool:
+	return pool in [SPECIALTY_POOL, SPECIALTY_CATALOG_POOL]
+
+
+static func _ordinary_pool(pool: int) -> int:
+	if not specialty_pool(pool):
+		return pool
+	return WAVE_CATALOG_POOL if has_catalog(pool) else WAVE_POOL
 
 
 static func drop(context: Dictionary, owned: Array, pool: int = VERSION) -> Array[String]:
@@ -65,11 +92,14 @@ static func drop(context: Dictionary, owned: Array, pool: int = VERSION) -> Arra
 		return result
 	# Inventory order, slot edits and other random consumers cannot reroll a candidate.
 	var canonical_owned: Array[String] = []
-	canonical_owned.assign(owned)
+	for id: String in owned:
+		if not SPECIALTY_DEFINITIONS.has(id):
+			canonical_owned.append(id)
 	canonical_owned.sort()
+	var ordinary_pool: int = _ordinary_pool(int(context.version))
 	var canonical_context: Dictionary = {
 		"run_id":context.run_id, "seed":context.seed, "day":int(context.day),
-		"action_id":context.action_id, "site_id":context.site_id, "version":int(context.version),
+		"action_id":context.action_id, "site_id":context.site_id, "version":ordinary_pool,
 	}
 	if context.has("liner"):
 		canonical_context.liner = true
@@ -77,7 +107,7 @@ static func drop(context: Dictionary, owned: Array, pool: int = VERSION) -> Arra
 			result.append(LINER)
 	var binding: String = JSON.stringify({"context":canonical_context, "owned":canonical_owned}, "", true, true)
 	var candidates: Array[String] = []
-	for id: String in ids(int(context.version)):
+	for id: String in ids(ordinary_pool):
 		if id != LINER and id not in owned:
 			candidates.append(id)
 	# Hash ranking has no shared RNG state and has an explicit tie-break across processes.
@@ -88,7 +118,35 @@ static func drop(context: Dictionary, owned: Array, pool: int = VERSION) -> Arra
 	)
 	for index: int in range(mini(SLOT_COUNT - result.size(), candidates.size())):
 		result.append(candidates[index])
+	var position: int = replaceable_slot(result) if context.has("specialty") else -1
+	if position >= 0:
+		var candidate: String = specialty_candidate(context.specialty, owned)
+		if candidate == SPECIALTY_REWARDS.support:
+			result.remove_at(position)
+		elif not candidate.is_empty():
+			result[position] = candidate
 	return result
+
+
+static func replaceable_slot(drops: Array) -> int:
+	# Milestone and dedicated rewards retain their original positions.
+	for index: int in range(drops.size() - 1, -1, -1):
+		if drops[index] in IDS:
+			return index
+	return -1
+
+
+static func specialty_candidate(policy: Dictionary, owned: Array) -> String:
+	if not _specialty_policy_valid(policy):
+		return ""
+	var preferred: String = SPECIALTY_REWARDS[policy.plan]
+	var available: Array[String] = []
+	for id: String in policy.eligible:
+		if id not in owned and (id != SPECIALTY_REWARDS.support or not policy.radio_owned):
+			available.append(id)
+	if preferred in available:
+		return preferred
+	return available[0] if not available.is_empty() else ""
 
 
 static func problem(owned: Variant, slots: Variant, pool: int = VERSION) -> String:
@@ -117,9 +175,15 @@ static func factors(slots: Array, pool: int = VERSION) -> Dictionary:
 	# Start from immutable original factors on every query; never compound a prior view.
 	var result: Dictionary = BASE_FACTORS.duplicate(true)
 	for id: String in slots:
-		if not id.is_empty():
+		if not id.is_empty() and not SPECIALTY_DEFINITIONS.has(id):
 			var definition: Dictionary = FILTER_DEFINITION if id == FILTER else LINER_DEFINITION if id == LINER else DEFINITIONS[id]
 			result[definition.key] = definition.factor
+	if not specialty_pool(pool):
+		return result
+	for id: String in slots:
+		if SPECIALTY_DEFINITIONS.has(id):
+			var definition: Dictionary = SPECIALTY_DEFINITIONS[id]
+			result[definition.key] *= definition.factor
 	return result
 
 
@@ -141,7 +205,8 @@ static func _slots_problem(slots: Variant, pool: int) -> String:
 
 static func _context_problem(context: Dictionary, pool: int = VERSION) -> String:
 	var liner: bool = context.has("liner")
-	if context.size() != CONTEXT_KEYS.size() + int(liner) or not context.has_all(CONTEXT_KEYS):
+	var specialty: bool = context.has("specialty")
+	if context.size() != CONTEXT_KEYS.size() + int(liner) + int(specialty) or not context.has_all(CONTEXT_KEYS):
 		return "BUILD_ITEMS_DROP_FIELDS"
 	if not valid_pool(context.version):
 		return "BUILD_ITEMS_DROP_VERSION"
@@ -155,7 +220,23 @@ static func _context_problem(context: Dictionary, pool: int = VERSION) -> String
 		return "BUILD_ITEMS_DROP_DAY"
 	if liner and (int(context.day) < 3 or context.site_id != "cash"):
 		return "BUILD_ITEMS_LINER_SITE"
+	if specialty and (liner or not specialty_pool(version) or context.site_id != "cash" \
+			or not _specialty_policy_valid(context.specialty)):
+		return "BUILD_ITEMS_SPECIALTY_POLICY"
 	for key: String in ["action_id", "site_id"]:
 		if not context[key] is String or context[key].is_empty() or context[key].length() > 256:
 			return "BUILD_ITEMS_DROP_SITE"
 	return ""
+
+
+static func _specialty_policy_valid(policy: Variant) -> bool:
+	if not policy is Dictionary or policy.size() != 3 or not policy.has_all(["plan", "eligible", "radio_owned"]) \
+			or not policy.plan is String or not SPECIALTY_REWARDS.has(policy.plan) \
+			or not policy.radio_owned is bool or not policy.eligible is Array or policy.eligible.size() > SPECIALTY_REWARDS.size():
+		return false
+	var prior: String = ""
+	for id: Variant in policy.eligible:
+		if not id is String or not SPECIALTY_REWARDS.values().has(id) or id <= prior:
+			return false
+		prior = id
+	return true

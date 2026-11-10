@@ -41,6 +41,7 @@ func _ready() -> void:
 	_stats = _make_label("", WHITE)
 	_objectives = _make_label("已停机 · 破阵者已击败", MUTED)
 	_durability = _make_label("结算已保存", MINT)
+	_durability.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	details_button = _make_button("查看归航明细", details_requested)
 	record_button = _make_button("查看旅程记录", record_requested, true)
 	new_journey_button = _make_button("开始新旅程", new_journey_requested)
@@ -71,7 +72,7 @@ func _draw() -> void:
 
 
 func present(day: int, returned: int, catalog_notice: String = "") -> void:
-	_durability.text = "结算已保存" if catalog_notice.is_empty() else "结算已保存 · " + catalog_notice
+	_durability.text = "结算已保存" if catalog_notice.is_empty() else "结算已保存\n" + catalog_notice
 	_day = day
 	_returned = returned
 	_update_stats()
@@ -101,7 +102,7 @@ func _layout() -> void:
 		* PumpStationArt.VICTORY_SIZE.x / PumpStationArt.VICTORY_SIZE.y)
 	var art_height: float = art_width * PumpStationArt.VICTORY_SIZE.y / PumpStationArt.VICTORY_SIZE.x
 	var art_x: float = margin + (art_room - art_width) * 0.5
-	var panel_height: float = 438.0 * _measure
+	var panel_height: float = 512.0 * _measure
 	_panel = Rect2(size.x - margin - panel_width, (size.y - panel_height) * 0.5, panel_width, panel_height)
 	_art = Rect2(art_x, (size.y - art_height) * 0.5, art_width, art_height)
 	_place(_brand, Vector2(art_x, _art.position.y - 60.0 * _measure), art_width, 27.0, 18)
@@ -113,11 +114,11 @@ func _layout() -> void:
 	_place(_heading, Vector2(left, top + 58.0 * _measure), inner_width, 72.0, 54)
 	_place(_stats, Vector2(left, top + 145.0 * _measure), inner_width, 32.0, 24)
 	_place(_objectives, Vector2(left, top + 214.0 * _measure), inner_width, 27.0, 19)
-	_place(_durability, Vector2(left, top + 249.0 * _measure), inner_width, 26.0, 17)
-	_place(record_button, Vector2(left, top + 302.0 * _measure), inner_width, 48.0, 20)
+	_place(_durability, Vector2(left, top + 249.0 * _measure), inner_width, 112.0, 17)
+	_place(record_button, Vector2(left, top + 376.0 * _measure), inner_width, 48.0, 20)
 	var button_gap: float = 12.0 * _measure
 	var small_width: float = (inner_width - button_gap) * 0.5
-	var action_y: float = top + 364.0 * _measure
+	var action_y: float = top + 438.0 * _measure
 	_place(details_button, Vector2(left, action_y), small_width, 45.0, 17)
 	_place(new_journey_button, Vector2(left + small_width + button_gap, action_y), small_width, 45.0, 17)
 	queue_redraw()

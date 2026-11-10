@@ -11,7 +11,15 @@ static func healed(events: Array, id: int) -> float:
 	return amount
 
 static func healing_kind(kind: Variant) -> bool:
-	return kind == "heal" or kind == FirstAidV1.KIND
+	return kind == "heal" or kind == FirstAidV1.KIND or kind == SpecialPowers.RADIO
+
+static func radio_equipped(generated: Dictionary) -> bool:
+	var equipment: Variant = generated.get("powers")
+	if not equipment is Dictionary or not SurvivalContracts.integer(equipment.get("version"),
+			SpecialPowers.M47_VERSION, SpecialPowers.M47_VERSION):
+		return false
+	var loadout: Variant = PowerState.loadout(equipment)
+	return SpecialPowers.loadout_valid(loadout) and SpecialPowers.RADIO in loadout.slots
 
 static func ability(event: Variant) -> bool:
 	return event is Dictionary and event.get("source")=="ability"
@@ -24,7 +32,7 @@ static func ability_problem(event: Dictionary, transaction: String, include_memb
 static func support_problem(value: Variant, token: Dictionary, generated: Dictionary, departure: Dictionary = {}) -> String:
 	var first_aid: bool = FirstAidV1.enabled(generated) and FirstAidV1.qualified(departure) \
 		and CampaignRules.first_aid_enabled(departure.get("journey", {}).get("campaign", {}))
-	var issue: String=BasicSupport.problem(value,token,first_aid)
+	var issue: String=BasicSupport.problem(value,token,first_aid,radio_equipped(generated))
 	if not issue.is_empty(): return issue
 	var previous: int=-1
 	var last: Dictionary={"heal":-30.0,"airstrike":-20.0}
@@ -33,11 +41,13 @@ static func support_problem(value: Variant, token: Dictionary, generated: Dictio
 		if not SurvivalContracts.integer(facts.get("at_ms"),0,RunSave.MAX_COUNTER) or facts.at_ms<previous or not SurvivalContracts.number(facts.get("at")) or not SortieSnapshot.duration_matches(float(facts.at),facts.at_ms): return "SUPPORT_FACT_TIME"
 		if event.kind in BasicSupport.KINDS and facts.at-last[event.kind]<BasicSupport.POLICY[event.kind+"_cooldown"]-0.00000001: return "SUPPORT_FACT_TIME"
 		if not SurvivalContracts.integer(facts.get("member_id"),1,5): return "SUPPORT_FACT_MEMBER"
-		if event.kind=="heal":
+		if event.kind in ["heal", SpecialPowers.RADIO]:
 			if facts.size()!=7 or not facts.has_all(["at","at_ms","member_id","health_before","health_after","amount","damage_received"]): return "HEAL_FACT_FIELDS"
 			for key: String in ["health_before","health_after","amount","damage_received"]:
 				if not SurvivalContracts.number(facts[key]): return "HEAL_FACT_NUMBER"
-			if facts.health_before<=0 or facts.amount<=0 or facts.amount>BasicSupport.POLICY.heal_amount*BuildItems.frozen_factors(generated.build).heal or facts.health_after!=facts.health_before+facts.amount or facts.damage_received<0: return "HEAL_FACT_AMOUNT"
+			var limit: float = float(SpecialPowers.RADIO_DEFINITION.heal_amount) if event.kind == SpecialPowers.RADIO \
+				else BasicSupport.POLICY.heal_amount * BuildItems.frozen_factors(generated.build).heal
+			if facts.health_before<=0 or facts.amount<=0 or facts.amount>limit or facts.health_after!=facts.health_before+facts.amount or facts.damage_received<0: return "HEAL_FACT_AMOUNT"
 			if not TransactionReceipt.same(event.payload,{"member_id":facts.member_id,"amount":facts.amount}): return "HEAL_REQUEST_SOURCE"
 		elif event.kind == FirstAidV1.KIND:
 			var aid_issue: String = _first_aid_problem(facts, event.payload, generated)
@@ -96,6 +106,9 @@ static func world_problem(world: Dictionary, receipt: Dictionary) -> String:
 			if member.is_empty() or event.facts.health_before+event.facts.damage_received!=member.health_before+healed(world.support.accepted.slice(0,world.support.accepted.find(event)),int(member.id)): return "HEAL_CAUSAL_SOURCE"
 			var maximum: float = GrowthRules.maximum(SurvivorRoster.member(FieldJoinRules.context(receipt).crew,int(member.id)))
 			if event.facts.health_after > maximum or (event.kind == FirstAidV1.KIND and event.facts.max_health != maximum): return "HEAL_MAXIMUM"
+			if event.kind == SpecialPowers.RADIO and event.facts.amount != minf(
+					float(SpecialPowers.RADIO_DEFINITION.heal_amount), maximum - float(event.facts.health_before)):
+				return "AID_BROADCAST_AMOUNT"
 	return ""
 
 static func line_clear(layout: StreetLayout, start: Vector2, end: Vector2) -> bool:
@@ -103,11 +116,27 @@ static func line_clear(layout: StreetLayout, start: Vector2, end: Vector2) -> bo
 
 static func plan_heal(world: Dictionary) -> Dictionary:
 	var support: BasicSupport=BasicSupport.new()
-	support.restore(world.support,FirstAidV1.enabled(world.generated))
+	support.restore(world.support,FirstAidV1.enabled(world.generated),radio_equipped(world.generated))
 	var members: Array[Dictionary]=[]
 	for row: Dictionary in world.survivors:
 		members.append({"member_id":row.state.member_id,"health":row.state.health,"max_health":row.state.max_health,"present":row.state.activity!=FieldActor.Activity.DOWN})
 	return support.plan_heal(members,factor(world,"heal"))
+
+static func plan_radio(world: Dictionary) -> Dictionary:
+	if not world.get("generated") is Dictionary or not radio_equipped(world.generated) or not world.get("survivors") is Array:
+		return {}
+	var members: Array[Dictionary] = []
+	for row: Variant in world.survivors:
+		if not row is Dictionary or not row.get("state") is Dictionary:
+			return {}
+		var state: Dictionary = row.state
+		# Indoor search hides its worker. Bus boarding closes field support
+		# before any passenger leaves the deployed roster.
+		var outdoors: bool = state.get("visible") == true and state.get("activity") in [
+			FieldActor.Activity.IDLE, FieldActor.Activity.MOVING, FieldActor.Activity.RECOVERING]
+		members.append({"member_id":state.get("member_id"), "health":state.get("health"),
+			"max_health":state.get("max_health"), "present":outdoors})
+	return BasicSupport.plan_recovery(members, float(SpecialPowers.RADIO_DEFINITION.heal_amount))
 
 static func plan_first_aid(world: Dictionary) -> Dictionary:
 	if not FirstAidV1.enabled(world.generated):
@@ -170,7 +199,7 @@ static func plan_airstrike_on_map(world: Dictionary, point: Vector2, layout: Str
 static func propose(before: Dictionary, request: Dictionary) -> Dictionary:
 	if (before.get("version")!=10 and not SortieSnapshot.combat_version(before.get("version"))) or request.size()!=3 or not request.has_all(["id","kind","payload"]) or not request.kind is String or not request.payload is Dictionary: return {}
 	var component: BasicSupport=BasicSupport.new()
-	component.restore(before.support,FirstAidV1.enabled(before.generated))
+	component.restore(before.support,FirstAidV1.enabled(before.generated),radio_equipped(before.generated))
 	if not TransactionReceipt.same(request,component.request(request.kind,request.payload)): return {}
 	var expected: Dictionary = {}
 	match request.kind:
@@ -181,6 +210,8 @@ static func propose(before: Dictionary, request: Dictionary) -> Dictionary:
 				expected = plan_airstrike(before, SortieSnapshot._vec(request.payload.point))
 		FirstAidV1.KIND:
 			expected = plan_first_aid(before)
+		SpecialPowers.RADIO:
+			expected = plan_radio(before)
 	if expected.is_empty() or not TransactionReceipt.same(expected,request.payload): return {}
 	var after: Dictionary=before.duplicate(true)
 	var facts: Dictionary={"at":before.sim.elapsed,"at_ms":floori(before.sim.elapsed*1000.0),"member_id":request.payload.member_id}

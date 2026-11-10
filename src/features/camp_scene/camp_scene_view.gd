@@ -275,7 +275,7 @@ func _build_blue_hour_footer() -> void:
 	row.add_theme_constant_override("separation", 9)
 	column.add_child(row)
 	var labels: Dictionary[StringName, String] = {&"home":"主菜单", &"crew":"队员", &"weapons":"装备仓",
-		&"workshop":"工坊", &"supplies":"补给与设施", &"training":"训练", &"sound":"声音", &"quit":"退出"}
+		&"workshop":"工坊", &"supplies":"补给与设施", &"training":"训练", &"specialties":"专精", &"sound":"声音", &"quit":"退出"}
 	for action: StringName in labels:
 		var button: Button = _blue_hour_button(row, action, labels[action])
 		if action in [&"crew", &"weapons", &"workshop", &"supplies", &"training"]:
@@ -392,6 +392,10 @@ func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, r
 	_journey_caption.text = "旅程进度" if pressure.is_empty() else pressure
 	_shortage_text.text = "口粮缺口 %d · 可考虑先补给" % daily.shortage if daily.shortage > 0 else "口粮缺口 0 · 库存充足"
 	var build: Dictionary = data.get("journey", {}).get("build", {})
+	var specialty: String = OpeningBuild.plan(data)
+	footer_buttons[&"specialties"].visible = OpeningBuild.is_m47(data)
+	if not specialty.is_empty():
+		_journey_caption.text += " · " + OpeningBuild.PLANS[specialty].title
 	if build.has("opening"):
 		var equipped: PackedStringArray = []
 		for item: String in build.slots:
@@ -594,7 +598,8 @@ func _link_focus() -> void:
 		if button.is_visible_in_tree() and not button.disabled:
 			sequence.append(button)
 	for button: Button in footer_buttons.values():
-		sequence.append(button)
+		if button.visible:
+			sequence.append(button)
 	for index: int in range(sequence.size()):
 		sequence[index].focus_next = sequence[(index + 1) % sequence.size()].get_path()
 		sequence[index].focus_previous = sequence[(index - 1 + sequence.size()) % sequence.size()].get_path()

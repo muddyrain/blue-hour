@@ -116,6 +116,77 @@ func _movement_and_reload() -> void:
 	world.free()
 
 
+func _specialty_effects() -> void:
+	var profile: Dictionary = _profile(2)
+	var start: Vector2 = Vector2(400, 400)
+	var navigation: FieldNavigation = FieldNavigation.new()
+	navigation.configure([])
+	var motion: Array[Dictionary] = []
+	var reload: Array[Dictionary] = []
+	for specialty: bool in [false, true]:
+		var stride: String = BuildItems.STRIDE_HARNESS if specialty else ""
+		var world: ClockWorld = _world(["field_tools_v1", stride], "airdrop")
+		world.supply.generated.build.version = BuildItems.SPECIALTY_POOL
+		var actor: FieldActor = _actor(world, profile, "carbine", start)
+		actor.command_path(PackedVector2Array([start, start + Vector2(1100, 0)]))
+		var deployed: Array[FieldActor] = [actor]
+		for tick: int in range(10):
+			FieldContacts.move(deployed, deployed, navigation, 0.1)
+		var distance: float = actor.position.x - start.x
+		var site: Expedition.SearchSite = Expedition.SearchSite.new(&"cash", actor.position)
+		site.seconds = 12.0
+		world.sites.assign([site])
+		world._cash_site = site
+		world.search_assignments.assign(actor.member_id, "cash")
+		world.search_assignments.begin(actor.member_id)
+		actor.activity = FieldActor.Activity.RECOVERING
+		world.elapsed = 1.0
+		world._update_search(1.0)
+		motion.append({"distance":distance, "work_progress":site.progress,
+			"reload":actor.magazine.seconds(), "attack":actor.weapon_definition.shot_interval(actor.trait_shot_factor)})
+
+		var guided: String = BuildItems.GUIDED_MAG if specialty else ""
+		world.supply.generated.build.slots = ["quick_loader_v1", guided]
+		var item: Dictionary = _item(actor.member_id, "carbine")
+		actor.magazine = WeaponMagazine.new(actor.weapon_instance_id, "carbine", WorkshopV1.QUICK)
+		world.apply_build(actor, profile, item)
+		var magazine: WeaponMagazine = actor.magazine
+		var capacity: int = magazine.capacity()
+		for shot: int in range(capacity):
+			magazine.commit_shot()
+		var elapsed: float = 0.0
+		while magazine.reloading and elapsed < 3.0:
+			magazine.advance(0.001)
+			elapsed += 0.001
+		reload.append({"clock":elapsed, "effective":magazine.seconds(), "capacity":capacity,
+			"rounds":magazine.rounds, "speed":actor.speed, "attack":actor.weapon_definition.shot_interval(actor.trait_shot_factor)})
+		world.free()
+	expect(near(motion[1].distance, motion[0].distance * 1.10, 0.01)
+		and motion[1].work_progress == motion[0].work_progress and motion[1].reload == motion[0].reload
+		and motion[1].attack == motion[0].attack, "stride changes actual movement alone for the same member and route")
+	expect(near(reload[1].effective, reload[0].effective * 0.90)
+		and near(reload[0].clock, reload[0].effective, 0.0011) and near(reload[1].clock, reload[1].effective, 0.0011)
+		and reload[0].capacity == reload[1].capacity and reload[1].rounds == reload[1].capacity
+		and reload[0].speed == reload[1].speed and reload[0].attack == reload[1].attack,
+		"guided mag changes actual reload with the same holder, instance, passive and workshop modification")
+	var support: BasicSupport = BasicSupport.new()
+	support.configure(BINDING)
+	var heal_world: Dictionary = {"version":SortieSnapshot.EXPLORATION_VERSION,
+		"generated":{"build":{"version":BuildItems.SPECIALTY_POOL, "slots":["", ""]}}, "support":support.snapshot(),
+		"sim":{"elapsed":1.0}, "survivors":[{"state":{"member_id":2, "health":90.0, "max_health":200.0,
+			"activity":FieldActor.Activity.IDLE, "damage_received":110.0}}]}
+	var standard: Dictionary = BuildAuthority.plan_heal(heal_world)
+	heal_world.generated.build.slots[0] = BuildItems.AID_KIT
+	var aid_kit: Dictionary = BuildAuthority.plan_heal(heal_world)
+	var candidate: Dictionary = BuildAuthority.propose(heal_world, support.request("heal", aid_kit))
+	expect(standard.get("amount") == 40.0 and aid_kit.get("amount") == 48.0 and not candidate.is_empty()
+		and candidate.survivors[0].state.health == 138.0 and candidate.support.cooldowns.heal == 30.0,
+		"equipped aid kit adds eight HP to the original Q and leaves its cooldown unchanged")
+	heal_world.survivors[0].state.health = 192.0
+	expect(BuildAuthority.plan_heal(heal_world).get("amount") == 8.0, "aid kit Q respects maximum health")
+	observations.specialty = {"movement":motion, "reload":reload, "q_normal":standard.get("amount"), "q_aid_kit":aid_kit.get("amount")}
+
+
 func _repeat_derivation() -> void:
 	var world: ClockWorld = _world(["pressure_rounds_v1", "quick_loader_v1"])
 	for fixture: Dictionary in [{"id":4, "gun":"carbine", "damage":24.84},
@@ -378,6 +449,7 @@ func run() -> void:
 		quit(2)
 		return
 	_movement_and_reload()
+	_specialty_effects()
 	_repeat_derivation()
 	_work_progress(30.0)
 	_work_progress(12.0)

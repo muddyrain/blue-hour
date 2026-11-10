@@ -379,6 +379,11 @@ func _refresh_departure_team(base: Dictionary, rations: Dictionary) -> void:
 	for child: Node in _review_details.get_children():
 		_review_details.remove_child(child)
 		child.queue_free()
+	if OpeningBuild.is_m47(base):
+		_review_details.add_child(CampStyle.label("本局专精 · " + OpeningBuild.PLANS[OpeningBuild.plan(base)].title, 18, CampStyle.TEAL))
+		var eligible: Label = CampStyle.label(SpecialtyPresentation.access_text(OpeningBuild.eligible(base)), 15, CampStyle.MUTED)
+		eligible.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_review_details.add_child(eligible)
 	for member: Dictionary in base.crew:
 		if float(member.health) <= 0.0:
 			continue
@@ -392,8 +397,14 @@ func _refresh_departure_team(base: Dictionary, rations: Dictionary) -> void:
 		_review_details.add_child(CampStyle.label("%s · HP %d" % [SurvivorRoster.display_label(member), ceili(member.health)], 18))
 		_review_details.add_child(CampStyle.label(weapon, 15, CampStyle.MUTED))
 		_review_details.add_child(HSeparator.new())
-	var powers: Dictionary = base.get("journey", {}).get("build", {}).get("powers", {})
+	var build: Dictionary = base.get("journey", {}).get("build", {})
+	var powers: Dictionary = build.get("powers", {})
 	var equipped: PackedStringArray = []
+	if OpeningBuild.is_m47(base):
+		var passives: Array = build.get("slots", []).filter(func(id: String) -> bool: return not id.is_empty())
+		var kit: Label = CampStyle.label("被动 · " + (SpecialtyPresentation.names(passives) if not passives.is_empty() else "空槽"), 16, CampStyle.TEAL)
+		kit.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_review_details.add_child(kit)
 	for id: String in powers.get("slots", [powers.get("slot", "")]):
 		if not id.is_empty():
 			equipped.append(SpecialPowers.definition(id).get("name", id))
@@ -443,6 +454,11 @@ func _refresh_blue_hour_card(index: int, generated: Dictionary) -> void:
 	if type == "supply" and not generated.has("rare_policy") and _has_extra_weapon(generated):
 		var lines: PackedStringArray = _descriptions[index].text.split("\n")
 		lines.insert(1, "附带装备 · 需另搜")
+		_descriptions[index].text = "\n".join(lines)
+	var specialty: String = BuildActions.specialization_candidate(generated)
+	if not specialty.is_empty():
+		var lines: PackedStringArray = _descriptions[index].text.split("\n")
+		lines.insert(1, "专精装备 · %s · 回收后归航确认" % SpecialtyPresentation.reward_name(specialty))
 		_descriptions[index].text = "\n".join(lines)
 	choices[index].text = "出发 · 突破封锁 →" if role == "finale" else "选择此行动 →"
 

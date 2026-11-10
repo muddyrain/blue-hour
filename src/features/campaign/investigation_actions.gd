@@ -71,6 +71,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var barricade: bool = CampaignRules.barricade_enabled(base.journey.campaign)
 	var billboard: bool = not clue.is_empty() and BillboardIntelV1.enabled(base.journey.campaign)
 	var opportunity: Dictionary = BillboardIntelV1.opportunity(base) if billboard else {}
+	var specialty: Dictionary = BuildActions.specialization_policy(base)
 	for index: int in range(result.size()):
 		var candidate: Dictionary = result[index]
 		if not opportunity.is_empty() and candidate.slot == BillboardActionV1.SLOT:
@@ -103,6 +104,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 			candidate = BarricadeV1.freeze(candidate)
 		if billboard:
 			candidate = BillboardActionV1.freeze(candidate)
+		candidate = BuildActions.with_specialization_drop(candidate, specialty)
 		result[index] = candidate
 		fingerprints[candidate.id] = RecordEncoding.fingerprint(candidate)
 	var frozen: Dictionary = {"offers":result, "fingerprints":fingerprints}

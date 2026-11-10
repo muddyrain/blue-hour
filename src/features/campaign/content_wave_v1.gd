@@ -18,7 +18,7 @@ static func marked(action: Dictionary) -> bool:
 	var powers: Variant = action.get("powers")
 	return action.get("version") == 9 and action.get("mission_policy") == 1 \
 		and SurvivalContracts.integer(action.get("content_wave_policy"), VERSION, VERSION) \
-		and powers is Dictionary and powers.get("version") == SpecialPowers.WAVE_VERSION
+		and powers is Dictionary and SpecialPowers.wave_version(powers.get("version"))
 
 
 static func eligible(action: Dictionary) -> bool:

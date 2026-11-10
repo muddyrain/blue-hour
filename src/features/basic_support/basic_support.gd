@@ -17,10 +17,12 @@ const ACCEPTED_KEYS: Array[String] = ["id", "kind", "payload", "facts"]
 
 var _state: Dictionary = {}
 var _allow_first_aid: bool = false
-var _first_aid_used: bool = false
+var _allow_radio: bool = false
+var _used_once: Dictionary = {}
 
 
-static func problem(value: Variant, binding: Dictionary, allow_first_aid: bool = false) -> String:
+static func problem(value: Variant, binding: Dictionary, allow_first_aid: bool = false,
+		allow_radio: bool = false) -> String:
 	if not value is Dictionary or value.size() != KEYS.size() or not value.has_all(KEYS):
 		return "BASIC_SUPPORT_FIELDS"
 	if not SurvivalContracts.json_value(value):
@@ -36,10 +38,12 @@ static func problem(value: Variant, binding: Dictionary, allow_first_aid: bool =
 		var event: Variant = value.accepted[index]
 		if not event is Dictionary or event.size() != ACCEPTED_KEYS.size() or not event.has_all(ACCEPTED_KEYS):
 			return "BASIC_SUPPORT_ACCEPTED_FIELDS"
-		if not event.id is String or event.id != _request_id(binding, index) or not _kind_allowed(event.kind, allow_first_aid) or not event.payload is Dictionary or not event.facts is Dictionary:
+		if not event.id is String or event.id != _request_id(binding, index) or not _kind_allowed(event.kind, allow_first_aid, allow_radio) or not event.payload is Dictionary or not event.facts is Dictionary:
 			return "BASIC_SUPPORT_ACCEPTED_IDENTITY"
 		if event.kind == FirstAidV1.KIND and used.has(event.kind):
 			return "FIRST_AID_ALREADY_USED"
+		if event.kind == SpecialPowers.RADIO and used.has(event.kind):
+			return "AID_BROADCAST_ALREADY_USED"
 		used[event.kind] = true
 	for kind: String in KINDS:
 		var remaining_time: Variant = value.cooldowns[kind]
@@ -54,8 +58,9 @@ static func _binding_valid(binding: Dictionary) -> bool:
 	return binding.get("transaction_id") is String and not String(binding.transaction_id).is_empty() and SurvivalContracts.json_value(binding)
 
 
-static func _kind_allowed(kind: Variant, allow_first_aid: bool) -> bool:
-	return kind in KINDS or (allow_first_aid and kind == FirstAidV1.KIND)
+static func _kind_allowed(kind: Variant, allow_first_aid: bool, allow_radio: bool) -> bool:
+	return (kind in KINDS or (allow_first_aid and kind == FirstAidV1.KIND)
+		or (allow_radio and kind == SpecialPowers.RADIO))
 
 
 static func _request_id(binding: Dictionary, sequence: int) -> String:
@@ -78,10 +83,11 @@ static func _point_valid(point: Variant) -> bool:
 	return point is Vector2 and point.is_finite()
 
 
-func configure(binding: Dictionary, allow_first_aid: bool = false) -> void:
+func configure(binding: Dictionary, allow_first_aid: bool = false, allow_radio: bool = false) -> void:
 	assert(_binding_valid(binding))
 	_allow_first_aid = allow_first_aid
-	_first_aid_used = false
+	_allow_radio = allow_radio
+	_used_once.clear()
 	_state = {
 		"version":1,
 		"binding":binding.duplicate(true),
@@ -95,11 +101,15 @@ func snapshot() -> Dictionary:
 	return _state.duplicate(true)
 
 
-func restore(value: Dictionary, allow_first_aid: bool = false) -> void:
-	assert(problem(value, value.get("binding", {}), allow_first_aid).is_empty())
+func restore(value: Dictionary, allow_first_aid: bool = false, allow_radio: bool = false) -> void:
+	assert(problem(value, value.get("binding", {}), allow_first_aid, allow_radio).is_empty())
 	_state = value.duplicate(true)
 	_allow_first_aid = allow_first_aid
-	_first_aid_used = value.accepted.any(func(event: Dictionary) -> bool: return event.kind == FirstAidV1.KIND)
+	_allow_radio = allow_radio
+	_used_once.clear()
+	for event: Dictionary in value.accepted:
+		if event.kind not in KINDS:
+			_used_once[event.kind] = true
 
 
 func advance(delta: float, active: bool) -> void:
@@ -115,13 +125,19 @@ func remaining(kind: String) -> float:
 
 
 func ready(kind: String) -> bool:
-	if kind == FirstAidV1.KIND:
-		return not _state.is_empty() and _allow_first_aid and not _first_aid_used
-	return not _state.is_empty() and kind in KINDS and remaining(kind) == 0.0
+	if _state.is_empty() or not _kind_allowed(kind, _allow_first_aid, _allow_radio):
+		return false
+	return remaining(kind) == 0.0 if kind in KINDS else not _used_once.has(kind)
 
 
 func plan_heal(members: Array[Dictionary], factor: float = 1.0) -> Dictionary:
 	if not is_finite(factor) or factor <= 0.0:
+		return {}
+	return plan_recovery(members, float(POLICY.heal_amount) * factor)
+
+
+static func plan_recovery(members: Array[Dictionary], maximum_amount: float) -> Dictionary:
+	if is_nan(maximum_amount) or maximum_amount <= 0.0:
 		return {}
 	var chosen: Dictionary = {}
 	var lowest_ratio: float = INF
@@ -138,7 +154,7 @@ func plan_heal(members: Array[Dictionary], factor: float = 1.0) -> Dictionary:
 			lowest_ratio = ratio
 	if chosen.is_empty():
 		return {}
-	var amount: float = minf(float(POLICY.heal_amount) * factor, float(chosen.max_health) - float(chosen.health))
+	var amount: float = minf(maximum_amount, float(chosen.max_health) - float(chosen.health))
 	if not is_finite(amount) or amount <= 0.0:
 		return {}
 	return {"member_id":int(chosen.member_id), "amount":amount}
@@ -192,7 +208,7 @@ func request(kind: String, payload: Dictionary) -> Dictionary:
 
 
 func accept(proposal: Dictionary, facts: Dictionary) -> bool:
-	if _state.is_empty() or proposal.size() != REQUEST_KEYS.size() or not proposal.has_all(REQUEST_KEYS) or not proposal.get("id") is String or not _kind_allowed(proposal.get("kind"), _allow_first_aid) or not proposal.get("payload") is Dictionary or not SurvivalContracts.json_value(proposal) or not SurvivalContracts.json_value(facts):
+	if _state.is_empty() or proposal.size() != REQUEST_KEYS.size() or not proposal.has_all(REQUEST_KEYS) or not proposal.get("id") is String or not _kind_allowed(proposal.get("kind"), _allow_first_aid, _allow_radio) or not proposal.get("payload") is Dictionary or not SurvivalContracts.json_value(proposal) or not SurvivalContracts.json_value(facts):
 		return false
 	var accepted: Dictionary = proposal.duplicate(true)
 	accepted.facts = facts.duplicate(true)
@@ -204,8 +220,8 @@ func accept(proposal: Dictionary, facts: Dictionary) -> bool:
 	# A invokes this only on a candidate that its original journal commits atomically.
 	_state.accepted.append(accepted)
 	_state.sequence = int(_state.sequence) + 1
-	if proposal.kind == FirstAidV1.KIND:
-		_first_aid_used = true
-	else:
+	if proposal.kind in KINDS:
 		_state.cooldowns[proposal.kind] = POLICY[proposal.kind + "_cooldown"]
+	else:
+		_used_once[proposal.kind] = true
 	return true

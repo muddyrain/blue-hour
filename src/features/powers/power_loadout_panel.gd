@@ -61,13 +61,14 @@ func _slot_row(title: Label, choice_requested: Signal) -> Dictionary[String, But
 	add_child(row)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(title)
-	for id: String in [SpecialPowers.SPEED, SpecialPowers.FREEZE, SpecialPowers.SUPPRESSION, ""]:
+	for id: String in [SpecialPowers.SPEED, SpecialPowers.FREEZE, SpecialPowers.SUPPRESSION, SpecialPowers.RADIO, ""]:
 		var button: Button=Button.new()
 		button.text=PowerActions.name_for(id) if not id.is_empty() else "卸下"
 		button.custom_minimum_size=Vector2(130,40)
 		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		if not id.is_empty():
-			button.icon=load("res://assets/powers/%s.svg"%id)
+			button.icon = preload("res://assets/powers/heal.svg") if id == SpecialPowers.RADIO \
+				else load("res://assets/powers/%s.svg" % id)
 			button.expand_icon=true
 			button.add_theme_constant_override("icon_max_width",28)
 		button.pressed.connect(func()->void: choice_requested.emit(id))
@@ -110,6 +111,7 @@ func _present_choices(buttons: Dictionary[String, Button], catalog: Dictionary, 
 	for id: String in buttons:
 		var button: Button = buttons[id]
 		button.visible = id.is_empty() or catalog.has(id)
+		button.custom_minimum_size.x = 104.0 if catalog.has(SpecialPowers.RADIO) else 130.0
 		var available: bool = id.is_empty() or id in owned
 		var elsewhere: bool = not id.is_empty() and id == other
 		var caption: String = PowerActions.name_for(id) if not id.is_empty() else "卸下"
@@ -118,9 +120,13 @@ func _present_choices(buttons: Dictionary[String, Button], catalog: Dictionary, 
 		button.tooltip_text = detail
 		if id == SpecialPowers.SUPPRESSION:
 			button.tooltip_text += "\n12 秒内普通、疾奔、重压感染者的直接近战伤害减半。"
+		elif id == SpecialPowers.RADIO:
+			button.tooltip_text += "\n" + SpecialPowers.RADIO_HELP
 		_enable(button, editable and available and id != equipped and not elsewhere)
 
 func _equipped(id: String, upgraded: bool) -> String:
+	if id == SpecialPowers.RADIO:
+		return PowerActions.name_for(id) + " · 瞬时治疗"
 	return "空槽" if id.is_empty() else "%s · %d 秒" % [PowerActions.name_for(id),int(SpecialPowers.duration(id,upgraded))]
 
 func _present_purchase(camp: Dictionary, choice: String, verb: String, editable: bool) -> void:

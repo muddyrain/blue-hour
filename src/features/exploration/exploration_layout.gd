@@ -79,7 +79,10 @@ static func complete(data: Dictionary) -> Dictionary:
 	var street: StreetLayout = NeighborhoodLayout.resource(data)
 	var base_nav: FieldNavigation = FieldNavigation.new()
 	base_nav.configure(street.blockers(), street.world_bounds)
-	var before: Dictionary = _door_routes(data, base_nav)
+	var prop_anchors: Array[String] = []
+	if data.has("warehouse_district"):
+		prop_anchors = WarehouseDistrict.prop_anchors(data.entities)
+	var before: Dictionary = _door_routes(data, base_nav, prop_anchors)
 	if before.is_empty():
 		return {}
 	var reserved: Array[Rect2] = _reserved(data)
@@ -104,6 +107,8 @@ static func complete(data: Dictionary) -> Dictionary:
 	if certificate.is_empty() or not _all_routes(data, nav):
 		return {}
 	if data.version==5 and not WorldgenLayout.content_reachable(data,certificate):
+		return {}
+	if data.has("warehouse_district") and not WarehouseDistrict.certified(data.warehouse_district, data.gates, nav, street.bus_door):
 		return {}
 	if data.has("loading_yard") and not IndustrialYard.certified(data, nav):
 		return {}
@@ -202,7 +207,7 @@ static func _place_object(data: Dictionary, kind: String, index: int, nav: Field
 	var targets: Array[float] = []
 	targets.assign([0.20, 0.90, 0.50, 0.85] if kind == "vehicle" else [0.85, 0.50, 0.20])
 	for entity: Dictionary in data.entities:
-		if entity.id in occupied:
+		if entity.id in occupied or not routes.doors.has(entity.id):
 			continue
 		for side: int in [-1, 1]:
 			var point: Vector2 = WorldLayout.point(entity.door) + Vector2(side * (144 if kind == "vehicle" else 200), 24)
@@ -242,13 +247,15 @@ static func _object_clear(data: Dictionary, collision: Rect2, work: Vector2, nav
 	return true
 
 
-static func _door_routes(data: Dictionary, nav: FieldNavigation) -> Dictionary:
+static func _door_routes(data: Dictionary, nav: FieldNavigation, anchors: Array[String] = []) -> Dictionary:
 	var start: Vector2 = WorldLayout.point(data.bus.door)
 	if not nav.is_clear(start):
 		return {}
 	var doors: Dictionary = {}
 	var dmax: float = 0.0
 	for entity: Dictionary in data.entities:
+		if not anchors.is_empty() and entity.id not in anchors:
+			continue
 		var target: Vector2 = WorldLayout.point(entity.door)
 		var path: PackedVector2Array = nav.path_between(start, target) if nav.is_clear(target) else PackedVector2Array()
 		if path.is_empty() or path[-1].distance_to(target) > 14.0:

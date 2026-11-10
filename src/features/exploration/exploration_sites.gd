@@ -53,6 +53,14 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 			var far: Dictionary = _choose(groceries, routing, "far", action_id)
 			if routing.doors[far.id].length - routing.doors[near.id].length >= 750.0:
 				supply_pair = [near, far]
+		elif layout.has("warehouse_district"):
+			var planned: Array = layout.warehouse_district.food
+			groceries = groceries.filter(func(entity: Dictionary) -> bool: return entity.id in planned)
+			if LevelPolicy.mission_supply_pair(groceries, routing, 2000.0).size() == 2:
+				for id: String in planned:
+					for entity: Dictionary in groceries:
+						if entity.id == id:
+							supply_pair.append(entity)
 		elif not cold_store:
 			supply_pair = LevelPolicy.mission_supply_pair(groceries, routing, 2000.0 if open_streets else LevelPolicy.MISSION_SUPPLY_LIMIT)
 		if supply_pair.size() != 2:
@@ -238,7 +246,7 @@ static func _done(ids: Array, facts: Dictionary) -> int:
 static func _candidates(layout: Dictionary, used: Array[String], allowed: Array) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for entity: Dictionary in layout.entities:
-		if entity.id not in used and (allowed.is_empty() or entity.archetype in allowed):
+		if not entity.get("service_only", false) and entity.id not in used and (allowed.is_empty() or entity.archetype in allowed):
 			result.append(entity)
 	return result
 

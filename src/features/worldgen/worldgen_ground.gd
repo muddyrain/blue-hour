@@ -23,9 +23,10 @@ func _draw() -> void:
 	var street_material: bool = int(layout.world_data.get("art_revision", 0)) == 3
 	var blue_hour: bool = _blue_hour()
 	var open_streets: bool = layout.world_data.has("open_streets")
-	var compact: bool = layout.world_data.get("open_streets") == OpenStreetsV1.VERSION
+	var compact: bool = int(layout.world_data.get("open_streets", 0)) >= OpenStreetsV1.COMPACT_VERSION
 	var junction: Rect2 = OpenStreetsV1.turn_junction(layout.roads[0], layout.roads[1]) \
 		if compact and layout.world_data.topology != "commercial" else Rect2()
+	var warehouse: bool = layout.world_data.has("warehouse_district")
 	var loading_yard: Dictionary = layout.world_data.get("loading_yard", {})
 	var rescue_court: Dictionary = layout.world_data.get("rescue_court", {})
 	var grass: Color = Color(0.59, 0.72, 0.76, 0.56) if blue_hour else Color(0.93, 0.94, 0.81, 0.58) if street_material else Color(0.77, 0.88, 0.76, 0.42)
@@ -35,6 +36,10 @@ func _draw() -> void:
 		var area: Rect2=WorldLayout.rect(parcel.rect)
 		draw_rect(area, Color("3c514b") if blue_hour else Color("62694f") if street_material else Color("56664e"))
 		draw_texture_rect(StreetBlock.GrassTexture, area, true, grass if blue_hour else Color(0.93, 0.94, 0.8, 0.60) if street_material else Color(0.7, 0.84, 0.66, 0.5))
+		if warehouse:
+			var service_area: Rect2 = area.grow(-WarehouseDistrict.PERIMETER)
+			draw_rect(service_area, Color("4d5657"))
+			draw_texture_rect(StreetBlock.ConcreteTexture, service_area, true, Color(0.66, 0.73, 0.77, 0.46))
 		if parcel.id == loading_yard.get("parcel"):
 			_loading_yard_floor(loading_yard)
 		if parcel.id == rescue_court.get("parcel"):

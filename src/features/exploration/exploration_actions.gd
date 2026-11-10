@@ -37,6 +37,8 @@ static func upgrade(source: Dictionary, worldgen: bool = false, level: bool = fa
 		return {}
 	if open_streets > 0 and (mission_policy != 1 or source.layout["size"] != "large" or rare_policy != 0 or not billboard_target.is_empty()):
 		return {}
+	if open_streets == OpenStreetsV1.VERSION and (source.layout.topology != "industrial" or industrial):
+		return {}
 	var value: Dictionary=source.duplicate(true)
 	value.version=9
 	if rare_policy != 0:

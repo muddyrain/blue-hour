@@ -213,9 +213,16 @@ static func _offer(source: Dictionary, type: String, recruit: int, mission: bool
 	var yard: bool = industrial and type == "airdrop" and topology == "industrial"
 	var candidate: Dictionary = _with_type(source, type, recruit, topology, size)
 	if open_streets > 0 and mission and size == "large" and not candidate.is_empty():
-		var pilot: Dictionary = ExplorationActions.upgrade(candidate, true, true, 1, yard, residential_rescue, 0, {}, open_streets)
+		var revision: int = open_streets if topology == "industrial" and not yard \
+			else mini(open_streets, OpenStreetsV1.COMPACT_VERSION)
+		var pilot: Dictionary = ExplorationActions.upgrade(candidate, true, true, 1, yard, residential_rescue, 0, {}, revision)
 		if not pilot.is_empty():
 			return pilot
+		if revision == OpenStreetsV1.VERSION:
+			print("BH_WAREHOUSE_DISTRICT_FALLBACK seed=%s task=%s" % [candidate.seed, type])
+			pilot = ExplorationActions.upgrade(candidate, true, true, 1, yard, residential_rescue, 0, {}, OpenStreetsV1.COMPACT_VERSION)
+			if not pilot.is_empty():
+				return pilot
 		print("BH_OPEN_STREETS_FALLBACK theme=%s task=%s seed=%s" % [topology, type, candidate.seed])
 	var offer: Dictionary = ExplorationActions.upgrade(candidate, true, true, int(mission), yard, residential_rescue) if not candidate.is_empty() else {}
 	if not mission or not offer.is_empty():

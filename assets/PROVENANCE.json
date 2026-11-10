@@ -676,6 +676,24 @@
       "license": "No additional license granted"
     },
     {
+      "path": "assets/worldgen/m45/hall.svg",
+      "sha256": "728fbda8e001ba045b88f4907df48dea31c8ea3449233cadf6aeed397450bb3f",
+      "origin": "Original project vector warehouse module, authored for M45-R2",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/worldgen/m45/office.svg",
+      "sha256": "df5037955221dc61ed4ca415cec34b5297bfe5bb9424e401fa039a0aa78e9454",
+      "origin": "Original project vector warehouse module, authored for M45-R2",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/worldgen/m45/shed.svg",
+      "sha256": "6a9cf7c88fe89e1bf8280556f0e51cd8ceaad204b93e9eabefccf4f6d9ed4960",
+      "origin": "Original project vector warehouse module, authored for M45-R2",
+      "license": "No additional license granted"
+    },
+    {
       "path": "assets/ui/m20/title-blue-hour.png",
       "sha256": "4fdcb13d1fcddbe6e906078288f077e66cf5968780fe8fbb02e7ee6d67b4404c",
       "origin": "M20 project-authored AI-assisted title art, text-free approved handoff",

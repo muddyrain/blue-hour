@@ -25,7 +25,10 @@ static func freeze(data: Dictionary) -> void:
 			var width: float=132 if kind=="scrap" else 112 if kind=="cargo" else 144
 			if area.size.x<width+24 or area.size.y<84:continue
 			# Place at a court boundary, leaving its entrance and orthogonal footways clear.
-			for point: Vector2 in [Vector2(area.position.x+width/2+12,area.position.y+52),Vector2(area.end.x-width/2-12,area.end.y-14),Vector2(area.get_center().x,area.position.y+52)]:
+			var candidates: Array[Vector2] = [Vector2(area.position.x+width/2+12,area.position.y+52),Vector2(area.end.x-width/2-12,area.end.y-14),Vector2(area.get_center().x,area.position.y+52)]
+			if data.has("warehouse_district") and kind == "cargo":
+				candidates.append(Vector2(area.position.x + width * 0.5 + 72.0, area.get_center().y + 14.0))
+			for point: Vector2 in candidates:
 				var block: Rect2=Rect2(point-Vector2(width*0.44,24),Vector2(width*0.88,24))
 				var route_clear: bool = not (OpenStreetsV1.intersects_sweep(data.bus, block, 24) if data.has("open_streets")
 					else WorldLayout.rect(data.bus.sweep).grow(24).intersects(block))

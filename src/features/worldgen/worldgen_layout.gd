@@ -29,7 +29,7 @@ static func _assemble(seed: String,size: String,topology: String,attempt: int,fa
 	return ExplorationLayout.complete(data) if not data.is_empty() else {}
 
 static func validate(value: Variant,cached: bool=true) -> String:
-	if not value is Dictionary or value.size()!=KEYS.size()+int(value.has("level_task"))+int(value.has("loading_yard"))+int(value.has("rescue_court"))+int(value.has("open_streets")) or not value.has_all(KEYS) or not SurvivalContracts.json_value(value): return "WORLDGEN_LAYOUT_FIELDS"
+	if not value is Dictionary or value.size()!=KEYS.size()+int(value.has("level_task"))+int(value.has("loading_yard"))+int(value.has("rescue_court"))+int(value.has("open_streets"))+int(value.has("warehouse_district")) or not value.has_all(KEYS) or not SurvivalContracts.json_value(value): return "WORLDGEN_LAYOUT_FIELDS"
 	if value.version!=5 or not value.seed is String or value.seed.is_empty() or value.seed.length()>128 or value["size"] not in NeighborhoodLayout.SIZES or value.topology not in NeighborhoodLayout.TOPOLOGIES or not SurvivalContracts.integer(value.attempt,0,2) or not value.fallback is bool or not is_map_id(value.id): return "WORLDGEN_LAYOUT_IDENTITY"
 	if value.has("level_task") and value.level_task not in TaskActions.TYPES:
 		return "LEVEL_TASK_IDENTITY"
@@ -39,6 +39,9 @@ static func validate(value: Variant,cached: bool=true) -> String:
 	var open_streets: int = int(value.get("open_streets", 0))
 	var industrial: bool = value.has("loading_yard")
 	var residential_rescue: bool = value.has("rescue_court")
+	var warehouse: bool = open_streets == OpenStreetsV1.VERSION
+	if warehouse != value.has("warehouse_district") or (warehouse and (value.topology != "industrial" or industrial)):
+		return "WAREHOUSE_DISTRICT_CONTEXT"
 	if industrial and (value.topology != "industrial" or value.get("level_task") != "airdrop" or not value.loading_yard is Dictionary):
 		return "INDUSTRIAL_YARD_CONTEXT"
 	if residential_rescue and (value.topology != "residential" or value.get("level_task") != "rescue" or not value.rescue_court is Dictionary):
@@ -64,7 +67,7 @@ static func content_reachable(data: Dictionary, routes: Dictionary) -> bool:
 		var count: int=0
 		var away: bool=false
 		for entity: Dictionary in data.entities:
-			if entity.archetype in category:
+			if entity.archetype in category and not entity.get("service_only", false):
 				count+=1
 				away=away or float(routes.doors[entity.id].length)>float(routes.dmax)*0.35
 		if count<2 or not away: return false

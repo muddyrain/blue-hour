@@ -3,7 +3,8 @@ extends RefCounted
 ## Versioned arterial routes. The parked body and the swept corridors are separate.
 
 const WIDE_VERSION: int = 1
-const VERSION: int = 2
+const COMPACT_VERSION: int = 2
+const VERSION: int = 3
 const BOUNDS: Array[int] = [0, 0, 12288, 8192]
 const WIDE_ARTERIAL_WIDTH: int = 480
 const ARTERIAL_WIDTH: int = 224
@@ -31,7 +32,7 @@ static func skeleton(seed: String, topology: String, attempt: int, fallback: boo
 			else size.x * random.randf_range(0.49, 0.61)),
 		_grid(size.y * random.randf_range(0.32, 0.41) if topology == "residential"
 			else size.y * random.randf_range(0.42, 0.55)))
-	var compact: bool = version == VERSION
+	var compact: bool = version >= COMPACT_VERSION
 	var width: int = ARTERIAL_WIDTH if compact else WIDE_ARTERIAL_WIDTH
 	var half_road: float = width * 0.5
 	var horizontal: Rect2 = Rect2(0.0, center.y - half_road, size.x, width)
@@ -107,7 +108,7 @@ static func certify(data: Dictionary, blockers: Array[Rect2]) -> bool:
 	var horizontal: Rect2 = WorldLayout.rect(data.roads[0])
 	var vertical: Rect2 = WorldLayout.rect(data.roads[1])
 	var corners: Array[Rect2] = _corners(horizontal, vertical, bounds)
-	if data.open_streets == VERSION and data.topology != "commercial":
+	if data.open_streets >= COMPACT_VERSION and data.topology != "commercial":
 		var junction: Rect2 = turn_junction(horizontal, vertical)
 		if _rect(junction) not in data.roads:
 			return false

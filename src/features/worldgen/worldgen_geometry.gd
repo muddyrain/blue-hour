@@ -15,7 +15,8 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 	var width: int = int(dimensions[0])
 	var height: int = int(dimensions[1])
 	var rank: int = NeighborhoodLayout.SIZES.find(size)
-	var compact: bool = open_streets == OpenStreetsV1.VERSION
+	var compact: bool = open_streets >= OpenStreetsV1.COMPACT_VERSION
+	var warehouse: bool = open_streets == OpenStreetsV1.VERSION
 	var main_y: int = int(round(float(height) * random.randf_range(0.40,0.61) / 32.0)) * 32
 	var main_width: int = WorldgenScale.MAIN_WIDTH
 	var segments: Array = [[0,main_y+main_width/2,width,main_y+main_width/2,main_width]]
@@ -117,22 +118,29 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 			return {}
 		court = rescue_plan.frozen
 		yard_parcel = court.parcel
-	for parcel: Dictionary in parcels:
-		if parcel.id == yard_parcel:
-			var filled: bool = _populate_rescue_court(parcel, rescue_plan, entities, roads, bus) if residential_rescue \
-				else _populate_yard(parcel, yard_plan, entities, roads, bus)
-			if not filled:
-				return {}
-		else:
-			var rows: int = 0
-			if open_streets > 0:
-				rows = 2 if topology == "commercial" and parcel.kind == "shopfront" else 1
-			if compact:
-				rows = 3 if float(parcel.rect[3]) >= 900.0 else 2
-			_populate(parcel, topology, random, entities, roads, bus, rows, compact)
-	# Food and equipment are actual parcels, not rewards granted to every building.
-	_ensure_categories(entities,parcels,roads,bus,yard_parcel)
-	_update_frontages(parcels,entities,yard_parcel,compact)
+	var district: Dictionary = {}
+	if warehouse:
+		district = WarehouseDistrict.populate(parcels, roads, bus, seed)
+		if district.is_empty():
+			return {}
+		entities = district.entities
+	else:
+		for parcel: Dictionary in parcels:
+			if parcel.id == yard_parcel:
+				var filled: bool = _populate_rescue_court(parcel, rescue_plan, entities, roads, bus) if residential_rescue \
+					else _populate_yard(parcel, yard_plan, entities, roads, bus)
+				if not filled:
+					return {}
+			else:
+				var rows: int = 0
+				if open_streets > 0:
+					rows = 2 if topology == "commercial" and parcel.kind == "shopfront" else 1
+				if compact:
+					rows = 3 if float(parcel.rect[3]) >= 900.0 else 2
+				_populate(parcel, topology, random, entities, roads, bus, rows, compact)
+		# Food and equipment are actual parcels, not rewards granted to every building.
+		_ensure_categories(entities,parcels,roads,bus,yard_parcel)
+		_update_frontages(parcels,entities,yard_parcel,compact)
 	var rescue: Array = entities[0].door.duplicate() if not entities.is_empty() else [64,64]
 	var furthest: float = 0.0
 	for entity: Dictionary in entities:
@@ -140,7 +148,7 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 		if distance > furthest:
 			furthest=distance
 			rescue=entity.door.duplicate()
-	var walls: Dictionary = _walls(parcels,entities,roads,bus)
+	var walls: Dictionary = district if warehouse else _walls(parcels,entities,roads,bus)
 	if not yard.is_empty():
 		walls.barriers.append_array(yard_plan.barriers)
 		walls.gates.append(yard.loading.gate)
@@ -155,6 +163,8 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 		data.open_streets = open_streets
 		data.arrivals = skeleton.arrivals
 		data.enemy_points = skeleton.enemy_points
+	if warehouse:
+		data.warehouse_district = district.district
 	if not yard.is_empty():
 		data.loading_yard = yard
 	if not task.is_empty():

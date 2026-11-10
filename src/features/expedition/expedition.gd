@@ -2087,7 +2087,7 @@ func _make_world_buildings() -> void:
 		var yard: Dictionary = layout.world_data.get("loading_yard", layout.world_data.get("rescue_court", {}))
 		var yard_bounds: Rect2 = WorldLayout.rect(yard.bounds) if not yard.is_empty() else Rect2()
 		for wall: Rect2 in layout.fences:
-			if not yard.is_empty() and yard_bounds.encloses(wall):
+			if layout.world_data.has("warehouse_district") or (not yard.is_empty() and yard_bounds.encloses(wall)):
 				var masonry: IndustrialYardWall = IndustrialYardWall.new()
 				masonry.footprint = wall
 				masonry.position = Vector2(wall.get_center().x, wall.end.y)
@@ -2135,8 +2135,10 @@ func _make_world_buildings() -> void:
 		building.soft_contact=layout.world_data.get("art_revision")==3
 		if layout.world_data.get("version")==5:
 			building.modulate=[Color.WHITE,Color(0.92,0.97,1.0),Color(1.0,0.97,0.9),Color.WHITE][int(entity.variant)]
+		if layout.world_data.has("warehouse_district"):
+			building.roof_tint = [Color.WHITE, Color(0.88, 1.12, 1.08), Color(1.14, 0.98, 0.83)][int(entity.variant)]
 		if not _supply_entrances.is_empty():
-			building.roof_tint = Color(0.69, 0.81, 1.0)
+			building.roof_tint *= Color(0.69, 0.81, 1.0)
 			building.facade_tint = Color(0.87, 0.91, 0.98)
 		building.world_asset = true
 		if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4 or layout.world_data.get("version")==5):

@@ -12,8 +12,9 @@ func _journey() -> void:
 		var action: Dictionary = app.mission_select.daily_offers[index]
 		if action.layout.has("open_streets"):
 			selected = index
-			_check(action.layout.open_streets == OpenStreetsV1.VERSION,
-				"every open-street offer uses the new journey's geometry revision")
+			var warehouse: bool = action.layout.topology == "industrial" and not action.layout.has("loading_yard")
+			var revision: int = OpenStreetsV1.VERSION if warehouse else OpenStreetsV1.COMPACT_VERSION
+			_check(action.layout.open_streets == revision, "open-street offer uses the theme's geometry revision")
 			_check(DailyActions.problem(action).is_empty(), "frozen M45 action authenticates")
 		elif action.layout["size"] != "large":
 			_check(action.layout.bounds == ExplorationLayout.SIZES[action.layout["size"]].bounds, "original small/medium dimensions")
@@ -34,6 +35,10 @@ func _journey() -> void:
 		"blocks":layout.parcels.size(), "loops":road_stats.loops, "bus":layout.bus})
 	_check(layout.bounds == OpenStreetsV1.BOUNDS and OpenStreetsV1.certify(layout, world.layout.blockers()),
 		"frozen continuous arterial, parking lane, clear turn and doorway")
+	if layout.has("warehouse_district"):
+		_check(layout.warehouse_district.roles.size() == 4 and WarehouseDistrict.certified(
+			layout.warehouse_district, layout.gates, world.navigation, world.layout.bus_door),
+			"four warehouse blocks retain both approaches and the yard passage")
 	await _advance(world, func() -> bool: return world.bus_view.stage == "disembarking", 1200)
 	_check(world._bus_sprite.position == WorldLayout.point(layout.bus.stop), "bus drives to the in-lane stop")
 	await _advance(world, func() -> bool: return not world.bus_view.running(), 180)

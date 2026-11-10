@@ -2,10 +2,13 @@ class_name OpenStreetsV1
 extends RefCounted
 ## Versioned arterial routes. The parked body and the swept corridors are separate.
 
-const VERSION: int = 1
+const WIDE_VERSION: int = 1
+const VERSION: int = 2
 const BOUNDS: Array[int] = [0, 0, 12288, 8192]
-const ARTERIAL_WIDTH: int = 480
-const LANE_OFFSET: float = 112.0
+const WIDE_ARTERIAL_WIDTH: int = 480
+const ARTERIAL_WIDTH: int = 224
+const SIDEWALK_WIDTH: int = 32
+const BOARDING_SETBACK: float = 48.0
 const HALF_LENGTH: float = 120.0
 const HALF_BODY_WIDTH: float = 40.0
 const TURN_RADIUS: float = 192.0
@@ -15,7 +18,11 @@ const OUTSIDE_BUFFER: float = 320.0
 const STOP_JUNCTION_GAP: float = 80.0
 
 
-static func skeleton(seed: String, topology: String, attempt: int, fallback: bool) -> Dictionary:
+static func supported(version: Variant) -> bool:
+	return SurvivalContracts.integer(version, WIDE_VERSION, VERSION)
+
+
+static func skeleton(seed: String, topology: String, attempt: int, fallback: bool, version: int) -> Dictionary:
 	var identity: String = topology + ":fallback" if fallback else seed + ":" + str(attempt)
 	var random: RandomNumberGenerator = RogueLayout.rng("BH_OPEN_STREETS_V1:" + identity)
 	var size: Vector2 = Vector2(BOUNDS[2], BOUNDS[3])
@@ -24,9 +31,11 @@ static func skeleton(seed: String, topology: String, attempt: int, fallback: boo
 			else size.x * random.randf_range(0.49, 0.61)),
 		_grid(size.y * random.randf_range(0.32, 0.41) if topology == "residential"
 			else size.y * random.randf_range(0.42, 0.55)))
-	var half_road: float = ARTERIAL_WIDTH * 0.5
-	var horizontal: Rect2 = Rect2(0.0, center.y - half_road, size.x, ARTERIAL_WIDTH)
-	var vertical: Rect2 = Rect2(center.x - half_road, 0.0, ARTERIAL_WIDTH, size.y)
+	var compact: bool = version == VERSION
+	var width: int = ARTERIAL_WIDTH if compact else WIDE_ARTERIAL_WIDTH
+	var half_road: float = width * 0.5
+	var horizontal: Rect2 = Rect2(0.0, center.y - half_road, size.x, width)
+	var vertical: Rect2 = Rect2(center.x - half_road, 0.0, width, size.y)
 	var bounds: Rect2 = Rect2(Vector2.ZERO, size)
 	var leaves: Array = []
 	var corners: Array[Rect2] = _corners(horizontal, vertical, bounds)
@@ -35,10 +44,12 @@ static func skeleton(seed: String, topology: String, attempt: int, fallback: boo
 		var east: bool = index % 2 == 1
 		leaves.append({"rect":_rect(corners[index]), "edges":[south, not south, east, not east]})
 	var segments: Array = [
-		[0, center.y, BOUNDS[2], center.y, ARTERIAL_WIDTH],
-		[center.x, 0, center.x, BOUNDS[3], ARTERIAL_WIDTH],
+		[0, center.y, BOUNDS[2], center.y, width],
+		[center.x, 0, center.x, BOUNDS[3], width],
 	]
-	var bus: Dictionary = _bus(center, topology, bounds, float(random.randi_range(20, 35) * 32))
+	var lane_offset: float = half_road - HALF_BODY_WIDTH - SWEEP_PADDING - (4.0 if compact else 68.0)
+	var bus: Dictionary = _bus(center, topology, bounds, float(random.randi_range(20, 35) * 32),
+		lane_offset, half_road, compact)
 	var direction: Vector2 = (WorldLayout.point(bus.stop) - WorldLayout.point(bus.entry)).normalized()
 	var sidewalk: Vector2 = Vector2(-direction.y, direction.x)
 	var gather: Vector2 = WorldLayout.point(bus.door)
@@ -48,8 +59,20 @@ static func skeleton(seed: String, topology: String, attempt: int, fallback: boo
 		_point(gather + direction * 48.0 + sidewalk * 16.0),
 		_point(gather + sidewalk * 56.0),
 	]
-	var enemy_points: Array = [[24.0, center.y - LANE_OFFSET], [size.x - 24.0, center.y + LANE_OFFSET]]
-	return {"segments":segments, "leaves":leaves, "bus":bus, "arrivals":arrivals, "enemy_points":enemy_points}
+	var enemy_points: Array = [[24.0, center.y - lane_offset], [size.x - 24.0, center.y + lane_offset]]
+	return {"segments":segments, "leaves":leaves, "bus":bus, "arrivals":arrivals, "enemy_points":enemy_points,
+		"junction":turn_junction(horizontal, vertical) if compact and topology != "commercial" else Rect2()}
+
+
+static func turn_junction(horizontal: Rect2, vertical: Rect2) -> Rect2:
+	return horizontal.intersection(vertical).grow(80.0)
+
+
+static func boarding_paving(bus: Dictionary) -> Rect2:
+	var gather: Vector2 = WorldLayout.point(bus.door)
+	var outward: Vector2 = (gather - WorldLayout.point(bus.passenger_door)).normalized()
+	var along: Vector2 = outward.orthogonal() * 112.0
+	return _between(gather - outward * BOARDING_SETBACK - along, gather + outward * 72.0 + along)
 
 
 static func swept_rects(bus: Dictionary, margin: float = 0.0) -> Array[Rect2]:
@@ -84,6 +107,14 @@ static func certify(data: Dictionary, blockers: Array[Rect2]) -> bool:
 	var horizontal: Rect2 = WorldLayout.rect(data.roads[0])
 	var vertical: Rect2 = WorldLayout.rect(data.roads[1])
 	var corners: Array[Rect2] = _corners(horizontal, vertical, bounds)
+	if data.open_streets == VERSION and data.topology != "commercial":
+		var junction: Rect2 = turn_junction(horizontal, vertical)
+		if _rect(junction) not in data.roads:
+			return false
+		# Clip the four inner corners against the same paved turning square.
+		corners.clear()
+		corners.append_array(_corners(junction, vertical, bounds))
+		corners.append_array(_corners(horizontal, junction, bounds))
 	var inbound: Array = bus.in_path
 	var outbound: Array = bus.out_path
 	if inbound.size() < 2 or outbound.size() < 2 or inbound[-1] != bus.stop or outbound[0] != bus.stop:
@@ -132,7 +163,8 @@ static func certify(data: Dictionary, blockers: Array[Rect2]) -> bool:
 	return true
 
 
-static func _bus(center: Vector2, topology: String, bounds: Rect2, upstream: float) -> Dictionary:
+static func _bus(center: Vector2, topology: String, bounds: Rect2, upstream: float,
+		lane_offset: float, half_road: float, compact: bool) -> Dictionary:
 	var entry: Vector2
 	var stop: Vector2
 	var exit: Vector2
@@ -141,29 +173,30 @@ static func _bus(center: Vector2, topology: String, bounds: Rect2, upstream: flo
 	var direction: Vector2
 	var facing: String
 	var turn: bool = topology != "commercial"
+	var radius: float = 144.0 if compact else TURN_RADIUS
 	match topology:
 		"industrial":
 			direction = Vector2.DOWN
 			facing = "down"
-			var crossing: Vector2 = center - Vector2.ONE * LANE_OFFSET
+			var crossing: Vector2 = center - Vector2.ONE * lane_offset
 			stop = crossing - Vector2(0.0, upstream)
 			entry = Vector2(stop.x, -OUTSIDE_BUFFER)
 			exit = Vector2(-OUTSIDE_BUFFER, crossing.y)
-			approach = crossing - Vector2(0.0, TURN_RADIUS)
-			end_turn = crossing - Vector2(TURN_RADIUS, 0.0)
+			approach = crossing - Vector2(0.0, radius)
+			end_turn = crossing - Vector2(radius, 0.0)
 		"residential":
 			direction = Vector2.LEFT
 			facing = "left"
-			var crossing: Vector2 = center + Vector2(LANE_OFFSET, -LANE_OFFSET)
+			var crossing: Vector2 = center + Vector2(lane_offset, -lane_offset)
 			stop = crossing + Vector2(upstream, 0.0)
 			entry = Vector2(bounds.end.x + OUTSIDE_BUFFER, stop.y)
 			exit = Vector2(crossing.x, -OUTSIDE_BUFFER)
-			approach = crossing + Vector2(TURN_RADIUS, 0.0)
-			end_turn = crossing - Vector2(0.0, TURN_RADIUS)
+			approach = crossing + Vector2(radius, 0.0)
+			end_turn = crossing - Vector2(0.0, radius)
 		_:
 			direction = Vector2.RIGHT
 			facing = "right"
-			stop = Vector2(center.x - upstream, center.y + LANE_OFFSET)
+			stop = Vector2(center.x - upstream, center.y + lane_offset)
 			entry = Vector2(-OUTSIDE_BUFFER, stop.y)
 			exit = Vector2(bounds.end.x + OUTSIDE_BUFFER, stop.y)
 	var parked_half: Vector2 = Vector2(HALF_LENGTH, HALF_BODY_WIDTH) if direction.y == 0.0 \
@@ -172,7 +205,7 @@ static func _bus(center: Vector2, topology: String, bounds: Rect2, upstream: flo
 	var sidewalk: Vector2 = Vector2(-direction.y, direction.x)
 	var door_center: Vector2 = stop + direction * 72.0
 	var passenger_door: Vector2 = door_center + sidewalk * HALF_BODY_WIDTH
-	var gather: Vector2 = door_center + sidewalk * (ARTERIAL_WIDTH * 0.5 - LANE_OFFSET + 72.0)
+	var gather: Vector2 = door_center + sidewalk * (half_road - lane_offset + (BOARDING_SETBACK if compact else 72.0))
 	var inbound: Array = [_point(entry), _point(stop)]
 	var outbound: Array = [_point(stop)]
 	var sweeps: Array = []

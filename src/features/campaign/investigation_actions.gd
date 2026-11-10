@@ -43,7 +43,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var sortie_risk: bool = CampaignRules.sortie_risk_enabled(base.journey.campaign)
 	var clue: String = CampaignRules.next_clue(base.journey.campaign)
 	var event_sortie: bool = not clue.is_empty() and CampaignRules.event_sortie_enabled(base.journey.campaign)
-	var open_streets: bool = base.journey.campaign.get("open_streets_policy") == OpenStreetsV1.VERSION
+	var open_streets: int = int(base.journey.campaign.get("open_streets_policy", 0))
 	var result: Array[Dictionary] = []
 	if clue.is_empty():
 		projected.journey.campaign.preparations = CampaignRules.PREPARATIONS
@@ -137,7 +137,7 @@ static func site_problem(value: Dictionary) -> String:
 
 static func _day(projected: Dictionary, clue: String, mission: bool, industrial: bool,
 		action_choices: bool, midgame: bool, finale: Dictionary = {}, rare_type: String = "",
-		sortie_risk: bool = false, open_streets: bool = false) -> Array[Dictionary]:
+		sortie_risk: bool = false, open_streets: int = 0) -> Array[Dictionary]:
 	var original: Array[Dictionary] = PersonaActions.offers(projected)
 	if original.size() != 3:
 		return []
@@ -187,7 +187,7 @@ static func _day(projected: Dictionary, clue: String, mission: bool, industrial:
 
 
 static func _choice_offer(base: Dictionary, source: Dictionary, industrial: bool, midgame: bool,
-		sortie_risk: bool, open_streets: bool) -> Dictionary:
+		sortie_risk: bool, open_streets: int) -> Dictionary:
 	var key: String = "m25-action-choice:%s:%d" % [base.journey.seed, int(base.day)]
 	if key.sha256_text().left(1).hex_to_int() % 2 == 0:
 		var transaction: String = "%s:%d" % [base.profile_id, int(base.settled_sorties) + 1]
@@ -205,15 +205,15 @@ static func _choice_offer(base: Dictionary, source: Dictionary, industrial: bool
 
 
 static func _offer(source: Dictionary, type: String, recruit: int, mission: bool,
-		industrial: bool, residential_rescue: bool = false, open_streets: bool = false) -> Dictionary:
+		industrial: bool, residential_rescue: bool = false, open_streets: int = 0) -> Dictionary:
 	var topology: String = "industrial" if type == "equipment" and source.layout.topology == "residential" else source.layout.topology
 	if residential_rescue:
 		topology = "residential"
 	var size: String = source.layout["size"]
 	var yard: bool = industrial and type == "airdrop" and topology == "industrial"
 	var candidate: Dictionary = _with_type(source, type, recruit, topology, size)
-	if open_streets and mission and size == "large" and not candidate.is_empty():
-		var pilot: Dictionary = ExplorationActions.upgrade(candidate, true, true, 1, yard, residential_rescue, 0, {}, true)
+	if open_streets > 0 and mission and size == "large" and not candidate.is_empty():
+		var pilot: Dictionary = ExplorationActions.upgrade(candidate, true, true, 1, yard, residential_rescue, 0, {}, open_streets)
 		if not pilot.is_empty():
 			return pilot
 		print("BH_OPEN_STREETS_FALLBACK theme=%s task=%s seed=%s" % [topology, type, candidate.seed])

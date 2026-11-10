@@ -23,6 +23,9 @@ func _draw() -> void:
 	var street_material: bool = int(layout.world_data.get("art_revision", 0)) == 3
 	var blue_hour: bool = _blue_hour()
 	var open_streets: bool = layout.world_data.has("open_streets")
+	var compact: bool = layout.world_data.get("open_streets") == OpenStreetsV1.VERSION
+	var junction: Rect2 = OpenStreetsV1.turn_junction(layout.roads[0], layout.roads[1]) \
+		if compact and layout.world_data.topology != "commercial" else Rect2()
 	var loading_yard: Dictionary = layout.world_data.get("loading_yard", {})
 	var rescue_court: Dictionary = layout.world_data.get("rescue_court", {})
 	var grass: Color = Color(0.59, 0.72, 0.76, 0.56) if blue_hour else Color(0.93, 0.94, 0.81, 0.58) if street_material else Color(0.77, 0.88, 0.76, 0.42)
@@ -51,13 +54,20 @@ func _draw() -> void:
 				draw_texture_rect(StreetBlock.PavingTexture,paving,true,Color(0.83,0.89,0.81,0.65))
 	# One continuous verge on each street, cut by all actual connections.
 	for road: Rect2 in layout.roads:
-		var is_arterial: bool = open_streets and minf(road.size.x, road.size.y) == OpenStreetsV1.ARTERIAL_WIDTH
-		var paving: Rect2 = road.grow(96 if is_arterial else 28).intersection(layout.world_bounds)
+		var width: float = minf(road.size.x, road.size.y)
+		var verge: int = 28
+		if compact and (width == OpenStreetsV1.ARTERIAL_WIDTH or road == junction):
+			verge = OpenStreetsV1.SIDEWALK_WIDTH
+		elif open_streets and width == OpenStreetsV1.WIDE_ARTERIAL_WIDTH:
+			verge = 96
+		var paving: Rect2 = road.grow(verge).intersection(layout.world_bounds)
 		if street_material:
 			_paving(paving)
 		else:
 			draw_rect(paving,Color("93998a"))
 			draw_texture_rect(StreetBlock.PavingTexture,paving,true,Color(0.88,0.91,0.86,0.52))
+	if compact:
+		_paving(OpenStreetsV1.boarding_paving(layout.world_data.bus))
 	if not loading_yard.is_empty():
 		_loading_yard_surface(loading_yard)
 	for entity: Dictionary in layout.world_data.entities:
@@ -82,6 +92,9 @@ func _draw() -> void:
 	if blue_hour and not open_streets:
 		_bus_curb_paint()
 	for road: Rect2 in layout.roads:
+		if road == junction:
+			_junction_curbs(junction)
+			continue
 		var horizontal: bool=road.size.x>road.size.y
 		var length: int=int(road.size.x if horizontal else road.size.y)
 		var tangent: Vector2 = Vector2.RIGHT if horizontal else Vector2.DOWN
@@ -105,6 +118,7 @@ func _draw() -> void:
 		if a.size.x<=a.size.y: continue
 		for b: Rect2 in layout.roads:
 			if b.size.x>=b.size.y or not a.intersects(b): continue
+			if compact and a.intersection(b).intersects(junction): continue
 			var y: float = a.position.y - 25 if b.position.y < a.position.y else a.end.y + 8
 			for stripe: int in range(8,int(b.size.x)-8,17):
 				draw_rect(Rect2(b.position.x+stripe,y,9,18),Color("939e9e") if blue_hour else Color("b9bca9"))
@@ -116,6 +130,20 @@ func _draw() -> void:
 		_loading_yard_lights(loading_yard)
 	if not rescue_court.is_empty():
 		_rescue_court_lights(rescue_court)
+
+
+func _junction_curbs(junction: Rect2) -> void:
+	for step: int in range(0, int(junction.size.x), 16):
+		var x: float = junction.position.x + step
+		var y: float = junction.position.y + step
+		for edge: Array in [
+			[Vector2(x, junction.position.y - 2), Vector2.RIGHT],
+			[Vector2(x, junction.end.y + 2), Vector2.RIGHT],
+			[Vector2(junction.position.x - 2, y), Vector2.DOWN],
+			[Vector2(junction.end.x + 2, y), Vector2.DOWN],
+		]:
+			if not _junction(edge[0] + edge[1] * 8.0, junction):
+				draw_line(edge[0], edge[0] + edge[1] * 16.0, Color("81898c"), 3.0)
 
 
 func _blue_hour() -> bool:

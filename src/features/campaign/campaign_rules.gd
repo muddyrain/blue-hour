@@ -197,8 +197,7 @@ static func _investigation_problem(value: Dictionary, run_id: String) -> String:
 		return "BARRICADE_CAMPAIGN_POLICY"
 	if (has_billboard or has_billboard_intel) and not BillboardIntelV1.enabled(value):
 		return "BILLBOARD_CAMPAIGN_POLICY"
-	if has_open_streets and (not has_billboard or not SurvivalContracts.integer(
-			value.open_streets_policy, OpenStreetsV1.VERSION, OpenStreetsV1.VERSION)):
+	if has_open_streets and (not has_billboard or not OpenStreetsV1.supported(value.open_streets_policy)):
 		return "OPEN_STREETS_CAMPAIGN_POLICY"
 	if has_campaign_pressure and not campaign_pressure_enabled(value):
 		return "CAMPAIGN_PRESSURE_POLICY"

@@ -12,6 +12,8 @@ func _journey() -> void:
 		var action: Dictionary = app.mission_select.daily_offers[index]
 		if action.layout.has("open_streets"):
 			selected = index
+			_check(action.layout.open_streets == OpenStreetsV1.VERSION,
+				"every open-street offer uses the new journey's geometry revision")
 			_check(DailyActions.problem(action).is_empty(), "frozen M45 action authenticates")
 		elif action.layout["size"] != "large":
 			_check(action.layout.bounds == ExplorationLayout.SIZES[action.layout["size"]].bounds, "original small/medium dimensions")

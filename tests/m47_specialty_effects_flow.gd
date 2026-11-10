@@ -184,8 +184,14 @@ func _reload_prepare() -> void:
 		if world == null:
 			return
 		if card >= 0:
-			await _search(world, world._toolbox_site())
-		await _food(world, 4)
+			var toolbox: Expedition.SearchSite = world._toolbox_site()
+			if not world.site_discovered(toolbox) and world.recon_site != null:
+				await _search(world, world.recon_site)
+			if not world.site_discovered(toolbox):
+				world.command_move(toolbox.door)
+				await _until(world, func() -> bool: return world.site_discovered(toolbox))
+			await _search(world, toolbox)
+		await _food(world, 2 if card >= 0 else 4)
 		await _finish_outing(world)
 		if WorkshopV1.tools(app.camp_snapshot()) > 0:
 			break

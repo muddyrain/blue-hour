@@ -155,6 +155,9 @@ var event_sortie_panel: EventSortiePanel
 var recon_site: SearchSite
 var recon_knowledge: ReconKnowledge
 var _recon_view: ReconFieldView
+var billboard_site: SearchSite
+var billboard_work: BillboardWorkV1
+var _billboard_view: BillboardFieldView
 var barricade_open: bool = false
 var _barricade_view: BarricadeView
 var _bus_sprite: Sprite2D
@@ -256,6 +259,15 @@ func _ready() -> void:
 		_recon_view.z_index = 1
 		_effects.z_index = 2
 		add_child(_recon_view)
+	if BillboardActionV1.enabled(supply.generated):
+		billboard_site = SearchSite.new(StringName(BillboardActionV1.SITE_ID), BillboardActionV1.point(supply.generated))
+		billboard_site.seconds = BillboardActionV1.SECONDS
+		billboard_site.hit = BillboardActionV1.hit_rect(billboard_site.door)
+		billboard_work = BillboardWorkV1.new()
+		_billboard_view = BillboardFieldView.new()
+		_billboard_view.position = billboard_site.door
+		_billboard_view.label_font = ui_theme.default_font if ui_theme != null else null
+		_sort.add_child(_billboard_view)
 	var bus: Sprite2D = Sprite2D.new()
 	_bus_sprite = bus
 	bus.texture = BusTexture
@@ -677,7 +689,7 @@ func request_search(kind: StringName = &"cash") -> void:
 	if phase == Phase.FINISHED or site == null or site.searched or not site_discovered(site):
 		return
 	var event_site: bool = _is_event_site(site)
-	if site != recon_site and not event_site and not pump_station_mode() and not supply.supports(site.kind):
+	if site != recon_site and site != billboard_site and not event_site and not pump_station_mode() and not supply.supports(site.kind):
 		return
 	var previous: int = search_assignments.member_for(String(site.id))
 	if previous > 0:
@@ -779,6 +791,8 @@ func member_site(member_id: int) -> SearchSite:
 func site_label(site: SearchSite) -> String:
 	if site == recon_site:
 		return "侦察点"
+	if site == billboard_site:
+		return "广告牌"
 	if _is_event_site(site):
 		return EventSortieV1.TITLE
 	return "工具箱点" if String(site.id) == WorkshopSiteV1.site_id(supply.generated) \
@@ -801,6 +815,8 @@ func _search_log(stage: String, site: SearchSite) -> void:
 func search_site(kind: StringName) -> SearchSite:
 	if recon_site != null and kind == recon_site.id:
 		return recon_site
+	if billboard_site != null and kind == billboard_site.id:
+		return billboard_site
 	for site: SearchSite in sites:
 		if site.id == kind: return site
 	if kind == &"cash":
@@ -1456,7 +1472,7 @@ func _clear_dead_worker() -> void:
 		var actor: FieldActor = search_member(int(job.member_id))
 		if actor != null and (actor.health <= 0 or actor.activity == FieldActor.Activity.DOWN):
 			var site: SearchSite = search_site(StringName(job.site_id))
-			if site != recon_site:
+			if site != recon_site and site != billboard_site:
 				site.progress = 0.0
 			_release_searcher(actor.member_id)
 			if pump_station_mode():
@@ -1496,6 +1512,9 @@ func _update_search(delta: float) -> void:
 			if outdoor and (not exploration_mode() or (site.id==&"cash" and supply.generated.type=="airdrop")):
 				_trigger_airdrop()
 			_search_log("entered",site)
+			# A movement step ending in range cannot also count as billboard work.
+			if site == billboard_site:
+				continue
 		if not work_state_matches(actor,site):
 			_release_searcher(actor.member_id)
 			_search_log("interrupted",site)
@@ -1509,6 +1528,14 @@ func _update_search(delta: float) -> void:
 			if worked > 0.0:
 				var start: float = elapsed - delta
 				recon_knowledge.record_work(actor.member_id, actor.position, start, minf(elapsed, start + worked))
+		elif site == billboard_site:
+			site.progress = minf(site.seconds, prior_progress + delta)
+			if site.seconds - site.progress <= 0.000000001:
+				site.progress = site.seconds
+			var worked: float = site.progress - prior_progress
+			if worked > 0.0:
+				var start: float = elapsed - delta
+				billboard_work.record(actor.member_id, actor.position, start, minf(elapsed, start + worked))
 		else:
 			site.progress += delta / (actor.trait_search_factor * actor.persona_work_factor * (BuildItems.frozen_factors(supply.generated.build).work if build_mode() else 1.0))
 		if site.progress > prior_progress and _is_event_site(site) and task_event.work_at < 0.0:
@@ -1525,6 +1552,12 @@ func _update_search(delta: float) -> void:
 
 
 func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
+	if site == billboard_site:
+		site.searched = true
+		_release_searcher(actor.member_id)
+		_show_notice("已调查 · 生还归航并确认后，下次选卡保证有超市补给")
+		_search_log("completed",site)
+		return true
 	if site == recon_site:
 		site.progress = site.seconds
 		site.searched = true
@@ -1628,6 +1661,8 @@ func _finish(evacuated: bool, boarding: Vector2i = Vector2i.ZERO) -> void:
 		"sites_searched":_searched_count(),
 		"kills": kills, "searched": _kind_searched(&"cash"), "health": remaining_health, "elapsed": elapsed}
 	if not layout.world_data.is_empty(): report.site_facts = WorldSites.facts(self)
+	if billboard_site != null:
+		report.billboard = billboard_work.snapshot(billboard_site.progress)
 	if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9)))): report.task_event=task_event.duplicate(true)
 	if build_mode(): report.support=basic_support.snapshot()
 	if power_mode(): report.powers=powers.duplicate(true)
@@ -1771,6 +1806,11 @@ func _update_ui() -> void:
 	_present_power()
 	if _hud == null:
 		return
+	if billboard_site != null:
+		var worker: FieldActor = search_member(search_assignments.member_for(String(billboard_site.id)))
+		var work_phase: String = search_assignments.phase_for(worker.member_id) if worker != null else ""
+		_billboard_view.present(billboard_site.progress, work_phase,
+			SearchWorkView.short_call_sign(worker.call_sign) if worker != null else "")
 	if event_sortie_panel != null and event_sortie_panel.visible:
 		var site: SearchSite = search_site(StringName(EventSortieV1.site_id(supply.generated)))
 		if phase == Phase.FINISHED or task_event.branch != "" or _near_event_worker(site) == null:
@@ -1798,9 +1838,13 @@ func _update_ui() -> void:
 		var assigned_site: SearchSite = member_site(actor.member_id)
 		var status: String = activities[actor.activity]
 		if assigned_site != null:
-			status = SearchWorkView.actor_status(search_assignments.phase_for(actor.member_id),site_label(assigned_site),TaskActions.outdoor_site(supply.generated,assigned_site.id))
+			var work_phase: String = search_assignments.phase_for(actor.member_id)
+			if assigned_site == billboard_site:
+				status = "调查·广告牌" if work_phase == "working" else "前往·广告牌"
+			else:
+				status = SearchWorkView.actor_status(work_phase,site_label(assigned_site),TaskActions.outdoor_site(supply.generated,assigned_site.id))
 		members.append({"id":actor.member_id,"label":"%s · %s" % [actor.call_sign, "阵亡" if actor.permanent_death else status],
-			"call_sign":actor.call_sign,"status":_weapon_status(actor,status),"ammo":_ammo_text(actor),"detail":("%s · %s"%[status,site_label(assigned_site) if assigned_site == recon_site else assigned_site.prop.title] if assigned_site!=null else status),
+			"call_sign":actor.call_sign,"status":_weapon_status(actor,status),"ammo":_ammo_text(actor),"detail":("%s · %s"%[status,site_label(assigned_site) if assigned_site.prop == null else assigned_site.prop.title] if assigned_site!=null else status),
 			"colour":SurvivorRoster.definition_by_id(String(actor.definition_id)).colour,
 			"hp":actor.health,"max_hp":actor.max_health})
 	if growth_mode:
@@ -1974,6 +2018,12 @@ func _searched_count() -> int:
 	return sites.filter(func(site: SearchSite) -> bool: return site.searched).size()
 
 func _clicked_site(point: Vector2) -> bool:
+	if billboard_site != null and billboard_site.hit.has_point(point):
+		if billboard_site.searched:
+			_show_notice(BillboardFieldView.DONE)
+		else:
+			request_search(billboard_site.id)
+		return true
 	if recon_site != null and recon_site.door.distance_squared_to(point) <= 32.0 * 32.0:
 		if recon_site.searched:
 			locate_objective("recon")
@@ -2577,6 +2627,12 @@ func _exploration_objective_rows() -> Array[Dictionary]:
 			"hint":"完成此点原搜集即可携带，归航确认后入库。"})
 	if recon_site != null:
 		_present_recon_objectives(rows)
+	if billboard_site != null:
+		rows.insert(1, {"id":BillboardActionV1.SITE_ID,
+			"title":"超市广告牌 · 已调查" if billboard_site.searched else "超市广告牌 · %.1f/4 秒" % billboard_site.progress,
+			"optional":true, "complete":billboard_site.searched, "done":int(billboard_site.searched), "total":1,
+			"site_ids":[BillboardActionV1.SITE_ID],
+			"hint":BillboardFieldView.DONE if billboard_site.searched else BillboardFieldView.HINT.replace("\n", " · ")})
 	return rows
 
 
@@ -2686,7 +2742,7 @@ func locate_objective(id: String) -> void:
 		_locate_marker.add_child(_locate_label)
 	var has_badge: bool = target_prop != null and not target_prop.loot_category.is_empty()
 	var recon_pin: bool = recon_site != null and id in ["primary", "recon_optional", "recon"]
-	_locate_label.visible = not has_badge and not recon_pin
+	_locate_label.visible = not has_badge and not recon_pin and id != BillboardActionV1.SITE_ID
 	# Shrink the pulse around the clickable entrance to clear the building badge.
 	var ring_scale: float = 0.5 if has_badge and not target_prop is ExplorationProp else 1.0
 	_locate_ring.scale = Vector2.ONE * ring_scale

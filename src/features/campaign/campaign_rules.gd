@@ -164,10 +164,12 @@ static func _investigation_problem(value: Dictionary, run_id: String) -> String:
 	var has_event_sortie: bool = value.has("event_sortie_policy")
 	var has_recon: bool = value.has("recon_policy")
 	var has_barricade: bool = value.has("barricade_policy")
+	var has_billboard: bool = value.has("billboard_policy")
+	var has_billboard_intel: bool = value.has("billboard_intel")
 	var field_count: int = INVESTIGATION_KEYS.size() + int(has_action_policy) + int(has_midgame) \
 		+ int(has_finale) + int(has_rare) + int(has_screamer) + int(has_affixes) + int(has_first_aid) \
 		+ int(has_sortie_risk) + int(has_campaign_pressure) + int(has_content_wave) + int(has_night_hound) \
-		+ int(has_workshop) + int(has_event_sortie) + int(has_recon) + int(has_barricade)
+		+ int(has_workshop) + int(has_event_sortie) + int(has_recon) + int(has_barricade) + int(has_billboard) + int(has_billboard_intel)
 	if value.size() != field_count or not value.has_all(INVESTIGATION_KEYS) or not SurvivalContracts.integer(value.version,version,version):
 		return "INVESTIGATION_FIELDS"
 	if has_action_policy and not action_choices_enabled(value):
@@ -192,6 +194,8 @@ static func _investigation_problem(value: Dictionary, run_id: String) -> String:
 		return "RECON_CAMPAIGN_POLICY"
 	if has_barricade and not barricade_enabled(value):
 		return "BARRICADE_CAMPAIGN_POLICY"
+	if (has_billboard or has_billboard_intel) and not BillboardIntelV1.enabled(value):
+		return "BILLBOARD_CAMPAIGN_POLICY"
 	if has_campaign_pressure and not campaign_pressure_enabled(value):
 		return "CAMPAIGN_PRESSURE_POLICY"
 	if has_content_wave and not ContentWaveV1.campaign_enabled(value):

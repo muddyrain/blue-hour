@@ -135,6 +135,8 @@ static func _profiled_problem(value: Variant) -> String:
 	if value.phase in ["CAMP_REGISTERED", "EDIT_READY", "EDIT_COMMITTED"]:
 		if field and not value.joins.is_empty():
 			return "FIELD_JOIN_CAMP_EVENT"
+		if value.phase == "CAMP_REGISTERED" and not BillboardIntelV1.opportunity(value.base).is_empty():
+			return "BILLBOARD_REGISTRATION_SOURCE"
 		return CampEdit.problem(value)
 	if not value.transaction_id is String or SurvivalContracts.transaction(value.base, {"check":true}, value.transaction_id).is_empty():
 		return "TRANSACTION_ID"
@@ -204,15 +206,15 @@ static func _profiled_problem(value: Variant) -> String:
 
 
 static func transition(previous: Dictionary, next: Dictionary, claimed_event: Dictionary = {},
-		claimed_recon: Dictionary = {}) -> String:
+		claimed_recon: Dictionary = {}, claimed_billboard: Dictionary = {}) -> String:
 	var stamp: int = FreezeProfile.enter("receipt.transition")
-	var result: String = _profiled_transition(previous, next, claimed_event, claimed_recon)
+	var result: String = _profiled_transition(previous, next, claimed_event, claimed_recon, claimed_billboard)
 	FreezeProfile.leave("receipt.transition", stamp)
 	return result
 
 
 static func _profiled_transition(previous: Dictionary, next: Dictionary, claimed_event: Dictionary,
-		claimed_recon: Dictionary) -> String:
+		claimed_recon: Dictionary, claimed_billboard: Dictionary) -> String:
 	var issue: String = problem(next)
 	if not issue.is_empty():
 		return issue
@@ -259,6 +261,10 @@ static func _profiled_transition(previous: Dictionary, next: Dictionary, claimed
 		return issue
 	issue = ReconKnowledge.history_problem(
 		ReconKnowledge.claimed(previous) if claimed_recon.is_empty() else claimed_recon, next)
+	if not issue.is_empty():
+		return issue
+	issue = BillboardIntelV1.history_problem(
+		BillboardIntelV1.claimed(previous) if claimed_billboard.is_empty() else claimed_billboard, next)
 	if not issue.is_empty():
 		return issue
 	if previous.phase == "SUSPEND_READY":
@@ -322,6 +328,9 @@ static func _result_problem(receipt: Dictionary) -> String:
 		receipt.rules.get("mission", {}).get("generated", {}), receipt.envelope.result.get("battle"))
 	if not workshop_issue.is_empty():
 		return workshop_issue
+	var billboard_issue: String = BillboardIntelV1.result_problem(receipt, after)
+	if not billboard_issue.is_empty():
+		return billboard_issue
 	if SurvivalState.is_extended(after):
 		var deaths: Array = []
 		for checkpoint: Dictionary in receipt.deaths:

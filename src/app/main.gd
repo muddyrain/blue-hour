@@ -898,6 +898,7 @@ func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}) -> vo
 			_battle_meta.campaign.event_sortie_policy = EventSortieV1.VERSION
 			_battle_meta.campaign.recon_policy = ReconActionV1.SOURCE_VERSION
 			_battle_meta.campaign.barricade_policy = BarricadeV1.VERSION
+			_battle_meta.campaign.billboard_policy = BillboardActionV1.VERSION
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true, true)
 		_battle_meta.build.powers = PowerState.initial_progression(
 			SpecialPowers.WAVE_VERSION if latest_rules else SpecialPowers.PROGRESSION_VERSION)
@@ -2589,6 +2590,13 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	if not catalog_notice.is_empty():
 		text += catalog_notice + "\n"
 	var generated: Dictionary = frozen.get("rules",{}).get("mission",{}).get("generated",{})
+	if BillboardActionV1.enabled(generated):
+		if not BillboardIntelV1.opportunity(snapshot).is_empty():
+			text += "超市广告牌 · 下次选卡保证出现超市补给%s\n" % ("" if durable else "（确认后生效）")
+		elif battle.get("billboard", {}).get("completed", false):
+			text += "超市广告牌 · 已调查，本次未登记情报\n"
+		else:
+			text += "超市广告牌 · 调查未完成\n"
 	if PumpStationAction.enabled(generated) and not battle.is_empty():
 		if battle.encounter.defeat.is_empty():
 			text += "河堤泵站 · 提前撤离，未登记胜利。\n" if battle.evacuated else "河堤泵站 · 未能归航。\n"

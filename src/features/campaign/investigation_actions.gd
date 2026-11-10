@@ -67,9 +67,15 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var workshop: bool = WorkshopV1.enabled(base) and CampFacilities.selected(base) == CampFacilities.WORKSHOP
 	var recon: bool = CampaignRules.recon_enabled(base.journey.campaign)
 	var barricade: bool = CampaignRules.barricade_enabled(base.journey.campaign)
+	var billboard: bool = not clue.is_empty() and BillboardIntelV1.enabled(base.journey.campaign)
+	var opportunity: Dictionary = BillboardIntelV1.opportunity(base) if billboard else {}
 	for index: int in range(result.size()):
 		var candidate: Dictionary = result[index]
-		if event_sortie:
+		if not opportunity.is_empty() and candidate.slot == BillboardActionV1.SLOT:
+			candidate = BillboardActionV1.target_offer(base.journey.seed, int(base.day), candidate, opportunity.strategy)
+			if candidate.is_empty():
+				return {}
+		if event_sortie and not candidate.has("billboard_target"):
 			var event_offer: Dictionary = EventSortieV1.freeze(candidate)
 			if not event_offer.is_empty():
 				candidate = event_offer
@@ -93,6 +99,8 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 			candidate = ReconActionV1.freeze(candidate, int(base.journey.campaign.recon_policy))
 		if barricade:
 			candidate = BarricadeV1.freeze(candidate)
+		if billboard:
+			candidate = BillboardActionV1.freeze(candidate)
 		result[index] = candidate
 		fingerprints[candidate.id] = RecordEncoding.fingerprint(candidate)
 	var frozen: Dictionary = {"offers":result, "fingerprints":fingerprints}

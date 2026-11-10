@@ -203,10 +203,20 @@ static func input_problem(input: Dictionary) -> String:
 				return "POLICY_REQUIRED:PERMADEATH_NOT_ENABLED"
 	if input.report.sortie_id != token.transaction_id:
 		return "REPORT_TRANSACTION"
+	var billboard: bool = BillboardActionV1.enabled(input.rules.mission.get("generated", {}))
+	if input.report.has("billboard") != billboard:
+		return "BILLBOARD_REPORT_FIELDS"
+	if billboard:
+		var elapsed: Variant = input.report.get("elapsed")
+		if not SurvivalContracts.number(elapsed) or elapsed < 0.0:
+			return "BILLBOARD_REPORT_CLOCK"
+		issue = BillboardWorkV1.problem(input.rules.mission.generated, input.report.billboard, float(elapsed), input.before.crew)
+		if not issue.is_empty():
+			return issue
 	for participant: Dictionary in input.report.participants:
 		if not TransactionReceipt.same(participant, SurvivorRoster.member(expected, int(participant.id))):
 			return "REPORT_EQUIPMENT"
-	if input.report.size() != REPORT_KEYS.size() + int(PowerState.enabled(input.before)) + int((input.rules.get("data_version")==8 or (input.rules.get("data_version")==9 or input.rules.get("data_version")==10))) + (1 if RescueState.is_family(input.before) else 0) + (1 if GrowthState.is_family(input.before) else 0) + int(FieldJoinState.is_family(input.before)) + int(TraitState.is_family(input.before)) + int((input.rules.get("data_version")==7 or (input.rules.get("data_version")==8 or (input.rules.get("data_version")==9 or input.rules.get("data_version")==10)))) + int((input.rules.get("data_version")==5 or (input.rules.get("data_version")==6 or (input.rules.get("data_version")==7 or (input.rules.get("data_version")==8 or (input.rules.get("data_version")==9 or input.rules.get("data_version")==10)))))) + int((input.rules.get("data_version")==3 or input.rules.get("data_version")==4 or (input.rules.get("data_version")==5 or (input.rules.get("data_version")==6 or (input.rules.get("data_version")==7 or (input.rules.get("data_version")==8 or (input.rules.get("data_version")==9 or input.rules.get("data_version")==10))))))) or not input.report.has_all(REPORT_KEYS):
+	if input.report.size() != REPORT_KEYS.size() + int(billboard) + int(PowerState.enabled(input.before)) + int((input.rules.get("data_version")==8 or (input.rules.get("data_version")==9 or input.rules.get("data_version")==10))) + (1 if RescueState.is_family(input.before) else 0) + (1 if GrowthState.is_family(input.before) else 0) + int(FieldJoinState.is_family(input.before)) + int(TraitState.is_family(input.before)) + int((input.rules.get("data_version")==7 or (input.rules.get("data_version")==8 or (input.rules.get("data_version")==9 or input.rules.get("data_version")==10)))) + int((input.rules.get("data_version")==5 or (input.rules.get("data_version")==6 or (input.rules.get("data_version")==7 or (input.rules.get("data_version")==8 or (input.rules.get("data_version")==9 or input.rules.get("data_version")==10)))))) + int((input.rules.get("data_version")==3 or input.rules.get("data_version")==4 or (input.rules.get("data_version")==5 or (input.rules.get("data_version")==6 or (input.rules.get("data_version")==7 or (input.rules.get("data_version")==8 or (input.rules.get("data_version")==9 or input.rules.get("data_version")==10))))))) or not input.report.has_all(REPORT_KEYS):
 		return "REPORT_FIELDS"
 	if RescueState.is_family(input.before):
 		if not input.report.get("rescue") is Dictionary or not RescueTarget.fact_problem(input.report.rescue).is_empty() or (input.report.rescue.status == "RESCUED" and (input.rules.mission.mission_id != "rescue" or (RescuePoolState.available(input.before).is_empty() if RescuePoolState.is_family(input.before) else not input.before.recruits.is_empty()))):

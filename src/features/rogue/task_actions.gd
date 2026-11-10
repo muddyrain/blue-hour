@@ -107,6 +107,8 @@ static func _airdrop_point(layout: Dictionary) -> Array:
 static func outdoor_site(value: Dictionary, id: StringName) -> bool:
 	if String(id) == ReconActionV1.SITE_ID:
 		return ReconActionV1.enabled(value)
+	if String(id) == BillboardActionV1.SITE_ID:
+		return BillboardActionV1.enabled(value)
 	if value.get("version")==9:
 		for site: Dictionary in value.sites:
 			if site.id==String(id): return site.work_mode=="outdoor"

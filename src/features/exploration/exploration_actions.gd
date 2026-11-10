@@ -1,21 +1,22 @@
 class_name ExplorationActions
 extends RefCounted
 ## V9 authenticates the new full description, never claims new geometry is old V3.
-static var _checked: Dictionary = {}
-static var _origins: Dictionary = {}
+static var _checked: ActionMemo = ActionMemo.new(64)
+static var _origins: ActionMemo = ActionMemo.new(64)
 
 static func origin(value: Dictionary) -> Dictionary:
 	# Reconstruct the original frozen reward/capability source without storing a
 	# duplicate obsolete map in every new receipt. Validate it before projection.
 	var source_type: String = "airdrop" if value.type == EventSortieV1.TYPE else value.type
 	var key: String=SurvivalContracts.fingerprint({"seed":value.seed,"day":value.day,"slot":value.slot,"type":source_type,"size":value.layout["size"],"topology":value.layout.topology,"recruit":value.recruit,"campaign":value.campaign,"build":value.build,"powers":value.powers,"persona":value.persona})
-	if _origins.has(key): return _origins[key].duplicate(true)
+	var cached: Variant = _origins.lookup(key)
+	if cached != null:
+		return cached.duplicate(true)
 	var task: Dictionary=TaskActions._make(value.seed,int(value.day),int(value.slot),source_type,value.layout.topology,value.layout["size"],int(value.recruit))
 	var source: Dictionary=source_from_task(task,value)
 	if source.is_empty(): return {}
 	if not PersonaActions.problem(source).is_empty(): return {}
-	if _origins.size()>=64: _origins.clear()
-	_origins[key]=source.duplicate(true)
+	_origins.store(key, source.duplicate(true))
 	return source
 
 static func source_from_task(task: Dictionary, context: Dictionary) -> Dictionary:
@@ -222,7 +223,7 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 	if not value.get("seed") is String or value.seed.length()!=32 or value.seed.to_lower()!=value.seed or not value.seed.is_valid_hex_number(false) or not SurvivalContracts.integer(value.get("day"),2,RunSave.MAX_COUNTER) or not SurvivalContracts.integer(value.get("slot"),0,2) or (not event_sortie and value.get("type") not in TaskActions.TYPES) or value.layout.get("size") not in NeighborhoodLayout.SIZES or value.layout.get("topology") not in NeighborhoodLayout.TOPOLOGIES or not SurvivalContracts.integer(value.get("recruit"),0,5) or not value.build.get("owned") is Array or not value.build.get("slots") is Array or not value.powers.get("owned") is Array or not PowerState.action_inventory_valid(value.powers.owned, PowerState.loadout(value.powers), int(value.day)) or not value.persona.get("facts") is Dictionary or not value.campaign.get("run_id") is String or value.campaign.run_id.length()!=32 or not value.campaign.run_id.is_valid_hex_number(false) or not SurvivalContracts.integer(value.campaign.get("preparations"),0,3): return "EXPLORATION_ACTION_CONTEXT"
 	var signature: String=RecordEncoding.fingerprint(value) if mission else SurvivalContracts.fingerprint(value)
 	var proof_key: String = "camp-source:" + signature if mission and camp_source else signature
-	if _checked.has(proof_key): return ""
+	if _checked.lookup(proof_key) == true: return ""
 	var source: Dictionary=origin(value)
 	if source.is_empty(): return "EXPLORATION_ORIGINAL_SOURCE"
 	var expected: Dictionary
@@ -277,8 +278,7 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 		if billboard and RecordEncoding.fingerprint(value.billboard) != RecordEncoding.fingerprint(expected.billboard):
 			return "BILLBOARD_ACTION_CANONICAL"
 		return "EXPLORATION_ACTION_CANONICAL"
-	if _checked.size()>=64: _checked.clear()
-	_checked[proof_key]=true
+	_checked.store(proof_key, true)
 	return ""
 
 static func matches(base: Dictionary,value: Variant) -> bool:

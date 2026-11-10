@@ -5,7 +5,7 @@ const BONES: Array[String] = ["avenue", "lanes", "court"]
 const NAMES: Array[String] = ["青禾商业街", "柳巷街区", "北岸仓储街"]
 const BOUNDS: Rect2 = Rect2(0, 0, 2560, 1920)
 const TYPES: Array[String] = ["convenience_store", "supermarket", "eatery", "warehouse", "garage", "detached_home", "row_house", "small_apartment"]
-static var _checked: Dictionary = {}
+static var _checked: ActionMemo = ActionMemo.new()
 
 static func generate(seed: String, bone: String, forced_offset: int = -1) -> Dictionary:
 	var variant: int = BONES.find(bone)
@@ -50,7 +50,7 @@ static func validate(value: Variant) -> String:
 	var offset: int = TYPES.find(value.entities[0].archetype)
 	if offset>3 or not TransactionReceipt.same(value,generate("",value.bone,offset)): return "WORLD_NONCANONICAL"
 	var signature: String = SurvivalContracts.fingerprint(value)
-	if _checked.has(signature): return ""
+	if _checked.lookup(signature) == true: return ""
 	if not value.bus is Dictionary or value.bus.size()!=7 or not value.bus.has_all(["rect","door","passenger_door","entry","exit","sweep","facing"]) or not _rect(value.bus.rect) or not _point(value.bus.door) or not _rect(value.bus.sweep): return "WORLD_BUS_FIELDS"
 	if not value.roads is Array or not value.arrivals is Array or not value.enemy_points is Array or value.arrivals.size()!=4 or value.enemy_points.size()!=4: return "WORLD_ARRAYS"
 	var blocks: Array[Rect2] = []
@@ -79,7 +79,7 @@ static func validate(value: Variant) -> String:
 	for i: int in range(4):
 		var goal: Vector2 = start+Vector2.ONE*((i-1.5)*16)
 		if not nav.is_clear(goal): return "WORLD_GATHER_SPACE"
-	_checked[signature] = true
+	_checked.store(signature, true)
 	return ""
 
 static func resource(data: Dictionary) -> StreetLayout:
@@ -113,9 +113,11 @@ static func _point(v: Variant) -> bool:
 static func _rect(v: Variant) -> bool:
 	return v is Array and v.size()==4 and _point(v.slice(0,2)) and SurvivalContracts.integer(v[2],16,2560) and SurvivalContracts.integer(v[3],16,1920) and BOUNDS.encloses(rect(v))
 
-static var _routes: Dictionary = {}
+static var _routes: ActionMemo = ActionMemo.new()
 static func route_length(data: Dictionary) -> int:
-	if _routes.has(data.id): return int(_routes[data.id])
+	var cached: Variant = _routes.lookup(data.id)
+	if cached != null:
+		return int(cached)
 	var layout: StreetLayout = resource(data)
 	var nav: FieldNavigation = FieldNavigation.new()
 	nav.configure(layout.blockers(),layout.world_bounds)
@@ -125,5 +127,5 @@ static func route_length(data: Dictionary) -> int:
 		var distance: float = 0
 		for i: int in range(1,path.size()): distance+=path[i-1].distance_to(path[i])
 		maximum=maxf(maximum,distance)
-	_routes[data.id]=ceili(maximum)
+	_routes.store(data.id, ceili(maximum))
 	return ceili(maximum)

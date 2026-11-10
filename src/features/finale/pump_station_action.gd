@@ -6,7 +6,7 @@ const VERSION: int = 1
 const CONSOLE: StringName = &"cash"
 const WORK_SECONDS: float = 5.0
 const TITLE: String = "突破封锁 · 河堤泵站"
-static var _checked: Dictionary[String, bool] = {}
+static var _checked: ActionMemo = ActionMemo.new(32)
 
 
 static func enabled(generated: Dictionary) -> bool:
@@ -60,7 +60,7 @@ static func problem(value: Dictionary) -> String:
 			or not SurvivalContracts.integer(value.get("slot"), 0, 2):
 		return "PUMP_ACTION_IDENTITY"
 	var identity: String = RecordEncoding.fingerprint(value)
-	if _checked.has(identity):
+	if _checked.lookup(identity) == true:
 		return ""
 	var campaign: Variant = value.get("campaign")
 	var build: Variant = value.get("build")
@@ -75,9 +75,7 @@ static func problem(value: Dictionary) -> String:
 	var expected: Dictionary = freeze(value)
 	if expected.is_empty() or identity != RecordEncoding.fingerprint(expected):
 		return "PUMP_ACTION_CANONICAL"
-	if _checked.size() >= 32:
-		_checked.clear()
-	_checked[identity] = true
+	_checked.store(identity, true)
 	return ""
 
 

@@ -7,12 +7,17 @@ const MAX_BYTES: int=16_777_216
 static var _entries: Dictionary={}
 static var _bytes: int=0
 static var _count: int=0
+static var _mutex: Mutex = Mutex.new()
 
 static func lookup(scope: String, value: Dictionary) -> Dictionary:
 	var stamp: int=FreezeProfile.enter("value_proof.lookup")
 	# Finite validated copies bound comparison depth even when the new input is invalid.
 	# Dictionary equality compares all nested typed values and ignores insertion order.
-	var rows: Array=_entries.get(scope,[])
+	# Published row lists are immutable. Take a reference under the lock, then
+	# compare the complete inputs outside it.
+	_mutex.lock()
+	var rows: Array = _entries.get(scope, [])
+	_mutex.unlock()
 	for index: int in range(rows.size()-1,-1,-1):
 		var row: Dictionary=rows[index]
 		if row.input==value:
@@ -29,12 +34,14 @@ static func remember(key: Dictionary, result: Variant) -> void:
 	var bytes: int=var_to_bytes(key.input).size()+var_to_bytes(result).size()
 	if bytes>MAX_BYTES:
 		return
+	var row: Dictionary = {"input":key.input.duplicate(true),
+		"result":result.duplicate(true) if result is Dictionary else result}
+	_mutex.lock()
 	if _count>=MAX_ENTRIES or _bytes+bytes>MAX_BYTES:
 		_entries.clear()
 		_bytes=0
 		_count=0
-	if not _entries.has(key.scope):
-		_entries[key.scope]=[]
-	_entries[key.scope].append({"input":key.input.duplicate(true),"result":result.duplicate(true) if result is Dictionary else result})
+	_entries[key.scope] = _entries.get(key.scope, []) + [row]
 	_bytes+=bytes
 	_count+=1
+	_mutex.unlock()

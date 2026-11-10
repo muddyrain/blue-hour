@@ -33,6 +33,10 @@ static func member(crew: Array, member_id: int) -> Dictionary:
 	return {}
 
 
+static func display_label(entry: Dictionary) -> String:
+	return "—" if entry.is_empty() else "%02d · %s" % [int(entry.id), entry.call_sign]
+
+
 static func new_crew() -> Array[Dictionary]:
 	var crew: Array[Dictionary] = [{"id":1,"health":200.0},{"id":2,"health":200.0}]
 	initialize(crew)

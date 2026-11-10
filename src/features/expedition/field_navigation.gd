@@ -9,6 +9,9 @@ const FOOT_RADIUS: float = 10.0
 var bounds: Rect2 = BOUNDS
 var obstacles: Array[Rect2] = []
 var _grid: AStarGrid2D = AStarGrid2D.new()
+# Published route certificates keep their geometry immutable, but AStar stores
+# search scratch data on the grid. Serialize queries on the shared instance.
+var _query_mutex: Mutex = Mutex.new()
 
 
 func configure(blockers: Array[Rect2], world_bounds: Rect2 = BOUNDS) -> void:
@@ -54,17 +57,21 @@ func copy_navigation() -> FieldNavigation:
 	copy.bounds = bounds
 	copy.obstacles = obstacles.duplicate()
 	copy._prepare_grid()
+	_query_mutex.lock()
 	for y: int in range(_grid.region.size.y):
 		for x: int in range(_grid.region.size.x):
 			var id: Vector2i = Vector2i(x, y)
 			if _grid.is_point_solid(id):
 				copy._grid.set_point_solid(id, true)
+	_query_mutex.unlock()
 	return copy
 
 
 func set_private_blocker(base: FieldNavigation, blocker: Rect2) -> void:
 	if obstacles.size() > base.obstacles.size():
+		base._query_mutex.lock()
 		_paint_blocker(base, obstacles[-1], false)
+		base._query_mutex.unlock()
 		obstacles.pop_back()
 	if blocker.has_area():
 		obstacles.append(blocker)
@@ -92,6 +99,7 @@ func is_clear(point: Vector2) -> bool:
 
 
 func path_between(start: Vector2, goal: Vector2) -> PackedVector2Array:
+	_query_mutex.lock()
 	var from_id: Vector2i = _nearest_walkable(start)
 	var to_id: Vector2i = _nearest_walkable(goal)
 	var points: PackedVector2Array = _grid.get_point_path(from_id, to_id)
@@ -100,6 +108,7 @@ func path_between(start: Vector2, goal: Vector2) -> PackedVector2Array:
 	if points.size() > 1 and start.distance_to(points[0]) <= CELL * 0.71:
 		if _segment_is_clear(start, points[1]):
 			points[0] = start
+	_query_mutex.unlock()
 	return points
 
 

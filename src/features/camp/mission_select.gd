@@ -389,7 +389,7 @@ func _refresh_departure_team(base: Dictionary, rations: Dictionary) -> void:
 			var mod: String = WorkshopV1.mod_for(base, item.instance_id)
 			if not mod.is_empty():
 				weapon += " · " + WorkshopV1.name_for(mod)
-		_review_details.add_child(CampStyle.label("%s · HP %d" % [member.call_sign, ceili(member.health)], 18))
+		_review_details.add_child(CampStyle.label("%s · HP %d" % [SurvivorRoster.display_label(member), ceili(member.health)], 18))
 		_review_details.add_child(CampStyle.label(weapon, 15, CampStyle.MUTED))
 		_review_details.add_child(HSeparator.new())
 	var powers: Dictionary = base.get("journey", {}).get("build", {}).get("powers", {})

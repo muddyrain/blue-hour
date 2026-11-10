@@ -448,8 +448,10 @@ func _matches_filter(item: Dictionary) -> bool:
 	var type: int = type_filter.selected
 	var status: int = status_filter.selected
 	var query: String = search.text.strip_edges().to_lower()
+	var instance_query: String = query.trim_prefix("#")
+	var matches_id: bool = not instance_query.is_empty() and WeaponInventory.short_id(item).to_lower().contains(instance_query)
 	return (status == 0 or status == _status(item)) and (type == 0 or type == (2 if melee else 1)) \
-		and (query.is_empty() or WeaponInventory.short_id(item).to_lower().contains(query) \
+		and (query.is_empty() or matches_id \
 		or WeaponInventory.definition(item.weapon_id).display_name.to_lower().contains(query))
 
 
@@ -484,7 +486,7 @@ func _rebuild_list() -> void:
 		var weapon: WeaponDefinition = WeaponInventory.definition(item.weapon_id)
 		var state: int = _status(item)
 		var owner: int = WeaponInventory.owner(_camp, item.instance_id)
-		var holder: String = _member_name(owner) if owner > 0 else "仓库"
+		var holder: String = _member_label(owner) if owner > 0 else "仓库"
 		var mod: String = WorkshopV1.mod_for(_camp, item.instance_id)
 		var quality: String = "稀有" if item.get("quality") == "rare" else "普通"
 		var traits: String = "Lv%d %s" % [int(item.get("weapon_level", 1)), quality]
@@ -523,7 +525,7 @@ func _update_targets() -> void:
 	target.clear()
 	for member: Dictionary in _camp.get("crew", []):
 		if float(member.health) > 0.0:
-			target.add_item(member.call_sign, int(member.id))
+			target.add_item(SurvivorRoster.display_label(member), int(member.id))
 	var index: int = target.get_item_index(_target_id)
 	if target.item_count == 0:
 		_target_id = 0
@@ -544,8 +546,8 @@ func _item_attributes(item: Dictionary) -> String:
 	return description if mod.is_empty() else description + " · " + WorkshopV1.name_for(mod)
 
 
-func _member_name(member_id: int) -> String:
-	return String(SurvivorRoster.member(_camp.get("crew", []), member_id).get("call_sign", "—"))
+func _member_label(member_id: int) -> String:
+	return SurvivorRoster.display_label(SurvivorRoster.member(_camp.get("crew", []), member_id))
 
 
 func _item_name(item: Dictionary) -> String:
@@ -586,7 +588,7 @@ func _refresh_detail() -> void:
 	var weapon: WeaponDefinition = WeaponInventory.definition(item.weapon_id)
 	var owner: int = WeaponInventory.owner(_camp, _selected)
 	_title.text = weapon.display_name
-	_meta.text = "#%s · %s · %s\n%s" % [WeaponInventory.short_id(item), STATUS[_status(item)], _member_name(owner) if owner > 0 else "仓库", _item_attributes(item)]
+	_meta.text = "#%s · %s · %s\n%s" % [WeaponInventory.short_id(item), STATUS[_status(item)], _member_label(owner) if owner > 0 else "仓库", _item_attributes(item)]
 	_meta.tooltip_text = "完整实例编号：" + _selected
 	_texture.texture = weapon.presentation.texture
 	if inventory:
@@ -621,8 +623,8 @@ func _show_comparison(item: Dictionary, owner: int) -> void:
 		return
 	var current_name: String = _item_name(current)
 	var chosen_name: String = _item_name(item)
-	var receiver: String = _member_name(_target_id)
-	var sender: String = _member_name(owner)
+	var receiver: String = _member_label(_target_id)
+	var sender: String = _member_label(owner)
 	_preview.text = "%s预览\n%s：%s → %s\n%s" % [verb, receiver, current_name, chosen_name,
 		("%s：%s → %s" % [sender, chosen_name, current_name]) if owner > 0 else ("库存：%s 回库" % current_name)]
 
@@ -717,7 +719,7 @@ func _magazine_preview(item: Dictionary, owner: int, mod: String) -> String:
 	var result: String = "%d → %d 发 · 基础换弹 %.2f → %.2f 秒" % [stock.capacity, option.capacity, stock.seconds, option.seconds]
 	if owner > 0:
 		var factor: float = float(_personal_factors(owner).get("reload", 1.0)) * float(_passive_factors().get("reload", 1.0))
-		result += "\n%s有效换弹 %.3f → %.3f 秒" % [_member_name(owner), float(stock.seconds) * factor, float(option.seconds) * factor]
+		result += "\n%s 有效换弹 %.3f → %.3f 秒" % [_member_label(owner), float(stock.seconds) * factor, float(option.seconds) * factor]
 	return result
 
 

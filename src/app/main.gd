@@ -35,6 +35,7 @@ var selected_supply: MissionSupply = preload("res://src/features/camp/supermarke
 var mission_select: MissionSelect
 var supply_panel: CampSupplyPanel
 var _mission_worker: Thread
+var _mission_request_key: String = ""
 var food: int = camp_rules.initial_food
 var last_day: Dictionary = {}
 var weapons: Array[Dictionary] = []
@@ -623,7 +624,7 @@ func return_to_title() -> void:
 
 
 func open_mission_select() -> void:
-	if phase != Phase.TITLE or _settings_open(true) or $Interface/Screen/Title/Start.disabled:
+	if phase != Phase.TITLE or _settings_open() or $Interface/Screen/Title/Start.disabled:
 		return
 	if hunger_trial and not _hunger_consented:
 		_hunger_confirmation.popup_centered(Vector2i(700,260))
@@ -644,27 +645,33 @@ func open_mission_select() -> void:
 
 func _load_mission_cards() -> void:
 	var base: Dictionary = camp_snapshot()
+	var request_key: String = RecordEncoding.fingerprint(base)
+	_mission_request_key = request_key
 	var rations: Dictionary = CampEconomy.rations(int(base.day), base.crew, int(base.food), camp_rules)
-	mission_select.show_waiting(base, rations)
-	if _mission_worker != null:
+	mission_select.show_waiting(base, rations, request_key.is_empty())
+	if request_key.is_empty() or _mission_worker != null:
 		return
-	# DailyActions uses shared certification caches. Only the worker runs that
-	# pipeline until joined. Camp and back navigation use read-only projections.
-	_mission_worker = Thread.new()
-	var error: Error = _mission_worker.start(_prepare_mission_cards.bind(base))
+	# Only the latest visible request may consume this worker's result.
+	var worker: Thread = Thread.new()
+	_mission_worker = worker
+	var error: Error = worker.start(_prepare_mission_cards.bind(base))
 	if error != OK:
 		_mission_worker = null
 		mission_select.show_waiting(base, rations, true)
 		return
-	while _mission_worker.is_alive():
+	while worker.is_alive():
 		await get_tree().process_frame
-	var prepared: Dictionary = _mission_worker.wait_to_finish()
-	_mission_worker = null
-	if not mission_select.visible:
-		_sync_camp_scene()
+	if _mission_worker != worker:
 		return
-	if phase != Phase.TITLE or not TransactionReceipt.same(base, camp_snapshot()):
+	var prepared: Dictionary = worker.wait_to_finish()
+	_mission_worker = null
+	if not mission_select.visible or _mission_request_key.is_empty():
+		return
+	if phase != Phase.TITLE or $Interface/Screen/Title/Start.disabled:
 		close_mission_select()
+		return
+	if _mission_request_key != request_key or not TransactionReceipt.same(base, camp_snapshot()):
+		_load_mission_cards()
 		return
 	if prepared.offers.is_empty():
 		mission_select.show_waiting(base, rations, true)
@@ -688,27 +695,27 @@ func _retry_mission_cards() -> void:
 
 
 func _leave_departure_for(action: StringName) -> void:
-	if _mission_worker == null:
+	if not mission_select.loading:
 		close_mission_select()
 		_camp_action(action, 0)
 
 
 func close_mission_select() -> void:
+	_mission_request_key = ""
 	mission_select.hide()
 	_title.show()
 	if is_instance_valid(_blue_hour_title_art) and is_instance_valid(camp_scene) and camp_scene.is_visible_in_tree():
-		if _mission_worker != null:
-			camp_scene.notice.text = "巴士仍在核验路线 · 可返回出击页查看"
 		camp_scene.restore_focus()
 	_request_audio(&"ui_back")
 
 
 func _select_mission(supply: MissionSupply) -> void:
-	if _departure_pending or _mission_worker != null or (is_instance_valid(_blue_hour_title_art) and phase != Phase.TITLE):
+	if _departure_pending or (mission_select.visible and mission_select.loading) or (is_instance_valid(_blue_hour_title_art) and phase != Phase.TITLE):
 		return
 	var from_menu: bool = is_instance_valid(_blue_hour_title_art) and mission_select.visible
 	var started: int = Time.get_ticks_msec()
 	_departure_pending = from_menu
+	_mission_request_key = ""
 	selected_supply = supply
 	mission_select.hide()
 	open_expedition()
@@ -1335,9 +1342,7 @@ func _close_sound_settings() -> void:
 	_request_audio(&"ui_back")
 
 
-func _settings_open(ignore_mission_worker: bool = false) -> bool:
-	if not ignore_mission_worker and _mission_worker != null:
-		return true
+func _settings_open() -> bool:
 	if is_instance_valid(supply_panel) and supply_panel.visible:
 		return true
 	if is_instance_valid(_equipment_catalog) and _equipment_catalog.visible:
@@ -2494,7 +2499,7 @@ func _sync_camp_scene() -> void:
 
 
 func _camp_action(action: StringName, member_id: int) -> void:
-	if not is_instance_valid(camp_scene) or not camp_scene.is_visible_in_tree() or _settings_open(action == &"bus") or _hunger_confirmation.visible or _progress_blocked or _requires_continue or not _camp_input_allowed():
+	if not is_instance_valid(camp_scene) or not camp_scene.is_visible_in_tree() or _settings_open() or _hunger_confirmation.visible or _progress_blocked or _requires_continue or not _camp_input_allowed():
 		return
 	match action:
 		&"bus": open_mission_select()

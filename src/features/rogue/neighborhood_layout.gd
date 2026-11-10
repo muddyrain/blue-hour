@@ -17,7 +17,7 @@ const DISTRICT_GUIDE: Dictionary = {
 	"enclosed_group":["住宅围合组团", "由院墙两端进入，绕到社区补给点。"],
 }
 const MAX_ATTEMPTS: int = 3
-static var _checked: Dictionary = {}
+static var _checked: ActionMemo = ActionMemo.new(129)
 
 static func generate(seed: String, size: String, topology: String) -> Dictionary:
 	for attempt: int in range(MAX_ATTEMPTS):
@@ -131,7 +131,7 @@ static func _profiled_validate(value: Variant, cached: bool = true) -> String:
 	if not value is Dictionary or value.size()!=16 or not value.has_all(["version","seed","size","topology","attempt","fallback","bounds","entities","roads","barriers","gates","bus","arrivals","enemy_points","rescue","id"]): return "NEIGHBORHOOD_FIELDS"
 	if value.version!=3 or not value.seed is String or value.seed.length()>128 or value["size"] not in SIZES or value.topology not in TOPOLOGIES or not SurvivalContracts.integer(value.attempt,0,2) or not value.fallback is bool: return "NEIGHBORHOOD_VERSION"
 	var signature: String = SurvivalContracts.fingerprint(value)
-	if cached and _checked.has(signature): return ""
+	if cached and _checked.lookup(signature) == true: return ""
 	if not TransactionReceipt.same(value,_assemble(value.seed,value["size"],value.topology,int(value.attempt),value.fallback)): return "NEIGHBORHOOD_CANONICAL"
 	var bounds: Rect2 = WorldLayout.rect(value.bounds)
 	var blocks: Array[Rect2] = []
@@ -164,8 +164,7 @@ static func _profiled_validate(value: Variant, cached: bool = true) -> String:
 		if path.is_empty() or path[-1].distance_to(target)>16: return "NEIGHBORHOOD_ROUTE"
 	for i: int in range(4):
 		if not nav.is_clear(start+Vector2.ONE*((i-1.5)*35.2)): return "NEIGHBORHOOD_GATHER"
-	if _checked.size()>128: _checked.clear()
-	_checked[signature]=true
+	_checked.store(signature, true)
 	return ""
 
 static func resource(data: Dictionary) -> StreetLayout:

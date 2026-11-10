@@ -14,7 +14,7 @@ const CACHE_SIZE: int = 8
 const KEYS: Array[String] = ["version", "id", "rect", "anchor", "landing", "near", "far",
 	"site_id", "layout", "closed_length", "open_length"]
 
-static var _closed: Dictionary[String, FieldNavigation] = {}
+static var _closed: ActionMemo = ActionMemo.new(CACHE_SIZE, true)
 
 
 static func enabled(action: Dictionary) -> bool:
@@ -54,15 +54,15 @@ static func navigation(action: Dictionary, opened: bool) -> FieldNavigation:
 	if opened or not enabled(action):
 		return original
 	var key: String = RecordEncoding.fingerprint(action)
-	if not _closed.has(key):
-		var stamp: int = FreezeProfile.enter("barricade.navigation_prepare")
-		var closed: FieldNavigation = original.copy_navigation()
-		closed.set_private_blocker(original, rect(action))
-		if _closed.size() >= CACHE_SIZE:
-			_closed.erase(_closed.keys()[0])
-		_closed[key] = closed
-		FreezeProfile.leave("barricade.navigation_prepare", stamp)
-	return _closed[key]
+	var cached: FieldNavigation = _closed.lookup(key) as FieldNavigation
+	if cached != null:
+		return cached
+	var stamp: int = FreezeProfile.enter("barricade.navigation_prepare")
+	var closed: FieldNavigation = original.copy_navigation()
+	closed.set_private_blocker(original, rect(action))
+	_closed.store(key, closed)
+	FreezeProfile.leave("barricade.navigation_prepare", stamp)
+	return closed
 
 
 static func _eligible(action: Dictionary) -> bool:

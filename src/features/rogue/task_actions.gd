@@ -12,13 +12,16 @@ const CONFIG: Dictionary = {
 	"airdrop":{"mission":"scavenge","name":"空投回收","cash":[4,7],"food":[0,2],"weapons":[1,1]}}
 const FOOD_TYPES: Array[String] = ["supermarket","convenience_store","eatery"]
 const GEAR_TYPES: Array[String] = ["warehouse","garage"]
-static var _checked: Dictionary = {}
-static var _offers: Dictionary = {}
+static var _checked: ActionMemo = ActionMemo.new(128)
+static var _offers: ActionMemo = ActionMemo.new(128)
 
 static func offers(base: Dictionary) -> Array[Dictionary]:
 	var cache_key: String = SurvivalContracts.fingerprint({"seed":base.journey.seed,"day":base.day,"eligible":RescuePoolState.available(base)})
-	if _offers.has(cache_key):
-		var cached: Array[Dictionary] = []; cached.assign(_offers[cache_key].duplicate(true)); return cached
+	var stored: Variant = _offers.lookup(cache_key)
+	if stored != null:
+		var cached: Array[Dictionary] = []
+		cached.assign(stored.duplicate(true))
+		return cached
 	var random: RandomNumberGenerator = RogueLayout.rng("daily-v4:"+String(base.journey.seed)+":"+str(int(base.day)))
 	var types: Array[String] = TYPES.duplicate()
 	if RescuePoolState.available(base).is_empty(): types.erase("rescue")
@@ -37,8 +40,7 @@ static func offers(base: Dictionary) -> Array[Dictionary]:
 		var offer: Dictionary = _make(base.journey.seed,int(base.day),i,types[i],bones[i],sizes[i],candidate if types[i]=="rescue" else 0)
 		if offer.is_empty(): offer=_make(base.journey.seed,int(base.day),i,types[i],"industrial",sizes[i],0)
 		result.append(offer)
-	if _offers.size()>=128: _offers.clear()
-	_offers[cache_key]=result.duplicate(true)
+	_offers.store(cache_key, result.duplicate(true))
 	return result
 
 static func _shuffle(values: Array[String], random: RandomNumberGenerator) -> void:
@@ -143,10 +145,9 @@ static func problem(value: Variant) -> String:
 	if value.type=="equipment" and value.layout.topology=="residential": return "TASK_THEME"
 	if (value.type=="rescue" and int(value.recruit) not in [3,4,5]) or (value.type!="rescue" and value.recruit!=0): return "TASK_RECRUIT"
 	var signature: String = SurvivalContracts.fingerprint(value)
-	if _checked.has(signature): return ""
+	if _checked.lookup(signature) == true: return ""
 	if not TransactionReceipt.same(value,_make(value.seed,int(value.day),int(value.slot),value.type,value.layout.topology,value.layout["size"],int(value.recruit))): return "TASK_CANONICAL"
-	if _checked.size()>=128: _checked.clear()
-	_checked[signature]=true
+	_checked.store(signature, true)
 	return ""
 
 static func matches(base: Dictionary, value: Variant) -> bool:

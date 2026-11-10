@@ -15,6 +15,7 @@ var frames: int = 0
 var failures: int = 0
 var legacy_hashes: Dictionary = {}
 var focus_observations: Array[bool] = []
+var exercise_departure_review: bool = false
 
 func _initialize() -> void:
 	root.unfocusable = true
@@ -56,6 +57,18 @@ func _tap(button: BaseButton) -> void:
 		viewport.push_input(event,true)
 		await _frame()
 	await _hold(5)
+	if exercise_departure_review or not app.mission_select.get("review_enabled"):
+		return
+	# Historical scenario drivers use the bus/card as a single logical step.
+	# M46 drivers verify the waiting screen and confirmation independently.
+	if button == app.camp_scene.hotspots[&"bus"]:
+		var deadline: int = Time.get_ticks_msec() + 90000
+		while app.mission_select.loading and Time.get_ticks_msec() < deadline:
+			await _frame()
+		_check(not app.mission_select.loading and not app.mission_select.daily_offers.is_empty(),
+			"bus finishes checking the actual task cards")
+	elif button in app.mission_select.choices:
+		await _tap(app.mission_select.depart_button)
 
 func _mark(label: String) -> void:
 	stages.append({"stage":label,"video_seconds":float(frames)/30.0,"camp_day":app.day,"pid":OS.get_process_id()})

@@ -33,6 +33,8 @@ var settled_sorties: int = 0
 var camp_rules: CampRules = preload("res://src/features/camp/camp_rules.tres")
 var selected_supply: MissionSupply = preload("res://src/features/camp/supermarket.tres")
 var mission_select: MissionSelect
+var supply_panel: CampSupplyPanel
+var _mission_worker: Thread
 var food: int = camp_rules.initial_food
 var last_day: Dictionary = {}
 var weapons: Array[Dictionary] = []
@@ -80,6 +82,7 @@ var _camp_legacy_return: Button
 var _camp_leave_dialog: ConfirmationDialog
 var _facility_confirmation: ConfirmationDialog
 var _facility_choice: String = ""
+var _facility_upgrade: bool = false
 var _camp_leave_action: Callable
 var _recruits: Array = []
 var hunger_trial: bool = false
@@ -189,12 +192,15 @@ func _ready() -> void:
 	$Interface/Screen/Title/Start.pressed.connect(open_mission_select)
 	mission_select = MissionSelect.new()
 	mission_select.player_mode = playable_entry
+	mission_select.review_enabled = playable_entry and not _developer_menu
 	mission_select.rescue_enabled = rescue_mode
 	mission_select.field_join_mode = field_join_mode
 	_screen.add_child(mission_select)
 	mission_select.hide()
 	mission_select.selected.connect(_select_mission)
 	mission_select.cancelled.connect(close_mission_select)
+	mission_select.retry_requested.connect(_retry_mission_cards)
+	mission_select.navigation_requested.connect(_leave_departure_for)
 	$Interface/Screen/Title/Practice.pressed.connect(open_practice)
 	$Interface/Screen/Title/Probe.pressed.connect(open_validation)
 	$Interface/Screen/Title/Reset.pressed.connect(reset_demo)
@@ -460,6 +466,9 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	if _mission_worker != null:
+		_mission_worker.wait_to_finish()
+		_mission_worker = null
 	if progress_session != null:
 		progress_session.close()
 	if is_instance_valid(audio):
@@ -614,31 +623,88 @@ func return_to_title() -> void:
 
 
 func open_mission_select() -> void:
-	if phase != Phase.TITLE or _settings_open() or $Interface/Screen/Title/Start.disabled:
+	if phase != Phase.TITLE or _settings_open(true) or $Interface/Screen/Title/Start.disabled:
 		return
 	if hunger_trial and not _hunger_consented:
 		_hunger_confirmation.popup_centered(Vector2i(700,260))
 		return
 	_title.hide()
-	if playable_entry:
+	if mission_select.review_enabled:
+		mission_select.show()
+		_load_mission_cards()
+	elif playable_entry:
 		var base: Dictionary = camp_snapshot()
 		mission_select.refresh_daily(base, CampEconomy.rations(int(base.day), base.crew, int(base.food), camp_rules))
 	else: mission_select.refresh_rescue(RescuePoolState.available(camp_snapshot()).is_empty() if pool_mode else not _recruits.is_empty(), RosterState.unavailable_reason(camp_snapshot()) if roster_mode else "四人历史编制已满" if pool_mode else "")
 	mission_select.show()
-	mission_select.choices[0].grab_focus()
+	if not mission_select.review_enabled:
+		mission_select.choices[0].grab_focus()
 	_request_audio(&"ui_confirm")
+
+
+func _load_mission_cards() -> void:
+	var base: Dictionary = camp_snapshot()
+	var rations: Dictionary = CampEconomy.rations(int(base.day), base.crew, int(base.food), camp_rules)
+	mission_select.show_waiting(base, rations)
+	if _mission_worker != null:
+		return
+	# DailyActions uses shared certification caches. Only the worker runs that
+	# pipeline until joined. Camp and back navigation use read-only projections.
+	_mission_worker = Thread.new()
+	var error: Error = _mission_worker.start(_prepare_mission_cards.bind(base))
+	if error != OK:
+		_mission_worker = null
+		mission_select.show_waiting(base, rations, true)
+		return
+	while _mission_worker.is_alive():
+		await get_tree().process_frame
+	var prepared: Dictionary = _mission_worker.wait_to_finish()
+	_mission_worker = null
+	if not mission_select.visible:
+		_sync_camp_scene()
+		return
+	if phase != Phase.TITLE or not TransactionReceipt.same(base, camp_snapshot()):
+		close_mission_select()
+		return
+	if prepared.offers.is_empty():
+		mission_select.show_waiting(base, rations, true)
+		return
+	mission_select.refresh_daily(base, rations, prepared)
+	if get_viewport().gui_get_focus_owner() == mission_select.cancel_button:
+		mission_select.choices[0].grab_focus()
+
+
+static func _prepare_mission_cards(base: Dictionary) -> Dictionary:
+	var offers: Array[Dictionary] = DailyActions.offers(base)
+	var supplies: Array[MissionSupply] = []
+	for offer: Dictionary in offers:
+		supplies.append(DailyActions.supply(offer))
+	return {"offers":offers, "supplies":supplies}
+
+
+func _retry_mission_cards() -> void:
+	if mission_select.visible and not mission_select.loading:
+		_load_mission_cards()
+
+
+func _leave_departure_for(action: StringName) -> void:
+	if _mission_worker == null:
+		close_mission_select()
+		_camp_action(action, 0)
 
 
 func close_mission_select() -> void:
 	mission_select.hide()
 	_title.show()
 	if is_instance_valid(_blue_hour_title_art) and is_instance_valid(camp_scene) and camp_scene.is_visible_in_tree():
+		if _mission_worker != null:
+			camp_scene.notice.text = "巴士仍在核验路线 · 可返回出击页查看"
 		camp_scene.restore_focus()
 	_request_audio(&"ui_back")
 
 
 func _select_mission(supply: MissionSupply) -> void:
-	if _departure_pending or (is_instance_valid(_blue_hour_title_art) and phase != Phase.TITLE):
+	if _departure_pending or _mission_worker != null or (is_instance_valid(_blue_hour_title_art) and phase != Phase.TITLE):
 		return
 	var from_menu: bool = is_instance_valid(_blue_hour_title_art) and mission_select.visible
 	var started: int = Time.get_ticks_msec()
@@ -893,6 +959,7 @@ func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}) -> vo
 		_battle_meta.campaign = CampaignRules.initial_mission(profile_id, true, true, true, true,
 			latest_rules, latest_rules, latest_rules, latest_rules, latest_rules, latest_rules)
 		if latest_rules:
+			CampFacilities.enable_tier_two(_battle_meta.campaign)
 			_battle_meta.campaign.night_hound_policy = NightHoundV1.VERSION
 			_battle_meta.campaign.workshop = WorkshopV1.initial()
 			_battle_meta.campaign.event_sortie_policy = EventSortieV1.VERSION
@@ -1268,7 +1335,11 @@ func _close_sound_settings() -> void:
 	_request_audio(&"ui_back")
 
 
-func _settings_open() -> bool:
+func _settings_open(ignore_mission_worker: bool = false) -> bool:
+	if not ignore_mission_worker and _mission_worker != null:
+		return true
+	if is_instance_valid(supply_panel) and supply_panel.visible:
+		return true
 	if is_instance_valid(_equipment_catalog) and _equipment_catalog.visible:
 		return true
 	if is_instance_valid(_facility_confirmation) and _facility_confirmation.visible:
@@ -1291,6 +1362,7 @@ func open_roster() -> void:
 			_roster_training(id)
 		)
 		roster_panel.closed.connect(close_roster)
+		roster_panel.navigation_requested.connect(_leave_roster_for)
 	if camp_prototype and SurvivorRoster.member(crew, roster_panel.selected_member_id).is_empty():
 		roster_panel.selected_member_id = int(crew[0].id)
 	_title.hide()
@@ -1307,8 +1379,19 @@ func close_roster(discard_pending: bool = false) -> void:
 		return
 	roster_panel.hide()
 	_title.show()
-	_roster_button.grab_focus()
+	if is_instance_valid(camp_scene) and camp_scene.is_visible_in_tree():
+		camp_scene.restore_focus()
+	else:
+		_roster_button.grab_focus()
 	_request_audio(&"ui_back")
+
+
+func _leave_roster_for(action: StringName, discard_pending: bool = false) -> void:
+	if not discard_pending and _guard_camp_editor(_leave_roster_for.bind(action, true)):
+		return
+	close_roster(true)
+	if action != &"camp":
+		_camp_action(action, 0)
 
 
 func open_growth(member_id: int, discard_pending: bool = false) -> void:
@@ -1366,11 +1449,14 @@ func _roster_equipment(member_id: int, discard_pending: bool = false) -> void:
 	close_roster(true)
 	_return_roster_member = member_id
 	open_loadout()
-	loadout_panel._selected_id = WeaponInventory.for_member(camp_snapshot(), member_id).instance_id
-	loadout_panel.refresh(camp_snapshot())
+	if loadout_panel.player_mode:
+		loadout_panel.select_for_member(member_id)
+	else:
+		loadout_panel._selected_id = WeaponInventory.for_member(camp_snapshot(), member_id).get("instance_id", "")
+		loadout_panel.refresh(camp_snapshot())
 
 
-func open_loadout() -> void:
+func open_loadout(workshop: bool = false) -> void:
 	if phase != Phase.TITLE or _settings_open() or _requires_continue or _progress_blocked:
 		return
 	if not is_instance_valid(loadout_panel):
@@ -1386,11 +1472,25 @@ func open_loadout() -> void:
 		loadout_panel.repair_requested.connect(repair_weapon)
 		loadout_panel.workshop_requested.connect(install_workshop_mod)
 		loadout_panel.closed.connect(close_loadout)
+		loadout_panel.navigation_requested.connect(_leave_loadout_for)
 	_title.hide()
 	loadout_panel.show()
 	loadout_panel.refresh(camp_snapshot())
-	loadout_panel.items.grab_focus()
+	if loadout_panel.player_mode:
+		if workshop:
+			loadout_panel.show_workshop()
+		else:
+			loadout_panel.show_inventory()
+	else:
+		loadout_panel.items.grab_focus()
 	_request_audio(&"ui_confirm")
+
+
+func _leave_loadout_for(action: StringName) -> void:
+	_return_roster_member = 0
+	close_loadout()
+	if not loadout_panel.visible and action != &"camp":
+		_camp_action(action, 0)
 
 
 func close_loadout() -> void:
@@ -1399,7 +1499,10 @@ func close_loadout() -> void:
 		return
 	loadout_panel.hide()
 	_title.show()
-	_loadout_button.grab_focus()
+	if is_instance_valid(camp_scene) and camp_scene.is_visible_in_tree():
+		camp_scene.restore_focus()
+	else:
+		_loadout_button.grab_focus()
 	_request_audio(&"ui_back")
 	if _return_roster_member > 0:
 		roster_panel.selected_member_id = _return_roster_member
@@ -1411,11 +1514,15 @@ func equip_weapon(member_id: int, identity: String) -> void:
 	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible or _progress_blocked:
 		return
 	if transactional_mode:
-		if _accept_transaction(progress_session.edit(camp_snapshot(),{"kind":"equip","member_id":member_id,"value":identity}),true):
+		var before: Dictionary = camp_snapshot()
+		if loadout_panel.player_mode and not loadout_panel.matches_equip(before, member_id, identity):
+			loadout_panel.refresh(before, "配装或持有人已变化，请重新预览。", _progress_dirty)
+			return
+		if _accept_transaction(progress_session.edit(before,{"kind":"equip","member_id":member_id,"value":identity}),true):
 			_request_audio(&"ui_confirm")
 		loadout_panel.refresh(camp_snapshot(),_progress_message,_progress_dirty)
 		if _progress_dirty:
-			loadout_panel.power_panel.retry_button.grab_focus()
+			loadout_panel.focus_retry()
 		return
 	_commit_loadout(WeaponInventory.equip(camp_snapshot(), member_id, identity))
 
@@ -1428,7 +1535,7 @@ func repair_weapon(identity: String) -> void:
 			_request_audio(&"ui_confirm")
 		loadout_panel.refresh(camp_snapshot(),_progress_message,_progress_dirty)
 		if _progress_dirty:
-			loadout_panel.power_panel.retry_button.grab_focus()
+			loadout_panel.focus_retry()
 		return
 	_commit_loadout(WeaponInventory.repair(camp_snapshot(), identity))
 
@@ -1447,7 +1554,7 @@ func install_workshop_mod(identity: String, mod: String) -> void:
 		_request_audio(&"ui_confirm")
 	loadout_panel.refresh(camp_snapshot(), "已安装%s · 使用工具箱 ×1、8 币" % WorkshopV1.name_for(mod) if saved else _progress_message, _progress_dirty)
 	if _progress_dirty:
-		loadout_panel.power_panel.retry_button.grab_focus()
+		loadout_panel.focus_retry()
 
 
 func _commit_loadout(transaction: Dictionary) -> void:
@@ -2272,7 +2379,7 @@ func _setup_camp_scene() -> void:
 	_facility_confirmation.confirmed.connect(_confirm_camp_facility)
 	_facility_confirmation.canceled.connect(func() -> void:
 		_facility_choice = ""
-		camp_scene.restore_focus.call_deferred())
+		_restore_facility_focus.call_deferred())
 	_screen.add_child(_facility_confirmation)
 	camp_scene.hide()
 	_camp_legacy_return = Button.new()
@@ -2286,13 +2393,21 @@ func _setup_camp_scene() -> void:
 
 
 
-func _offer_camp_facility(choice: String) -> void:
+func _offer_camp_facility(choice: String, upgrade: bool = false) -> void:
+	if not _camp_input_allowed() or _progress_dirty or not CampSupplyPanel.NAMES.has(choice):
+		return
 	var before: Dictionary = camp_snapshot()
-	if not _camp_input_allowed() or not CampFacilities.can_build(before, choice):
+	var offer: Dictionary = CampFacilities.upgrade_offer(before, choice) if upgrade else {}
+	if (upgrade and not offer.available) or (not upgrade and not CampFacilities.can_build(before, choice)):
 		return
 	_facility_choice = choice
-	_facility_confirmation.dialog_text = "花费 %d 货币建设%s？\n本旅程建设额度仅一次，确认保存后生效。" % [CampFacilities.BUILD_COST, CampSceneView.FACILITY_NAMES[choice]]
-	_facility_confirmation.popup_centered(Vector2i(540, 210))
+	_facility_upgrade = upgrade
+	var label: String = CampSupplyPanel.UPGRADES[choice] if upgrade else CampSupplyPanel.NAMES[choice]
+	var cost: int = int(offer.cost) if upgrade else CampFacilities.BUILD_COST
+	var effect: String = CampSupplyPanel.UPGRADE_EFFECTS[choice] if upgrade else CampSupplyPanel.EFFECTS[choice]
+	_facility_confirmation.ok_button_text = "确认投资并保存"
+	_facility_confirmation.dialog_text = "%s · 花费 %d 币 · 保存后余 %d 币\n%s" % [label, cost, int(before.cash) - cost, effect]
+	_facility_confirmation.popup_centered(Vector2i(630, 200))
 
 
 func _confirm_camp_facility() -> void:
@@ -2300,10 +2415,62 @@ func _confirm_camp_facility() -> void:
 	_facility_choice = ""
 	if phase != Phase.TITLE or not _camp_open or not transactional_mode or not CampSceneView.FACILITY_NAMES.has(choice):
 		return
-	if _accept_transaction(progress_session.edit(camp_snapshot(), {"kind": "facility", "member_id": 0, "value": choice}), true):
-		_progress_message = "%s已建成，建设支出已保存。" % CampSceneView.FACILITY_NAMES[choice]
+	var kind: String = "facility_upgrade" if _facility_upgrade else "facility"
+	if _accept_transaction(progress_session.edit(camp_snapshot(), {"kind":kind, "member_id":0, "value":choice}), true):
+		var label: String = CampSupplyPanel.UPGRADES[choice] if _facility_upgrade else CampSupplyPanel.NAMES[choice]
+		_progress_message = "%s已建成，支出已保存。" % label
+		_request_audio(&"ui_confirm")
 	_update_camp()
-	camp_scene.restore_focus.call_deferred()
+	_refresh_supply_panel()
+	_restore_facility_focus.call_deferred()
+
+
+func _restore_facility_focus() -> void:
+	if is_instance_valid(supply_panel) and supply_panel.visible:
+		supply_panel.back_button.grab_focus()
+	elif is_instance_valid(camp_scene):
+		camp_scene.restore_focus()
+
+
+func open_supplies() -> void:
+	if phase != Phase.TITLE or _settings_open() or _requires_continue or _progress_blocked:
+		return
+	if not is_instance_valid(supply_panel):
+		supply_panel = CampSupplyPanel.new()
+		supply_panel.theme = CampStyle.blue_hour_theme(_screen.theme)
+		_screen.add_child(supply_panel)
+		supply_panel.investment_requested.connect(_offer_camp_facility)
+		supply_panel.retry_requested.connect(_retry_facility)
+		supply_panel.navigation_requested.connect(_leave_supplies_for)
+	_title.hide()
+	supply_panel.show()
+	_refresh_supply_panel()
+	supply_panel.back_button.grab_focus()
+	_request_audio(&"ui_confirm")
+
+
+func _refresh_supply_panel() -> void:
+	if is_instance_valid(supply_panel) and supply_panel.visible:
+		var base: Dictionary = camp_snapshot()
+		supply_panel.refresh(base, CampEconomy.rations(day, base.crew, food, camp_rules), _progress_message, _progress_dirty)
+
+
+func _retry_facility() -> void:
+	if not _progress_dirty or not transactional_mode:
+		return
+	_accept_transaction(progress_session.retry(), true)
+	_refresh_supply_panel()
+
+
+func _leave_supplies_for(action: StringName) -> void:
+	if _facility_confirmation.visible:
+		return
+	supply_panel.hide()
+	_title.show()
+	camp_scene.restore_focus()
+	_request_audio(&"ui_back")
+	if action != &"camp":
+		_camp_action(action, 0)
 
 
 func _sync_camp_scene() -> void:
@@ -2327,7 +2494,7 @@ func _sync_camp_scene() -> void:
 
 
 func _camp_action(action: StringName, member_id: int) -> void:
-	if not is_instance_valid(camp_scene) or not camp_scene.is_visible_in_tree() or _settings_open() or _hunger_confirmation.visible or _progress_blocked or _requires_continue or not _camp_input_allowed():
+	if not is_instance_valid(camp_scene) or not camp_scene.is_visible_in_tree() or _settings_open(action == &"bus") or _hunger_confirmation.visible or _progress_blocked or _requires_continue or not _camp_input_allowed():
 		return
 	match action:
 		&"bus": open_mission_select()
@@ -2339,8 +2506,13 @@ func _camp_action(action: StringName, member_id: int) -> void:
 				roster_panel.selected_member_id = member_id
 				roster_panel.refresh(camp_snapshot())
 				roster_panel.buttons_by_id[member_id].grab_focus()
-		&"weapons": open_loadout()
-		&"supplies": camp_scene.open_info(action)
+		&"weapons", &"inventory": open_loadout()
+		&"workshop": open_loadout(true)
+		&"supplies":
+			if camp_scene.player_mode:
+				open_supplies()
+			else:
+				camp_scene.open_info(action)
 		&"training":
 			if training_mode:
 				open_training()
@@ -2373,7 +2545,11 @@ func _camp_escape() -> bool:
 	# LineEdit consumes ui_cancel before _unhandled_input, so this scope owns its back intent.
 	if not camp_prototype or phase != Phase.TITLE or _new_game_confirmation.visible or _hunger_confirmation.visible or (is_instance_valid(_camp_leave_dialog) and _camp_leave_dialog.visible):
 		return false
-	if is_instance_valid(training_panel) and training_panel.visible:
+	if is_instance_valid(_facility_confirmation) and _facility_confirmation.visible:
+		return false
+	if is_instance_valid(supply_panel) and supply_panel.visible:
+		_leave_supplies_for(&"camp")
+	elif is_instance_valid(training_panel) and training_panel.visible:
 		if training_panel.confirmation.visible:
 			return false
 		close_training()
@@ -2390,7 +2566,8 @@ func _camp_escape() -> bool:
 		if loadout_panel.confirmation.visible or loadout_panel.power_panel.confirmation.visible \
 			or loadout_panel.workshop_confirmation.visible:
 			return false
-		close_loadout()
+		if not loadout_panel.cancel_swap_preview() and not loadout_panel.back_from_workshop():
+			close_loadout()
 	elif mission_select.visible:
 		close_mission_select()
 	elif is_instance_valid(sound_settings) and sound_settings.visible:
@@ -2743,7 +2920,7 @@ func _edit_power(request: Dictionary, success: String) -> void:
 	var saved: bool = _accept_transaction(progress_session.edit(camp_snapshot(),request),true)
 	loadout_panel.refresh(camp_snapshot(),success if saved else _progress_message,_progress_dirty)
 	if _progress_dirty:
-		loadout_panel.power_panel.retry_button.grab_focus()
+		loadout_panel.focus_retry()
 
 
 func retry_power_edit() -> void:

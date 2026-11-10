@@ -60,9 +60,18 @@ func restore(value: Dictionary) -> void:
 	rounds=int(value.rounds);reloading=value.reloading;remaining=float(value.remaining)
 
 static func parameters(gun: String, mod: String = "") -> Dictionary:
+	var stock: Dictionary = CombatEquipment.magazine(gun)
 	if mod.is_empty():
-		return CombatEquipment.magazine(gun)
-	return CARBINE_MODS.get(mod, {}) if gun == "carbine" else {}
+		return stock
+	if gun == "carbine":
+		return CARBINE_MODS.get(mod, {})
+	if gun == "long_rifle":
+		match mod:
+			EXTENDED:
+				return {"capacity": int(stock.capacity) + 2, "seconds": float(stock.seconds) + 0.35}
+			QUICK:
+				return {"capacity": maxi(1, int(stock.capacity) - 2), "seconds": maxf(0.60, float(stock.seconds) - 0.35)}
+	return {}
 
 static func problem(value: Variant, identity: String, gun: String, factor: float = 1.0, mod: String = "") -> String:
 	var modified: bool = not mod.is_empty()

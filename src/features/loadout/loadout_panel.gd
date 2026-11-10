@@ -8,10 +8,12 @@ signal workshop_requested(instance_id: String, mod: String)
 signal build_requested(slot: int, item_id: String)
 signal power_requested(ability_id: String)
 signal closed
+signal navigation_requested(action: StringName)
 
 var power_panel: PowerLoadoutPanel
 var build_panel: BuildItemsPanel
 var player_mode: bool = false
+var armory: CampArmoryView
 
 var items: ItemList
 var equip_buttons: Array[Button] = []
@@ -46,6 +48,9 @@ func _ready() -> void:
 	background.color = Color("10232d")
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
+	if player_mode:
+		_setup_armory()
+		return
 	var margins: MarginContainer = MarginContainer.new()
 	margins.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side: String in ["left", "right"]:
@@ -150,6 +155,9 @@ func _ready() -> void:
 func refresh(data: Dictionary, feedback: String = "", retry_power: bool = false) -> void:
 	_data = data.duplicate(true)
 	_retry_power = retry_power
+	if is_instance_valid(armory):
+		armory.refresh(_data, feedback, retry_power)
+		return
 	power_panel.present(data,not CampaignState.ended(data) and not retry_power,retry_power)
 	build_panel.visible=BuildState.enabled(data)
 	if build_panel.visible:
@@ -209,6 +217,74 @@ func refresh(data: Dictionary, feedback: String = "", retry_power: bool = false)
 			label.tooltip_text = WeaponInventory.MECHANIC_TITLE + " · 武器维修减 3 币\n" + label.tooltip_text
 	_crew.text = "货币 %d\n食物 %d" % [int(_data.cash),int(_data.food)]
 	message.text = feedback if not feedback.is_empty() else "选择一件武器，再配给指定队员；已装备的武器可直接交换。"
+
+
+func _setup_armory() -> void:
+	armory = CampArmoryView.new()
+	armory.name = "CampArmory"
+	add_child(armory)
+	items = armory.items
+	message = armory.message
+	back_button = armory.back_button
+	confirmation = armory.confirmation
+	workshop_confirmation = armory.workshop_confirmation
+	workshop_buttons = armory.workshop_buttons
+	repair_button = armory.repair_button
+	power_panel = armory.power_panel
+	build_panel = armory.build_panel
+	armory.equip_requested.connect(equip_requested.emit)
+	armory.repair_requested.connect(repair_requested.emit)
+	armory.workshop_requested.connect(workshop_requested.emit)
+	armory.selection_changed.connect(func(identity: String) -> void: _selected_id = identity)
+	armory.navigation_requested.connect(func(action: StringName) -> void:
+		if action == &"camp":
+			closed.emit()
+		else:
+			navigation_requested.emit(action))
+	build_panel.requested.connect(build_requested.emit)
+	power_panel.requested.connect(power_requested.emit)
+
+
+func show_inventory() -> void:
+	if is_instance_valid(armory):
+		armory.show_inventory()
+
+
+func show_workshop(instance_id: String = "") -> void:
+	if is_instance_valid(armory):
+		armory.show_workshop(instance_id)
+
+
+func back_from_workshop() -> bool:
+	return is_instance_valid(armory) and armory.back_from_workshop()
+
+
+func cancel_swap_preview() -> bool:
+	return is_instance_valid(armory) and armory.cancel_swap_preview()
+
+
+func select_for_member(member_id: int) -> void:
+	var item: Dictionary = WeaponInventory.for_member(_data, member_id)
+	if is_instance_valid(armory):
+		armory.select_inventory(item.get("instance_id", ""), member_id)
+	elif not item.is_empty():
+		_selected_id = item.instance_id
+		refresh(_data)
+
+
+func focus_inventory() -> void:
+	items.grab_focus()
+
+
+func focus_retry() -> void:
+	if is_instance_valid(armory):
+		armory.focus_retry()
+	else:
+		power_panel.retry_button.grab_focus()
+
+
+func matches_equip(data: Dictionary, member_id: int, instance_id: String) -> bool:
+	return not is_instance_valid(armory) or armory.matches_equip(data, member_id, instance_id)
 
 
 func _select(index: int) -> void:

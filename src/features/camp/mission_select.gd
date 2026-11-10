@@ -4,6 +4,8 @@ extends Control
 
 signal selected(supply: MissionSupply)
 signal cancelled
+signal retry_requested
+signal navigation_requested(action: StringName)
 
 const Supplies: Array[MissionSupply] = [preload("res://src/features/camp/scavenge.tres"), preload("res://src/features/camp/supermarket.tres")]
 const SHOP: Texture2D = preload("res://assets/candidates/shop_02.png")
@@ -31,6 +33,14 @@ var player_mode: bool = false
 var field_join_mode: bool = false
 var rescue_completed: bool = false
 var cancel_button: Button
+var depart_button: Button
+var loading: bool = false
+var review_enabled: bool = false
+var _retry_button: Button
+var _review_details: VBoxContainer
+var _review_target: Label
+var _selected_index: int = -1
+var _review_nav: Array[Button] = []
 
 
 func _ready() -> void:
@@ -54,16 +64,25 @@ func _ready() -> void:
 	var column: VBoxContainer = VBoxContainer.new()
 	column.add_theme_constant_override("separation", 12 if player_mode else 16)
 	margins.add_child(column)
-	_heading = CampStyle.label("选择行动" if player_mode else "行动地图 / 旧街", 34 if player_mode else 32)
+	_heading = CampStyle.label("准备出击" if review_enabled else ("选择行动" if player_mode else "行动地图 / 旧街"), 34 if player_mode else 32)
 	column.add_child(_heading)
 	_subtitle = CampStyle.label("选择此行的补给方向，准备好后出发。", 18, CampStyle.MUTED)
 	column.add_child(_subtitle)
 	var row: HBoxContainer = HBoxContainer.new()
 	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	if player_mode:
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 16 if player_mode else 24)
-	column.add_child(row)
+	if review_enabled:
+		var content: HBoxContainer = HBoxContainer.new()
+		content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		content.add_theme_constant_override("separation", 14)
+		column.add_child(content)
+		content.add_child(row)
+		_build_departure_review(content)
+	else:
+		column.add_child(row)
 	var available: Array[MissionSupply] = Supplies.duplicate()
 	if rescue_enabled: available.append(preload("res://src/features/camp/rescue.tres"))
 	_active.assign(available)
@@ -82,6 +101,10 @@ func _ready() -> void:
 		panel.add_child(card)
 		var rescue: bool = supply.id == &"rescue"
 		var title: Label = CampStyle.label("%02d / %s" % [index + 1, RescueTarget.ACTION_TITLE if rescue else supply.layout.display_name], 24)
+		if review_enabled:
+			title.add_theme_font_size_override("font_size", 18)
+			title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		if player_mode:
 			var top: HBoxContainer = HBoxContainer.new()
 			top.add_theme_constant_override("separation", 10)
@@ -122,7 +145,7 @@ func _ready() -> void:
 		var button: Button = Button.new()
 		button.text = "前往救援 →" if index == 2 else ("出发搜集 →" if index == 0 else "前往超市 →")
 		button.custom_minimum_size.y = 46 if player_mode else 52
-		button.pressed.connect(func() -> void: selected.emit(_active[index]))
+		button.pressed.connect(_choose.bind(index))
 		card.add_child(button)
 		choices.append(button)
 		if player_mode:
@@ -135,7 +158,23 @@ func _ready() -> void:
 	if player_mode:
 		cancel_button.custom_minimum_size.x = 184
 		cancel_button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	column.add_child(cancel_button)
+	if review_enabled:
+		var footer: HBoxContainer = HBoxContainer.new()
+		column.add_child(footer)
+		footer.add_child(cancel_button)
+		for action: StringName in [&"crew", &"weapons", &"workshop", &"supplies"]:
+			var nav: Button = Button.new()
+			nav.text = {&"crew":"队员", &"weapons":"装备仓", &"workshop":"工坊", &"supplies":"补给"}[action]
+			nav.pressed.connect(navigation_requested.emit.bind(action))
+			footer.add_child(nav)
+			_review_nav.append(nav)
+		_retry_button = Button.new()
+		_retry_button.text = "重试生成"
+		_retry_button.pressed.connect(retry_requested.emit)
+		footer.add_child(_retry_button)
+		_retry_button.hide()
+	else:
+		column.add_child(cancel_button)
 	if player_mode:
 		_link_choices()
 
@@ -151,8 +190,20 @@ func refresh_rescue(completed: bool, reason: String = "") -> void:
 		_link_choices()
 
 
-func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
-	daily_offers = DailyActions.offers(base)
+func refresh_daily(base: Dictionary, rations: Dictionary = {}, prepared: Dictionary = {}) -> void:
+	if prepared.is_empty():
+		daily_offers = DailyActions.offers(base)
+	else:
+		daily_offers.assign(prepared.offers)
+	loading = false
+	_selected_index = -1
+	if review_enabled:
+		_retry_button.hide()
+		depart_button.disabled = true
+		for nav: Button in _review_nav:
+			nav.disabled = false
+		_review_target.text = "选择左侧一张行动卡"
+		_refresh_departure_team(base, rations)
 	var action_choices: bool = CampaignRules.action_choices_enabled(base.get("journey", {}).get("campaign"))
 	var has_mission_cards: bool = daily_offers.any(func(offer: Dictionary) -> bool: return offer.get("mission_policy") == 1)
 	_subtitle.text = "比较主收益、路线与风险。物资和线索随生还归航确认。" if has_mission_cards else "选择此行的补给方向，准备好后出发。"
@@ -162,6 +213,8 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 		_heading.text = ("选择行动" if player_mode else String(display.title)) + " · " + String(display.progress)
 		if action_choices and player_mode:
 			_heading.text = "选择行动 · 第 %d 天 · %s" % [int(base.day), display.progress]
+	if review_enabled:
+		_heading.text = _heading.text.replace("选择行动", "准备出击")
 	for index: int in range(choices.size()):
 		var panel: PanelContainer = _card_panels[index]
 		panel.visible = index < daily_offers.size()
@@ -169,7 +222,7 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 			panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER if daily_offers.size() == 1 else Control.SIZE_EXPAND_FILL
 			panel.custom_minimum_size.x = 366 if daily_offers.size() == 1 else 0
 		if index>=daily_offers.size(): continue
-		var supply: MissionSupply = DailyActions.supply(daily_offers[index])
+		var supply: MissionSupply = DailyActions.supply(daily_offers[index]) if prepared.is_empty() else prepared.supplies[index]
 		_active[index] = supply
 		var pressure: Label = _campaign_pressures[index]
 		pressure.visible = CampaignPressureV1.enabled(supply.generated)
@@ -252,6 +305,102 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 			_refresh_blue_hour_card(index, supply.generated)
 	if player_mode:
 		_link_choices()
+
+
+func show_waiting(base: Dictionary, rations: Dictionary, failed: bool = false) -> void:
+	loading = not failed
+	daily_offers.clear()
+	_selected_index = -1
+	_heading.text = "准备出击 · 第 %d 天" % int(base.day)
+	_subtitle.text = "正在核验今日路线与任务。可以返回营地。" if loading else "未取得可出击的行动。可以重试或返回营地。"
+	for index: int in range(choices.size()):
+		choices[index].disabled = true
+		_card_panels[index].hide()
+	depart_button.disabled = true
+	for nav: Button in _review_nav:
+		nav.disabled = loading
+	_retry_button.visible = failed
+	_review_target.text = "等待任务卡" if loading else "暂无可用任务卡"
+	_refresh_departure_team(base, rations)
+	_link_choices()
+	cancel_button.grab_focus()
+
+
+func _choose(index: int) -> void:
+	if not review_enabled:
+		selected.emit(_active[index])
+		return
+	if loading or index >= daily_offers.size() or choices[index].disabled:
+		return
+	_selected_index = index
+	_review_target.text = _titles[index].text
+	for row: int in range(choices.size()):
+		choices[row].text = "当前选择" if row == index else "选择此行动 →"
+	depart_button.disabled = false
+	_link_choices()
+	depart_button.grab_focus()
+
+
+func _confirm_departure() -> void:
+	if not loading and _selected_index >= 0 and _selected_index < daily_offers.size():
+		selected.emit(_active[_selected_index])
+
+
+func _build_departure_review(parent: Container) -> void:
+	var panel: PanelContainer = PanelContainer.new()
+	panel.custom_minimum_size.x = 292
+	panel.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.PANEL))
+	parent.add_child(panel)
+	var body: VBoxContainer = VBoxContainer.new()
+	body.add_theme_constant_override("separation", 10)
+	panel.add_child(body)
+	body.add_child(CampStyle.label("出击小队", 23))
+	var scroll: ScrollContainer = ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_child(scroll)
+	_review_details = VBoxContainer.new()
+	_review_details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_review_details.add_theme_constant_override("separation", 10)
+	scroll.add_child(_review_details)
+	_review_target = CampStyle.label("", 17, CampStyle.TEAL)
+	_review_target.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_child(_review_target)
+	depart_button = Button.new()
+	depart_button.text = "确认出击 →"
+	depart_button.custom_minimum_size.y = 46
+	depart_button.disabled = true
+	CampStyle.blue_hour_primary(depart_button)
+	depart_button.pressed.connect(_confirm_departure)
+	body.add_child(depart_button)
+
+
+func _refresh_departure_team(base: Dictionary, rations: Dictionary) -> void:
+	for child: Node in _review_details.get_children():
+		_review_details.remove_child(child)
+		child.queue_free()
+	for member: Dictionary in base.crew:
+		if float(member.health) <= 0.0:
+			continue
+		var item: Dictionary = WeaponInventory.for_member(base, int(member.id))
+		var weapon: String = "未配装"
+		if not item.is_empty():
+			weapon = "%s %s" % [WeaponInventory.definition(item.weapon_id).display_name, WeaponInventory.short_id(item)]
+			var mod: String = WorkshopV1.mod_for(base, item.instance_id)
+			if not mod.is_empty():
+				weapon += " · " + WorkshopV1.name_for(mod)
+		_review_details.add_child(CampStyle.label("%s · HP %d" % [member.call_sign, ceili(member.health)], 18))
+		_review_details.add_child(CampStyle.label(weapon, 15, CampStyle.MUTED))
+		_review_details.add_child(HSeparator.new())
+	var powers: Dictionary = base.get("journey", {}).get("build", {}).get("powers", {})
+	var equipped: PackedStringArray = []
+	for id: String in powers.get("slots", [powers.get("slot", "")]):
+		if not id.is_empty():
+			equipped.append(SpecialPowers.definition(id).get("name", id))
+	var support: Label = CampStyle.label("支援 · %s" % ("、".join(equipped) if not equipped.is_empty() else "能力槽空置"), 16, CampStyle.TEAL)
+	support.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_review_details.add_child(support)
+	_review_details.add_child(CampStyle.label("口粮 %d · 下餐需 %d" % [base.food, rations.get("required", 0)], 16, CampStyle.MUTED))
 
 
 static func _event_card_text(generated: Dictionary) -> String:
@@ -388,7 +537,15 @@ func _link_choices() -> void:
 	for index: int in range(choices.size()):
 		if _card_panels[index].visible and not choices[index].disabled:
 			stops.append(choices[index])
+	if review_enabled and not depart_button.disabled:
+		stops.append(depart_button)
 	stops.append(cancel_button)
+	if review_enabled:
+		for nav: Button in _review_nav:
+			if not nav.disabled:
+				stops.append(nav)
+		if _retry_button.visible:
+			stops.append(_retry_button)
 	for index: int in range(stops.size()):
 		var button: Button = stops[index]
 		var previous: NodePath = stops[posmod(index - 1, stops.size())].get_path()

@@ -12,11 +12,12 @@ static func candidate(ledger: Dictionary) -> Dictionary:
 		"victim_ids":[],"applied":false}
 
 
-static func settle(food: Dictionary, battle: Array, policy: Dictionary, binding: Dictionary = {}, limits: Dictionary = {}) -> Dictionary:
-	if not SurvivalContracts.food_problem(food).is_empty():
+static func settle(food: Dictionary, battle: Array, policy: Dictionary, binding: Dictionary = {}, limits: Dictionary = {},
+		expected_facility_food: int = -1) -> Dictionary:
+	if not SurvivalContracts.food_problem(food, expected_facility_food).is_empty():
 		return {"error":"FOOD_LEDGER"}
 	if policy.get("ruleset_id") == DIRECT:
-		return _direct(food, battle, policy, binding, limits)
+		return _direct(food, battle, policy, binding, limits, expected_facility_food)
 	var shortage: int = int(food.food_shortage)
 	if shortage > 0 and policy.is_empty():
 		return {"error":"POLICY_REQUIRED", "reason":"HUNGER_RULE"}
@@ -40,7 +41,7 @@ static func settle(food: Dictionary, battle: Array, policy: Dictionary, binding:
 			"provided":float(food.ration_per_member)*(1.0-fraction),"nominal_damage":nominal,"actual_damage":damage})
 	var ledger: Dictionary = {"ruleset_id":policy.get("ruleset_id", "NO_SHORTAGE"),
 		"ration_member_ids":food.ration_member_ids.duplicate(),"effects":effects}
-	var issue: String = SurvivalContracts.ledgers_problem(food, ledger, battle, limits)
+	var issue: String = SurvivalContracts.ledgers_problem(food, ledger, battle, limits, expected_facility_food)
 	return {"error":"", "ledger":ledger,"allocation":allocation} if issue.is_empty() else {"error":issue}
 
 
@@ -51,7 +52,8 @@ static func description(ledger: Dictionary) -> String:
 	return "缺粮 %d：成员损失候选 %d 人，尚未应用；原作可能减员。" % [ledger.food_shortage, result.loss_count]
 
 
-static func _direct(food: Dictionary, battle: Array, policy: Dictionary, binding: Dictionary, limits: Dictionary = {}) -> Dictionary:
+static func _direct(food: Dictionary, battle: Array, policy: Dictionary, binding: Dictionary, limits: Dictionary,
+		expected_facility_food: int) -> Dictionary:
 	if policy.size() != 3 or policy.get("scope") != "ISOLATED_CANDIDATE" or policy.get("source") != "PROJECT_TEMP" or food.ration_per_member != 1:
 		return {"error":"DIRECT_POLICY"}
 	if binding.size() != 5 or not binding.has_all(["run_id", "root_id", "transaction_id", "base_hash", "rules_hash"]):
@@ -97,5 +99,5 @@ static func _direct(food: Dictionary, battle: Array, policy: Dictionary, binding
 		effects.append({"id":id, "health_before":member.health, "health_after":0.0 if selected else member.health, "outcome":outcome})
 		allocation.append({"id":id, "required":1, "provided":0 if selected else 1, "outcome":outcome})
 	var ledger: Dictionary = {"ruleset_id":DIRECT, "ration_member_ids":ids, "victim_ids":victims, "selection_hash":seed, "effects":effects}
-	var issue: String = SurvivalContracts.ledgers_problem(food, ledger, battle, limits)
+	var issue: String = SurvivalContracts.ledgers_problem(food, ledger, battle, limits, expected_facility_food)
 	return {"error":"", "ledger":ledger, "allocation":allocation} if issue.is_empty() else {"error":issue}

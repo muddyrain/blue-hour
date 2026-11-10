@@ -38,6 +38,7 @@ var _return_summary: PanelContainer
 var _return_goods: Label
 var _return_text: Label
 var _return_advice: Label
+var _return_objective: Label
 var _facilities: PanelContainer
 var _facility_heading: Label
 var _team_scroll: ScrollContainer
@@ -167,6 +168,8 @@ func _build_blue_hour_header() -> void:
 	return_row.add_child(return_details)
 	_return_text = CampStyle.label("", 16)
 	return_details.add_child(_return_text)
+	_return_objective = CampStyle.label("", 14, CampStyle.TEAL)
+	return_details.add_child(_return_objective)
 	_return_advice = CampStyle.label("", 14, CampStyle.AMBER)
 	return_details.add_child(_return_advice)
 
@@ -271,11 +274,11 @@ func _build_blue_hour_footer() -> void:
 	var row: HBoxContainer = HBoxContainer.new()
 	row.add_theme_constant_override("separation", 9)
 	column.add_child(row)
-	var labels: Dictionary[StringName, String] = {&"home":"返回主菜单", &"crew":"队伍档案", &"weapons":"武器整备",
-		&"supplies":"物资口粮", &"training":"篝火训练", &"sound":"声音", &"quit":"退出"}
+	var labels: Dictionary[StringName, String] = {&"home":"主菜单", &"crew":"队员", &"weapons":"装备仓",
+		&"workshop":"工坊", &"supplies":"补给与设施", &"training":"训练", &"sound":"声音", &"quit":"退出"}
 	for action: StringName in labels:
 		var button: Button = _blue_hour_button(row, action, labels[action])
-		if action in [&"crew", &"weapons", &"supplies", &"training"]:
+		if action in [&"crew", &"weapons", &"workshop", &"supplies", &"training"]:
 			hotspots[action] = button
 		else:
 			footer_buttons[action] = button
@@ -418,11 +421,15 @@ func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, r
 	_return_summary.visible = not last.is_empty()
 	if not last.is_empty():
 		var facility_meal: bool = int(last.get("facility_food", 0)) > 0
-		CampStyle.place(_return_summary, Rect2(42, 480, 748, 103) if facility_meal else Rect2(42, 505, 748, 78))
+		var task: Dictionary = last.get("task", {})
+		var extended: bool = facility_meal or not task.is_empty()
+		CampStyle.place(_return_summary, Rect2(42, 480, 748, 103) if extended else Rect2(42, 505, 748, 78))
 		var returned_weapons: Array = data.weapons.filter(func(item: Dictionary) -> bool:
 			return item.get("acquired_sortie") == data.last_settlement_id)
 		_return_goods.text = "入库 %d 币 · %d 件武器" % [last.cash_gained, returned_weapons.size()]
 		_return_text.text = ReturnFeedback.food_text(last)
+		_return_objective.visible = not task.is_empty()
+		_return_objective.text = TaskActions.summary_text(task) if not task.is_empty() else ""
 		_return_advice.text = "损坏武器可先在武器整备中维修，再配装。"
 		_return_advice.visible = returned_weapons.any(func(item: Dictionary) -> bool: return item.condition == "damaged")
 	eligibility_text.text = reason
@@ -441,7 +448,7 @@ func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, r
 	var active: Array[int] = world.visible_member_ids
 	_team_count.text = "%d 人在营 · 选择队员查看详情" % active.size()
 	hotspots[&"crew"].set_meta("member_id", active[0] if not active.is_empty() else 0)
-	hotspots[&"training"].text = "篝火训练" if TrainingState.is_family(data) else "篝火休憩"
+	hotspots[&"training"].text = "训练" if TrainingState.is_family(data) else "休憩"
 	for id: int in member_buttons:
 		var button: Button = member_buttons[id]
 		button.visible = id in active
@@ -577,8 +584,8 @@ func _announce(button: Button, text: String) -> void:
 
 func _link_focus() -> void:
 	var sequence: Array[Button] = []
-	for action: StringName in [&"bus", &"crew", &"weapons", &"supplies", &"training"]:
-		if not hotspots[action].disabled:
+	for action: StringName in [&"bus", &"crew", &"weapons", &"workshop", &"supplies", &"training"]:
+		if hotspots.has(action) and not hotspots[action].disabled:
 			sequence.append(hotspots[action])
 	for id: int in [1, 2, 3, 4, 5]:
 		if member_buttons[id].visible:

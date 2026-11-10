@@ -26,6 +26,9 @@ static func problem(camp: Dictionary) -> String:
 	if value.outcome!="DEFEAT" and camp.journey.state!="ACTIVE": return "CAMPAIGN_LIFE_SOURCE"
 	if value.outcome!="ACTIVE" and value.result_transaction!=camp.last_settlement_id: return "CAMPAIGN_RESULT_SOURCE"
 	if value.outcome=="VICTORY" and ((not CampaignRules.is_investigation(value) and camp.settled_sorties<5) or not camp.last_day.get("evacuated",false)): return "CAMPAIGN_VICTORY_SOURCE"
+	issue = BillboardIntelV1.camp_problem(camp)
+	if not issue.is_empty():
+		return issue
 	return WorkshopV1.problem(camp)
 
 static func settled(before: Dictionary, after: Dictionary, report: Dictionary, generated: Dictionary) -> Dictionary:
@@ -45,4 +48,9 @@ static func settled(before: Dictionary, after: Dictionary, report: Dictionary, g
 	if value.outcome!="ACTIVE": value.result_transaction=report.sortie_id
 	if WorkshopV1.enabled(before):
 		value.workshop = WorkshopV1.settled(before, generated, report)
+	if BillboardIntelV1.enabled(value):
+		value.erase("billboard_intel")
+		var opportunity: Dictionary = BillboardIntelV1.earned(after, value, report, generated)
+		if not opportunity.is_empty():
+			value.billboard_intel = opportunity
 	return value

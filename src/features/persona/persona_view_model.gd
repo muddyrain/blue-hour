@@ -75,7 +75,9 @@ static func field(world: Expedition, actor: FieldActor, status: String) -> Dicti
 	model.move_detail="常态 %.2f · 当前 %.2f 像素/秒\n%s"%[actor.speed,actor.effective_speed(),"疾行剩余 %.2f 秒"%SpecialPowers.ability_remaining(world.powers,SpecialPowers.SPEED,world.elapsed) if actor.power_move_factor>1.0 else "无临时疾行"]
 	var site: Expedition.SearchSite=world.member_site(actor.member_id)
 	var seconds: float=world._site_seconds(site) if site!=null else 30.0
-	var effective: float=seconds*actor.trait_search_factor*actor.persona_work_factor*BuildItems.frozen_factors(world.supply.generated.build).work
+	var effective: float = seconds
+	if site == null or site != world.billboard_site:
+		effective *= actor.trait_search_factor * actor.persona_work_factor * BuildItems.frozen_factors(world.supply.generated.build).work
 	model.work_detail="%s · 有效耗时 %.4f 秒\n%s"%[world.site_label(site) if site!=null else "基准搜刮（30秒室内）",effective,"进度 %.0f%%"%(site.progress/seconds*100.0) if site!=null else "接到任务后按实际站点基础计算"]
 	return model
 

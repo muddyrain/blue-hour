@@ -116,6 +116,8 @@ static func capture(world: Expedition) -> Dictionary:
 	if world.power_mode(): captured.powers=world.powers.duplicate(true)
 	if world.recon_knowledge != null:
 		captured.recon = world.recon_knowledge.snapshot(world.recon_site.progress)
+	if world.billboard_site != null:
+		captured.billboard = world.billboard_work.snapshot(world.billboard_site.progress)
 	return captured
 
 
@@ -127,7 +129,10 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 	var recon: bool = generated and value.get("generated") is Dictionary and ReconActionV1.enabled(value.generated)
 	if value.has("recon") != recon:
 		return "WORLD_RECON_BINDING"
-	if value.size() != int(recon) + int(search_version(value.get("version"))) + int(power_version(value.get("version"))) + int(combat_version(value.get("version"))) + KEYS.size() + (2 if RescueState.is_family(receipt.base) else 0) + (1 if GrowthState.is_family(receipt.base) else 0) + int(FieldJoinState.is_family(receipt.base)) + int(TraitState.is_family(receipt.base)) + int(generated) + int(task_version(value.get("version"))) + int((value.get("version")==CAMPAIGN_VERSION or (value.get("version")==BUILD_VERSION or combat_version(value.get("version")))))+int((value.get("version")==BUILD_VERSION or combat_version(value.get("version")))) or not value.has_all(KEYS) or not SurvivalContracts.json_value(value):
+	var billboard: bool = generated and value.get("generated") is Dictionary and BillboardActionV1.enabled(value.generated)
+	if value.has("billboard") != billboard:
+		return "WORLD_BILLBOARD_BINDING"
+	if value.size() != int(billboard) + int(recon) + int(search_version(value.get("version"))) + int(power_version(value.get("version"))) + int(combat_version(value.get("version"))) + KEYS.size() + (2 if RescueState.is_family(receipt.base) else 0) + (1 if GrowthState.is_family(receipt.base) else 0) + int(FieldJoinState.is_family(receipt.base)) + int(TraitState.is_family(receipt.base)) + int(generated) + int(task_version(value.get("version"))) + int((value.get("version")==CAMPAIGN_VERSION or (value.get("version")==BUILD_VERSION or combat_version(value.get("version")))))+int((value.get("version")==BUILD_VERSION or combat_version(value.get("version")))) or not value.has_all(KEYS) or not SurvivalContracts.json_value(value):
 		return "WORLD_FIELDS"
 	var base_build: String = ENEMY_BUILD if enemy_mode else QUALITY_BUILD if WeaponState.is_state(receipt.base) else ROSTER_BUILD if RosterState.is_family(receipt.base) else POOL_BUILD if RescuePoolState.is_family(receipt.base) else TRAINING_BUILD if TrainingState.is_state(receipt.base) else TRAIT_BUILD if TraitState.is_family(receipt.base) else FIELD_BUILD if FieldJoinState.is_family(receipt.base) else (GROWTH_BUILD if GrowthState.is_family(receipt.base) else BUILD)
 	if generated:
@@ -267,6 +272,10 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 		var source_issue: String = knowledge.source_problem(value)
 		if not source_issue.is_empty():
 			return source_issue
+	if billboard:
+		var work_issue: String = BillboardWorkV1.problem(value.generated, value.billboard, float(sim.elapsed), receipt.base.crew)
+		if not work_issue.is_empty():
+			return work_issue
 	if (value.worker == 0) != value.active_site.is_empty() or (value.worker != 0 and (int(value.worker) not in ids or value.sites[value.active_site].searched)):
 		return "WORLD_WORKER_SOURCE"
 	if value.worker != 0 and int(_member(value.survivors,int(value.worker)).state.activity) not in ([1,2,4] if value.version==OUTDOOR_VERSION or magazine_version(value.version) else [1,2]):
@@ -401,6 +410,8 @@ static func apply(world: Expedition, value: Dictionary) -> String:
 		return "WORLD_RECONSTRUCTION_SETUP"
 	if value.has("recon") != (world.recon_knowledge != null):
 		return "WORLD_RECON_BINDING"
+	if value.has("billboard") != (world.billboard_site != null):
+		return "WORLD_BILLBOARD_BINDING"
 	if compatibility(world) != value.compatibility or _encode(world.get_viewport_rect().size) != value.viewport or world.hunger_trial != value.hunger or world.battle_drill != value.drill.enabled:
 		return "WORLD_BUILD_DATA_VIEWPORT_MISMATCH"
 	if world.bus_view != null: world.bus_view.skip()
@@ -416,6 +427,10 @@ static func apply(world: Expedition, value: Dictionary) -> String:
 		world.recon_knowledge.restore(value.recon)
 		world.recon_site.progress = float(value.recon.progress)
 		world.recon_site.searched = value.recon.completed
+	if value.has("billboard"):
+		world.billboard_work.restore(value.billboard)
+		world.billboard_site.progress = float(value.billboard.progress)
+		world.billboard_site.searched = value.billboard.completed
 	if BarricadeV1.enabled(world.supply.generated):
 		world.apply_barricade_history(value.support.accepted)
 	for actor: FieldActor in world.survivors:
@@ -663,6 +678,8 @@ static func old_outdoor(value: Dictionary) -> bool:
 
 
 static func _work_point(generated: Dictionary, id: String) -> Vector2:
+	if id == BillboardActionV1.SITE_ID:
+		return BillboardActionV1.point(generated)
 	for site: Dictionary in generated.sites:
 		if site.id==id: return TaskActions.site_point(generated,site)
 	return Vector2.INF
@@ -701,6 +718,8 @@ static func _jobs_problem(value: Dictionary, ids: Array[int], knowledge: ReconKn
 		site_ids.append(id)
 	if knowledge != null:
 		site_ids.append(ReconActionV1.SITE_ID)
+	if value.has("billboard"):
+		site_ids.append(BillboardActionV1.SITE_ID)
 	var issue: String = SearchAssignments.problem(value.get("jobs"),ids,site_ids)
 	if not issue.is_empty():
 		return issue
@@ -708,8 +727,9 @@ static func _jobs_problem(value: Dictionary, ids: Array[int], knowledge: ReconKn
 	for job: Dictionary in value.jobs.assignments:
 		var actor: Dictionary = _member(value.survivors,int(job.member_id)).state
 		var recon_job: bool = knowledge != null and job.site_id == ReconActionV1.SITE_ID
-		var site: Dictionary = value.recon if recon_job else value.sites[job.site_id]
-		if actor.health <= 0 or site.get("completed" if recon_job else "searched"):
+		var billboard_job: bool = value.has("billboard") and job.site_id == BillboardActionV1.SITE_ID
+		var site: Dictionary = value.recon if recon_job else value.billboard if billboard_job else value.sites[job.site_id]
+		if actor.health <= 0 or site.get("completed" if recon_job or billboard_job else "searched"):
 			return "SEARCH_UNAVAILABLE_SOURCE"
 		if value.get("rescue") is Dictionary and value.rescue.get("status")=="IN_PROGRESS" and value.rescue.get("worker")==job.member_id:
 			return "SEARCH_RESCUE_OCCUPIED"
@@ -723,6 +743,10 @@ static func _jobs_problem(value: Dictionary, ids: Array[int], knowledge: ReconKn
 					return "RECON_WORKING_PROGRESS"
 				if site.has("work") and int(site.work.back()[0]) != int(job.member_id):
 					return "RECON_WORK_SOURCE"
+			if billboard_job and not site.work.is_empty():
+				var last: Array = site.work.back()
+				if absf(float(last[2]) - float(value.sim.elapsed)) <= 0.000000001 and int(last[0]) != int(job.member_id):
+					return "BILLBOARD_WORK_SOURCE"
 			if job.site_id == EventSortieV1.site_id(value.generated) and (value.task_event.branch == "" or site.progress <= 0.0):
 				return "SORTIE_EVENT_WORKING"
 			if actor.activity != (FieldActor.Activity.RECOVERING if outdoor else FieldActor.Activity.SEARCHING) or actor.visible != outdoor or _vec(actor.position).distance_to(door)>14.0 or not actor.path.is_empty() or actor._path_index!=0:

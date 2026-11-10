@@ -198,6 +198,8 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 			_descriptions[index].add_theme_font_size_override("font_size", 16)
 		elif mission_card:
 			var title: String = {"supply":"补给", "airdrop":"装备", "equipment":"调查", "rescue":RescueTarget.ACTION_TITLE}[supply.generated.type]
+			if supply.generated.has("billboard_target"):
+				title = "超市补给"
 			if SortieRiskV1.enabled(supply.generated):
 				title = "装备 · 深入回收" if supply.generated.sortie_risk.tier == SortieRiskV1.DEEP else "装备 · 常规回收"
 			_titles[index].text = "%02d / %s" % [index + 1, title]
@@ -209,6 +211,10 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}) -> void:
 			elif BarricadeV1.enabled(supply.generated):
 				var lines: PackedStringArray = _descriptions[index].text.split("\n")
 				lines.insert(1, "有车辆路障 · 可绕行或用空袭开路")
+				_descriptions[index].text = "\n".join(lines)
+			if supply.generated.has("billboard_target"):
+				var lines: PackedStringArray = _descriptions[index].text.split("\n")
+				lines.insert(1, "广告牌情报 · 本次选卡有效")
 				_descriptions[index].text = "\n".join(lines)
 			_descriptions[index].custom_minimum_size.y = 100
 			_descriptions[index].add_theme_font_size_override("font_size", 16)

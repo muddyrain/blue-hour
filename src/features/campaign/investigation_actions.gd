@@ -218,9 +218,9 @@ static func _offer(source: Dictionary, type: String, recruit: int, mission: bool
 		var pilot: Dictionary = ExplorationActions.upgrade(candidate, true, true, 1, yard, residential_rescue, 0, {}, revision)
 		if not pilot.is_empty():
 			return pilot
-		if revision == OpenStreetsV1.VERSION:
-			print("BH_WAREHOUSE_DISTRICT_FALLBACK seed=%s task=%s" % [candidate.seed, type])
-			pilot = ExplorationActions.upgrade(candidate, true, true, 1, yard, residential_rescue, 0, {}, OpenStreetsV1.COMPACT_VERSION)
+		for prior: int in range(revision - 1, OpenStreetsV1.COMPACT_VERSION - 1, -1):
+			print("BH_WAREHOUSE_DISTRICT_FALLBACK revision=%d seed=%s task=%s" % [prior, candidate.seed, type])
+			pilot = ExplorationActions.upgrade(candidate, true, true, 1, yard, residential_rescue, 0, {}, prior)
 			if not pilot.is_empty():
 				return pilot
 		print("BH_OPEN_STREETS_FALLBACK theme=%s task=%s seed=%s" % [topology, type, candidate.seed])

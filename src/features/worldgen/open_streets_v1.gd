@@ -4,7 +4,8 @@ extends RefCounted
 
 const WIDE_VERSION: int = 1
 const COMPACT_VERSION: int = 2
-const VERSION: int = 3
+const DISTRICT_VERSION: int = 3
+const VERSION: int = 4
 const BOUNDS: Array[int] = [0, 0, 12288, 8192]
 const WIDE_ARTERIAL_WIDTH: int = 480
 const ARTERIAL_WIDTH: int = 224

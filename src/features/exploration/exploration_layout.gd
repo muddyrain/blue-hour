@@ -173,6 +173,8 @@ static func _geometry_problem(data: Dictionary) -> String:
 
 static func _reserved(data: Dictionary) -> Array[Rect2]:
 	var zones: Array[Rect2] = OpenStreetsV1.swept_rects(data.bus, 32.0)
+	if data.get("warehouse_district", {}).has("alley"):
+		zones.append_array(WarehouseScenery.reserved_walks(data))
 	zones.append(WorldLayout.rect(data.bus.rect).grow(40.0))
 	for value: Array in [data.bus.door, data.bus.passenger_door]:
 		zones.append(Rect2(WorldLayout.point(value) - Vector2(112, 112), Vector2(224, 224)))

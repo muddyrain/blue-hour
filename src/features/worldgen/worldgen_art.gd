@@ -22,6 +22,12 @@ static func definition(entity: Dictionary) -> Dictionary:
 	if entity.archetype=="detached_home" and entity.variant==3:
 		value.texture=HOME;value.roof_split=476;value.title="内院住宅"
 	var art: String = entity.get("art", "")
+	if WarehouseSlots.BUILDINGS.has(art):
+		var spec: Dictionary = WarehouseSlots.BUILDINGS[art]
+		var canvas: Vector2 = spec.size
+		value.merge({"native_size":canvas, "origin":Vector2(canvas.x * 0.5, canvas.y),
+			"reference_width":canvas.x, "roof_split":spec.roof, "title":spec.title,
+			"texture":WarehouseDressingArt.texture(art), "fixed_roof":true}, true)
 	if WAREHOUSE_TEXTURES.has(art):
 		var form: Dictionary = WarehouseDistrict.MODULES[art]
 		var size: Vector2 = form.size

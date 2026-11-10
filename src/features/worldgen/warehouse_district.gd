@@ -270,7 +270,20 @@ static func _court(parcel: Dictionary, area: Rect2, kind: String, entrance: Vect
 static func certified(district: Dictionary, gates: Array, nav: FieldNavigation, start: Vector2) -> bool:
 	if gates.size() != 2 or not nav._segment_is_clear(WorldLayout.point(gates[0]), WorldLayout.point(gates[1])):
 		return false
-	for value: Array in gates:
+	var entries: Array = gates.duplicate()
+	if district.has("alley"):
+		var alley: Rect2 = WorldLayout.rect(district.alley)
+		var top: Vector2 = Vector2(alley.get_center().x, alley.position.y)
+		var bottom: Vector2 = Vector2(top.x, alley.end.y)
+		var outlet: Rect2 = WorldLayout.rect(district.alley_outlet)
+		var corner: Vector2 = Vector2(outlet.get_center().x, bottom.y)
+		var street: Vector2 = Vector2(corner.x, outlet.end.y)
+		if not nav._segment_is_clear(top, bottom) or not nav._segment_is_clear(bottom, corner) \
+				or not nav._segment_is_clear(corner, street):
+			return false
+		entries.append(_point(top))
+		entries.append(_point(street))
+	for value: Array in entries:
 		var target: Vector2 = WorldLayout.point(value)
 		var path: PackedVector2Array = nav.path_between(start, target)
 		if path.is_empty() or path[-1].distance_to(target) > 14.0:

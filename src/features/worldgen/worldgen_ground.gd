@@ -57,6 +57,11 @@ func _draw() -> void:
 				draw_rect(paving.grow(3).intersection(area),Color("676e62"))
 				draw_rect(paving,Color("909384"))
 				draw_texture_rect(StreetBlock.PavingTexture,paving,true,Color(0.83,0.89,0.81,0.65))
+		for detail: Dictionary in parcel.get("dressing", []):
+			if detail.has("surface"):
+				var surface: Texture2D = WarehouseDressingArt.texture(detail.slot)
+				if surface != null:
+					draw_texture_rect(surface, WorldLayout.rect(detail.surface), false)
 	# One continuous verge on each street, cut by all actual connections.
 	for road: Rect2 in layout.roads:
 		var width: float = minf(road.size.x, road.size.y)

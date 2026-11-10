@@ -38,7 +38,7 @@ func blockers() -> Array[Rect2]:
 		if world_data.get("version")==5:
 			for parcel: Dictionary in world_data.parcels:
 				for detail: Dictionary in parcel.get("dressing",[]):
-					for rect: Array in detail.get("collisions",[detail.get("collision",[])]):
+					for rect: Array in detail.get("collisions", [detail.collision] if detail.has("collision") else []):
 						blocks.append(Rect2(float(rect[0]),float(rect[1]),float(rect[2]),float(rect[3])))
 		return blocks
 	var values: Array[Rect2] = [bus_block,cash_block,food_block]

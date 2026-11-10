@@ -39,6 +39,13 @@ func _journey() -> void:
 		_check(layout.warehouse_district.roles.size() == 4 and WarehouseDistrict.certified(
 			layout.warehouse_district, layout.gates, world.navigation, world.layout.bus_door),
 			"four warehouse blocks retain both approaches and the yard passage")
+	if layout.open_streets == OpenStreetsV1.VERSION:
+		var annexes: Array = layout.entities.filter(func(entity: Dictionary) -> bool:
+			return WarehouseSlots.BUILDINGS.has(entity.art) and entity.id.ends_with("_annex"))
+		var blockers: Array[Rect2] = world.layout.blockers()
+		_check(layout.warehouse_district.has("alley") and annexes.size() >= 2 and annexes.all(func(entity: Dictionary) -> bool:
+			return entity.service_only and blockers.has(WorldLayout.rect(entity.rect))),
+			"dressed warehouse retains the side alley and real non-searchable annex footprints")
 	await _advance(world, func() -> bool: return world.bus_view.stage == "disembarking", 1200)
 	_check(world._bus_sprite.position == WorldLayout.point(layout.bus.stop), "bus drives to the in-lane stop")
 	await _advance(world, func() -> bool: return not world.bus_view.running(), 180)

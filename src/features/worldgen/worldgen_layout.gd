@@ -25,8 +25,15 @@ static func generate(seed: String, size: String, topology: String, task: String 
 static func _assemble(seed: String,size: String,topology: String,attempt: int,fallback: bool,
 		task: String = "", industrial: bool = false, residential_rescue: bool = false, open_streets: int = 0) -> Dictionary:
 	var data: Dictionary = WorldgenGeometry.assemble(seed, size, topology, attempt, fallback, task, industrial, residential_rescue, open_streets)
-	if not data.is_empty(): WorldgenDressing.freeze(data)
-	return ExplorationLayout.complete(data) if not data.is_empty() else {}
+	if data.is_empty():
+		return {}
+	var dressed: bool = open_streets == OpenStreetsV1.VERSION
+	if dressed and not WarehouseScenery.attach(data):
+		return {}
+	WorldgenDressing.freeze(data)
+	if dressed and not WarehouseScenery.dress(data):
+		return {}
+	return ExplorationLayout.complete(data)
 
 static func validate(value: Variant,cached: bool=true) -> String:
 	if not value is Dictionary or value.size()!=KEYS.size()+int(value.has("level_task"))+int(value.has("loading_yard"))+int(value.has("rescue_court"))+int(value.has("open_streets"))+int(value.has("warehouse_district")) or not value.has_all(KEYS) or not SurvivalContracts.json_value(value): return "WORLDGEN_LAYOUT_FIELDS"
@@ -39,7 +46,7 @@ static func validate(value: Variant,cached: bool=true) -> String:
 	var open_streets: int = int(value.get("open_streets", 0))
 	var industrial: bool = value.has("loading_yard")
 	var residential_rescue: bool = value.has("rescue_court")
-	var warehouse: bool = open_streets == OpenStreetsV1.VERSION
+	var warehouse: bool = open_streets >= OpenStreetsV1.DISTRICT_VERSION
 	if warehouse != value.has("warehouse_district") or (warehouse and (value.topology != "industrial" or industrial)):
 		return "WAREHOUSE_DISTRICT_CONTEXT"
 	if industrial and (value.topology != "industrial" or value.get("level_task") != "airdrop" or not value.loading_yard is Dictionary):

@@ -16,7 +16,7 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 	var height: int = int(dimensions[1])
 	var rank: int = NeighborhoodLayout.SIZES.find(size)
 	var compact: bool = open_streets >= OpenStreetsV1.COMPACT_VERSION
-	var warehouse: bool = open_streets == OpenStreetsV1.VERSION
+	var warehouse: bool = open_streets >= OpenStreetsV1.DISTRICT_VERSION
 	var main_y: int = int(round(float(height) * random.randf_range(0.40,0.61) / 32.0)) * 32
 	var main_width: int = WorldgenScale.MAIN_WIDTH
 	var segments: Array = [[0,main_y+main_width/2,width,main_y+main_width/2,main_width]]

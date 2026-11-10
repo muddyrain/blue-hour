@@ -2118,6 +2118,8 @@ func _make_world_buildings() -> void:
 	if layout.world_data.get("version")==5:
 		for parcel: Dictionary in layout.world_data.parcels:
 			for detail: Dictionary in parcel.get("dressing",[]):
+				if detail.has("surface"):
+					continue
 				var scenery: WorldgenFurniture=WorldgenFurniture.new()
 				scenery.detail=detail;scenery.position=WorldLayout.point(detail.point);_sort.add_child(scenery)
 	var props: Dictionary = {}
@@ -2126,6 +2128,7 @@ func _make_world_buildings() -> void:
 		var definition: Dictionary = WorldgenArt.definition(entity) if layout.world_data.get("version")==5 else NeighborhoodArt.definition(entity.archetype) if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4) else BuildingLibrary.definition(entity.archetype)
 		var building: FieldProp = FieldProp.new()
 		building.facade = definition.texture
+		building.fixed_roof = definition.get("fixed_roof", false)
 		if definition.has("native_size"):
 			building.native_size=definition.native_size
 			building.render_anchor=definition.origin

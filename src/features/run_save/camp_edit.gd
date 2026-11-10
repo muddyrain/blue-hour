@@ -35,6 +35,8 @@ static func _propose_valid(before: Dictionary, request: Dictionary) -> Dictionar
 			return BuildState.equip(before,member_id,request.value)
 		"facility":
 			return CampFacilities.build(before, request.value) if member_id == 0 else {}
+		"facility_upgrade":
+			return CampFacilities.upgrade(before, request.value) if member_id == 0 else {}
 		WorkshopV1.EXTENDED, WorkshopV1.QUICK:
 			return WorkshopV1.install(before, request.value, request.kind) if member_id == 0 else {}
 		"train_trait":
@@ -94,6 +96,8 @@ static func problem(value: Dictionary) -> String:
 			return "CAMP_DEATH_HISTORY"
 		ids.append(int(death.member_id))
 	if value.phase == "CAMP_REGISTERED":
+		if CampFacilities.tier_two_enabled(value.base) and (value.base.day != 2 or not CampFacilities.selected(value.base).is_empty()):
+			return "MIDGAME_REGISTRATION_SOURCE"
 		var opening_issue: String = OpeningBuild.registration_problem(value.base)
 		if not opening_issue.is_empty():
 			return opening_issue

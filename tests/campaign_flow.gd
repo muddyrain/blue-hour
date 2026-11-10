@@ -249,9 +249,13 @@ func _extract(world: Expedition) -> void:
 	await _until(world,func()->bool:return world.phase==Expedition.Phase.BOARDING)
 	world.request_bus_gather()
 	await _until(world,func()->bool:return world.phase==Expedition.Phase.FINISHED)
-	_check(app.phase==app.Phase.RESULT and world.boarding_status().arrived==world.living_count(),"original bus gathers actual living actors before result")
-	for index:int in range(300):
-		if not world.bus_view.running():break
+	for index: int in range(1500):
+		if not world.bus_view.running():
+			break
 		world.step(1.0/30.0)
-		if movie!=null:await _frame()
+		if movie != null:
+			await _frame()
+	var gathered: Vector2i = world.bus_view.final_boarding
+	_check(app.phase == app.Phase.RESULT and gathered.x == gathered.y and gathered.y == world.living_count(),
+		"original bus gathers actual living actors before result")
 	await _hold(3)

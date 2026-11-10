@@ -13,9 +13,9 @@ const SIZES: Dictionary = {
 const KEYS: Array[String] = ["version", "seed", "size", "topology", "attempt", "fallback", "bounds", "entities", "roads", "barriers", "gates", "bus", "arrivals", "enemy_points", "rescue", "id", "objects"]
 const MAX_CACHE: int = 48
 static var _built: Dictionary = {}
-static var _checked: Dictionary = {}
 static var _certificates: Dictionary = {}
 static var _open_certificates: Dictionary[String, String] = {}
+static var _cache_mutex: Mutex = Mutex.new()
 
 
 static func policy() -> Dictionary:
@@ -47,12 +47,11 @@ static func validate(value: Variant, cached: bool = true) -> String:
 	if not SurvivalContracts.integer(value.version, VERSION, VERSION) or not value.seed is String or value.seed.is_empty() or value.seed.length() > 128 or not value["size"] is String or not SIZES.has(value["size"]) or not value.topology is String or value.topology not in NeighborhoodLayout.TOPOLOGIES or not SurvivalContracts.integer(value.attempt, 0, 2) or not value.fallback is bool or not is_map_id(value.id):
 		return "EXPLORATION_LAYOUT_IDENTITY"
 	var signature: String = RecordEncoding.fingerprint(value)
-	if cached and _checked.has(signature):
+	if cached and has_certificate(signature):
 		return ""
 	var expected: Dictionary = _assemble(value.seed, value["size"], value.topology, int(value.attempt), value.fallback)
 	if expected.is_empty() or RecordEncoding.fingerprint(expected) != signature:
 		return "EXPLORATION_LAYOUT_CANONICAL"
-	_checked[signature] = true
 	return ""
 
 
@@ -70,10 +69,9 @@ static func complete(data: Dictionary, trace: Array[String] = []) -> Dictionary:
 	var size: String = data["size"]
 	# Complete original geometry and policy form the cache identity, including all collisions.
 	var origin_key: String = RecordEncoding.fingerprint({"geometry":data, "policy":policy()})
-	if _built.has(origin_key):
-		var prior: Dictionary = _built[origin_key]
-		if _certificates.has(RecordEncoding.fingerprint(prior)):
-			return prior.duplicate(true)
+	var prior: Dictionary = _cached_layout(origin_key)
+	if not prior.is_empty():
+		return prior.duplicate(true)
 	var issue: String = _geometry_problem(data)
 	if not issue.is_empty():
 		trace.append(issue)
@@ -135,24 +133,49 @@ static func complete(data: Dictionary, trace: Array[String] = []) -> Dictionary:
 	data.erase("id")
 	data.id = (WorldgenLayout.PREFIX if data.version==5 else PREFIX) + RecordEncoding.fingerprint(data).substr(0, 32)
 	var signature: String = RecordEncoding.fingerprint(data)
+	certificate.nav = nav
+	_store_certificate(origin_key, signature, data.duplicate(true), certificate)
+	return data
+
+
+static func has_certificate(signature: String) -> bool:
+	_cache_mutex.lock()
+	var present: bool = _certificates.has(signature)
+	_cache_mutex.unlock()
+	return present
+
+
+static func _cached_layout(origin_key: String) -> Dictionary:
+	_cache_mutex.lock()
+	var entry: Dictionary = _built.get(origin_key, {})
+	var layout: Dictionary = entry.layout if not entry.is_empty() and _certificates.has(entry.signature) else {}
+	_cache_mutex.unlock()
+	return layout
+
+
+static func _cached_certificate(signature: String) -> Dictionary:
+	_cache_mutex.lock()
+	var certificate: Dictionary = _certificates.get(signature, {})
+	_cache_mutex.unlock()
+	return certificate
+
+
+static func _store_certificate(origin_key: String, signature: String, data: Dictionary, certificate: Dictionary) -> void:
+	_cache_mutex.lock()
 	if _certificates.size() >= MAX_CACHE:
 		_certificates.clear()
-		_checked.clear()
 		_built.clear()
 		_open_certificates.clear()
 	if data.has("open_streets"):
-		if _open_certificates.size() >= 4:
+		if not _open_certificates.has(signature) and _open_certificates.size() >= 4:
 			var oldest: String = _open_certificates.keys()[0]
 			_certificates.erase(oldest)
-			_checked.erase(oldest)
 			_built.erase(_open_certificates[oldest])
 			_open_certificates.erase(oldest)
 		_open_certificates[signature] = origin_key
-	certificate.nav = nav
 	_certificates[signature] = certificate
-	_checked[signature] = true
-	_built[origin_key] = data.duplicate(true)
-	return data
+	_built[origin_key] = {"layout":data, "signature":signature}
+	_cache_mutex.unlock()
 
 
 static func _geometry_problem(data: Dictionary) -> String:
@@ -336,8 +359,14 @@ static func _length(path: PackedVector2Array) -> float:
 
 
 static func _routing(data: Dictionary) -> Dictionary:
-	# Shared navigation is read-only: never configure or mutate this graph in a caller.
-	if not validate(data).is_empty():
+	# Hold a reference to the certificate across validation. A parallel cache
+	# eviction can remove the entry, but cannot invalidate the retained graph.
+	var signature: String = RecordEncoding.fingerprint(data)
+	var value: Dictionary = _cached_certificate(signature)
+	if not validate(data, not value.is_empty()).is_empty():
 		return {}
-	var value: Dictionary = _certificates[RecordEncoding.fingerprint(data)]
+	while value.is_empty():
+		value = _cached_certificate(signature)
+		if value.is_empty() and not validate(data, false).is_empty():
+			return {}
 	return {"nav":value.nav, "dmax":value.dmax, "doors":value.doors.duplicate(true)}

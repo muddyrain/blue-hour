@@ -29,8 +29,9 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var identity: String = RecordEncoding.fingerprint(base)
 	if identity.is_empty():
 		return {}
-	if _days.has(identity):
-		return _days[identity]
+	var cached: Variant = ActionMemo.lookup(_days, identity)
+	if cached != null:
+		return cached
 	# The original task/boss generators consume their original frozen phase format.
 	var projected: Dictionary = base.duplicate(false)
 	projected.journey = base.journey.duplicate(false)
@@ -105,9 +106,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 		result[index] = candidate
 		fingerprints[candidate.id] = RecordEncoding.fingerprint(candidate)
 	var frozen: Dictionary = {"offers":result, "fingerprints":fingerprints}
-	if _days.size() >= MAX_DAYS_CACHED:
-		_days.erase(_days.keys()[0])
-	_days[identity] = frozen
+	ActionMemo.store(_days, identity, frozen, MAX_DAYS_CACHED, true)
 	return frozen
 
 

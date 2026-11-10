@@ -60,7 +60,7 @@ static func problem(value: Dictionary) -> String:
 			or not SurvivalContracts.integer(value.get("slot"), 0, 2):
 		return "PUMP_ACTION_IDENTITY"
 	var identity: String = RecordEncoding.fingerprint(value)
-	if _checked.has(identity):
+	if ActionMemo.lookup(_checked, identity) == true:
 		return ""
 	var campaign: Variant = value.get("campaign")
 	var build: Variant = value.get("build")
@@ -75,9 +75,7 @@ static func problem(value: Dictionary) -> String:
 	var expected: Dictionary = freeze(value)
 	if expected.is_empty() or identity != RecordEncoding.fingerprint(expected):
 		return "PUMP_ACTION_CANONICAL"
-	if _checked.size() >= 32:
-		_checked.clear()
-	_checked[identity] = true
+	ActionMemo.store(_checked, identity, true, 32)
 	return ""
 
 

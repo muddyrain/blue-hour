@@ -24,8 +24,18 @@ func _journey() -> void:
 	await _tap(app.mission_select.cancel_button)
 	await _tap(app.camp_scene.hotspots[&"weapons"])
 	var original: String = WeaponInventory.for_member(app.camp_snapshot(),1).instance_id
-	app.equip_weapon(1,WeaponInventory.for_member(app.camp_snapshot(),2).instance_id)
-	app.equip_weapon(1,original); app.close_loadout()
+	var other: String = WeaponInventory.for_member(app.camp_snapshot(),2).instance_id
+	if app.loadout_panel.player_mode and app.loadout_panel.get("armory") != null:
+		app.loadout_panel.armory.select_inventory(other, 1)
+		await _tap(app.loadout_panel.armory.confirm_equip)
+		_check(WeaponInventory.owner(app.camp_snapshot(), other) == 1, "real swap changes the intended owner")
+		app.loadout_panel.armory.select_inventory(original, 1)
+		await _tap(app.loadout_panel.armory.confirm_equip)
+		_check(WeaponInventory.owner(app.camp_snapshot(), original) == 1, "second real swap restores original assignment")
+	else:
+		app.equip_weapon(1, other)
+		app.equip_weapon(1, original)
+	app.close_loadout()
 	_check(TransactionReceipt.same({"v":offers},{"v":await _menu()}),"same-day equip and browse preserve candidates")
 	await _start("rescue" if scenario.begins_with("rescue") else "supply" if scenario=="early" else scenario)
 	var world: Expedition = app.expedition
@@ -108,7 +118,9 @@ func _start(type: String) -> void:
 	world.set_physics_process(false); world.set_process(false)
 	await _advance(world,func() -> bool:return not world.bus_view.running())
 	world.finished.connect(func(report: Dictionary) -> void:journey_reports.append(report.duplicate(true)))
-	_check(world.elapsed==0 and app.progress_session._transaction.recover().receipt.rules.data_version==(6 if world.supply.generated.version==5 else 5),"arrival preserves clock and selected task policy")
+	var receipt: Dictionary = app.progress_session._transaction.recover().receipt
+	_check(world.elapsed == 0 and TransactionReceipt.same(receipt.rules.mission.generated, _selected)
+		and DailyActions.matches(receipt.base, world.supply.generated), "arrival preserves clock and selected task policy")
 	world.camera.set_process(false)
 	await _hud_sample(world)
 
@@ -151,7 +163,9 @@ func _finish(world: Expedition, fault: bool) -> void:
 	_check(not task.is_empty(),"confirmed camp retains task outcome")
 	if task.is_empty(): return
 	_check(task.status==("EARLY" if scenario=="early" else "TARGET_LOST" if scenario=="rescue-death" else "COMPLETED"),"actual objective outcome: "+str(task))
-	_check(TaskActions.summary_text(task) in app.camp_scene.eligibility_text.text,"camp shows objective separately from actual gain")
+	var summary: Label = app.camp_scene.get("_return_objective")
+	var shown: String = summary.text if is_instance_valid(summary) else app.camp_scene.eligibility_text.text
+	_check(TaskActions.summary_text(task) in shown, "camp shows objective separately from actual gain")
 	_write("task-performance.json",{"freezes":task_freezes,"input":"normal viewport/business intentions; accelerated 6 ticks per render","display_fps":"NOT_MEASURED"})
 	await _shot(scenario+"-camp")
 

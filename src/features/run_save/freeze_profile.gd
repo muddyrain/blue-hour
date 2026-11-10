@@ -24,7 +24,7 @@ static func start(metadata: Dictionary) -> void:
 
 
 static func enter(label: String) -> int:
-	if not active:
+	if not _recording():
 		return 0
 	var stamp: int = Time.get_ticks_usec()
 	_stack.append({"label":label, "started":stamp, "children":0})
@@ -32,7 +32,7 @@ static func enter(label: String) -> int:
 
 
 static func leave(label: String, stamp: int) -> void:
-	if not active or stamp == 0:
+	if stamp == 0 or not _recording():
 		return
 	var row: Dictionary = _stack.pop_back()
 	assert(row.label == label and row.started == stamp)
@@ -43,7 +43,7 @@ static func leave(label: String, stamp: int) -> void:
 
 
 static func sample(label: String, stamp: int) -> void:
-	if not active:
+	if not _recording():
 		return
 	var elapsed: int = Time.get_ticks_usec() - stamp
 	_record(label, elapsed, elapsed)
@@ -52,17 +52,17 @@ static func sample(label: String, stamp: int) -> void:
 
 
 static func scale(label: String, value: int) -> void:
-	if active:
+	if _recording():
 		_meta[label] = maxi(int(_meta.get(label, 0)), value)
 
 
 static func count(label: String) -> void:
-	if active:
+	if _recording():
 		_meta[label] = int(_meta.get(label, 0)) + 1
 
 
 static func mark(label: String, stamp: int = 0) -> void:
-	if active and not _marks.has(label):
+	if _recording() and not _marks.has(label):
 		_marks[label] = stamp if stamp > 0 else Time.get_ticks_usec()
 
 
@@ -75,6 +75,11 @@ static func finish() -> void:
 		"metadata":_meta.duplicate(true), "stages":_rows.duplicate(true), "marks":_marks.duplicate(),
 		"mode":"synchronous; inclusive durations nest; self_usec excludes measured children"}
 	active = false
+
+
+static func _recording() -> bool:
+	# Background generation must never append to a synchronous callback's stack.
+	return active and OS.get_thread_caller_id() == OS.get_main_thread_id()
 
 
 static func _record(label: String, elapsed: int, own: int) -> void:

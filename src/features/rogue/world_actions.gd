@@ -12,8 +12,11 @@ static var _offers: Dictionary = {}
 
 static func offers(base: Dictionary) -> Array[Dictionary]:
 	var cache_key: String=SurvivalContracts.fingerprint({"seed":base.journey.seed,"day":base.day,"eligible":RescuePoolState.available(base)})
-	if _offers.has(cache_key):
-		var cached: Array[Dictionary]=[];cached.assign(_offers[cache_key].duplicate(true));return cached
+	var stored: Variant = ActionMemo.lookup(_offers, cache_key)
+	if stored != null:
+		var cached: Array[Dictionary] = []
+		cached.assign(stored.duplicate(true))
+		return cached
 	var types: Array[String] = TYPES.duplicate()
 	var random: RandomNumberGenerator = RogueLayout.rng("daily-v2:"+String(base.journey.seed)+":"+str(int(base.day)))
 	if RescuePoolState.available(base).is_empty():types[2]="supply" if random.randi_range(0,1)==0 else "equipment"
@@ -25,8 +28,7 @@ static func offers(base: Dictionary) -> Array[Dictionary]:
 	var result: Array[Dictionary]=[]
 	var candidate: int=RescuePoolState.choice(base,"%s:%d"%[base.profile_id,int(base.settled_sorties)+1])
 	for slot: int in range(3):result.append(_make(String(base.journey.seed),int(base.day),slot,types[slot],bones[slot],candidate if types[slot]=="rescue" else 0))
-	if _offers.size()>=128:_offers.clear()
-	_offers[cache_key]=result.duplicate(true)
+	ActionMemo.store(_offers, cache_key, result.duplicate(true), 128)
 	return result
 
 static func _make(seed: String, day: int, slot: int, type: String, bone: String, recruit: int) -> Dictionary:
@@ -47,12 +49,11 @@ static func problem(value: Variant) -> String:
 	var issue: String=WorldLayout.validate(value.layout)
 	if not issue.is_empty():return issue
 	var signature: String=SurvivalContracts.fingerprint(value)
-	if _checked.has(signature):return ""
+	if ActionMemo.lookup(_checked, signature) == true:return ""
 	var expected: Dictionary=_make(value.seed,int(value.day),int(value.slot),value.type,value.layout.bone,int(value.recruit))
 	if not TransactionReceipt.same(value,expected):return "DAILY_CANONICAL"
 	if (value.type=="rescue" and int(value.recruit) not in [3,4,5]) or (value.type!="rescue" and value.recruit!=0):return "DAILY_RECRUIT"
-	if _checked.size()>=128:_checked.clear()
-	_checked[signature]=true
+	ActionMemo.store(_checked, signature, true, 128)
 	return ""
 
 static func matches(base: Dictionary, value: Variant) -> bool:

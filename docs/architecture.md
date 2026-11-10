@@ -54,6 +54,10 @@ M39 用营地和合格出击的 `night_hound_policy` 冻结资格。CombatRuntim
 
 M40 将工坊策略和工具箱来源账保存在原旅程。WorkshopSiteV1 只标记已认证可选点，原搜集和归航收据持有完成与入库事实。CampEdit 以同一笔编辑扣除工具、货币并登记实例改装。WeaponMagazine 从冻结实例配置计算容量和有效换弹上限，旧原装快照保持原结构。[M40 合同](design/m40-workshop-01.md)。
 
+M46 以 `midgame` V2 记录新旅程的设施升级日。CampEdit 从已确认的归航账本核验资格。FrozenSettlement 从冻结出击前态计算设施应发和实际入库。WorkshopV1 继续持有工具箱来源与实例改装，WeaponMagazine 沿用按实例与持有人因子认证的快照。装备仓和出击确认只读这些业务结果。[M46 合同](design/m46-camp-ux-01.md)。
+
+M46-R1 让营地编辑与后台选卡共享只读的认证结果。缓存的查找、发布与逐出各自同步，耗时的生成在锁外运行。共享寻路图按实例串行查询。Main 只把匹配当前确认营地前态的结果交给出击页。
+
 TaskActions只生成/校验V4任务描述并投影真实目标进度；DailyActions保留V1/V2/V3认证分支。Expedition沿原站点/刷怪owner推进空投工作和有界一次性压力，SortieSnapshot世界6保存同一task_event及原敌人事实；FrozenSettlement从报告计算任务摘要，EnemyState只对111开放经校验的last_day.task。没有新保存或收益owner；见[任务合同](design/m6-rogue-02.md)。
 
 RogueActions只拥有每日V1配置与确定性描述，RogueLayout只拼装/校验值布局并构造StreetLayout；现有Main/ProductionProgress/FrozenSettlement/Snapshot继续拥有选择、写入、结果和恢复。data_version2与世界version3显式绑定完整generated；旧规则与旧历史认证独立保留，普通入口在消费前拒绝旧途中。空间描述统一驱动原绘制、寻路、遮挡和交互，详情见[生成合同](design/m6-rogue-01.md)。

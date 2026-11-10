@@ -69,7 +69,7 @@ static func validate(value: Variant,cached: bool=true) -> String:
 	if residential_rescue and (value.topology != "residential" or value.get("level_task") != "rescue" or not value.rescue_court is Dictionary):
 		return "RESCUE_COURT_CONTEXT"
 	var signature: String=RecordEncoding.fingerprint(value)
-	if cached and ExplorationLayout._checked.has(signature): return ""
+	if cached and ExplorationLayout.has_certificate(signature): return ""
 	var expected: Dictionary = _assemble(value.seed, value["size"], value.topology, int(value.attempt),
 		value.fallback, value.get("level_task", ""), industrial, residential_rescue, open_streets)
 	return "" if not expected.is_empty() and RecordEncoding.fingerprint(expected)==signature else "WORLDGEN_LAYOUT_CANONICAL"

@@ -209,7 +209,9 @@ static func result_problem(receipt: Dictionary) -> String:
 		return "TASK_RESULT_VERSION"
 	if not result.get("food") is Dictionary or not result.get("hunger") is Dictionary:
 		return "XP_RESULT_RATIONS"
-	issue = SurvivalContracts.ledgers_problem(result.food,result.hunger,FieldJoinRules.meal_members(report.member_results,receipt.base),limits(before.crew))
+	var facility_food: int = CampFacilities.offered_food(receipt.base, int(receipt.base.day), report.evacuated)
+	issue = SurvivalContracts.ledgers_problem(result.food, result.hunger,
+		FieldJoinRules.meal_members(report.member_results, receipt.base), limits(before.crew), facility_food)
 	if not issue.is_empty():
 		return issue
 	var expected: Dictionary = actual.duplicate(true)

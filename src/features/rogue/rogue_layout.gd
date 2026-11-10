@@ -115,7 +115,7 @@ static func validate(value: Variant) -> String:
 		if not _rect(road): return "LAYOUT_ROAD"
 	if not is_map_id(value.id) or value.id!="rogue_v1_"+geometry_hash(value).substr(0,32): return "LAYOUT_IDENTITY"
 	var signature: String = SurvivalContracts.fingerprint(value)
-	if _valid.has(signature):return ""
+	if ActionMemo.lookup(_valid, signature) == true:return ""
 	var nav: FieldNavigation = FieldNavigation.new()
 	nav.configure(blockers)
 	var bus: Vector2
@@ -140,8 +140,7 @@ static func validate(value: Variant) -> String:
 		var gap: float = minf(tuning.squad_spacing,tuning.boarding_radius*1.2/3.0)
 		var goal: Vector2 = bus+Vector2.ONE*((i-1.5)*gap)
 		if not nav.is_clear(goal) or nav.path_between(start,goal).is_empty():return "LAYOUT_BOARDING_SPACE"
-	if _valid.size()>=128:_valid.clear()
-	_valid[signature]=true
+	ActionMemo.store(_valid, signature, true, 128)
 	return ""
 
 static func resource(data: Dictionary) -> StreetLayout:

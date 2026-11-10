@@ -55,7 +55,7 @@ static func problem(camp: Dictionary) -> String:
 				return "WORKSHOP_MOD_FIELDS"
 			continue
 		var item: Dictionary = WeaponInventory.find(camp, entry.instance_id)
-		if item.get("weapon_id") != "carbine" or item.get("condition") != "ready" \
+		if not _supported_instance(camp, item) or item.get("condition") != "ready" \
 				or entry.mod not in [EXTENDED, QUICK] or installed.has(entry.instance_id):
 			return "WORKSHOP_MOD_SOURCE"
 		installed[entry.instance_id] = true
@@ -83,6 +83,11 @@ static func name_for(mod: String) -> String:
 	return "扩容弹匣" if mod == EXTENDED else "快拆弹匣" if mod == QUICK else "原装弹匣"
 
 
+static func _supported_instance(camp: Dictionary, item: Dictionary) -> bool:
+	return item.get("weapon_id") == "carbine" or (item.get("weapon_id") == "long_rifle"
+		and CampFacilities.upgraded(camp) and item.get("quality") == "common" and item.get("affixes") == [])
+
+
 static func mod_problem(camp: Dictionary, instance_id: String, mod: String) -> String:
 	if not enabled(camp) or CampFacilities.selected(camp) != CampFacilities.WORKSHOP:
 		return "需要已建工坊"
@@ -91,12 +96,23 @@ static func mod_problem(camp: Dictionary, instance_id: String, mod: String) -> S
 	if mod not in [EXTENDED, QUICK]:
 		return "改装方案无效"
 	var item: Dictionary = WeaponInventory.find(camp, instance_id)
-	if item.get("weapon_id") != "carbine":
-		return "请选择一把卡宾枪"
+	if item.is_empty():
+		return "该武器实例已失效"
+	if item.weapon_id == "long_rifle" and CampFacilities.tier_two_enabled(camp):
+		if not CampFacilities.upgraded(camp):
+			return "长管步枪改装需要二级工坊的校准台"
+		if not _supported_instance(camp, item):
+			return "校准台仅接受无词条的普通长管步枪"
+	elif item.weapon_id != "carbine":
+		return "请选择卡宾枪或普通长管步枪" if CampFacilities.upgraded(camp) else "请选择一把卡宾枪"
+	var owner: int = WeaponInventory.owner(camp, instance_id)
+	if owner > 0 and not WeaponInventory._living(camp, owner):
+		return "历史队员的配装仅供查阅"
+	var gun: String = WeaponInventory.definition(item.weapon_id).display_name
 	if item.get("condition") != "ready":
-		return "先维修这把卡宾枪"
+		return "先维修这把%s" % gun
 	if not mod_for(camp, instance_id).is_empty():
-		return "这把卡宾枪已改装"
+		return "这把%s已改装" % gun
 	if tools(camp) < 1:
 		return "需要工具箱 ×1"
 	if int(camp.cash) < COST:

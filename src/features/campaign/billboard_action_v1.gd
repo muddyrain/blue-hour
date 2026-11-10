@@ -119,11 +119,12 @@ static func _certificate(seed: String, day: int) -> Dictionary:
 			or seed != seed.to_lower() or not seed.is_valid_hex_number(false):
 		return {}
 	var id: String = action_id(seed, day, SLOT)
-	if not _targets.has(id):
-		if _targets.size() >= TARGET_CACHE_SIZE:
-			_targets.erase(_targets.keys()[0])
-		_targets[id] = _certify_target(seed, day, id)
-	return _targets[id]
+	var cached: Variant = ActionMemo.lookup(_targets, id)
+	if cached != null:
+		return cached
+	var certified: Dictionary = _certify_target(seed, day, id)
+	ActionMemo.store(_targets, id, certified, TARGET_CACHE_SIZE, true)
+	return certified
 
 
 static func _certify_target(seed: String, day: int, id: String) -> Dictionary:

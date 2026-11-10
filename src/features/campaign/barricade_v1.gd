@@ -54,15 +54,15 @@ static func navigation(action: Dictionary, opened: bool) -> FieldNavigation:
 	if opened or not enabled(action):
 		return original
 	var key: String = RecordEncoding.fingerprint(action)
-	if not _closed.has(key):
-		var stamp: int = FreezeProfile.enter("barricade.navigation_prepare")
-		var closed: FieldNavigation = original.copy_navigation()
-		closed.set_private_blocker(original, rect(action))
-		if _closed.size() >= CACHE_SIZE:
-			_closed.erase(_closed.keys()[0])
-		_closed[key] = closed
-		FreezeProfile.leave("barricade.navigation_prepare", stamp)
-	return _closed[key]
+	var cached: FieldNavigation = ActionMemo.lookup(_closed, key) as FieldNavigation
+	if cached != null:
+		return cached
+	var stamp: int = FreezeProfile.enter("barricade.navigation_prepare")
+	var closed: FieldNavigation = original.copy_navigation()
+	closed.set_private_blocker(original, rect(action))
+	ActionMemo.store(_closed, key, closed, CACHE_SIZE, true)
+	FreezeProfile.leave("barricade.navigation_prepare", stamp)
+	return closed
 
 
 static func _eligible(action: Dictionary) -> bool:

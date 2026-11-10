@@ -128,7 +128,7 @@ static func hunger_problem(ledger: Dictionary, battle_results: Array, limits: Di
 	return ""
 
 
-static func food_problem(ledger: Dictionary) -> String:
+static func food_problem(ledger: Dictionary, expected_facility_food: int = -1) -> String:
 	for key: String in ["food_before","food_found","food_stored","food_overflow","food_required","food_consumed","food_shortage","food_after"]:
 		if not integer(ledger.get(key),0,MAX_ID):
 			return "食物账本数字无效"
@@ -144,13 +144,16 @@ static func food_problem(ledger: Dictionary) -> String:
 	var stored: int = mini(int(ledger.food_found),CampRules.FOOD_LIMIT-int(ledger.food_before))
 	var available: int = int(ledger.food_before)+stored
 	if CampFacilities.has_food_fields(ledger):
-		var facility: int = CampFacilities.SUPPLY_FOOD
-		if not integer(ledger.get("facility_food"), facility, facility) or not integer(ledger.get("facility_stored"), 0, facility):
+		# Legacy callers still accept only the original two rations when a facility ledger exists.
+		var facility: int = CampFacilities.SUPPLY_FOOD if expected_facility_food < 0 else expected_facility_food
+		if facility <= 0 or not integer(ledger.get("facility_food"), facility, facility) or not integer(ledger.get("facility_stored"), 0, facility):
 			return "设施口粮账本数字无效"
 		var facility_stored: int = mini(facility, CampRules.FOOD_LIMIT - available)
 		if ledger.facility_stored != facility_stored:
 			return "设施口粮账本不守恒"
 		available += facility_stored
+	elif expected_facility_food > 0:
+		return "缺少设施口粮账本"
 	var required: int = seen.size()*int(ledger.ration_per_member)
 	var consumed: int = mini(available,required)
 	if ledger.food_stored != stored or ledger.food_overflow != ledger.food_found-stored or ledger.food_required != required or ledger.food_consumed != consumed or ledger.food_shortage != required-consumed or ledger.food_after != available-consumed:
@@ -158,8 +161,8 @@ static func food_problem(ledger: Dictionary) -> String:
 	return ""
 
 
-static func ledgers_problem(food: Dictionary, hunger: Dictionary, battle_results: Array, limits: Dictionary = {}) -> String:
-	var issue: String = food_problem(food)
+static func ledgers_problem(food: Dictionary, hunger: Dictionary, battle_results: Array, limits: Dictionary = {}, expected_facility_food: int = -1) -> String:
+	var issue: String = food_problem(food, expected_facility_food)
 	if issue.is_empty():
 		issue = hunger_problem(hunger,battle_results,limits)
 	if not issue.is_empty():

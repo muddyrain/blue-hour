@@ -23,5 +23,9 @@ func _journey() -> void:
 		if kind=="missing": receipt.envelope.result.battle.site_facts={}
 		else: receipt.envelope.result.battle.site_facts.cash={}
 		receipt.envelope.result_hash=SurvivalContracts.fingerprint(receipt.envelope.result)
-		_check(TransactionReceipt.problem(receipt).contains("SITE_"),"malformed site facts reject before summary projection "+kind)
+		var problem: String = TransactionReceipt.problem(receipt)
+		var site_issue: String = WorldSites.problem(receipt.rules.mission.generated.sites,
+			receipt.envelope.result.battle.site_facts, receipt.rules.mission.generated.version == 9)
+		_check(not problem.is_empty() and site_issue.begins_with("SITE_"),
+			"malformed site facts and rehashed receipt reject before summary projection %s (%s)" % [kind, problem])
 	_write("result-input.json",{"encoded":RecordEncoding.stringify(packet.input),"spawn_count":packet.input.report.xp_inputs.spawn_count})

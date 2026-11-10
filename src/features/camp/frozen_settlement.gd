@@ -68,7 +68,8 @@ static func _profiled_compute(input: Dictionary) -> Dictionary:
 		int(before.food), int(report.food), int(input.rules.ration_per_member), growth, facility_food)
 	if food.is_empty():
 		return _reject("FOOD_LEDGER")
-	var hunger: Dictionary = HungerOutcome.settle(food, FieldJoinRules.meal_members(report.member_results,input.before), input.rules.hunger, input.token,limits)
+	var hunger: Dictionary = HungerOutcome.settle(food, FieldJoinRules.meal_members(report.member_results,input.before),
+		input.rules.hunger, input.token, limits, facility_food)
 	if not hunger.error.is_empty():
 		return _reject(hunger.error + (":" + String(hunger.get("reason", "")) if hunger.has("reason") else ""))
 	for effect: Dictionary in hunger.ledger.effects:

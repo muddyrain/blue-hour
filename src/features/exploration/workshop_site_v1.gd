@@ -47,16 +47,15 @@ static func source_problem(camp: Dictionary, entry: Dictionary) -> String:
 
 static func _source_site(seed: String, day: int, identity: String, size: String, yard: bool) -> String:
 	var key: String = "%s:%s:%d" % [identity, size, int(yard)]
-	if _sources.has(key):
-		return _sources[key]
+	var cached: Variant = ActionMemo.lookup(_sources, key)
+	if cached != null:
+		return String(cached)
 	# Existing day rewards and level geometry are independent of equipment and survivors.
 	# The original departure receipt separately proves this map was offered and cleared.
 	var task: Dictionary = TaskActions._make(seed, day, SortieRiskV1.SLOT, "airdrop", "industrial", size, 0)
 	var action: Dictionary = ExplorationActions.upgrade(WeaponActions._upgrade(task), true, true, 1, yard)
 	var optional: String = _optional_site(action)
-	if _sources.size() >= SOURCE_CACHE_LIMIT:
-		_sources.clear()
-	_sources[key] = optional
+	ActionMemo.store(_sources, key, optional, SOURCE_CACHE_LIMIT)
 	return optional
 
 

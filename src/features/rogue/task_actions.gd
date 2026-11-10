@@ -17,8 +17,11 @@ static var _offers: Dictionary = {}
 
 static func offers(base: Dictionary) -> Array[Dictionary]:
 	var cache_key: String = SurvivalContracts.fingerprint({"seed":base.journey.seed,"day":base.day,"eligible":RescuePoolState.available(base)})
-	if _offers.has(cache_key):
-		var cached: Array[Dictionary] = []; cached.assign(_offers[cache_key].duplicate(true)); return cached
+	var stored: Variant = ActionMemo.lookup(_offers, cache_key)
+	if stored != null:
+		var cached: Array[Dictionary] = []
+		cached.assign(stored.duplicate(true))
+		return cached
 	var random: RandomNumberGenerator = RogueLayout.rng("daily-v4:"+String(base.journey.seed)+":"+str(int(base.day)))
 	var types: Array[String] = TYPES.duplicate()
 	if RescuePoolState.available(base).is_empty(): types.erase("rescue")
@@ -37,8 +40,7 @@ static func offers(base: Dictionary) -> Array[Dictionary]:
 		var offer: Dictionary = _make(base.journey.seed,int(base.day),i,types[i],bones[i],sizes[i],candidate if types[i]=="rescue" else 0)
 		if offer.is_empty(): offer=_make(base.journey.seed,int(base.day),i,types[i],"industrial",sizes[i],0)
 		result.append(offer)
-	if _offers.size()>=128: _offers.clear()
-	_offers[cache_key]=result.duplicate(true)
+	ActionMemo.store(_offers, cache_key, result.duplicate(true), 128)
 	return result
 
 static func _shuffle(values: Array[String], random: RandomNumberGenerator) -> void:
@@ -143,10 +145,9 @@ static func problem(value: Variant) -> String:
 	if value.type=="equipment" and value.layout.topology=="residential": return "TASK_THEME"
 	if (value.type=="rescue" and int(value.recruit) not in [3,4,5]) or (value.type!="rescue" and value.recruit!=0): return "TASK_RECRUIT"
 	var signature: String = SurvivalContracts.fingerprint(value)
-	if _checked.has(signature): return ""
+	if ActionMemo.lookup(_checked, signature) == true: return ""
 	if not TransactionReceipt.same(value,_make(value.seed,int(value.day),int(value.slot),value.type,value.layout.topology,value.layout["size"],int(value.recruit))): return "TASK_CANONICAL"
-	if _checked.size()>=128: _checked.clear()
-	_checked[signature]=true
+	ActionMemo.store(_checked, signature, true, 128)
 	return ""
 
 static func matches(base: Dictionary, value: Variant) -> bool:

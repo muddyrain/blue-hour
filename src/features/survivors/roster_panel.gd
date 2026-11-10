@@ -7,6 +7,7 @@ signal equipment_requested(member_id: int)
 signal growth_requested(member_id: int)
 signal training_requested(member_id: int)
 signal closed
+signal navigation_requested(action: StringName)
 
 var player_mode: bool = false
 
@@ -179,7 +180,17 @@ func _ready() -> void:
 	back_button.text = "返回营地 / Esc"
 	back_button.custom_minimum_size.y = 44
 	back_button.pressed.connect(func() -> void: closed.emit())
-	column.add_child(back_button)
+	if player_mode:
+		var footer: HBoxContainer = HBoxContainer.new()
+		column.add_child(footer)
+		footer.add_child(back_button)
+		for action: StringName in [&"weapons", &"workshop", &"supplies", &"bus"]:
+			var button: Button = Button.new()
+			button.text = {&"weapons":"装备仓", &"workshop":"工坊", &"supplies":"补给", &"bus":"巴士"}[action]
+			button.pressed.connect(navigation_requested.emit.bind(action))
+			footer.add_child(button)
+	else:
+		column.add_child(back_button)
 	get_viewport().size_changed.connect(_fit_viewport)
 
 
@@ -189,7 +200,7 @@ func refresh(data: Dictionary, feedback: String = "") -> void:
 	_fit_viewport()
 	var persona_mode: bool=PersonaState.enabled(_data)
 	growth_button.visible=not persona_mode
-	back_button.visible=not persona_mode
+	back_button.visible=player_mode or not persona_mode
 	equipment_button.visible=not persona_mode
 	_history_link.visible=persona_mode
 	message.visible=not persona_mode or not feedback.is_empty()
@@ -200,8 +211,10 @@ func refresh(data: Dictionary, feedback: String = "") -> void:
 	elif not persona_mode and _legacy_detail.get_parent()==null:
 		_detail_host.remove_child(persona_details)
 		_detail_host.add_child(_legacy_detail)
-	if persona_mode: persona_details.present(PersonaViewModel.camp(_data,selected_member_id))
-	if persona_mode: persona_details.custom_minimum_size.y=maxf(220.0,_detail_host.size.y)
+	if persona_mode:
+		persona_details.present(PersonaViewModel.camp(_data, selected_member_id))
+		persona_details.close_button.visible = not player_mode
+		persona_details.custom_minimum_size.y = maxf(220.0, _detail_host.size.y)
 	if SurvivorRoster.member(_data.crew,selected_member_id).is_empty():
 		selected_member_id = int(_data.crew[0].id)
 	_heading.text = "幸存者名册 · 存活%d / 历史%d" % [_data.crew.filter(func(m: Dictionary) -> bool: return m.health>0).size(),_data.crew.size()]
@@ -299,6 +312,9 @@ func _exit_tree() -> void:
 
 
 func _fit_viewport() -> void:
+	if player_mode:
+		offset_top = 24.0
+		return
 	# Compact views need 420px for the shared detail body, including its 140px
 	# scroll area with the Windows font metrics. Reclaim the unused title gap.
 	offset_top=48.0 if PersonaState.enabled(_data) and get_viewport_rect().size.y<700.0 else 104.0

@@ -22,8 +22,9 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 	var cold_store: bool = rare_policy == RareSortie.VERSION and type == "supply"
 	var armory: bool = rare_policy == RareSortie.VERSION and type == "airdrop"
 	var key: String = RecordEncoding.fingerprint({"layout":layout, "type":type, "cash":cash, "food":food, "weapons":weapons, "action_id":action_id, "policy":ExplorationLayout.policy(), "mission_policy":mission_policy, "rare_policy":rare_policy})
-	if _generated.has(key):
-		return _generated[key].duplicate(true)
+	var cached: Variant = ActionMemo.lookup(_generated, key)
+	if cached != null:
+		return cached.duplicate(true)
 	var routing: Dictionary = ExplorationLayout._routing(layout)
 	var nav: FieldNavigation = routing.nav
 	var routes: Dictionary = {}
@@ -195,9 +196,7 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 		"optional_objectives":objectives, "metrics":{"dmax":routing.dmax, "routes":routes}}
 	if sites.size() > 15:
 		return {}
-	if _generated.size() >= 96:
-		_generated.clear()
-	_generated[key] = result.duplicate(true)
+	ActionMemo.store(_generated, key, result.duplicate(true), 96)
 	return result
 
 

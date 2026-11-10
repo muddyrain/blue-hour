@@ -167,20 +167,34 @@ func _radio_before() -> void:
 
 
 func _reload_prepare() -> void:
-	if not await _recover_specialty("firepower", BuildItems.GUIDED_MAG, false) or not _build(CampFacilities.WORKSHOP):
+	var saved: Dictionary = app.progress_session.inspect()
+	var owned: Array = saved.get("camp", {}).get("journey", {}).get("build", {}).get("owned", [])
+	if saved.get("state") == "CAMP" and BuildItems.GUIDED_MAG in owned:
+		if not await _continue_trip():
+			return
+	elif not await _recover_specialty("firepower", BuildItems.GUIDED_MAG, false):
 		return
-	if not await _open_cards():
+	if CampFacilities.selected(app.camp_snapshot()) != CampFacilities.WORKSHOP and not _build(CampFacilities.WORKSHOP):
 		return
-	var card: int = _find_card(func(action: Dictionary) -> bool: return not WorkshopSiteV1.site_id(action).is_empty())
-	var world: Expedition = await _start(card)
-	if world == null:
-		return
-	await _search(world, world._toolbox_site())
-	await _food(world, 5)
-	await _finish_outing(world)
+	for attempt: int in range(6):
+		if not await _open_cards():
+			return
+		var card: int = _find_card(func(action: Dictionary) -> bool: return not WorkshopSiteV1.site_id(action).is_empty())
+		var world: Expedition = await _start(card if card >= 0 else _find_card(func(action: Dictionary) -> bool: return action.type == "supply"))
+		if world == null:
+			return
+		if card >= 0:
+			await _search(world, world._toolbox_site())
+		await _food(world, 4)
+		await _finish_outing(world)
+		if WorkshopV1.tools(app.camp_snapshot()) > 0:
+			break
 	var camp: Dictionary = app.camp_snapshot()
 	var item: Dictionary = WeaponInventory.for_member(camp, 1)
-	_check(item.weapon_id == "carbine" and WorkshopV1.tools(camp) > 0, "normal workshop has an earned tool and the original carbine")
+	var ready: bool = item.get("weapon_id") == "carbine" and WorkshopV1.tools(camp) > 0
+	_check(ready, "normal workshop has an earned tool and the original carbine")
+	if not ready:
+		return
 	if not _edit({"kind":WorkshopV1.QUICK, "member_id":0, "value":item.instance_id}):
 		return
 	_write("prepared.json", {"camp":RecordEncoding.fingerprint(app.camp_snapshot()), "weapon":item.instance_id, "returns":route})

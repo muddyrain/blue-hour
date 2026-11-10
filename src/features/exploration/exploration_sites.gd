@@ -2,6 +2,8 @@ class_name ExplorationSites
 extends RefCounted
 ## Frozen per-object budgets and read-only goals. Existing WorldSites owns carrying rewards.
 
+const OPEN_PRIMARY_LIMIT: float = 3800.0
+const OPEN_GEAR_PREFERRED: float = 2400.0
 const OPTIONAL_IDS: Array[String] = ["optional_buildings_all", "searchable_vehicles_all", "fruit_trees_all"]
 const OPTIONAL_TITLES: Dictionary = {"optional_buildings_all":"搜完可选建筑", "searchable_vehicles_all":"搜完停放车辆", "fruit_trees_all":"采完本图果树"}
 static var _generated: Dictionary = {}
@@ -16,6 +18,7 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 	var config: Dictionary = TaskActions.CONFIG[type]
 	if cash < int(config.cash[0]) or cash > int(config.cash[1]) or food < int(config.food[0]) or food > int(config.food[1]) or weapons < int(config.weapons[0]) or weapons > int(config.weapons[1]):
 		return {}
+	var open_streets: bool = layout.has("open_streets")
 	var cold_store: bool = rare_policy == RareSortie.VERSION and type == "supply"
 	var armory: bool = rare_policy == RareSortie.VERSION and type == "airdrop"
 	var key: String = RecordEncoding.fingerprint({"layout":layout, "type":type, "cash":cash, "food":food, "weapons":weapons, "action_id":action_id, "policy":ExplorationLayout.policy(), "mission_policy":mission_policy, "rare_policy":rare_policy})
@@ -51,7 +54,7 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 			if routing.doors[far.id].length - routing.doors[near.id].length >= 750.0:
 				supply_pair = [near, far]
 		elif not cold_store:
-			supply_pair = LevelPolicy.mission_supply_pair(groceries, routing)
+			supply_pair = LevelPolicy.mission_supply_pair(groceries, routing, 2000.0 if open_streets else LevelPolicy.MISSION_SUPPLY_LIMIT)
 		if supply_pair.size() != 2:
 			return {}
 	for kind: String in ["food", "cash"]:
@@ -71,6 +74,8 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 					if candidate.id == layout.loading_yard.warehouse:
 						entity = candidate
 						break
+			elif open_streets and type in ["equipment", "airdrop"] and kind == "cash" and index == 0:
+				entity = _open_gear_target(candidates, routing)
 			elif mission_policy == 1 and type == "equipment" and kind == "cash" and index == 0:
 				entity = LevelPolicy.mission_investigation_target(candidates, routing)
 			elif layout.has("level_task") and type!="airdrop":
@@ -142,8 +147,14 @@ static func generate(layout: Dictionary, type: String, cash: int, food: int, wea
 		primary_away = primary_away or routes[id].zone != "near"
 	if type == "rescue":
 		var rescue_route: Dictionary = _route(layout, WorldLayout.point(layout.rescue), nav, float(routing.dmax))
-		primary_away = not rescue_route.is_empty() and rescue_route.zone != "near"
-	if not primary_away and (mission_policy != 1 or type != "supply"):
+		if rescue_route.is_empty() or (open_streets and float(rescue_route.length) > OPEN_PRIMARY_LIMIT):
+			return {}
+		primary_away = rescue_route.zone != "near"
+	if open_streets:
+		for id: String in targets:
+			if float(routes[id].length) > OPEN_PRIMARY_LIMIT:
+				return {}
+	elif not primary_away and (mission_policy != 1 or type != "supply"):
 		return {}
 	var pool: Array[String] = OPTIONAL_IDS.duplicate()
 	pool.sort_custom(func(a: String, b: String) -> bool:
@@ -248,12 +259,25 @@ static func _choose(candidates: Array[Dictionary], routing: Dictionary, zone: St
 	return ranked[0]
 
 
+static func _open_gear_target(candidates: Array[Dictionary], routing: Dictionary) -> Dictionary:
+	var target: Dictionary = {}
+	var best: float = INF
+	for candidate: Dictionary in candidates:
+		var distance: float = float(routing.doors[candidate.id].length)
+		var score: float = absf(distance - OPEN_GEAR_PREFERRED)
+		if distance <= OPEN_PRIMARY_LIMIT and score < best:
+			target = candidate
+			best = score
+	return target
+
+
 static func _airdrop_point(layout: Dictionary, entity: Dictionary, nav: FieldNavigation) -> Array:
 	if layout.has("loading_yard"):
 		return layout.loading_yard.work_point.duplicate()
 	for offset: Vector2 in [Vector2(0, 16), Vector2(32, 16), Vector2(-32, 16), Vector2(0, 24)]:
 		var point: Vector2 = WorldLayout.point(entity.door) + offset
-		var clear: bool = not WorldLayout.rect(layout.bus.sweep).grow(40.0).has_point(point)
+		var clear: bool = not (OpenStreetsV1.intersects_sweep(layout.bus, Rect2(point, Vector2.ONE), 40.0) if layout.has("open_streets")
+			else WorldLayout.rect(layout.bus.sweep).grow(40.0).has_point(point))
 		for corner: Vector2 in [Vector2.ZERO, Vector2(-28, -28), Vector2(28, -28), Vector2(-28, 28), Vector2(28, 28)]:
 			clear = clear and nav.is_clear(point + corner)
 		if clear:

@@ -82,4 +82,7 @@ func hit_area(kind: StringName) -> Rect2:
 
 
 func bus_foot() -> Vector2:
+	if world_data.has("open_streets"):
+		var stop: Array = world_data.bus.stop
+		return Vector2(float(stop[0]), float(stop[1]))
 	return Vector2(bus_block.get_center().x,bus_block.end.y)

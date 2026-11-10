@@ -22,6 +22,7 @@ func _ready() -> void:
 func _draw() -> void:
 	var street_material: bool = int(layout.world_data.get("art_revision", 0)) == 3
 	var blue_hour: bool = _blue_hour()
+	var open_streets: bool = layout.world_data.has("open_streets")
 	var loading_yard: Dictionary = layout.world_data.get("loading_yard", {})
 	var rescue_court: Dictionary = layout.world_data.get("rescue_court", {})
 	var grass: Color = Color(0.59, 0.72, 0.76, 0.56) if blue_hour else Color(0.93, 0.94, 0.81, 0.58) if street_material else Color(0.77, 0.88, 0.76, 0.42)
@@ -50,7 +51,8 @@ func _draw() -> void:
 				draw_texture_rect(StreetBlock.PavingTexture,paving,true,Color(0.83,0.89,0.81,0.65))
 	# One continuous verge on each street, cut by all actual connections.
 	for road: Rect2 in layout.roads:
-		var paving: Rect2=road.grow(28).intersection(layout.world_bounds)
+		var is_arterial: bool = open_streets and minf(road.size.x, road.size.y) == OpenStreetsV1.ARTERIAL_WIDTH
+		var paving: Rect2 = road.grow(96 if is_arterial else 28).intersection(layout.world_bounds)
 		if street_material:
 			_paving(paving)
 		else:
@@ -77,7 +79,7 @@ func _draw() -> void:
 	for road: Rect2 in layout.roads:
 		draw_rect(road, Color("263748") if blue_hour else Color("34434b"))
 		draw_texture_rect(StreetBlock.AsphaltTexture, road, true, Color(0.63, 0.74, 0.95, 0.43) if blue_hour else Color(0.73, 0.8, 0.82, 0.45))
-	if blue_hour:
+	if blue_hour and not open_streets:
 		_bus_curb_paint()
 	for road: Rect2 in layout.roads:
 		var horizontal: bool=road.size.x>road.size.y
@@ -95,8 +97,8 @@ func _draw() -> void:
 						draw_rect(Rect2(p+Vector2(1,5),Vector2(18,4)),Color("28363a"))
 		for step: int in range(32,length-32,88):
 			var p: Vector2=Vector2(road.position.x+step,road.get_center().y) if horizontal else Vector2(road.get_center().x,road.position.y+step)
-			var center_line: Color = Color("aa956d") if minf(road.size.x, road.size.y) == WorldgenScale.MAIN_WIDTH else Color("727879")
-			if not _junction(p,road) and (not blue_hour or not layout.bus_block.grow(40).has_point(p)):
+			var center_line: Color = Color("aa956d") if minf(road.size.x, road.size.y) >= WorldgenScale.MAIN_WIDTH else Color("727879")
+			if not _junction(p,road) and (open_streets or not blue_hour or not layout.bus_block.grow(40).has_point(p)):
 				draw_line(p, p + tangent * 32.0, center_line if blue_hour else Color("c3b27d"), 2)
 	# Crossings mark the actual perpendicular road connections, never a collision.
 	for a: Rect2 in layout.roads:
@@ -117,7 +119,7 @@ func _draw() -> void:
 
 
 func _blue_hour() -> bool:
-	return not supply_entrances.is_empty() or layout.world_data.has("loading_yard") or layout.world_data.has("rescue_court")
+	return layout.world_data.has("open_streets") or not supply_entrances.is_empty() or layout.world_data.has("loading_yard") or layout.world_data.has("rescue_court")
 
 
 func _rescue_court_floor(court: Dictionary) -> void:

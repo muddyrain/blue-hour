@@ -6,11 +6,12 @@ const MIN_WIDTH: int = 736
 const MIN_HEIGHT: int = 464
 
 static func assemble(seed: String, size: String, topology: String, attempt: int, fallback: bool,
-		task: String = "", industrial: bool = false, residential_rescue: bool = false) -> Dictionary:
+		task: String = "", industrial: bool = false, residential_rescue: bool = false,
+		open_streets: bool = false) -> Dictionary:
 	if residential_rescue and (topology != "residential" or task != "rescue"):
 		return {}
 	var random: RandomNumberGenerator = RogueLayout.rng("worldgen-v1:" + ((size + ":" + topology + ":fallback") if fallback else seed + ":" + str(attempt)))
-	var dimensions: Array = DIMENSIONS[size]
+	var dimensions: Array = OpenStreetsV1.BOUNDS.slice(2) if open_streets else DIMENSIONS[size]
 	var width: int = int(dimensions[0])
 	var height: int = int(dimensions[1])
 	var rank: int = NeighborhoodLayout.SIZES.find(size)
@@ -21,9 +22,15 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 		{"rect":[0,0,width,main_y],"edges":[false,true,false,false]},
 		{"rect":[0,main_y+main_width,width,height-main_y-main_width],"edges":[true,false,false,false]}
 	]
-	var target: int = [5,8,11][rank] + random.randi_range(-1,1)
+	var skeleton: Dictionary = OpenStreetsV1.skeleton(seed, topology, attempt, fallback) if open_streets else {}
+	if open_streets:
+		if skeleton.is_empty():
+			return {}
+		segments = skeleton.segments
+		leaves = skeleton.leaves
+	var target: int = (28 if open_streets else [5,8,11][rank]) + random.randi_range(-1,1)
 	# Each cut joins at least one existing road edge. Both children retain that edge.
-	for step: int in range(18):
+	for step: int in range(28 if open_streets else 18):
 		if leaves.size() >= target: break
 		var options: Array[Dictionary] = []
 		for index: int in range(leaves.size()):
@@ -39,6 +46,10 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 		var parent: Dictionary = leaves[int(choice.index)]
 		leaves.remove_at(int(choice.index))
 		_split(parent, bool(choice.vertical), random, leaves, segments)
+		if open_streets and not OpenStreetsV1.stop_clear(skeleton.bus, _roads([segments[-1]], width, height)):
+			segments.pop_back()
+			leaves.resize(leaves.size() - 2)
+			leaves.insert(int(choice.index), parent)
 	var roads: Array = _roads(segments,width,height)
 	var parcels: Array = []
 	# Small local dead ends create service courts without replacing a whole-map template.
@@ -52,17 +63,23 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 			var x: int = int(box.end.x - 176)
 			var from_y: int = _connect(int(box.end.y if leaf.edges[1] else box.position.y),x,true,segments)
 			var to_y: int = int(box.end.y-240 if leaf.edges[1] else box.position.y+240)
-			segments.append([x,mini(from_y,to_y),x,maxi(from_y,to_y),96])
-			segments.append([x-160,to_y,x,to_y,96])
-			kind = "service" if topology == "industrial" else "courtyard"
+			var spur: Array = [[x,mini(from_y,to_y),x,maxi(from_y,to_y),96], [x-160,to_y,x,to_y,96]]
+			if not open_streets or OpenStreetsV1.stop_clear(skeleton.bus, _roads(spur, width, height)):
+				segments.append_array(spur)
+				kind = "service" if topology == "industrial" else "courtyard"
+			else:
+				stub = false
 		parcels.append({"id":"p%02d"%index,"rect":leaf.rect.duplicate(),"kind":kind,"road_edges":leaf.edges.duplicate(),"buildings":[],"entrance":[],"dead_end":stub,"courtyards":[],"walks":[],"frontage":{"available":0.0,"occupied":0.0,"coverage":0.0}})
 	roads = _roads(segments,width,height)
-	var stop_x: int = _stop_x(width,main_y,roads,random)
+	var stop_x: int = 0 if open_streets else _stop_x(width,main_y,roads,random)
 	var foot_y: int = main_y+main_width-48
 	var door: Array = [stop_x+190,main_y+main_width+48]
 	var bus: Dictionary = {"rect":[stop_x,foot_y-80,240,80],"door":door,"passenger_door":[stop_x+190,foot_y-16],"entry":[-160,foot_y],"exit":[width+160,foot_y],"sweep":[0,foot_y-100,width,120],"facing":"right"}
+	if open_streets:
+		bus = skeleton.bus
+		door = bus.door
 	if not task.is_empty():
-		LevelPolicy.prepare(parcels,task,seed)
+		LevelPolicy.prepare(parcels, task, seed, WorldLayout.point(door) if open_streets else Vector2.INF)
 	var entities: Array = []
 	var yard_plan: Dictionary = {}
 	var yard: Dictionary = {}
@@ -88,7 +105,7 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 			if not filled:
 				return {}
 		else:
-			_populate(parcel,topology,random,entities,roads,bus)
+			_populate(parcel,topology,random,entities,roads,bus, (2 if topology == "commercial" and parcel.kind == "shopfront" else 1) if open_streets else 0)
 	# Food and equipment are actual parcels, not rewards granted to every building.
 	_ensure_categories(entities,parcels,roads,bus,yard_parcel)
 	_update_frontages(parcels,entities,yard_parcel)
@@ -110,6 +127,10 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 		walls.gates.append(court.side.gate)
 	var arrivals: Array = [[door[0]-48,door[1]+24],[door[0],door[1]+24],[door[0]+48,door[1]+24],[door[0],door[1]+56]]
 	var data: Dictionary = {"version":5,"seed":seed,"size":size,"topology":topology,"attempt":attempt,"fallback":fallback,"bounds":[0,0,width,height],"entities":entities,"roads":roads,"barriers":walls.barriers,"gates":walls.gates,"bus":bus,"arrivals":arrivals,"enemy_points":[[24,main_y+24],[width-24,main_y+24]],"rescue":rescue,"objects":[],"parcels":parcels,"graph":WorldgenStructure.graph(segments)}
+	if open_streets:
+		data.open_streets = OpenStreetsV1.VERSION
+		data.arrivals = skeleton.arrivals
+		data.enemy_points = skeleton.enemy_points
 	if not yard.is_empty():
 		data.loading_yard = yard
 	if not task.is_empty():
@@ -142,8 +163,8 @@ static func _split(parent: Dictionary, vertical: bool, random: RandomNumberGener
 
 static func _connect(edge: int, along: int, vertical: bool, segments: Array) -> int:
 	for segment: Array in segments:
-		if vertical and segment[1]==segment[3] and absi(int(segment[1])-edge)<=WorldgenScale.MAIN_WIDTH/2 and along>=int(segment[0]) and along<=int(segment[2]):return int(segment[1])
-		if not vertical and segment[0]==segment[2] and absi(int(segment[0])-edge)<=WorldgenScale.MAIN_WIDTH/2 and along>=int(segment[1]) and along<=int(segment[3]):return int(segment[0])
+		if vertical and segment[1]==segment[3] and absi(int(segment[1])-edge)<=maxi(WorldgenScale.MAIN_WIDTH,int(segment[4]))/2 and along>=int(segment[0]) and along<=int(segment[2]):return int(segment[1])
+		if not vertical and segment[0]==segment[2] and absi(int(segment[0])-edge)<=maxi(WorldgenScale.MAIN_WIDTH,int(segment[4]))/2 and along>=int(segment[1]) and along<=int(segment[3]):return int(segment[0])
 	return edge
 
 static func _roads(segments: Array, width: int, height: int) -> Array:
@@ -207,7 +228,7 @@ static func _populate_rescue_court(parcel: Dictionary, plan: Dictionary, entitie
 			_add_walk(parcel, WorldLayout.rect(paving))
 	return true
 
-static func _populate(parcel: Dictionary, topology: String, random: RandomNumberGenerator, entities: Array, roads: Array, bus: Dictionary) -> void:
+static func _populate(parcel: Dictionary, topology: String, random: RandomNumberGenerator, entities: Array, roads: Array, bus: Dictionary, row_limit: int = 0) -> void:
 	var box: Rect2=WorldLayout.rect(parcel.rect)
 	var group_count: int=maxi(1,int((box.size.x-96.0)/720.0))
 	var group_width: float=(box.size.x-96.0-96.0*(group_count-1))/group_count
@@ -227,7 +248,7 @@ static func _populate(parcel: Dictionary, topology: String, random: RandomNumber
 		var foot: float=front_foot
 		var row: int=0
 		var rear_roof: float=box.end.y
-		while foot>box.position.y+128:
+		while foot>box.position.y+128 and (row_limit == 0 or row < row_limit):
 			var headroom: float=foot-box.position.y-16.0
 			var pool: Array=_building_pool(parcel.kind,topology,row)
 			# A shallow commercial back row uses low shops; homes are admitted only
@@ -316,7 +337,8 @@ static func _fill_frontage(pool: Array, width: float, gap: float, random: Random
 
 static func _available_frontage(left: float, width: float, foot: float, roads: Array, bus: Dictionary) -> float:
 	var spans: Array[Vector2]=[Vector2(left,left+width)]
-	var clearances: Array[Rect2]=[WorldLayout.rect(bus.sweep).grow(32),Rect2(WorldLayout.point(bus.door)-Vector2(148,148),Vector2(296,296))]
+	var clearances: Array[Rect2] = OpenStreetsV1.swept_rects(bus, 32)
+	clearances.append(Rect2(WorldLayout.point(bus.door)-Vector2(148,148),Vector2(296,296)))
 	for road: Array in roads:clearances.append(WorldLayout.rect(road).grow(16))
 	for area: Rect2 in clearances:
 		if area.end.y<=foot-128 or area.position.y>=foot:continue
@@ -350,7 +372,7 @@ static func _add_building(type: String, variant: int, x: float, foot: float, par
 	if not plot.grow(-32).encloses(block):return false
 	if foot-WorldgenScale.visible_height(type,variant,art)<plot.position.y+16:return false
 	# Keep all boarding/arrival positions and the full sweep free before props are added.
-	if block.grow(32).intersects(WorldLayout.rect(bus.sweep)) or block.grow(20).intersects(Rect2(WorldLayout.point(bus.door)-Vector2(128,128),Vector2(256,256))):return false
+	if OpenStreetsV1.intersects_sweep(bus, block, 32) or block.grow(20).intersects(Rect2(WorldLayout.point(bus.door)-Vector2(128,128),Vector2(256,256))):return false
 	for value: Array in roads:
 		if block.grow(16).intersects(WorldLayout.rect(value)):return false
 	for entity: Dictionary in entities:
@@ -398,7 +420,7 @@ static func _walls(parcels: Array, entities: Array, roads: Array, bus: Dictionar
 			for court: Dictionary in other.courtyards:
 				clear=clear and not wall.grow(44).has_point(WorldLayout.point(court.entrance))
 		for road: Array in roads:clear=clear and not wall.grow(24).intersects(WorldLayout.rect(road))
-		clear=clear and not wall.grow(40).intersects(WorldLayout.rect(bus.sweep)) and not Rect2(WorldLayout.point(bus.door)-Vector2(160,160),Vector2(320,320)).intersects(wall)
+		clear=clear and not OpenStreetsV1.intersects_sweep(bus, wall, 40) and not Rect2(WorldLayout.point(bus.door)-Vector2(160,160),Vector2(320,320)).intersects(wall)
 		if clear:
 			barriers.append([wall.position.x,wall.position.y,wall.size.x,wall.size.y]);gates.append([gate.x,gate.y])
 	return {"barriers":barriers,"gates":gates}
@@ -457,4 +479,4 @@ static func _replacement_fits(entity: Dictionary, type: String, entities: Array,
 		if other.id!=entity.id and (block.grow(16).intersects(WorldLayout.rect(other.rect)) or visible.intersects(WorldgenScale.visible_rect(other))):return false
 	for road: Array in roads:
 		if block.grow(16).intersects(WorldLayout.rect(road)):return false
-	return not block.grow(32).intersects(WorldLayout.rect(bus.sweep)) and not block.grow(20).intersects(Rect2(WorldLayout.point(bus.door)-Vector2(128,128),Vector2(256,256)))
+	return not OpenStreetsV1.intersects_sweep(bus, block, 32) and not block.grow(20).intersects(Rect2(WorldLayout.point(bus.door)-Vector2(128,128),Vector2(256,256)))

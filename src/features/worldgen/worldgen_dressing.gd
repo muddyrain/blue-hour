@@ -27,7 +27,9 @@ static func freeze(data: Dictionary) -> void:
 			# Place at a court boundary, leaving its entrance and orthogonal footways clear.
 			for point: Vector2 in [Vector2(area.position.x+width/2+12,area.position.y+52),Vector2(area.end.x-width/2-12,area.end.y-14),Vector2(area.get_center().x,area.position.y+52)]:
 				var block: Rect2=Rect2(point-Vector2(width*0.44,24),Vector2(width*0.88,24))
-				var clear: bool=area.encloses(block) and not WorldLayout.rect(data.bus.sweep).grow(24).intersects(block)
+				var route_clear: bool = not (OpenStreetsV1.intersects_sweep(data.bus, block, 24) if data.has("open_streets")
+					else WorldLayout.rect(data.bus.sweep).grow(24).intersects(block))
+				var clear: bool = area.encloses(block) and route_clear
 				for other: Rect2 in occupied+reserved:clear=clear and not block.grow(20).intersects(other)
 				for road: Array in data.roads:clear=clear and not block.grow(24).intersects(WorldLayout.rect(road))
 				for walk: Array in parcel.walks:clear=clear and not block.grow(12).intersects(WorldLayout.rect(walk))

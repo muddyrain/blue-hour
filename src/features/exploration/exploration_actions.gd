@@ -28,12 +28,14 @@ static func source_from_task(task: Dictionary, context: Dictionary) -> Dictionar
 
 static func upgrade(source: Dictionary, worldgen: bool = false, level: bool = false,
 		mission_policy: int = 0, industrial: bool = false, residential_rescue: bool = false,
-		rare_policy: int = 0, billboard_target: Dictionary = {}) -> Dictionary:
+		rare_policy: int = 0, billboard_target: Dictionary = {}, open_streets: bool = false) -> Dictionary:
 	if mission_policy != 0 and (mission_policy != 1 or not worldgen or not level):
 		return {}
 	if industrial and (mission_policy != 1 or source.type != "airdrop" or source.layout.topology != "industrial"):
 		return {}
 	if residential_rescue and (mission_policy != 1 or source.type != "rescue" or source.layout.topology != "residential"):
+		return {}
+	if open_streets and (mission_policy != 1 or source.layout["size"] != "large" or rare_policy != 0 or not billboard_target.is_empty()):
 		return {}
 	var value: Dictionary=source.duplicate(true)
 	value.version=9
@@ -55,7 +57,7 @@ static func upgrade(source: Dictionary, worldgen: bool = false, level: bool = fa
 	if level:
 		var map: Dictionary
 		if billboard_target.is_empty():
-			map = level_map(source, value.id, mission_policy, industrial, residential_rescue, rare_policy)
+			map = level_map(source, value.id, mission_policy, industrial, residential_rescue, rare_policy, false, open_streets)
 		else:
 			if mission_policy != 1 or rare_policy != 0 or source.type != "supply" or source.slot != BillboardActionV1.SLOT \
 					or source.layout["size"] != billboard_target.get("size") or source.layout.topology != billboard_target.get("topology"):
@@ -89,15 +91,16 @@ static func upgrade(source: Dictionary, worldgen: bool = false, level: bool = fa
 	value.exploration={"version":1,"policy":ExplorationLayout.policy(),"primary":{"cash":source.cash,"food":source.food,"weapons":value.weapons},"optional_objectives":content.optional_objectives,"metrics":content.metrics}
 	if level:
 		value.exploration.level=content.level
-	if worldgen: value.worldgen = WorldgenLayout.policy(level, industrial, residential_rescue)
+	if worldgen: value.worldgen = WorldgenLayout.policy(level, industrial, residential_rescue, open_streets)
 	return value
 
 
 static func level_map(source: Dictionary, id: String, mission_policy: int, industrial: bool,
-		residential_rescue: bool, rare_policy: int, require_supermarket: bool = false) -> Dictionary:
+		residential_rescue: bool, rare_policy: int, require_supermarket: bool = false,
+		open_streets: bool = false) -> Dictionary:
 	for attempt: int in range(4):
 		var layout: Dictionary = WorldgenLayout._assemble("BH_LEVEL_V1:" + id, source.layout["size"],
-			source.layout.topology, mini(attempt, 2), attempt == 3, source.type, industrial, residential_rescue)
+			source.layout.topology, mini(attempt, 2), attempt == 3, source.type, industrial, residential_rescue, open_streets)
 		if layout.is_empty():
 			continue
 		var content: Dictionary = ExplorationSites.generate(layout, source.type, int(source.cash),
@@ -165,6 +168,7 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 	var level: bool=worldgen and value.worldgen is Dictionary and value.worldgen.get("version")==2
 	var industrial: bool = level and value.worldgen.get("revision") == 2
 	var residential_rescue: bool = level and value.worldgen.get("revision") == 3
+	var open_streets: bool = level and value.worldgen.has("open_streets")
 	var mission: bool = value is Dictionary and value.has("mission_policy")
 	var rare: bool = value is Dictionary and value.has("rare_policy")
 	var gear_build: bool = value is Dictionary and value.has("gear_build_policy")
@@ -190,7 +194,7 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 			return issue
 		if not mission or rare or gear_build or screamer or weapon_affixes or sortie_risk or night_hound or workshop_tool:
 			return "EVENT_SORTIE_CONTEXT"
-	if worldgen and (not value.worldgen is Dictionary or not TransactionReceipt.same(value.worldgen,WorldgenLayout.policy(level, industrial, residential_rescue))): return "WORLDGEN_ACTION_POLICY"
+	if worldgen and (not value.worldgen is Dictionary or not TransactionReceipt.same(value.worldgen,WorldgenLayout.policy(level, industrial, residential_rescue, open_streets))): return "WORLDGEN_ACTION_POLICY"
 	if mission and (not level or not SurvivalContracts.integer(value.mission_policy, 1, 1)): return "MISSION_ACTION_POLICY"
 	if rare and (not mission or not SurvivalContracts.integer(value.rare_policy, RareSortie.VERSION, RareSortie.VERSION)): return "RARE_ACTION_POLICY"
 	if gear_build and (not mission or rare or value.get("type") != "airdrop" \
@@ -215,7 +219,7 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 		expected = SortieRiskV1.freeze(source, source_risk.topology, source_risk.yard)
 	else:
 		expected = upgrade(source, worldgen, level, int(mission), industrial, residential_rescue,
-			int(value.get("rare_policy", 0)), value.get("billboard_target", {}))
+			int(value.get("rare_policy", 0)), value.get("billboard_target", {}), open_streets)
 	if event_sortie and not expected.is_empty():
 		expected = EventSortieV1.freeze(expected)
 	if expected.is_empty(): return "EXPLORATION_ACTION_CANONICAL"

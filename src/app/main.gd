@@ -899,6 +899,8 @@ func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}) -> vo
 			_battle_meta.campaign.recon_policy = ReconActionV1.SOURCE_VERSION
 			_battle_meta.campaign.barricade_policy = BarricadeV1.VERSION
 			_battle_meta.campaign.billboard_policy = BillboardActionV1.VERSION
+			if "--bh-open-streets" in OS.get_cmdline_user_args() and CampSceneLayout.isolated(ProjectSettings.globalize_path(progress_path)):
+				_battle_meta.campaign.open_streets_policy = OpenStreetsV1.VERSION
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true, true)
 		_battle_meta.build.powers = PowerState.initial_progression(
 			SpecialPowers.WAVE_VERSION if latest_rules else SpecialPowers.PROGRESSION_VERSION)
@@ -955,6 +957,13 @@ func _on_expedition_finished(report: Dictionary, sortie_id: String) -> void:
 			if _accept_transaction(progress_session.commit_result(),true):
 				_pending_settlement = {}
 			_show_battle_result(frozen,_pending_settlement.is_empty())
+		elif report.evacuated and expedition.layout.world_data.has("open_streets") and expedition.bus_view != null:
+			phase = Phase.EXPEDITION
+			_screen.hide()
+			_result.hide()
+			expedition.bus_view.departed.connect(
+				func() -> void: _show_battle_result(_pending_settlement, false), CONNECT_ONE_SHOT)
+			expedition.bus_view.departure()
 		else:
 			_show_battle_result(_pending_settlement,false)
 			if report.evacuated and expedition.bus_view != null:

@@ -35,7 +35,9 @@ static func placements(layout: StreetLayout) -> Array[Dictionary]:
 static func _clear(layout: StreetLayout, point: Vector2) -> bool:
 	if not layout.world_bounds.grow(-28).has_point(point) or layout.bus_block.grow(72).has_point(point):
 		return false
-	if WorldLayout.rect(layout.world_data.bus.sweep).grow(12).has_point(point):
+	var bus: Dictionary = layout.world_data.bus
+	if (OpenStreetsV1.intersects_sweep(bus, Rect2(point, Vector2.ONE), 12) if bus.has("sweeps")
+			else WorldLayout.rect(bus.sweep).grow(12).has_point(point)):
 		return false
 	for block: Rect2 in layout.blockers():
 		if block.grow(22).has_point(point):

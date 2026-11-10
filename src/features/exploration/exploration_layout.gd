@@ -15,6 +15,7 @@ const MAX_CACHE: int = 48
 static var _built: Dictionary = {}
 static var _checked: Dictionary = {}
 static var _certificates: Dictionary = {}
+static var _open_certificates: Dictionary[String, String] = {}
 
 
 static func policy() -> Dictionary:
@@ -94,6 +95,9 @@ static func complete(data: Dictionary) -> Dictionary:
 			data.objects.append(object)
 	# Only one final graph after all prop collisions have been selected.
 	street = NeighborhoodLayout.resource(data)
+	if data.has("open_streets"):
+		if not OpenStreetsV1.certify(data, street.blockers()):
+			return {}
 	var nav: FieldNavigation = FieldNavigation.new()
 	nav.configure(street.blockers(), street.world_bounds)
 	var certificate: Dictionary = _door_routes(data, nav)
@@ -115,6 +119,15 @@ static func complete(data: Dictionary) -> Dictionary:
 		_certificates.clear()
 		_checked.clear()
 		_built.clear()
+		_open_certificates.clear()
+	if data.has("open_streets"):
+		if _open_certificates.size() >= 4:
+			var oldest: String = _open_certificates.keys()[0]
+			_certificates.erase(oldest)
+			_checked.erase(oldest)
+			_built.erase(_open_certificates[oldest])
+			_open_certificates.erase(oldest)
+		_open_certificates[signature] = origin_key
 	certificate.nav = nav
 	_certificates[signature] = certificate
 	_checked[signature] = true
@@ -124,13 +137,13 @@ static func complete(data: Dictionary) -> Dictionary:
 
 static func _geometry_problem(data: Dictionary) -> String:
 	var bounds: Rect2 = WorldLayout.rect(data.bounds)
-	if (data.version==4 and data.entities.size() != SIZES[data["size"]].buildings) or not TransactionReceipt.same({"v":data.bounds}, {"v":SIZES[data["size"]].bounds}):
+	var expected: Array = OpenStreetsV1.BOUNDS if data.has("open_streets") else SIZES[data["size"]].bounds
+	if (data.version==4 and data.entities.size() != SIZES[data["size"]].buildings) or not TransactionReceipt.same({"v":data.bounds}, {"v":expected}):
 		return "EXPLORATION_DIMENSIONS"
 	var blocks: Array[Rect2] = []
-	var sweep: Rect2 = WorldLayout.rect(data.bus.sweep)
 	for entity: Dictionary in data.entities:
 		var block: Rect2 = WorldLayout.rect(entity.rect)
-		if not bounds.encloses(block) or block.intersects(sweep):
+		if not bounds.encloses(block) or OpenStreetsV1.intersects_sweep(data.bus, block):
 			return "EXPLORATION_BUILDING_BOUNDS"
 		for other: Rect2 in blocks:
 			if block.grow(12.0).intersects(other):
@@ -145,7 +158,7 @@ static func _geometry_problem(data: Dictionary) -> String:
 				return "EXPLORATION_ROAD_BUILDING"
 	for wall: Array in data.barriers:
 		var barrier: Rect2 = WorldLayout.rect(wall)
-		if not bounds.encloses(barrier) or barrier.intersects(sweep):
+		if not bounds.encloses(barrier) or OpenStreetsV1.intersects_sweep(data.bus, barrier):
 			return "EXPLORATION_WALL_BOUNDS"
 		for block: Rect2 in blocks:
 			if barrier.grow(12.0).intersects(block):
@@ -154,7 +167,8 @@ static func _geometry_problem(data: Dictionary) -> String:
 
 
 static func _reserved(data: Dictionary) -> Array[Rect2]:
-	var zones: Array[Rect2] = [WorldLayout.rect(data.bus.sweep).grow(32.0), WorldLayout.rect(data.bus.rect).grow(40.0)]
+	var zones: Array[Rect2] = OpenStreetsV1.swept_rects(data.bus, 32.0)
+	zones.append(WorldLayout.rect(data.bus.rect).grow(40.0))
 	for value: Array in [data.bus.door, data.bus.passenger_door]:
 		zones.append(Rect2(WorldLayout.point(value) - Vector2(112, 112), Vector2(224, 224)))
 	for value: Array in data.arrivals:

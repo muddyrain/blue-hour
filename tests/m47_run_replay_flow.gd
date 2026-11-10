@@ -64,10 +64,16 @@ func _resume() -> void:
 
 
 func _new_trip(plan: String, cancel_probe: bool = false) -> bool:
-	var launch: Button = app.get_node("Interface/Screen/Title/Reset") if not app._home_button.is_visible_in_tree() else app._home_button
+	var launch: Button = app._home_button
+	if app.phase == app.Phase.RESULT:
+		launch = app._pump_victory.new_journey_button if is_instance_valid(app._pump_victory) and app._pump_victory.visible else app._battle_new_button
+	elif not launch.is_visible_in_tree():
+		launch = app.get_node("Interface/Screen/Title/Reset")
 	await _tap(launch)
-	_check(app._new_game_confirmation.visible and app._opening_picker.choices.size() == 3,
-		"the ordinary title offers all three opening cards")
+	var opened: bool = app._new_game_confirmation.visible and app._opening_picker.choices.size() == 3
+	_check(opened, "the ordinary start control offers all three opening cards")
+	if not opened:
+		return false
 	if cancel_probe:
 		await _shot("01-opening-specialties")
 		var before: Dictionary = app.progress_session.inspect()

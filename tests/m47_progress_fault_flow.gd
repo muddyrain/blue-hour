@@ -218,7 +218,6 @@ func _reject_tampering(path: String, expected: Dictionary, receipt_hash: String)
 
 
 func _check_archive(path: String, run_id: String) -> void:
-	app.return_to_title()
 	if not await _new_trip("scavenge"):
 		return
 	var progress: ProductionProgress = app.progress_session
@@ -226,9 +225,13 @@ func _check_archive(path: String, run_id: String) -> void:
 	var archived: String = app.progress_path + SpecializationProgress.ARCHIVE_PREFIX + run_id
 	var preserved: String = output.path_join("retained-specialty.json")
 	var expected: Dictionary = progress.refresh_catalog()
-	_check(DirAccess.dir_exists_absolute(archived) and expected.error == OK and expected.specialties.scavenge == 2
-		and OpeningBuild.eligible(new_camp) == [OpeningBuild.PLANS.scavenge.unlock_id],
-		"normal next registration freezes the prior XP and preserves the exact old bound journal")
+	var archived_ok: bool = (
+		DirAccess.dir_exists_absolute(archived) and expected.error == OK and expected.specialties.scavenge == 2
+		and OpeningBuild.eligible(new_camp) == [OpeningBuild.PLANS.scavenge.unlock_id]
+	)
+	_check(archived_ok, "normal next registration freezes the prior XP and preserves the exact old bound journal")
+	if not archived_ok:
+		return
 	if FileAccess.file_exists(preserved) or DirAccess.rename_absolute(path, preserved) != OK:
 		_check(false, "the isolated probe retains the archived specialty file before simulating loss")
 		return

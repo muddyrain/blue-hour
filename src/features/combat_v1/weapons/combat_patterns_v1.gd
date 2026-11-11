@@ -59,7 +59,7 @@ static func melee_policy(weapon_id: String) -> Dictionary:
 
 
 static func shotgun_plan(origin: Vector2, muzzle: Vector2, heading: Vector2,
-		targets: Array[Dictionary], obstacles: Array[ShotObstacle], reach: float = 150.0) -> Dictionary:
+		targets: Array[Dictionary], obstacles: Array[ShotObstacle], reach: float = 150.0, pierce: bool = false) -> Dictionary:
 	var result: Dictionary = {"targets":[], "rays":[]}
 	if not _valid_frame(origin, heading, reach) or not muzzle.is_finite() or not _valid_targets(targets):
 		return result
@@ -85,11 +85,27 @@ static func shotgun_plan(origin: Vector2, muzzle: Vector2, heading: Vector2,
 		var stop: float = minf(first, wall)
 		result.rays.append({"from":muzzle, "to":muzzle.lerp(end, stop) if stop < INF else end, "id":victim})
 		if victim != -1:
-			counts[victim] = int(counts.get(victim, 0)) + 1
+			counts[victim] = float(counts.get(victim, 0)) + 1.0 if pierce else int(counts.get(victim, 0)) + 1
+			if pierce:
+				var second: float = INF
+				var secondary: int = -1
+				for target: Dictionary in targets:
+					if not target.alive or not target.available or target.id == victim or origin.distance_squared_to(target.foot) >= reach * reach:
+						continue
+					var entry: float = _circle_entry(muzzle, end, target.foot + Vector2.UP * AttackRules.HIT_HEIGHT, float(POLICY.shotgun.radius))
+					if entry <= first or entry >= wall or entry == INF:
+						continue
+					if entry < second or (entry == second and (secondary == -1 or int(target.id) < secondary)):
+						second = entry
+						secondary = int(target.id)
+				if secondary != -1:
+					counts[secondary] = float(counts.get(secondary, 0)) + AttackRules.PIERCE_DAMAGE_FACTOR
+					result.rays.back().secondary = secondary
+					result.rays.back().pierce_to = muzzle.lerp(end, second)
 	var identities: Array = counts.keys()
 	identities.sort()
 	for identity: int in identities:
-		result.targets.append({"id":identity, "hits":int(counts[identity])})
+		result.targets.append({"id":identity, "hits":float(counts[identity]) if pierce else int(counts[identity])})
 	return result
 
 

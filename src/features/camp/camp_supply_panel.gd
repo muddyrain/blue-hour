@@ -9,18 +9,22 @@ signal navigation_requested(action: StringName)
 const NAMES: Dictionary[String, String] = {
 	"supply": "补给设施",
 	"workshop": "工坊",
+	"planning": "规划室",
 }
 const UPGRADES: Dictionary[String, String] = {
 	"supply": "扩建补给架",
 	"workshop": "校准台",
+	"planning": "二级规划室",
 }
 const EFFECTS: Dictionary[String, String] = {
 	"supply": "成功归航应发 2 粮，按营地剩余容量入库。",
 	"workshop": "每次维修减免 4 币，最低 1 币。可随出击回收工具箱并改装卡宾枪。",
+	"planning": "成功归航后，向最终存活且特长未满的一名队员发放 1 点特长进度。",
 }
 const UPGRADE_EFFECTS: Dictionary[String, String] = {
 	"supply": "升级后出发且成功归航，设施应发从 2 粮增至 3 粮，按营地剩余容量入库。",
 	"workshop": "开放普通长管步枪的扩容与快拆方案。每件仅可改装一次，消耗 1 工具箱与 8 币。",
+	"planning": "下一次出发后成功归航，向合格队员发放 2 点特长进度。",
 }
 
 var build_buttons: Dictionary[String, Button] = {}
@@ -31,6 +35,8 @@ var _status: Label
 var _retry: Button
 var _build_status: Dictionary[String, Label] = {}
 var _upgrade_status: Dictionary[String, Label] = {}
+var _facility_rows: Dictionary[String, Control] = {}
+var _ledger: Label
 
 
 func _ready() -> void:
@@ -67,6 +73,7 @@ func _ready() -> void:
 	body.add_child(routes)
 	for choice: String in NAMES:
 		_build_route(routes, choice)
+	_ledger = _wrapped(body, "")
 	_status = CampStyle.label("", 16, CampStyle.AMBER)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(_status)
@@ -87,6 +94,19 @@ func refresh(camp: Dictionary, rations: Dictionary, feedback: String, pending: b
 		camp.day, camp.food, rations.required, balance, camp.cash, WorkshopV1.tools(camp)]
 	var current: String = CampFacilities.selected(camp)
 	for choice: String in NAMES:
+		_facility_rows[choice].visible = choice != "planning" or EconomyBuildV1.enabled(camp)
+		if EconomyBuildV1.enabled(camp):
+			var build_offer: Dictionary = EconomyBuildV1.offer(camp, "build", choice)
+			var upgrade_offer: Dictionary = EconomyBuildV1.offer(camp, "upgrade_facility", choice)
+			var level: int = EconomyBuildV1.level(camp, choice)
+			_build_status[choice].text = "%s · %s" % ["未建" if level == 0 else "%d 级" % level,
+				build_offer.summary if build_offer.available else build_offer.reason]
+			build_buttons[choice].disabled = pending or not build_offer.available
+			build_buttons[choice].text = "建设 · %d 币 + %d 工具" % [build_offer.cost, build_offer.tools]
+			upgrade_buttons[choice].disabled = pending or not upgrade_offer.available
+			upgrade_buttons[choice].text = "升级 · %d 币 + %d 工具" % [upgrade_offer.cost, upgrade_offer.tools]
+			_upgrade_status[choice].text = upgrade_offer.summary if upgrade_offer.available else upgrade_offer.reason
+			continue
 		var build: Button = build_buttons[choice]
 		build.disabled = pending or not CampFacilities.can_build(camp, choice)
 		if not current.is_empty():
@@ -102,6 +122,9 @@ func refresh(camp: Dictionary, rations: Dictionary, feedback: String, pending: b
 		_upgrade_status[choice].text = "可以升级" if offer.available else offer.reason
 	_status.text = feedback
 	_retry.visible = pending
+	_ledger.text = "设施按出发前状态结算；建设和升级不会补发已完成的归航。"
+	if EconomyBuildV1.enabled(camp):
+		_ledger.text += "\n" + EconomyBuildV1.ledger_text(camp)
 
 
 func _build_route(parent: Container, choice: String) -> void:
@@ -109,6 +132,7 @@ func _build_route(parent: Container, choice: String) -> void:
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.PANEL))
 	parent.add_child(panel)
+	_facility_rows[choice] = panel
 	var column: VBoxContainer = VBoxContainer.new()
 	column.add_theme_constant_override("separation", 9)
 	panel.add_child(column)

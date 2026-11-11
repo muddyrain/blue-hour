@@ -207,8 +207,8 @@ func request(kind: String, payload: Dictionary) -> Dictionary:
 	return {"id":_request_id(_state.binding, int(_state.sequence)), "kind":kind, "payload":payload.duplicate(true)}
 
 
-func accept(proposal: Dictionary, facts: Dictionary) -> bool:
-	if _state.is_empty() or proposal.size() != REQUEST_KEYS.size() or not proposal.has_all(REQUEST_KEYS) or not proposal.get("id") is String or not _kind_allowed(proposal.get("kind"), _allow_first_aid, _allow_radio) or not proposal.get("payload") is Dictionary or not SurvivalContracts.json_value(proposal) or not SurvivalContracts.json_value(facts):
+func accept(proposal: Dictionary, facts: Dictionary, heal_cooldown: float = 30.0) -> bool:
+	if heal_cooldown not in [24.0, 30.0] or _state.is_empty() or proposal.size() != REQUEST_KEYS.size() or not proposal.has_all(REQUEST_KEYS) or not proposal.get("id") is String or not _kind_allowed(proposal.get("kind"), _allow_first_aid, _allow_radio) or not proposal.get("payload") is Dictionary or not SurvivalContracts.json_value(proposal) or not SurvivalContracts.json_value(facts):
 		return false
 	var accepted: Dictionary = proposal.duplicate(true)
 	accepted.facts = facts.duplicate(true)
@@ -221,7 +221,7 @@ func accept(proposal: Dictionary, facts: Dictionary) -> bool:
 	_state.accepted.append(accepted)
 	_state.sequence = int(_state.sequence) + 1
 	if proposal.kind in KINDS:
-		_state.cooldowns[proposal.kind] = POLICY[proposal.kind + "_cooldown"]
+		_state.cooldowns[proposal.kind] = heal_cooldown if proposal.kind == "heal" else POLICY[proposal.kind + "_cooldown"]
 	else:
 		_used_once[proposal.kind] = true
 	return true

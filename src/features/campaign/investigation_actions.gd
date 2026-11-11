@@ -66,7 +66,8 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var campaign_pressure: bool = CampaignRules.campaign_pressure_enabled(base.journey.campaign)
 	var content_wave: bool = ContentWaveV1.enabled(base)
 	var night_hound: bool = NightHoundV1.campaign_enabled(base.journey.campaign)
-	var workshop: bool = WorkshopV1.enabled(base) and CampFacilities.selected(base) == CampFacilities.WORKSHOP
+	var economy: bool = EconomyActions.camp_enabled(base)
+	var workshop: bool = not economy and WorkshopV1.enabled(base) and CampFacilities.selected(base) == CampFacilities.WORKSHOP
 	var recon: bool = CampaignRules.recon_enabled(base.journey.campaign)
 	var barricade: bool = CampaignRules.barricade_enabled(base.journey.campaign)
 	var billboard: bool = not clue.is_empty() and BillboardIntelV1.enabled(base.journey.campaign)
@@ -78,7 +79,14 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 			candidate = BillboardActionV1.target_offer(base.journey.seed, int(base.day), candidate, opportunity.strategy)
 			if candidate.is_empty():
 				return {}
-		if event_sortie and not candidate.has("billboard_target"):
+		var hardware: bool = economy and int(base.day) >= 3 and int(base.day) % 3 == 0 \
+			and candidate.slot == 2 and not candidate.campaign.is_finale and not candidate.has("billboard_target")
+		if hardware:
+			var equipment_source: Dictionary = _with_type(ExplorationActions.origin(candidate), "airdrop", 0, "industrial", candidate.layout["size"])
+			candidate = _offer(equipment_source, "airdrop", 0, true, false, false, open_streets) if not equipment_source.is_empty() else {}
+			if candidate.is_empty():
+				return {}
+		if event_sortie and not hardware and not candidate.has("billboard_target"):
 			var event_offer: Dictionary = EventSortieV1.freeze(candidate)
 			if not event_offer.is_empty():
 				candidate = event_offer
@@ -105,6 +113,10 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 		if billboard:
 			candidate = BillboardActionV1.freeze(candidate)
 		candidate = BuildActions.with_specialization_drop(candidate, specialty)
+		if economy and candidate.get("version") == 9:
+			candidate = EconomyActions.freeze(candidate, hardware)
+			if candidate.is_empty():
+				return {}
 		result[index] = candidate
 		fingerprints[candidate.id] = RecordEncoding.fingerprint(candidate)
 	var frozen: Dictionary = {"offers":result, "fingerprints":fingerprints}

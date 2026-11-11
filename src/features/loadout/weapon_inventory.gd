@@ -74,6 +74,8 @@ static func hammer_site_drop(generated: Dictionary, site: Dictionary) -> Diction
 
 
 static func site_reward(sortie_id: String, generated: Dictionary, site: Dictionary, quality: bool) -> Dictionary:
+	if generated.has("economy_source"):
+		return EconomyBuildV1.site_reward(sortie_id, generated, site) if quality else {}
 	if (generated.get("version")!=5 and (generated.get("version")!=6 and (generated.get("version")!=7 and (generated.get("version")!=8 and generated.get("version")!=9)))):return reward(sortie_id,quality)
 	if site.drop.get("version") == HAMMER_DROP_VERSION:
 		var expected: Dictionary = hammer_site_drop(generated, site)
@@ -325,6 +327,9 @@ static func bank(after: Dictionary, rewards: Array, identity: String, generated:
 
 
 static func short_id(item: Dictionary) -> String:
+	if item.get("origin") == "m48-crafted":
+		var identity: String = String(item.instance_id).get_slice(":",2)
+		return "自制-" + identity.left(8) + "-" + identity.right(4)
 	return item.instance_id.trim_prefix(item.instance_id.get_slice(":", 0) + ":")
 
 

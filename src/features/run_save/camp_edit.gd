@@ -25,6 +25,10 @@ static func propose(before: Dictionary, request: Dictionary) -> Dictionary:
 static func _propose_valid(before: Dictionary, request: Dictionary) -> Dictionary:
 	var member_id: int = int(request.member_id)
 	match request.kind:
+		"economy":
+			return EconomyBuildV1.propose(before, request) if member_id == 0 else {}
+		"build_invest":
+			return BuildState.invest(before, request.value) if member_id == 0 else {}
 		"power_slot":
 			return PowerState.equip(before,request.value) if member_id==0 else {}
 		"power_equip":
@@ -59,6 +63,7 @@ static func _propose_valid(before: Dictionary, request: Dictionary) -> Dictionar
 
 
 static func record(before: Dictionary, request: Dictionary, identity: String, previous: Dictionary) -> Dictionary:
+	if request.get("kind") == "economy" and EconomyBuildV1.intent(request).get("edit_id") != identity: return {}
 	if request.get("kind") is String and request.kind=="train_trait":
 		var intent: Dictionary = TrainingRules.intent_for(request)
 		if not intent.get("edit_id") is String or intent.edit_id!=identity:
@@ -96,6 +101,9 @@ static func problem(value: Dictionary) -> String:
 			return "CAMP_DEATH_HISTORY"
 		ids.append(int(death.member_id))
 	if value.phase == "CAMP_REGISTERED":
+		if EconomyBuildV1.enabled(value.base) and not TransactionReceipt.same(value.base.journey.campaign.economy, EconomyBuildV1.initial()): return "ECONOMY_REGISTRATION_SOURCE"
+		var build_issue: String = BuildState.registration_problem(value.base)
+		if not build_issue.is_empty(): return build_issue
 		if CampFacilities.tier_two_enabled(value.base) and (value.base.day != 2 or not CampFacilities.selected(value.base).is_empty()):
 			return "MIDGAME_REGISTRATION_SOURCE"
 		var opening_issue: String = OpeningBuild.registration_problem(value.base)
@@ -114,6 +122,7 @@ static func problem(value: Dictionary) -> String:
 		var intent: Dictionary = TrainingRules.intent_for(value.rules.request)
 		if not intent.get("edit_id") is String or intent.edit_id!=value.transaction_id:
 			return "TRAINING_EDIT_ID_CONFLICT"
+	if value.rules.request.get("kind") == "economy" and EconomyBuildV1.intent(value.rules.request).get("edit_id") != value.transaction_id: return "ECONOMY_EDIT_ID_CONFLICT"
 	var after: Dictionary = propose(value.base, value.rules.request)
 	if after.is_empty() or TransactionReceipt.same(after, value.base) or value.envelope.size() != 3 or value.envelope.get("before_hash") != SurvivalContracts.fingerprint(value.base) or value.envelope.get("after_hash") != SurvivalContracts.fingerprint(after) or not value.envelope.get("result") is Dictionary or not TransactionReceipt.same(value.envelope.result, after):
 		return "EDIT_FROZEN_RESULT"

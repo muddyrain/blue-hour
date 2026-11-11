@@ -57,9 +57,11 @@ static func with_specialization_drop(action: Dictionary, policy: Dictionary) -> 
 
 
 static func _specialization_site(action: Dictionary) -> bool:
+	var pool: int = int(action.get("build", {}).get("version", BuildItems.VERSION))
+	var power_version: int = SpecialPowers.M48_VERSION if BuildItems.m48_pool(pool) else SpecialPowers.M47_VERSION
 	if action.get("type") != "airdrop" or action.get("mission_policy") != 1 or action.get("slot") != 2 \
 			or action.get("campaign", {}).get("is_finale") != false or not action.has("gear_build_policy") \
-			or not BuildItems.specialty_pool(int(action.build.version)) or action.powers.version != SpecialPowers.M47_VERSION \
+			or not BuildItems.specialty_pool(int(action.build.version)) or not SurvivalContracts.integer(action.powers.version, power_version, power_version) \
 			or not action.powers.sample.is_empty() or action.has("rare_policy") or action.has("event_sortie") \
 			or action.has("investigation") or action.has("finale_policy") or action.has("billboard_target") \
 			or action.layout.topology == "industrial" or action.layout.has("loading_yard") \
@@ -79,14 +81,16 @@ static func offers(base: Dictionary) -> Array[Dictionary]:
 		if base.settled_sorties==0 and not CampaignRules.context(base.journey.campaign).is_finale and old.slot==0 and not CampaignActions.offers(base).any(func(v:Dictionary)->bool:return v.type=="equipment"):
 			var task: Dictionary=TaskActions._make(base.journey.seed,int(base.day),0,"equipment","industrial",old.layout["size"],0)
 			old=CampaignActions._upgrade(WeaponActions._upgrade(task),base.profile_id,0)
-		result.append(upgrade(old,base.journey.build.owned,base.journey.build.slots,BuildState.pool(base)))
+		result.append(upgrade(old,base.journey.build.owned,base.journey.build.slots,BuildState.pool(base),base.journey.build.get("progression", {}).get("enhanced", [])))
 	return result
 
-static func upgrade(old: Dictionary, owned: Array, slots: Array, pool: int = BuildItems.VERSION) -> Dictionary:
+static func upgrade(old: Dictionary, owned: Array, slots: Array, pool: int = BuildItems.VERSION, enhanced: Array = []) -> Dictionary:
 	var v: Dictionary=old.duplicate(true)
 	v.version=7
 	var context: Dictionary={"version":1,"run_id":old.campaign.run_id,"seed":old.seed,"day":old.day,"action_id":old.id,"site_id":"cash"}
 	v.build={"version":pool,"run_id":old.campaign.run_id,"owned":owned.duplicate(),"slots":slots.duplicate(),"drop_context":context,"drops":BuildItems.drop(context,owned,pool) if old.type=="equipment" and not old.campaign.is_finale else [],"policy":{"items":BuildItems.definitions(pool),"support":BasicSupport.POLICY}}
+	if BuildItems.m48_pool(pool):
+		v.build.enhanced = enhanced.duplicate()
 	return v
 
 static func legacy(v: Dictionary) -> Dictionary:
@@ -99,11 +103,14 @@ static func problem(v: Variant) -> String:
 	if not v is Dictionary or v.get("version")!=7 or not v.get("build") is Dictionary or not v.build.get("owned") is Array or not v.build.get("slots") is Array: return "BUILD_ACTION_FIELDS"
 	if not BuildItems.valid_pool(v.build.get("version")): return "BUILD_ACTION_POOL"
 	var pool: int = int(v.build.version)
+	if not BuildItems.enhancements_valid(v.build.get("enhanced", []), pool): return "BUILD_ACTION_ENHANCEMENTS"
+	for id: String in v.build.get("enhanced", []):
+		if id not in v.build.owned: return "BUILD_ACTION_ENHANCEMENT_OWNERSHIP"
 	var issue: String=BuildItems.problem(v.build.owned,v.build.slots,pool)
 	if not issue.is_empty(): return issue
 	issue=CampaignActions.problem(legacy(v))
 	if not issue.is_empty(): return issue
-	return "" if TransactionReceipt.same(v,upgrade(legacy(v),v.build.owned,v.build.slots,pool)) else "BUILD_ACTION_BINDING"
+	return "" if TransactionReceipt.same(v,upgrade(legacy(v),v.build.owned,v.build.slots,pool,v.build.get("enhanced", []))) else "BUILD_ACTION_BINDING"
 
 static func matches(base: Dictionary, v: Variant) -> bool:
 	if not BuildState.enabled(base) or not problem(v).is_empty(): return false

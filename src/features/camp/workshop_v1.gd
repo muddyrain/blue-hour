@@ -26,6 +26,7 @@ static func marker_problem(value: Variant) -> String:
 
 
 static func problem(camp: Dictionary) -> String:
+	if EconomyBuildV1.enabled(camp): return "" if TransactionReceipt.same(camp.journey.campaign.workshop, initial()) else "ECONOMY_LEGACY_WORKSHOP_CHANGED"
 	var campaign: Dictionary = camp.get("journey", {}).get("campaign", {})
 	if not campaign.has("workshop"):
 		return ""
@@ -63,6 +64,7 @@ static func problem(camp: Dictionary) -> String:
 
 
 static func tools(camp: Dictionary) -> int:
+	if EconomyBuildV1.enabled(camp): return EconomyBuildV1.tools(camp)
 	if not enabled(camp):
 		return 0
 	var available: int = 0
@@ -72,6 +74,7 @@ static func tools(camp: Dictionary) -> int:
 
 
 static func mod_for(camp: Dictionary, instance_id: String) -> String:
+	if EconomyBuildV1.enabled(camp): return String(WeaponInventory.find(camp, instance_id).get("economy", {}).get("magazine", ""))
 	if enabled(camp) and not instance_id.is_empty():
 		for entry: Dictionary in camp.journey.campaign.workshop.tools:
 			if entry.instance_id == instance_id:
@@ -89,6 +92,7 @@ static func _supported_instance(camp: Dictionary, item: Dictionary) -> bool:
 
 
 static func mod_problem(camp: Dictionary, instance_id: String, mod: String) -> String:
+	if EconomyBuildV1.enabled(camp): return String(EconomyBuildV1.offer(camp, "magazine", instance_id, mod).reason)
 	if not enabled(camp) or CampFacilities.selected(camp) != CampFacilities.WORKSHOP:
 		return "需要已建工坊"
 	if CampaignState.ended(camp) or camp.journey.state != "ACTIVE":
@@ -121,6 +125,7 @@ static func mod_problem(camp: Dictionary, instance_id: String, mod: String) -> S
 
 
 static func install(before: Dictionary, instance_id: String, mod: String) -> Dictionary:
+	if EconomyBuildV1.enabled(before): return {} # M48 uses an edit-bound economy intent.
 	if not mod_problem(before, instance_id, mod).is_empty():
 		return {}
 	var after: Dictionary = before.duplicate(true)
@@ -144,6 +149,7 @@ static func recovered(action: Dictionary, report: Dictionary) -> bool:
 
 
 static func settled(before: Dictionary, action: Dictionary, report: Dictionary) -> Dictionary:
+	if EconomyBuildV1.enabled(before): return before.journey.campaign.workshop.duplicate(true)
 	var result: Dictionary = before.journey.campaign.workshop.duplicate(true)
 	if CampFacilities.selected(before) == CampFacilities.WORKSHOP and recovered(action, report):
 		result.tools.append({"sortie":int(before.settled_sorties) + 1, "action_id":action.id,

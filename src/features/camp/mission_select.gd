@@ -239,7 +239,12 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}, prepared: Diction
 		var pump_card: bool = PumpStationAction.enabled(supply.generated)
 		var rare_card: bool = supply.generated.has("rare_policy")
 		var event_site: String = EventSortieV1.site_id(supply.generated)
-		if not event_site.is_empty():
+		if EconomyActions.hardware(supply.generated):
+			_titles[index].text = "%02d / %s" % [index + 1, EconomyActions.HARDWARE_TITLE]
+			_descriptions[index].text = EconomyActions.card_text(supply.generated)
+			_descriptions[index].custom_minimum_size.y = 100
+			_descriptions[index].add_theme_font_size_override("font_size", 16)
+		elif not event_site.is_empty():
 			_titles[index].text = "%02d / %s" % [index + 1, EventSortieV1.TITLE]
 			_descriptions[index].text = _event_card_text(supply.generated)
 			_descriptions[index].custom_minimum_size.y = 100
@@ -397,6 +402,14 @@ func _refresh_departure_team(base: Dictionary, rations: Dictionary) -> void:
 		_review_details.add_child(CampStyle.label("%s · HP %d" % [SurvivorRoster.display_label(member), ceili(member.health)], 18))
 		_review_details.add_child(CampStyle.label(weapon, 15, CampStyle.MUTED))
 		_review_details.add_child(HSeparator.new())
+	if EconomyActions.camp_enabled(base):
+		var levels: PackedStringArray = []
+		for facility: String in ["supply", "workshop", "planning"]:
+			levels.append("%s Lv%d" % [{"supply":"补给", "workshop":"工坊", "planning":"规划"}[facility], EconomyBuildV1.level(base, facility)])
+		var rooms: Label = CampStyle.label("设施 · " + " / ".join(levels), 15, CampStyle.MUTED)
+		rooms.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_review_details.add_child(rooms)
+		_review_details.add_child(CampStyle.label("工具 %d" % EconomyBuildV1.tools(base), 16, CampStyle.TEAL))
 	var build: Dictionary = base.get("journey", {}).get("build", {})
 	var powers: Dictionary = build.get("powers", {})
 	var equipped: PackedStringArray = []

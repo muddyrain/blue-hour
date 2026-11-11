@@ -87,13 +87,16 @@ func attack(world: Expedition,actor: FieldActor,delta: float) -> void:
 		actor.cooldown=actor.weapon_definition.interval
 		return
 	var muzzle: Vector2=actor.position+actor.visual.aimed_shot_offset(actor.aim)
-	var plan: Dictionary=CombatPatternsV1.shotgun_plan(actor.position,CombatEquipment.shot_origin(actor.position),actor.aim,rows(world.enemies),world.shot_obstacles,actor.weapon_definition.shot_range)
+	var plan: Dictionary=CombatPatternsV1.shotgun_plan(actor.position,CombatEquipment.shot_origin(actor.position),actor.aim,rows(world.enemies),world.shot_obstacles,actor.weapon_definition.shot_range,actor.weapon_definition.combat_affix == WeaponModifiers.PIERCE)
+	var kills_before: int = actor.confirmed_kills
 	state.sequence+=1
 	state.committed=[]
 	if not _commit(world,actor,plan.targets,state):
 		state.sequence-=1
 		return
-	actor.magazine.commit_shot()
+	var refunded: int = actor.magazine.commit_shot(actor.weapon_definition.combat_affix == WeaponModifiers.REFUND and actor.confirmed_kills > kills_before)
+	if refunded > 0:
+		world._combat_popup(actor.position + Vector2(12,-136),"击倒补弹 +1",Color("a5dfce"))
 	actor.cooldown=actor.weapon_definition.shot_interval(actor.trait_shot_factor)
 	actor.visual.show_fire(actor.aim)
 	for ray: Dictionary in plan.rays:
@@ -105,7 +108,9 @@ func attack(world: Expedition,actor: FieldActor,delta: float) -> void:
 		line.default_color=Color("ffd78b")
 		world._effects.add_child(line)
 		line.create_tween().tween_property(line,"modulate:a",0.0,0.10).finished.connect(line.queue_free)
-	world.combat_feedback.emit({"kind":"shotgun","member_id":actor.member_id,"sequence":state.sequence,"targets":plan.targets,"magazine":actor.magazine.snapshot(),"elapsed":world.elapsed})
+		if ray.has("pierce_to"):
+			world._shot_trace(ray.to,ray.pierce_to,Color("a5dfce"))
+	world.combat_feedback.emit({"kind":"shotgun","member_id":actor.member_id,"instance_id":actor.weapon_instance_id,"sequence":state.sequence,"targets":plan.targets,"rays":plan.rays,"rounds_refunded":refunded,"damage":actor.weapon_definition.damage,"magazine":actor.magazine.snapshot(),"elapsed":world.elapsed})
 
 func _target(world: Expedition,actor: FieldActor) -> FieldActor:
 	var ordered: Array[FieldActor]=world.enemies.duplicate()
@@ -120,14 +125,14 @@ func _commit(world: Expedition,actor: FieldActor,plan: Array,state: Dictionary) 
 	for hit: Dictionary in plan:
 		var target: FieldActor=_enemy(world,int(hit.id))
 		if target==null: return false
-		if target.health<=actor.weapon_definition.damage*int(hit.hits):
+		if target.health<=actor.weapon_definition.damage*float(hit.hits):
 			fatal+=1
 			if world.growth_mode and not world.is_practice and (not world.growth_inputs.can_record(actor,target,world.elapsed) or not world.xp_inputs.can_record(world,actor,target)): return _blocked(world)
 	if world.growth_mode and world.xp_inputs.events.size()+fatal>GrowthRules.MAX_EVENTS: return _blocked(world)
 	# Validate the complete batch before any HP, ammo, feedback or XP changes.
 	for hit: Dictionary in plan:
 		var target: FieldActor=_enemy(world,int(hit.id))
-		var damage: float=actor.weapon_definition.damage*int(hit.hits)
+		var damage: float=actor.weapon_definition.damage*float(hit.hits)
 		if not target.take_damage(damage,actor.position.direction_to(target.position)): return _blocked(world)
 		state.committed.append(int(hit.id))
 		world._hit_effect(target.position,damage,false)

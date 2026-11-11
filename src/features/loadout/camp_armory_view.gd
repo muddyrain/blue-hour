@@ -7,6 +7,7 @@ signal repair_requested(instance_id: String)
 signal workshop_requested(instance_id: String, mod: String)
 signal navigation_requested(action: StringName)
 signal selection_changed(instance_id: String)
+signal economy_requested(request: Dictionary)
 
 const YARD: Texture2D = preload("res://assets/ui/m20/camp-blue-hour.png")
 const STATUS: Array[String] = ["全部", "闲置", "已装备", "待维修"]
@@ -67,6 +68,10 @@ var _to_workshop: Button
 var _to_inventory: Button
 var _retry_button: Button
 var _nav: Dictionary[StringName, Button] = {}
+var economy_buttons: Dictionary[String, Button] = {}
+var craft_buttons: Dictionary[String, Button] = {}
+var _craft_row: HBoxContainer
+var _economy_box: VBoxContainer
 
 
 func _ready() -> void:
@@ -118,7 +123,7 @@ func refresh(data: Dictionary, feedback: String, pending: bool) -> void:
 	build_panel.visible = BuildState.enabled(data)
 	if build_panel.visible:
 		var build: Dictionary = data.journey.build
-		build_panel.present(build.owned, build.slots, true, _editable(), build.get("opening", {}).get("plan", ""), BuildState.pool(data))
+		build_panel.present(build.owned, build.slots, true, _editable(), build.get("opening", {}).get("plan", ""), BuildState.pool(data), data)
 	_update_targets()
 	_rebuild_list()
 
@@ -212,6 +217,11 @@ func _build_list(column: VBoxContainer) -> void:
 	column.add_child(_workshop_tabs)
 	_workshop_options[&"repair"] = _button(_workshop_tabs, "维修", _set_workshop_tab.bind(&"repair"))
 	_workshop_options[&"mod"] = _button(_workshop_tabs, "改装", _set_workshop_tab.bind(&"mod"))
+	_craft_row = HBoxContainer.new()
+	column.add_child(_craft_row)
+	for weapon_id: String in ["carbine", "long_rifle", "shotgun_v1"]:
+		craft_buttons[weapon_id] = _button(_craft_row, "制作" + WeaponInventory.definition(weapon_id).display_name,
+			_preview_economy.bind("craft", weapon_id, ""))
 	_filters = VBoxContainer.new()
 	column.add_child(_filters)
 	var choices: HBoxContainer = HBoxContainer.new()
@@ -263,6 +273,7 @@ func _build_detail(column: VBoxContainer) -> void:
 	picture.add_child(_texture)
 	var scroll: ScrollContainer = ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(scroll)
 	_detail_body = VBoxContainer.new()
@@ -286,6 +297,19 @@ func _build_detail(column: VBoxContainer) -> void:
 	_comparison.add_child(_proposed)
 	_detail = _wrapped("", 15, CampStyle.MUTED)
 	_detail_body.add_child(_detail)
+	_economy_box = VBoxContainer.new()
+	_economy_box.add_theme_constant_override("separation", 6)
+	_detail_body.add_child(_economy_box)
+	var operations: Array[Array] = [
+		["sell", "", "预览出售"], ["upgrade_weapon", "", "升级自制武器"],
+		["basic_component", "quick_v1", "安装轻快机件"], ["basic_component", "reach_v1", "安装延伸瞄具"],
+		["combat_component", WeaponModifiers.PIERCE, "安装穿透弹"],
+		["combat_component", WeaponModifiers.REFUND, "安装击倒补弹"],
+		["magazine", WorkshopV1.EXTENDED, "安装扩容弹匣"], ["magazine", WorkshopV1.QUICK, "安装快拆弹匣"]]
+	for operation: Array in operations:
+		var key: String = String(operation[0]) + ":" + String(operation[1])
+		economy_buttons[key] = _button(_economy_box, operation[2],
+			_preview_economy.bind(operation[0], "", operation[1]))
 	_preview = _wrapped("", 16, CampStyle.TEAL)
 	column.add_child(_preview)
 	var actions: HBoxContainer = HBoxContainer.new()
@@ -366,6 +390,7 @@ func _wrapped(caption: String, font_size: int, colour: Color) -> Label:
 
 func _dialog(title: String, caption: String, action: Callable) -> ConfirmationDialog:
 	var dialog: ConfirmationDialog = ConfirmationDialog.new()
+	dialog.dialog_autowrap = true
 	dialog.title = title
 	dialog.ok_button_text = caption
 	dialog.cancel_button_text = "取消"
@@ -449,7 +474,7 @@ func _matches_filter(item: Dictionary) -> bool:
 	var status: int = status_filter.selected
 	var query: String = search.text.strip_edges().to_lower()
 	var instance_query: String = query.trim_prefix("#")
-	var matches_id: bool = not instance_query.is_empty() and WeaponInventory.short_id(item).to_lower().contains(instance_query)
+	var matches_id: bool = not instance_query.is_empty() and (WeaponInventory.short_id(item).to_lower().contains(instance_query) or String(item.instance_id).to_lower().contains(instance_query))
 	return (status == 0 or status == _status(item)) and (type == 0 or type == (2 if melee else 1)) \
 		and (query.is_empty() or matches_id \
 		or WeaponInventory.definition(item.weapon_id).display_name.to_lower().contains(query))
@@ -583,6 +608,7 @@ func _refresh_detail() -> void:
 	for mod: String in MODS:
 		workshop_buttons[mod].visible = valid and modification
 	_plan = {}
+	_refresh_economy(item)
 	if not valid:
 		return
 	var weapon: WeaponDefinition = WeaponInventory.definition(item.weapon_id)
@@ -672,7 +698,7 @@ func _stat_text(item: Dictionary, member_id: int) -> String:
 func _passive_factors() -> Dictionary:
 	if not BuildState.enabled(_camp):
 		return {}
-	return BuildItems.factors(_camp.journey.build.slots, BuildState.pool(_camp))
+	return BuildItems.camp_factors(_camp)
 
 
 func _personal_factors(member_id: int) -> Dictionary:
@@ -738,6 +764,10 @@ func _confirm_repair() -> void:
 func _finish_repair() -> void:
 	var request: Dictionary = _request
 	_request = {}
+	if request.has("economy"):
+		if _editable():
+			economy_requested.emit(request.economy)
+		return
 	if request.get("instance_id", "") != _selected or not _editable():
 		return
 	var item: Dictionary = WeaponInventory.find(_camp, _selected)
@@ -771,3 +801,41 @@ func _finish_workshop() -> void:
 		message.text = "改装条件已变化，请重新确认。"
 		return
 	workshop_requested.emit(_selected, mod)
+
+
+func _refresh_economy(item: Dictionary) -> void:
+	var enabled: bool = EconomyBuildV1.enabled(_camp)
+	_craft_row.visible = enabled and _tab == &"workshop"
+	_economy_box.visible = enabled and not item.is_empty()
+	for weapon_id: String in craft_buttons:
+		var offer: Dictionary = EconomyBuildV1.offer(_camp, "craft", weapon_id)
+		craft_buttons[weapon_id].disabled = _pending or not offer.available
+		craft_buttons[weapon_id].tooltip_text = offer.summary if offer.available else offer.reason
+	for key: String in economy_buttons:
+		var op: String = key.get_slice(":", 0)
+		var choice: String = key.get_slice(":", 1)
+		var button: Button = economy_buttons[key]
+		button.visible = (op == "sell") == (_tab == &"inventory")
+		var offer: Dictionary = EconomyBuildV1.offer(_camp, op, item.get("instance_id", ""), choice)
+		button.disabled = _pending or not _editable() or not offer.available
+		button.tooltip_text = offer.summary if offer.available else offer.reason
+	if enabled:
+		for button: Button in workshop_buttons.values():
+			button.hide()
+
+
+func _preview_economy(op: String, target_id: String, choice: String) -> void:
+	if not _editable():
+		return
+	if target_id.is_empty():
+		target_id = _selected
+	var offer: Dictionary = EconomyBuildV1.offer(_camp, op, target_id, choice)
+	if not offer.available:
+		message.text = offer.reason
+		return
+	var identity: String = String(_camp.profile_id) + ":edit:" + RunSave.new_profile_id()
+	_request = {"economy":EconomyBuildV1.request(_camp, op, target_id, choice, identity)}
+	confirmation.title = "确认营地整备"
+	confirmation.ok_button_text = "确认并保存"
+	confirmation.dialog_text = offer.summary
+	confirmation.popup_centered(Vector2i(660, 260))

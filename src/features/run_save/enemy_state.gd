@@ -32,7 +32,8 @@ static func problem(data: Dictionary) -> String:
 	if not build_issue.is_empty(): return build_issue
 	var facility_issue: String = CampFacilities.camp_problem(data)
 	if not facility_issue.is_empty(): return facility_issue
-	var projected: Dictionary = data.duplicate(true)
+	var projected: Dictionary = EconomyBuildV1.legacy_projection(data) if EconomyBuildV1.enabled(data) else data.duplicate(true)
+	if projected.is_empty(): return "ECONOMY_LEGACY_PROJECTION"
 	projected.journey.erase("campaign")
 	projected.journey.erase("build")
 	# Explicit111 extension; older schemas retain their exact last_day whitelist.

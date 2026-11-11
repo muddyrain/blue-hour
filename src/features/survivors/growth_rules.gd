@@ -186,7 +186,14 @@ static func result_problem(receipt: Dictionary) -> String:
 	var actual: Dictionary = result.camp
 	if CampaignState.is_short(receipt.base)!=CampaignState.is_short(actual): return "CAMPAIGN_MODE_CHANGED"
 	if CampaignState.is_short(receipt.base):
-		if (receipt.rules.get("data_version")!=7 and (receipt.rules.get("data_version")!=8 and (receipt.rules.get("data_version")!=9 and receipt.rules.get("data_version")!=10))) or not TransactionReceipt.same(actual.journey.campaign,CampaignState.settled(receipt.base,actual,report,receipt.rules.mission.generated)): return "CAMPAIGN_RESULT_TRANSITION"
+		var actual_campaign: Dictionary = actual.journey.campaign.duplicate(true)
+		var expected_campaign: Dictionary = CampaignState.settled(receipt.base,actual,report,receipt.rules.mission.generated)
+		if EconomyBuildV1.enabled(receipt.base):
+			actual_campaign.erase("economy")
+			expected_campaign.erase("economy")
+			var economy_issue: String = EconomyBuildV1.result_problem(receipt)
+			if not economy_issue.is_empty(): return economy_issue
+		if (receipt.rules.get("data_version")!=7 and (receipt.rules.get("data_version")!=8 and (receipt.rules.get("data_version")!=9 and receipt.rules.get("data_version")!=10))) or not TransactionReceipt.same(actual_campaign,expected_campaign): return "CAMPAIGN_RESULT_TRANSITION"
 	if TrainingState.is_family(before) and not TransactionReceipt.same({"v":before.training},{"v":actual.get("training")}):
 		return "TRAINING_HISTORY_CHANGED_IN_SORTIE"
 	var issue: String = SurvivalContracts.report_problem(before.crew,report,true,BuildState.enabled(before))
@@ -235,6 +242,9 @@ static func result_problem(receipt: Dictionary) -> String:
 		var computed_traits: Dictionary = TraitRules.bank(expected,before,report,RunTransaction.token_for(receipt),receipt.rules.mission.get("generated",{}))
 		if not computed_traits.error.is_empty() or not result.get("traits") is Dictionary or not TransactionReceipt.same(result.traits,computed_traits.get("ledger",{})):
 			return "TRAIT_RESULT_LEDGER"
+	if EconomyBuildV1.enabled(receipt.base):
+		var planning_issue: String = EconomyBuildV1.apply_planning_result(expected, receipt)
+		if not planning_issue.is_empty(): return planning_issue
 	for member: Dictionary in before.crew:
 		var target: Dictionary = SurvivorRoster.member(expected.crew,int(member.id))
 		var observed: Dictionary = SurvivorRoster.member(actual.crew,int(member.id))

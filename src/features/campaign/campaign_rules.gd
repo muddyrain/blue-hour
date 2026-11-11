@@ -167,12 +167,15 @@ static func _investigation_problem(value: Dictionary, run_id: String) -> String:
 	var has_billboard: bool = value.has("billboard_policy")
 	var has_billboard_intel: bool = value.has("billboard_intel")
 	var has_open_streets: bool = value.has("open_streets_policy")
+	var has_economy: bool = value.has("economy")
 	var field_count: int = INVESTIGATION_KEYS.size() + int(has_action_policy) + int(has_midgame) \
 		+ int(has_finale) + int(has_rare) + int(has_screamer) + int(has_affixes) + int(has_first_aid) \
 		+ int(has_sortie_risk) + int(has_campaign_pressure) + int(has_content_wave) + int(has_night_hound) \
-		+ int(has_workshop) + int(has_event_sortie) + int(has_recon) + int(has_barricade) + int(has_billboard) + int(has_billboard_intel) + int(has_open_streets)
+		+ int(has_workshop) + int(has_event_sortie) + int(has_recon) + int(has_barricade) + int(has_billboard) + int(has_billboard_intel) + int(has_open_streets) + int(has_economy)
 	if value.size() != field_count or not value.has_all(INVESTIGATION_KEYS) or not SurvivalContracts.integer(value.version,version,version):
 		return "INVESTIGATION_FIELDS"
+	if has_economy and (not has_workshop or not has_open_streets or not EconomyBuildV1.marker_problem(value.economy).is_empty()):
+		return "ECONOMY_CAMPAIGN_POLICY"
 	if has_action_policy and not action_choices_enabled(value):
 		return "INVESTIGATION_ACTION_POLICY"
 	if has_midgame and not midgame_enabled(value):

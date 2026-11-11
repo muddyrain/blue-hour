@@ -26,7 +26,7 @@ static func propose(before: Dictionary, request: Dictionary) -> Dictionary:
 	var equipment: Variant = PowerState.loadout(before.generated.powers)
 	if not SpecialPowers.problem(before.powers,before.powers.binding,equipment,float(before.sim.elapsed)).is_empty(): return {}
 	var slot: Variant = request.get("slot", 0)
-	if not SurvivalContracts.integer(slot,0,1) or not TransactionReceipt.same(request,SpecialPowers.request(before.powers,int(slot))): return {}
+	if not SurvivalContracts.integer(slot,0,before.powers.get("loadout", {}).get("slots", [""]).size()-1) or not TransactionReceipt.same(request,SpecialPowers.request(before.powers,int(slot))): return {}
 	var powers: Dictionary=SpecialPowers.accept(before.powers,request,float(before.sim.elapsed))
 	if powers.is_empty(): return {}
 	var after: Dictionary=before.duplicate(true)
@@ -37,7 +37,7 @@ static func transition(previous: Dictionary, next: Dictionary) -> String:
 	if not previous.get("powers") is Array or not next.get("powers") is Array: return "POWER_RECEIPT_FIELDS"
 	var equipment: Dictionary = next.rules.mission.generated.powers
 	if same_events(previous.powers,next.powers,equipment): return ""
-	var limit: int = 2 if PowerState.progression(equipment) else 1
+	var limit: int = equipment.slots.size() if PowerState.progression(equipment) else 1
 	if next.phase!="SUSPEND_READY" or next.powers.size() != previous.powers.size() + 1 or next.powers.size() > limit:
 		return "POWER_RETRACTED_OR_PHASE"
 	if not same_events(previous.powers,next.powers.slice(0,previous.powers.size()),equipment):

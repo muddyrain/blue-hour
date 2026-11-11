@@ -84,6 +84,7 @@ var _camp_leave_dialog: ConfirmationDialog
 var _facility_confirmation: ConfirmationDialog
 var _facility_choice: String = ""
 var _facility_upgrade: bool = false
+var _economy_request: Dictionary = {}
 var _camp_leave_action: Callable
 var _recruits: Array = []
 var hunger_trial: bool = false
@@ -117,6 +118,8 @@ var _backup_save: Dictionary = {}
 var _requires_continue: bool = false
 var _progress_blocked: bool = false
 var _progress_dirty: bool = false
+var _camp_commit_busy: bool = false
+var _camp_commit_label: String = ""
 var _allow_invalid_replacement: bool = false
 var _progress_message: String = ""
 var _continue_button: Button
@@ -131,6 +134,11 @@ var pause_menu: SortiePauseMenu
 var _menu_was_paused: bool = false
 var _menu_from_pause: bool = false
 var _exit_target: String = ""
+var _startup_pending: bool = false
+var _startup_worker: Thread
+var _startup_overlay: PanelContainer
+var _startup_label: Label
+var _startup_exit_requested: bool = false
 
 @onready var _title: Control = $Interface/Screen/Title
 @onready var _status: Label = $Interface/Screen/Status
@@ -181,7 +189,23 @@ func _ready() -> void:
 	camp_prototype = playable_entry or ("--bh-camp-prototype" in launch_arguments and CampSceneLayout.isolated(progress_path))
 	if not playable_entry and "--bh-camp-prototype" in launch_arguments and not camp_prototype:
 		_camp_scene_problem = "营地场景原型需要明确的隔离目录；保留原界面。"
-	_setup_progress()
+	var startup_state: Dictionary = {}
+	if playable_entry and transactional_mode and DisplayServer.get_name() != "headless" and _has_progress_sources():
+		_startup_pending = true
+		_show_startup_verification()
+		# Paint before acquiring the writer or hashing existing source files.
+		await get_tree().process_frame
+		await get_tree().process_frame
+		progress_session = _create_progress_session()
+		_startup_worker = Thread.new()
+		if _startup_worker.start(_inspect_startup.bind(progress_session)) == OK:
+			while _startup_worker.is_alive():
+				await get_tree().process_frame
+			startup_state = _startup_worker.wait_to_finish()
+		else:
+			startup_state = _inspect_startup(progress_session)
+		_startup_worker = null
+	_setup_progress(startup_state)
 	audio_preferences = AudioPreferences.new(audio_settings_path)
 	var load_result: Error = audio_preferences.load_preferences()
 	if load_result == ERR_FILE_NOT_FOUND:
@@ -213,7 +237,7 @@ func _ready() -> void:
 	_roster_button = _progress_button("营地幸存者 →", 600.0, open_roster)
 	_roster_button.position.x = 572.0
 	_roster_button.size = Vector2(274, 40)
-	$Interface/Screen/Result/Continue.pressed.connect(return_to_title)
+	$Interface/Screen/Result/Continue.pressed.connect(_confirm_result_ui)
 	_back.pressed.connect(return_to_title)
 	_setup_presentation()
 	if playable_entry and not _developer_menu:
@@ -236,6 +260,11 @@ func _ready() -> void:
 	if survival_mode and not _migration_source.is_empty():
 		_migration_entry = _progress_button("旧存档转换 →", 446, open_migration)
 	_update_camp()
+	if _startup_pending:
+		_startup_overlay.queue_free()
+		_startup_pending = false
+		if _startup_exit_requested:
+			request_exit("quit")
 	print("BH_READY phase=TITLE renderer=%s" % RenderingServer.get_current_rendering_method())
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with("--verify-quality="):
@@ -467,6 +496,9 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	if _startup_worker != null and _startup_worker.is_started():
+		_startup_worker.wait_to_finish()
+		_startup_worker = null
 	if _mission_worker != null:
 		_mission_worker.wait_to_finish()
 		_mission_worker = null
@@ -477,6 +509,9 @@ func _exit_tree() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if _startup_pending:
+		get_viewport().set_input_as_handled()
+		return
 	if is_instance_valid(_equipment_catalog) and _equipment_catalog.visible and event.is_action_pressed("return_to_title") and not event.is_echo():
 		_close_equipment_catalog()
 		get_viewport().set_input_as_handled()
@@ -511,6 +546,9 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _startup_pending:
+		get_viewport().set_input_as_handled()
+		return
 	if is_instance_valid(_equipment_catalog) and _equipment_catalog.visible:
 		get_viewport().set_input_as_handled()
 		return
@@ -577,6 +615,40 @@ func open_validation() -> void:
 	_back.show()
 	_status.text = "验证场景 / 点击网格放置标记 · Esc 返回"
 	print("BH_PHASE VALIDATION")
+
+
+func _confirm_result_ui() -> void:
+	if _camp_commit_busy: return
+	if not EconomyBuildV1.enabled(camp_snapshot()):
+		return_to_title()
+		return
+	var button: Button = $Interface/Screen/Result/Continue
+	var caption: String = button.text
+	_camp_commit_busy = true
+	_camp_commit_label = "return"
+	button.text = "正在确认归航并保存…"
+	button.disabled = true
+	await get_tree().process_frame
+	await get_tree().process_frame
+	return_to_title()
+	_camp_commit_busy = false
+	_camp_commit_label = ""
+	if button.text == "正在确认归航并保存…": button.text = caption
+	button.disabled = false
+
+
+func _begin_camp_commit(before: Dictionary, kind: String) -> void:
+	_camp_commit_busy = true
+	_camp_commit_label = kind
+	if is_instance_valid(loadout_panel) and loadout_panel.visible:
+		loadout_panel.refresh(before,"正在保存整备，请稍候…",true)
+		loadout_panel.armory._retry_button.hide()
+		loadout_panel.power_panel.retry_button.hide()
+	if is_instance_valid(supply_panel) and supply_panel.visible:
+		supply_panel.refresh(before,CampEconomy.rations(day,before.crew,food,camp_rules),"正在保存设施，请稍候…",true)
+		supply_panel._retry.hide()
+	await get_tree().process_frame
+	await get_tree().process_frame
 
 
 func return_to_title() -> void:
@@ -982,10 +1054,13 @@ func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}, m47_p
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true, true)
 		var powers_version: int = SpecialPowers.PROGRESSION_VERSION
 		if not m47_policy.is_empty():
-			powers_version = SpecialPowers.M47_VERSION
+			powers_version = SpecialPowers.M48_VERSION
+			_battle_meta.campaign.economy = EconomyBuildV1.initial()
 		elif latest_rules:
 			powers_version = SpecialPowers.WAVE_VERSION
 		_battle_meta.build.powers = PowerState.initial_progression(powers_version)
+		if not m47_policy.is_empty():
+			BuildState.enable_m48(_battle_meta.build)
 		if not opening_plan.is_empty():
 			var starter: Dictionary = OpeningBuild.source(opening_plan, profile_id, _battle_meta.root_id, _battle_meta.seed, m47_policy)
 			_battle_meta.build.opening = starter
@@ -1232,6 +1307,11 @@ func _suspend_problem(result: Dictionary) -> String:
 
 
 func request_exit(target: String) -> void:
+	if _startup_pending:
+		if target == "quit":
+			_startup_exit_requested = true
+			_startup_label.text = "正在核验旅程与资料…\n核验完成后将显示退出确认。"
+		return
 	# A native exclusive dialog owns Esc/close until its choice is resolved.
 	if is_instance_valid(_facility_confirmation) and _facility_confirmation.visible:
 		return
@@ -1475,10 +1555,13 @@ func open_loadout(workshop: bool = false) -> void:
 		loadout_panel.build_requested.connect(equip_build_item)
 		loadout_panel.power_requested.connect(equip_power)
 		loadout_panel.power_panel.second_requested.connect(equip_power.bind(1))
+		loadout_panel.power_panel.third_requested.connect(equip_power.bind(2))
+		loadout_panel.build_investment_requested.connect(invest_build)
 		loadout_panel.power_panel.investment_requested.connect(invest_power)
 		loadout_panel.power_panel.retry_requested.connect(retry_power_edit)
 		loadout_panel.repair_requested.connect(repair_weapon)
 		loadout_panel.workshop_requested.connect(install_workshop_mod)
+		loadout_panel.economy_requested.connect(confirm_economy_edit)
 		loadout_panel.closed.connect(close_loadout)
 		loadout_panel.navigation_requested.connect(_leave_loadout_for)
 	_title.hide()
@@ -1502,8 +1585,9 @@ func _leave_loadout_for(action: StringName) -> void:
 
 
 func close_loadout() -> void:
+	if _camp_commit_busy: return
 	if not is_instance_valid(loadout_panel) or loadout_panel.confirmation.visible or loadout_panel.power_panel.confirmation.visible \
-			or loadout_panel.workshop_confirmation.visible:
+			or loadout_panel.workshop_confirmation.visible or loadout_panel.build_panel._confirmation.visible:
 		return
 	loadout_panel.hide()
 	_title.show()
@@ -1519,6 +1603,7 @@ func close_loadout() -> void:
 
 
 func equip_weapon(member_id: int, identity: String) -> void:
+	if _camp_commit_busy: return
 	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible or _progress_blocked:
 		return
 	if transactional_mode:
@@ -1526,8 +1611,11 @@ func equip_weapon(member_id: int, identity: String) -> void:
 		if loadout_panel.player_mode and not loadout_panel.matches_equip(before, member_id, identity):
 			loadout_panel.refresh(before, "配装或持有人已变化，请重新预览。", _progress_dirty)
 			return
+		if EconomyBuildV1.enabled(before): await _begin_camp_commit(before, "weapon_equip")
 		if _accept_transaction(progress_session.edit(before,{"kind":"equip","member_id":member_id,"value":identity}),true):
 			_request_audio(&"ui_confirm")
+		_camp_commit_busy = false
+		_camp_commit_label = ""
 		loadout_panel.refresh(camp_snapshot(),_progress_message,_progress_dirty)
 		if _progress_dirty:
 			loadout_panel.focus_retry()
@@ -1536,11 +1624,16 @@ func equip_weapon(member_id: int, identity: String) -> void:
 
 
 func repair_weapon(identity: String) -> void:
+	if _camp_commit_busy: return
 	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible or _progress_blocked:
 		return
 	if transactional_mode:
-		if _accept_transaction(progress_session.edit(camp_snapshot(),{"kind":"repair","member_id":0,"value":identity}),true):
+		var before: Dictionary = camp_snapshot()
+		if EconomyBuildV1.enabled(before): await _begin_camp_commit(before, "weapon_repair")
+		if _accept_transaction(progress_session.edit(before,{"kind":"repair","member_id":0,"value":identity}),true):
 			_request_audio(&"ui_confirm")
+		_camp_commit_busy = false
+		_camp_commit_label = ""
 		loadout_panel.refresh(camp_snapshot(),_progress_message,_progress_dirty)
 		if _progress_dirty:
 			loadout_panel.focus_retry()
@@ -1549,6 +1642,7 @@ func repair_weapon(identity: String) -> void:
 
 
 func install_workshop_mod(identity: String, mod: String) -> void:
+	if _camp_commit_busy: return
 	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible \
 			or _progress_blocked or not transactional_mode:
 		return
@@ -1563,6 +1657,26 @@ func install_workshop_mod(identity: String, mod: String) -> void:
 	loadout_panel.refresh(camp_snapshot(), "已安装%s · 使用工具箱 ×1、8 币" % WorkshopV1.name_for(mod) if saved else _progress_message, _progress_dirty)
 	if _progress_dirty:
 		loadout_panel.focus_retry()
+
+
+func confirm_economy_edit(request: Dictionary) -> void:
+	if _camp_commit_busy: return
+	if phase != Phase.TITLE or _progress_blocked or _progress_dirty or not transactional_mode:
+		return
+	var before: Dictionary = camp_snapshot()
+	var frozen_request: Dictionary = request.duplicate(true)
+	await _begin_camp_commit(before,"economy")
+	var saved: bool = _accept_transaction(progress_session.edit(before, frozen_request), true)
+	_camp_commit_busy = false
+	_camp_commit_label = ""
+	if saved:
+		_request_audio(&"ui_confirm")
+	_update_camp()
+	if is_instance_valid(loadout_panel) and loadout_panel.visible:
+		loadout_panel.refresh(camp_snapshot(), _progress_message, _progress_dirty)
+		if _progress_dirty:
+			loadout_panel.focus_retry()
+	_refresh_supply_panel()
 
 
 func _commit_loadout(transaction: Dictionary) -> void:
@@ -2035,17 +2149,63 @@ func _apply_progress(data: Dictionary) -> void:
 	_progress_blocked = false
 
 
-func _setup_progress() -> void:
+func _has_progress_sources() -> bool:
+	var absolute: String = ProjectSettings.globalize_path(progress_path)
+	var directory: DirAccess = DirAccess.open(absolute.get_base_dir())
+	if directory == null:
+		return false
+	var prefix: String = absolute.get_file()
+	for entry: String in directory.get_files():
+		if entry == prefix or entry.begins_with(prefix + "."):
+			return true
+	for entry: String in directory.get_directories():
+		if entry.begins_with(prefix + "."):
+			return true
+	return false
+
+
+func _show_startup_verification() -> void:
+	_startup_overlay = PanelContainer.new()
+	_startup_overlay.name = "StartupVerification"
+	_startup_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_startup_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_startup_overlay.z_index = 4000
+	_startup_overlay.theme = CampStyle.blue_hour_theme(_screen.theme)
+	_startup_overlay.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.INK, Color("48646d")))
+	_startup_label = Label.new()
+	_startup_label.text = "正在核验旅程与资料…\n完成后可继续同一旅程。"
+	_startup_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_startup_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_startup_label.add_theme_font_size_override("font_size", 24)
+	_startup_overlay.add_child(_startup_label)
+	_screen.add_child(_startup_overlay)
+
+
+func _create_progress_session() -> ProductionProgress:
+	var session: ProductionProgress = ProductionProgress.new(progress_path,battle_mode,survival_mode,hunger_trial,rescue_mode,growth_mode,field_join_mode,trait_mode,training_mode,pool_mode,roster_mode,quality_mode,enemy_mode,playable_entry)
+	session.suspend_enabled = safe_suspend
+	return session
+
+
+static func _inspect_startup(session: ProductionProgress) -> Dictionary:
+	# One writer owns inspection and any legitimate catalog publication until join.
+	var state: Dictionary = session.inspect()
+	session.refresh_catalog()
+	return state
+
+
+func _setup_progress(preloaded_state: Dictionary = {}) -> void:
 	run_save = RunSave.new(progress_path)
 	profile_id = RunSave.new_profile_id()
 	_initialize_weapons("initial")
 	var loaded: Error = ERR_UNAVAILABLE
 	if transactional_mode:
-		progress_session = ProductionProgress.new(progress_path,battle_mode,survival_mode,hunger_trial,rescue_mode,growth_mode,field_join_mode,trait_mode,training_mode,pool_mode,roster_mode,quality_mode,enemy_mode,playable_entry)
-		progress_session.suspend_enabled = safe_suspend
-		var state: Dictionary = progress_session.inspect()
-		if playable_entry:
-			progress_session.refresh_catalog()
+		var state: Dictionary = preloaded_state
+		if state.is_empty():
+			progress_session = _create_progress_session()
+			state = progress_session.inspect()
+			if playable_entry:
+				progress_session.refresh_catalog()
 		if state.error == OK and state.state == "SUSPENDED":
 			_requires_continue = true
 			_progress_message = "已有未完成的出击暂存。继续将恢复原战场并消费本次快照，不返回旧营地。"
@@ -2398,6 +2558,7 @@ func _setup_camp_scene() -> void:
 	_facility_confirmation.confirmed.connect(_confirm_camp_facility)
 	_facility_confirmation.canceled.connect(func() -> void:
 		_facility_choice = ""
+		_economy_request = {}
 		_restore_facility_focus.call_deferred())
 	_screen.add_child(_facility_confirmation)
 	camp_scene.hide()
@@ -2416,6 +2577,21 @@ func _offer_camp_facility(choice: String, upgrade: bool = false) -> void:
 	if not _camp_input_allowed() or _progress_dirty or not CampSupplyPanel.NAMES.has(choice):
 		return
 	var before: Dictionary = camp_snapshot()
+	if EconomyBuildV1.enabled(before):
+		if not upgrade and EconomyBuildV1.level(before, choice) > 0:
+			open_supplies()
+			return
+		var op: String = "upgrade_facility" if upgrade else "build"
+		var quote: Dictionary = EconomyBuildV1.offer(before, op, choice)
+		if not quote.available:
+			_progress_message = quote.reason
+			_refresh_supply_panel()
+			return
+		var identity: String = String(before.profile_id) + ":edit:" + RunSave.new_profile_id()
+		_economy_request = EconomyBuildV1.request(before, op, choice, "", identity)
+		_facility_confirmation.dialog_text = quote.summary
+		_facility_confirmation.popup_centered(Vector2i(660, 260))
+		return
 	var offer: Dictionary = CampFacilities.upgrade_offer(before, choice) if upgrade else {}
 	if (upgrade and not offer.available) or (not upgrade and not CampFacilities.can_build(before, choice)):
 		return
@@ -2430,6 +2606,12 @@ func _offer_camp_facility(choice: String, upgrade: bool = false) -> void:
 
 
 func _confirm_camp_facility() -> void:
+	if not _economy_request.is_empty():
+		var request: Dictionary = _economy_request
+		_economy_request = {}
+		confirm_economy_edit(request)
+		_restore_facility_focus.call_deferred()
+		return
 	var choice: String = _facility_choice
 	_facility_choice = ""
 	if phase != Phase.TITLE or not _camp_open or not transactional_mode or not CampSceneView.FACILITY_NAMES.has(choice):
@@ -2475,6 +2657,7 @@ func _refresh_supply_panel() -> void:
 
 
 func _retry_facility() -> void:
+	if _camp_commit_busy: return
 	if not _progress_dirty or not transactional_mode:
 		return
 	_accept_transaction(progress_session.retry(), true)
@@ -2482,6 +2665,7 @@ func _retry_facility() -> void:
 
 
 func _leave_supplies_for(action: StringName) -> void:
+	if _camp_commit_busy: return
 	if _facility_confirmation.visible:
 		return
 	supply_panel.hide()
@@ -2549,6 +2733,7 @@ func _camp_action(action: StringName, member_id: int) -> void:
 
 
 func _guard_camp_editor(action: Callable) -> bool:
+	if _camp_commit_busy: return true
 	if not camp_prototype or not is_instance_valid(_camp_leave_dialog) or not is_instance_valid(roster_panel) or not roster_panel.visible or not roster_panel.name_edit.editable:
 		return false
 	var member: Dictionary = SurvivorRoster.member(crew, roster_panel.selected_member_id)
@@ -2560,6 +2745,7 @@ func _guard_camp_editor(action: Callable) -> bool:
 
 
 func _camp_escape() -> bool:
+	if _camp_commit_busy: return true
 	if is_instance_valid(pause_menu) and pause_menu.root.visible:
 		return false
 	# LineEdit consumes ui_cancel before _unhandled_input, so this scope owns its back intent.
@@ -2584,7 +2770,7 @@ func _camp_escape() -> bool:
 		close_roster()
 	elif is_instance_valid(loadout_panel) and loadout_panel.visible:
 		if loadout_panel.confirmation.visible or loadout_panel.power_panel.confirmation.visible \
-			or loadout_panel.workshop_confirmation.visible:
+			or loadout_panel.workshop_confirmation.visible or loadout_panel.build_panel._confirmation.visible:
 			return false
 		if not loadout_panel.cancel_swap_preview() and not loadout_panel.back_from_workshop():
 			close_loadout()
@@ -2598,7 +2784,7 @@ func _camp_escape() -> bool:
 
 
 func _camp_input_allowed() -> bool:
-	return not (is_instance_valid(training_panel) and training_panel.visible) and phase == Phase.TITLE and not _new_game_confirmation.visible and not _hunger_confirmation.visible and not (is_instance_valid(pause_menu) and pause_menu.root.visible) and not (is_instance_valid(_camp_leave_dialog) and _camp_leave_dialog.visible)
+	return not _camp_commit_busy and not (is_instance_valid(training_panel) and training_panel.visible) and phase == Phase.TITLE and not _new_game_confirmation.visible and not _hunger_confirmation.visible and not (is_instance_valid(pause_menu) and pause_menu.root.visible) and not (is_instance_valid(_camp_leave_dialog) and _camp_leave_dialog.visible)
 
 
 func _roster_training(id: int) -> void:
@@ -2925,13 +3111,20 @@ func _close_equipment_catalog() -> void:
 
 
 func equip_build_item(slot: int, item: String) -> void:
+	if _camp_commit_busy: return
 	if phase!=Phase.TITLE or not loadout_panel.visible or _progress_blocked or not BuildState.enabled(camp_snapshot()): return
-	var saved: bool=_accept_transaction(progress_session.edit(camp_snapshot(),{"kind":"build_slot","member_id":slot,"value":item}),true)
-	loadout_panel.refresh(camp_snapshot(),"本局道具配装已保存；下一行动生效。" if saved else _progress_message)
+	var before: Dictionary = camp_snapshot()
+	if EconomyBuildV1.enabled(before): await _begin_camp_commit(before, "build_slot")
+	var saved: bool=_accept_transaction(progress_session.edit(before,{"kind":"build_slot","member_id":slot,"value":item}),true)
+	_camp_commit_busy = false
+	_camp_commit_label = ""
+	loadout_panel.refresh(camp_snapshot(),"本局道具配装已保存；下一行动生效。" if saved else _progress_message,_progress_dirty)
+	if _progress_dirty:
+		loadout_panel.focus_retry()
 	if not saved:
 		var build: Dictionary = camp_snapshot().journey.build
 		loadout_panel.build_panel.present(build.owned, build.slots, false, false,
-			build.get("opening", {}).get("plan", ""), BuildState.pool(camp_snapshot()))
+			build.get("opening", {}).get("plan", ""), BuildState.pool(camp_snapshot()), camp_snapshot())
 
 func equip_power(id: String, slot: int = 0) -> void:
 	var camp: Dictionary = camp_snapshot()
@@ -2945,17 +3138,32 @@ func invest_power(choice: String) -> void:
 	_edit_power({"kind":"power_invest","member_id":0,"value":choice}, "能力投资已保存；余额与效果已更新。")
 
 
+func invest_build(choice: String) -> void:
+	_edit_power({"kind":"build_invest","member_id":0,"value":choice}, "道具投资已保存；余额与效果已更新。")
+
+
 func _edit_power(request: Dictionary, success: String) -> void:
+	if _camp_commit_busy: return
 	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible or _progress_blocked:
 		return
-	var saved: bool = _accept_transaction(progress_session.edit(camp_snapshot(),request),true)
+	var before: Dictionary = camp_snapshot()
+	var frozen_request: Dictionary = request.duplicate(true)
+	if EconomyBuildV1.enabled(before): await _begin_camp_commit(before,String(request.kind))
+	var saved: bool = _accept_transaction(progress_session.edit(before,frozen_request),true)
+	_camp_commit_busy = false
+	_camp_commit_label = ""
 	loadout_panel.refresh(camp_snapshot(),success if saved else _progress_message,_progress_dirty)
 	if _progress_dirty:
 		loadout_panel.focus_retry()
 
 
 func retry_power_edit() -> void:
+	if _camp_commit_busy: return
 	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible or not _progress_dirty:
 		return
+	var before: Dictionary = camp_snapshot()
+	if EconomyBuildV1.enabled(before): await _begin_camp_commit(before, "retry_edit")
 	var saved: bool = _accept_transaction(progress_session.retry(),true)
+	_camp_commit_busy = false
+	_camp_commit_label = ""
 	loadout_panel.refresh(camp_snapshot(),"本次整备已保存；余额与状态已更新。" if saved else _progress_message,not saved)

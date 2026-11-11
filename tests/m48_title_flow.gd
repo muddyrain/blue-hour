@@ -11,3 +11,11 @@ func _journey() -> void:
 	await _tap(app.pause_menu.buttons[1])
 	# An actual quit terminates before this line; any return is a failed close.
 	_check(false,"native Quit must end its own process")
+
+
+func _shot(label: String) -> void:
+	await _hold(2)
+	RenderingServer.force_draw()
+	var captured: Image = viewport.get_texture().get_image()
+	_check(captured.get_size() == viewport.size
+		and captured.save_png(output.path_join(label + ".png")) == OK, "native viewport capture " + label)

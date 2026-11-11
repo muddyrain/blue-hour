@@ -19,7 +19,11 @@ func _run() -> void:
 	await process_frame
 	app._new_game("scavenge", {"version":CatalogProgress.VERSION, "unlock":""},
 		{"version":OpeningBuild.POLICY_VERSION, "eligible":[]})
-	var fresh: Dictionary = app.camp_snapshot()
+	var registration: Dictionary = app.progress_session.inspect()
+	var registered: bool = not app._progress_blocked and registration.get("error") == OK \
+		and registration.get("state") == "CAMP" and registration.get("receipt", {}).get("phase") == "CAMP_REGISTERED"
+	_check(registered, "source fixture starts from an actually acknowledged isolated registration")
+	var fresh: Dictionary = app.camp_snapshot() if registered else {}
 	_check(EconomyActions.camp_enabled(fresh), "ordinary M48 creation selects the explicit source policy")
 	if EconomyActions.camp_enabled(fresh):
 		for day: int in [3, 4, 6, 9]:

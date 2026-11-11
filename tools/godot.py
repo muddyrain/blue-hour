@@ -24,7 +24,7 @@ def main():
  def execute(label,args,flags=None,expected=0):
   folder=job/label;folder.mkdir();cmd=[exe,'--headless','--path',str(ROOT),'--audio-driver','Dummy',*args]
   flags=list(flags if flags is not None else ([] if label=='startup-default' else ['--bh-legacy-entry']))
-  cmd+=['--',*flags,'--bh-progress='+str(folder/('run.enemy-v1.json' if label in ['startup-default','rogue-contracts','world-contracts','neighborhood-contracts','task-contracts','task-data','campaign-contracts','journal-cache','world-bus','r2-save-failure'] or '--bh-enemy-trial' in flags else 'run.json')),'--bh-audio-settings='+str(folder/'audio.json')]
+  cmd+=['--',*flags,'--bh-progress='+str(folder/('run.enemy-v1.json' if label in ['startup-default','rogue-contracts','world-contracts','neighborhood-contracts','task-contracts','task-data','campaign-contracts','journal-cache','world-bus','r2-save-failure','m48-sources','m48-record-transport','m48-record-cache','journal-prefix'] or '--bh-enemy-trial' in flags else 'run.json')),'--bh-audio-settings='+str(folder/'audio.json')]
   if label=='known-hash-cycle':cmd+=['--cycle-output='+(folder/'cycle.json').as_posix()]
   if label=='record-hash':cmd+=['--record-output='+(folder/'data').as_posix()]
   if label=='closeout-view':cmd+=['--view-output='+(folder/'frames').as_posix()]

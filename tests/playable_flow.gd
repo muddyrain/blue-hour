@@ -16,6 +16,7 @@ var failures: int = 0
 var legacy_hashes: Dictionary = {}
 var focus_observations: Array[bool] = []
 var exercise_departure_review: bool = false
+var _playable_startup_contract: bool = false
 
 func _initialize() -> void:
 	root.unfocusable = true
@@ -137,6 +138,10 @@ func _run() -> void:
 	if "--flow-bootstrap-m10" in OS.get_cmdline_user_args(): app.set_script(load("res://.local/m11-power-01/input/m10_main.gd"))
 	if "--flow-bootstrap-m8" in OS.get_cmdline_user_args(): app.set_script(load("res://.local/m9_m8_main.gd"))
 	viewport.add_child(app)
+	_playable_startup_contract = _detect_playable_startup_contract()
+	if not await _wait_for_playable_startup():
+		quit(1)
+		return
 	if movie != null:
 		var overlay: CanvasLayer = CanvasLayer.new()
 		overlay.layer = 100
@@ -178,6 +183,31 @@ func _run() -> void:
 	viewport = null
 	await process_frame
 	quit(0 if failures==0 else 1)
+
+
+func _detect_playable_startup_contract() -> bool:
+	# Historical bootstrap scripts do not expose the native verification contract.
+	for property: Dictionary in app.get_property_list():
+		if property.get("name") == "_startup_pending":
+			return true
+	return false
+
+
+func _playable_startup_pending() -> bool:
+	return _playable_startup_contract and app.get("_startup_pending") == true
+
+
+func _wait_for_playable_startup() -> bool:
+	if not _playable_startup_pending():
+		return true
+	var deadline: int = Time.get_ticks_msec()+900000
+	while _playable_startup_pending() and Time.get_ticks_msec() < deadline:
+		await _frame()
+	var complete: bool = not _playable_startup_pending()
+	_check(complete,"native startup verification finishes before any title or journey operation")
+	if not complete:
+		_write("startup-timeout.json",{"pid":OS.get_process_id(),"pending":true,"timeout_seconds":900})
+	return complete
 
 func _resume() -> void:
 	var expected: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(output.get_base_dir().path_join("first/report.json")))

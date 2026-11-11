@@ -122,6 +122,8 @@ static func _profiled_compute(input: Dictionary) -> Dictionary:
 		after.journey.campaign=CampaignState.settled(before,after,report,input.rules.mission.generated)
 	if BuildState.enabled(before):
 		after.journey.build=BuildState.settled(before,report,input.rules.mission.generated)
+	if EconomyBuildV1.enabled(before):
+		EconomyBuildV1.settled(before, after, report, input.rules.mission.generated)
 	issue = state_problem(after)
 	if not issue.is_empty():
 		return _reject("AFTER: " + issue)

@@ -3,6 +3,7 @@ extends RefCounted
 ## Camp inventory facts are published only by CampEdit / FrozenSettlement.
 const SECOND_SLOT: String = "second_slot"
 const FREEZE: String = "freeze"
+const THIRD_SLOT: String = "third_slot"
 const INVESTMENT_COST: int = 24
 
 static func enabled(camp: Dictionary) -> bool:
@@ -15,8 +16,10 @@ static func initial_build() -> Dictionary:
 	return build
 
 static func initial_progression(version: int = SpecialPowers.PROGRESSION_VERSION) -> Dictionary:
-	return {"version":version, "owned":[], "slots":[""],
-		"investments":{SECOND_SLOT:0, FREEZE:0}, "sources":[], "uses":[]}
+	var investments: Dictionary = {}
+	for choice: String in SpecialPowers.investment_keys(version):
+		investments[choice] = 0
+	return {"version":version, "owned":[], "slots":[""], "investments":investments, "sources":[], "uses":[]}
 
 static func progression(inventory: Dictionary) -> bool:
 	return SpecialPowers.progression_version(inventory.get("version"))
@@ -34,8 +37,13 @@ static func action_inventory_valid(owned: Variant, equipment: Variant, day: int)
 	for id: String in equipment.slots:
 		if id != "" and id not in owned:
 			return false
-	return equipment.investments.second_slot <= day and equipment.investments.freeze <= day \
-		and (equipment.investments.freeze == 0 or SpecialPowers.FREEZE in owned)
+	for choice: String in SpecialPowers.investment_keys(int(equipment.version)):
+		if equipment.investments[choice] > day:
+			return false
+	for id: String in SpecialPowers.policy(int(equipment.version)):
+		if SpecialPowers.upgraded(equipment, id) and id not in owned:
+			return false
+	return true
 
 static func inventory_valid(owned: Variant, slot: Variant, version: int = 1) -> bool:
 	var catalog: Dictionary = SpecialPowers.policy(version)
@@ -52,8 +60,10 @@ static func problem(camp: Dictionary, specialty: Dictionary = {}) -> String:
 	if specialty.is_empty():
 		specialty = BuildActions.specialization_policy(camp)
 	if ContentWaveV1.enabled(camp) != (value is Dictionary and SpecialPowers.wave_version(value.get("version"))) \
-			or (not specialty.is_empty()) != (value is Dictionary and value.get("version") == SpecialPowers.M47_VERSION):
+			or (not specialty.is_empty()) != (value is Dictionary and SurvivalContracts.integer(value.get("version"), SpecialPowers.M47_VERSION, SpecialPowers.M48_VERSION)):
 		return "POWER_CATALOG_MODE"
+	if value is Dictionary and (value.get("version") == SpecialPowers.M48_VERSION) != BuildState.m48_enabled(camp):
+		return "POWER_M48_MODE"
 	if value is Dictionary and progression(value):
 		return _progression_problem(camp, value, specialty)
 	if not value is Dictionary or value.size()!=5 or not value.has_all(["version","owned","slot","sources","uses"]) or value.version!=1 or not inventory_valid(value.owned,value.slot) or not value.sources is Array or value.sources.size()!=value.owned.size() or not value.uses is Array or value.uses.size()>camp.settled_sorties: return "POWER_CAMP_FIELDS"
@@ -95,30 +105,47 @@ static func equip_progression(before: Dictionary, slot: int, ability: String) ->
 	slots[slot] = ability
 	return after if problem(after).is_empty() else {}
 
+static func investment_choice(value: Dictionary, choice: String) -> String:
+	return SpecialPowers.upgrade_key(choice) if value.get("version") == SpecialPowers.M48_VERSION and SpecialPowers.policy(SpecialPowers.M48_VERSION).has(choice) else choice
+
+static func investment_cost(camp: Dictionary, choice: String) -> int:
+	return 32 if choice == THIRD_SLOT and camp.get("journey", {}).get("build", {}).get("powers", {}).get("version") == SpecialPowers.M48_VERSION else INVESTMENT_COST
+
 static func investment_problem(camp: Dictionary, choice: String) -> String:
-	if not enabled(camp) or choice not in [SECOND_SLOT, FREEZE]:
+	if not enabled(camp):
 		return "当前旅程不可购买"
 	var value: Dictionary = camp.journey.build.powers
-	if not progression(value) or camp.journey.state != "ACTIVE":
+	choice = investment_choice(value, choice)
+	if not progression(value) or camp.journey.state != "ACTIVE" or CampaignState.ended(camp) or choice not in SpecialPowers.investment_keys(int(value.version)):
 		return "当前旅程不可购买"
 	if value.investments[choice] != 0:
-		return "已解锁" if choice == SECOND_SLOT else "已强化"
-	if choice == FREEZE and SpecialPowers.FREEZE not in value.owned:
-		return "先带回全域冻结"
-	if camp.cash < INVESTMENT_COST:
-		return "还差 %d 币" % (INVESTMENT_COST - int(camp.cash))
+		return "已解锁" if choice in [SECOND_SLOT, THIRD_SLOT] else "已强化"
+	if choice == THIRD_SLOT and value.investments.second_slot == 0:
+		return "先开启第二槽"
+	for id: String in SpecialPowers.policy(int(value.version)):
+		if SpecialPowers.upgrade_key(id) == choice and id not in value.owned:
+			return "先带回" + PowerActions.name_for(id)
+	var cost: int = investment_cost(camp, choice)
+	if camp.cash < cost:
+		return "还差 %d 币" % (cost - int(camp.cash))
 	return ""
 
 static func invest(before: Dictionary, choice: String) -> Dictionary:
+	if BuildState.m48_enabled(before):
+		choice = BuildState.investment_intent(before, choice)
+		if choice.is_empty():
+			return {}
 	if not investment_problem(before, choice).is_empty():
 		return {}
 	var after: Dictionary = before.duplicate(true)
 	var value: Dictionary = after.journey.build.powers
+	choice = investment_choice(value, choice)
 	value.investments[choice] = int(before.day)
-	if choice == SECOND_SLOT:
+	if choice in [SECOND_SLOT, THIRD_SLOT]:
 		value.slots.append("")
-	after.cash = int(before.cash) - INVESTMENT_COST
-	after.camp_spending = int(before.camp_spending) + INVESTMENT_COST
+	var cost: int = investment_cost(before, choice)
+	after.cash = int(before.cash) - cost
+	after.camp_spending = int(before.camp_spending) + cost
 	return after
 
 static func registration_problem(camp: Dictionary) -> String:
@@ -127,9 +154,21 @@ static func registration_problem(camp: Dictionary) -> String:
 	var version: int = SpecialPowers.WAVE_VERSION if ContentWaveV1.enabled(camp) else SpecialPowers.PROGRESSION_VERSION
 	if OpeningBuild.is_m47(camp):
 		version = SpecialPowers.M47_VERSION
+	if BuildState.m48_enabled(camp):
+		version = SpecialPowers.M48_VERSION
 	return "" if TransactionReceipt.same(camp.journey.build.powers, initial_progression(version)) else "POWER_PROGRESSION_REGISTRATION"
 
 static func opening_spend_valid(camp: Dictionary) -> bool:
+	if BuildState.m48_enabled(camp) and camp.day == 2 and camp.settled_sorties == 0 and camp.last_day.is_empty():
+		var spent: int = 0
+		for purchase: Dictionary in camp.journey.build.get("progression", {}).get("purchases", []):
+			if purchase.day == 2:
+				spent += int(purchase.cost)
+		var inventory: Dictionary = camp.journey.build.powers
+		for choice: String in SpecialPowers.investment_keys(int(inventory.version)):
+			if inventory.investments[choice] == 2:
+				spent += investment_cost(camp, choice)
+		return spent > 0 and camp.camp_spending == spent and camp.cash == CampRules.INITIAL_CASH - spent
 	var value: Dictionary = camp.journey.get("build", {}).get("powers", {})
 	return progression(value) and camp.day == 2 and camp.settled_sorties == 0 and camp.last_day.is_empty() \
 		and value.investments.second_slot == 2 and camp.camp_spending == INVESTMENT_COST \
@@ -158,10 +197,15 @@ static func _progression_problem(camp: Dictionary, value: Dictionary, specialty:
 		previous_day = day
 		acquired[source.ability_id] = day
 		prior.append(source.ability_id)
-	if value.investments.freeze != 0 and value.investments.freeze <= acquired.get(SpecialPowers.FREEZE, camp.day):
-		return "POWER_UPGRADE_BEFORE_ACQUISITION"
-	var purchases_today: int = int(value.investments.freeze == camp.day) + int(value.investments.second_slot == camp.day)
-	if purchases_today > 0 and not SurvivalContracts.integer(camp.get("camp_spending"), purchases_today * INVESTMENT_COST, RunSave.MAX_COUNTER):
+	for id: String in SpecialPowers.policy(int(value.version)):
+		var key: String = SpecialPowers.upgrade_key(id)
+		if SpecialPowers.upgraded(loadout(value), id) and value.investments[key] <= acquired.get(id, camp.day):
+			return "POWER_UPGRADE_BEFORE_ACQUISITION"
+	var purchases_today: int = 0
+	for choice: String in SpecialPowers.investment_keys(int(value.version)):
+		if value.investments[choice] == camp.day:
+			purchases_today += investment_cost(camp, choice)
+	if purchases_today > 0 and not SurvivalContracts.integer(camp.get("camp_spending"), purchases_today, RunSave.MAX_COUNTER):
 		return "POWER_INVESTMENT_SPENDING"
 	previous_day = 1
 	for used: Variant in value.uses:
@@ -193,7 +237,7 @@ static func _progression_problem(camp: Dictionary, value: Dictionary, specialty:
 static func _historical_loadout(equipment: Dictionary, inventory: Dictionary, day: int, acquired: Dictionary) -> bool:
 	if not progression(equipment) or equipment.version != inventory.version:
 		return false
-	for choice: String in [SECOND_SLOT, FREEZE]:
+	for choice: String in SpecialPowers.investment_keys(int(inventory.version)):
 		var purchase_day: int = int(inventory.investments[choice])
 		if equipment.investments[choice] != (purchase_day if purchase_day <= day else 0):
 			return false

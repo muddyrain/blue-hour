@@ -33,6 +33,7 @@ static func site_affix_reward(item: Dictionary, seed: String, action: String, si
 
 
 static func problem(item: Dictionary) -> String:
+	if item.has("economy"): return _economy_problem(item)
 	if item.size()!=(9 if item.has("drop") else 8) or not item.has_all(KEYS) or not SurvivalContracts.integer(item.weapon_level,1,2) or not item.quality is String or item.quality not in ["common","rare"] or not item.affixes is Array:
 		return "WEAPON_MODIFIER_FIELDS"
 	for key: String in ["instance_id","weapon_id","condition","origin","acquired_sortie"]:
@@ -56,7 +57,7 @@ static func problem(item: Dictionary) -> String:
 
 static func effective(item: Dictionary, personal_factor: float = 1.0) -> Dictionary:
 	var base: WeaponDefinition = WeaponInventory.definition(item.weapon_id)
-	var level_factor: float = 1.10 if item.get("weapon_level",1)==2 else 1.0
+	var level_factor: float = 1.0 + 0.1 * (int(item.get("weapon_level", 1)) - 1) if item.has("economy") else 1.10 if item.get("weapon_level",1)==2 else 1.0
 	var affixes: Array = item.get("affixes",[])
 	return {"damage":base.damage*level_factor,"interval":base.interval*(0.90 if "quick_v1" in affixes else 1.0)*(1.0 if CombatEquipment.melee(item.weapon_id) else personal_factor),"range":base.shot_range*(1.15 if "reach_v1" in affixes else 1.0)}
 
@@ -72,6 +73,9 @@ static func combat_definition(item: Dictionary) -> WeaponDefinition:
 
 
 static func combat_affix(item: Dictionary) -> String:
+	if item.has("economy") and not CombatEquipment.melee(item.get("weapon_id", "")):
+		for affix: String in item.get("affixes", []):
+			if affix in [PIERCE, REFUND]: return affix
 	var affixes: Variant = item.get("affixes")
 	if _site_affix_drop(item) and item.get("weapon_id") == "long_rifle" and item.get("quality") == "rare" \
 			and affixes is Array and affixes.size() == 1 and affixes[0] in [PIERCE, REFUND]:
@@ -93,11 +97,34 @@ static func description(item: Dictionary) -> String:
 			"quick_v1": names.append("轻快机件：间隔×0.90")
 			PIERCE: names.append("穿透弹")
 			REFUND: names.append("击倒补弹")
-	return "武器Lv%d · %s · %s" % [int(item.get("weapon_level",1)),"稀有" if item.get("quality","")=="rare" else "普通","无词条" if names.is_empty() else " / ".join(names)]
+	return "武器Lv%d · %s · %s" % [int(item.get("weapon_level",1)),String({"common":"普通", "enhanced":"增强", "rare":"稀有", "crafted":"自制"}.get(item.get("quality", "common"), "普通")),"无词条" if names.is_empty() else " / ".join(names)]
 
 
 static func effect_description(item: Dictionary) -> String:
 	match combat_affix(item):
 		PIERCE: return "穿透弹 · 首次命中后，同一发可再命中射线上的一个敌人，伤害为首击的 50%。墙体仍会挡弹。"
 		REFUND: return "击倒补弹 · 这把枪实际击倒敌人时，自身弹匣补 1 发。每发最多一次，受弹匣容量限制。"
+	return ""
+
+
+static func _economy_problem(item: Dictionary) -> String:
+	if item.size() != (10 if item.has("drop") else 9) or not item.has_all(KEYS) or not SurvivalContracts.integer(item.weapon_level, 1, 5) or item.get("quality") not in ["common", "enhanced", "rare", "crafted"] or not item.get("affixes") is Array: return "ECONOMY_WEAPON_ATTRIBUTES"
+	for key: String in ["instance_id", "weapon_id", "condition", "origin", "acquired_sortie"]:
+		if not item.get(key) is String: return "ECONOMY_WEAPON_STRINGS"
+	if WeaponInventory.definition(item.weapon_id) == null or item.condition not in ["ready", "damaged"]: return "ECONOMY_WEAPON_DEFINITION"
+	var config: Variant = item.economy
+	if not config is Dictionary or config.size() != 6 or not config.has_all(["version", "crafted", "edit_id", "basic", "combat", "magazine"]) or not SurvivalContracts.integer(config.version, 1, 1) or not config.crafted is bool: return "ECONOMY_WEAPON_CONFIGURATION"
+	for key: String in ["edit_id", "basic", "combat", "magazine"]:
+		if not config[key] is String: return "ECONOMY_WEAPON_CONFIGURATION"
+	if config.basic not in ["", "quick_v1", "reach_v1"] or config.combat not in ["", PIERCE, REFUND] or config.magazine not in ["", "extended_mag", "quick_mag"]: return "ECONOMY_COMPONENT_ID"
+	if config.crafted:
+		if item.origin != "m48-crafted" or item.quality != "crafted" or item.weapon_id not in EconomyBuildV1.GUNS or not item.acquired_sortie.is_empty() or item.has("drop") or item.instance_id != config.edit_id + ":crafted" or not TransactionReceipt.same({"v":item.affixes}, {"v":EconomyBuildV1.components(config)}): return "ECONOMY_CRAFTED_SOURCE"
+	else:
+		if not config.edit_id.is_empty() or not config.basic.is_empty() or not config.combat.is_empty() or item.quality == "crafted": return "ECONOMY_ORDINARY_CONFIGURATION"
+		if item.affixes.size() != int({"common":0, "enhanced":1, "rare":2}.get(item.quality, -1)): return "ECONOMY_AFFIX_COUNT"
+	var seen: Array[String] = []
+	for affix: Variant in item.affixes:
+		if not affix is String or affix in seen or affix not in ["quick_v1", "reach_v1", PIERCE, REFUND] or (CombatEquipment.melee(item.weapon_id) and affix in [PIERCE, REFUND]): return "ECONOMY_AFFIX_COMPATIBILITY"
+		seen.append(affix)
+	if not config.magazine.is_empty() and item.weapon_id not in EconomyBuildV1.GUNS: return "ECONOMY_MELEE_MAGAZINE"
 	return ""

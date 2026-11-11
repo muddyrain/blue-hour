@@ -71,6 +71,10 @@ static func parameters(gun: String, mod: String = "") -> Dictionary:
 				return {"capacity": int(stock.capacity) + 2, "seconds": float(stock.seconds) + 0.35}
 			QUICK:
 				return {"capacity": maxi(1, int(stock.capacity) - 2), "seconds": maxf(0.60, float(stock.seconds) - 0.35)}
+	if gun == "shotgun_v1":
+		match mod:
+			EXTENDED: return {"capacity":6, "seconds":3.00}
+			QUICK: return {"capacity":3, "seconds":1.80}
 	return {}
 
 static func problem(value: Variant, identity: String, gun: String, factor: float = 1.0, mod: String = "") -> String:

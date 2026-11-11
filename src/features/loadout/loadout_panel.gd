@@ -5,6 +5,8 @@ extends Control
 signal equip_requested(member_id: int, instance_id: String)
 signal repair_requested(instance_id: String)
 signal workshop_requested(instance_id: String, mod: String)
+signal economy_requested(request: Dictionary)
+signal build_investment_requested(choice: String)
 signal build_requested(slot: int, item_id: String)
 signal power_requested(ability_id: String)
 signal closed
@@ -116,6 +118,7 @@ func _ready() -> void:
 	detail_scroll.add_child(_detail)
 	build_panel=BuildItemsPanel.new()
 	build_panel.requested.connect(func(slot:int,item:String)->void: build_requested.emit(slot,item))
+	build_panel.investment_requested.connect(build_investment_requested.emit)
 	column.add_child(build_panel)
 	power_panel=PowerLoadoutPanel.new()
 	power_panel.requested.connect(func(id:String)->void:power_requested.emit(id))
@@ -162,7 +165,7 @@ func refresh(data: Dictionary, feedback: String = "", retry_power: bool = false)
 	build_panel.visible=BuildState.enabled(data)
 	if build_panel.visible:
 		var build: Dictionary = data.journey.build
-		build_panel.present(build.owned, build.slots, true, not CampaignState.ended(data) and not retry_power, build.get("opening", {}).get("plan", ""), BuildState.pool(data))
+		build_panel.present(build.owned, build.slots, true, not CampaignState.ended(data) and not retry_power, build.get("opening", {}).get("plan", ""), BuildState.pool(data), data)
 	items.max_text_lines = 3 if WeaponState.is_family(_data) else 1
 	_sync_members()
 	for id: int in _member_equipment:
@@ -235,6 +238,7 @@ func _setup_armory() -> void:
 	armory.equip_requested.connect(equip_requested.emit)
 	armory.repair_requested.connect(repair_requested.emit)
 	armory.workshop_requested.connect(workshop_requested.emit)
+	armory.economy_requested.connect(economy_requested.emit)
 	armory.selection_changed.connect(func(identity: String) -> void: _selected_id = identity)
 	armory.navigation_requested.connect(func(action: StringName) -> void:
 		if action == &"camp":
@@ -242,6 +246,7 @@ func _setup_armory() -> void:
 		else:
 			navigation_requested.emit(action))
 	build_panel.requested.connect(build_requested.emit)
+	build_panel.investment_requested.connect(build_investment_requested.emit)
 	power_panel.requested.connect(power_requested.emit)
 
 
@@ -338,7 +343,7 @@ func _select(index: int) -> void:
 			_detail.text += "\n%02d %s · 当前 %s → 所选\n伤%.2f→%.2f / 秒%.3f→%.3f / 距%.2f→%.2f" % [int(member.id),member.call_sign.left(5),
 				WeaponInventory.definition(current.weapon_id).display_name,before.damage,proposed.damage,before.interval,proposed.interval,before.range,proposed.range]
 	if BuildState.enabled(_data):
-		var factors: Dictionary=BuildItems.factors(_data.journey.build.slots, BuildState.pool(_data))
+		var factors: Dictionary=BuildItems.camp_factors(_data)
 		var values: Dictionary=WeaponModifiers.effective(item)
 		if item.weapon_id=="shotgun_v1": _detail.text+="\n本局单颗 %.2f×5"%(values.damage*factors.damage)
 		var damage: float = values.damage * (1.0 if CombatEquipment.melee(item.weapon_id) else factors.damage)
@@ -451,7 +456,7 @@ func _magazine_preview(mod: String, factor: float, owner_id: int) -> String:
 func _reload_factor(owner_id: int) -> float:
 	var factor: float = 1.0
 	if BuildState.enabled(_data):
-		factor = float(BuildItems.factors(_data.journey.build.slots, BuildState.pool(_data)).reload)
+		factor = float(BuildItems.camp_factors(_data).reload)
 	if owner_id > 0 and PersonaState.enabled(_data):
 		var recipe: Dictionary = SurvivorPersona.member(_data.journey.build.persona, owner_id)
 		factor *= float(SurvivorPersona.factors(recipe).get("reload", 1.0))

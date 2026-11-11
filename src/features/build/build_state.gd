@@ -12,6 +12,13 @@ static func pool(camp: Dictionary) -> int:
 	var build: Dictionary = camp.get("journey", {}).get("build", {})
 	var catalog: Dictionary = build.get("catalog", {})
 	var catalog_unlocked: bool = not catalog.get("unlock", "").is_empty()
+	# Pure legacy task projections retain the explicit build policy while replacing campaign.
+	# Actual camps still require the campaign/build agreement in problem().
+	var progression: Variant = build.get("progression")
+	var m48_source: bool = progression is Dictionary and SurvivalContracts.integer(progression.get("version"),1,1) \
+		and SurvivalContracts.integer(build.get("powers", {}).get("version"),SpecialPowers.M48_VERSION,SpecialPowers.M48_VERSION)
+	if m48_enabled(camp) or m48_source:
+		return BuildItems.M48_CATALOG_POOL if catalog_unlocked else BuildItems.M48_POOL
 	if OpeningBuild.is_m47(camp):
 		return BuildItems.SPECIALTY_CATALOG_POOL if catalog_unlocked else BuildItems.SPECIALTY_POOL
 	if build.get("powers", {}).get("version") == SpecialPowers.WAVE_VERSION:
@@ -19,7 +26,7 @@ static func pool(camp: Dictionary) -> int:
 	return BuildItems.CATALOG_POOL if catalog_unlocked else BuildItems.VERSION
 
 
-static func problem(camp: Dictionary) -> String:
+static func _problem_base(camp: Dictionary) -> String:
 	if not enabled(camp): return ""
 	var build: Variant = camp.journey.build
 	if not build is Dictionary:
@@ -134,7 +141,7 @@ static func _specialty_source_valid(source: Dictionary, specialty: Dictionary) -
 		and generated.build.owned == source.owned
 
 static func equip(before: Dictionary, slot: int, item: String) -> Dictionary:
-	if not enabled(before) or slot not in [0,1]: return {}
+	if not enabled(before) or slot < 0 or slot >= before.journey.build.slots.size(): return {}
 	var after: Dictionary=before.duplicate(true)
 	after.journey.build.slots[slot]=item
 	return after if problem(after).is_empty() else {}
@@ -156,3 +163,134 @@ static func settled(before: Dictionary, report: Dictionary, generated: Dictionar
 		result.sources.append(source)
 	if PowerState.enabled(before): result.powers=PowerState.settled(before,report,generated)
 	return result
+
+
+static func m48_enabled(camp: Dictionary) -> bool:
+	var marker: Variant = camp.get("journey", {}).get("campaign", {}).get("economy")
+	return marker is Dictionary and SurvivalContracts.integer(marker.get("version"), 1, 1)
+
+
+static func enable_m48(build: Dictionary) -> void:
+	build.progression = {"version":1, "enhanced":[], "purchases":[]}
+
+
+static func problem(camp: Dictionary) -> String:
+	if not enabled(camp):
+		return ""
+	var marked: bool = m48_enabled(camp)
+	if camp.journey.build.has("progression") != marked:
+		return "BUILD_PROGRESSION_MODE"
+	if not marked:
+		return _problem_base(camp)
+	var issue: String = _progression_problem(camp)
+	if not issue.is_empty():
+		return issue
+	var projected: Dictionary = camp.duplicate(false)
+	projected.journey = camp.journey.duplicate(false)
+	projected.journey.build = camp.journey.build.duplicate(false)
+	projected.journey.build.erase("progression")
+	return _problem_base(projected)
+
+
+static func _progression_problem(camp: Dictionary) -> String:
+	var value: Variant = camp.journey.build.get("progression")
+	if not camp.journey.build.get("owned") is Array or not camp.journey.build.get("sources") is Array or not camp.journey.build.get("slots") is Array:
+		return "BUILD_PROGRESSION_CONTAINER"
+	if not value is Dictionary or value.size() != 3 or not value.has_all(["version", "enhanced", "purchases"]) \
+			or value.version != 1 or not BuildItems.enhancements_valid(value.enhanced, pool(camp)) or not value.purchases is Array:
+		return "BUILD_PROGRESSION_FIELDS"
+	var enhanced: Array[String] = []
+	var slots: int = 2
+	var previous_day: int = 2
+	var spending_today: int = 0
+	for purchase: Variant in value.purchases:
+		if not purchase is Dictionary or purchase.size() != 3 or not purchase.has_all(["choice", "day", "cost"]) \
+				or not purchase.choice is String or not SurvivalContracts.integer(purchase.day, previous_day, int(camp.day)):
+			return "BUILD_PROGRESSION_PURCHASE"
+		var expected_cost: int = BuildItems.UPGRADE_COST
+		if purchase.choice == "next_slot":
+			if slots >= 4:
+				return "BUILD_PROGRESSION_SLOT_COUNT"
+			expected_cost = 16 if slots == 2 else 24
+			slots += 1
+		else:
+			if purchase.choice not in camp.journey.build.owned or purchase.choice in enhanced:
+				return "BUILD_PROGRESSION_OWNERSHIP"
+			var acquired_day: int = 1
+			for source: Variant in camp.journey.build.sources:
+				if not source is Dictionary or not source.get("item_id") is String or not source.get("transaction_id") is String:
+					return "BUILD_PROGRESSION_SOURCE"
+				if source.item_id == purchase.choice:
+					acquired_day = int(source.transaction_id.get_slice(":", 1)) + 1
+			if purchase.day <= acquired_day:
+				return "BUILD_PROGRESSION_BEFORE_ACQUISITION"
+			enhanced.append(purchase.choice)
+		if not SurvivalContracts.integer(purchase.cost, expected_cost, expected_cost):
+			return "BUILD_PROGRESSION_PRICE"
+		previous_day = int(purchase.day)
+		if purchase.day == camp.day:
+			spending_today += expected_cost
+	if slots != camp.journey.build.slots.size() or enhanced != value.enhanced:
+		return "BUILD_PROGRESSION_RESULT"
+	if not SurvivalContracts.integer(camp.camp_spending, spending_today, RunSave.MAX_COUNTER):
+		return "BUILD_PROGRESSION_SPENDING"
+	return ""
+
+
+static func investment_offer(camp: Dictionary, choice: String) -> Dictionary:
+	var reason: String = ""
+	var cost: int = 10
+	var summary: String = ""
+	if not m48_enabled(camp) or camp.journey.state != "ACTIVE" or CampaignState.ended(camp):
+		reason = "当前旅程不可投资"
+	elif choice == "next_slot":
+		var count: int = camp.journey.build.slots.size()
+		cost = 16 if count == 2 else 24
+		summary = "被动槽 %d → %d" % [count, count + 1]
+		if count >= 4:
+			reason = "已开启四个被动槽"
+	elif choice not in camp.journey.build.owned:
+		reason = "先回收并确认拥有该道具"
+	elif choice in camp.journey.build.progression.enhanced:
+		reason = "该道具已强化"
+	else:
+		summary = BuildItems.effect_text(choice, false, pool(camp)) + " → " + BuildItems.effect_text(choice, true, pool(camp))
+	if reason.is_empty() and int(camp.cash) < cost:
+		reason = "还差 %d 币" % [cost - int(camp.cash)]
+	return {"available":reason.is_empty(), "reason":reason, "cost":cost, "summary":summary}
+
+
+static func invest(before: Dictionary, choice: String) -> Dictionary:
+	choice = investment_intent(before, choice)
+	if choice.is_empty():
+		return {}
+	var offer: Dictionary = investment_offer(before, choice)
+	if not offer.available:
+		return {}
+	var after: Dictionary = before.duplicate(true)
+	if choice == "next_slot":
+		after.journey.build.slots.append("")
+	else:
+		after.journey.build.progression.enhanced.append(choice)
+	after.journey.build.progression.purchases.append({"choice":choice, "day":int(before.day), "cost":int(offer.cost)})
+	after.cash -= int(offer.cost)
+	after.camp_spending += int(offer.cost)
+	return after
+
+
+static func registration_problem(camp: Dictionary) -> String:
+	if not m48_enabled(camp):
+		return ""
+	return "" if TransactionReceipt.same(camp.journey.build.get("progression", {}), {"version":1, "enhanced":[], "purchases":[]}) else "BUILD_PROGRESSION_REGISTRATION"
+
+
+static func investment_value(camp: Dictionary, choice: String) -> String:
+	return JSON.stringify({"choice":choice, "before_hash":SurvivalContracts.fingerprint(camp)})
+
+
+static func investment_intent(camp: Dictionary, value: String) -> String:
+	var intent: Variant = JSON.parse_string(value)
+	if not intent is Dictionary or intent.size() != 2 or not intent.has_all(["choice", "before_hash"]) \
+			or not intent.choice is String or intent.before_hash != SurvivalContracts.fingerprint(camp):
+		return ""
+	return intent.choice

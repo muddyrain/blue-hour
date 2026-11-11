@@ -117,6 +117,7 @@ var pending_burst: Dictionary = {}
 var power_frozen: bool = false
 var power_panel: PowerSlotPanel
 var second_power_panel: PowerSlotPanel
+var third_power_panel: PowerSlotPanel
 var power_view: PowerEffectView
 var basic_support: BasicSupport = BasicSupport.new()
 var support_commit: Callable
@@ -797,7 +798,7 @@ func site_label(site: SearchSite) -> String:
 		return "广告牌"
 	if _is_event_site(site):
 		return EventSortieV1.TITLE
-	return "工具箱点" if String(site.id) == WorkshopSiteV1.site_id(supply.generated) \
+	return "工具回收点" if _tools_at(String(site.id)) > 0 \
 		else SearchWorkView.short_site(site.prop.title,sites.find(site)+1)
 
 
@@ -1618,8 +1619,9 @@ func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
 	var investigation: Dictionary = supply.generated.get("investigation", {})
 	if supply.generated.get("mission_policy") == 1 and investigation.get("site_id") == String(site.id):
 		_show_notice("已携带线索：%s · 生还归航并确认后登记" % CampaignRules.CLUE_NAMES[investigation.clue_id])
-	if String(site.id) == WorkshopSiteV1.site_id(supply.generated):
-		_show_notice("已携带工具箱 ×1 · 归航确认后入库")
+	var tool_count: int = _tools_at(String(site.id))
+	if tool_count > 0:
+		_show_notice("已携带工具 ×%d · 归航确认后入库" % tool_count)
 	print("BH_SEARCH completed kind=%s reward=%d cash=%d food=%d" % [site.kind,reward,loot,food_loot])
 	search_completed.emit(reward)
 	_search_log("completed",site)
@@ -1775,12 +1777,18 @@ func _make_ui() -> void:
 		power_panel.position=Vector2(16,300)
 		power_panel.activation_requested.connect(request_power)
 		_hud.view.add_child(power_panel)
-		if SpecialPowers.progression_version(powers.get("version")) and powers.loadout.slots.size() == 2:
+		if SpecialPowers.progression_version(powers.get("version")) and powers.loadout.slots.size() >= 2:
 			second_power_panel = PowerSlotPanel.new()
 			second_power_panel.slot_index = 1
 			second_power_panel.position = Vector2(16, 378)
 			second_power_panel.activation_requested.connect(request_power.bind(1))
 			_hud.view.add_child(second_power_panel)
+		if SpecialPowers.progression_version(powers.get("version")) and powers.loadout.slots.size() >= 3:
+			third_power_panel = PowerSlotPanel.new()
+			third_power_panel.slot_index = 2
+			third_power_panel.position = Vector2(16, 456)
+			third_power_panel.activation_requested.connect(request_power.bind(2))
+			_hud.view.add_child(third_power_panel)
 		power_view=PowerEffectView.new()
 		_effects.add_child(power_view)
 	if player_mode and BuildItems.specialty_pool(int(supply.generated.get("build", {}).get("version", 0))):
@@ -1788,14 +1796,34 @@ func _make_ui() -> void:
 		for id: String in supply.generated.build.slots:
 			if id in [BuildItems.AID_KIT, BuildItems.STRIDE_HARNESS, BuildItems.GUIDED_MAG]:
 				var item: Dictionary = SpecialtyPresentation.definition(id)
-				names.append("%s\n%s" % [item.name, item.effect])
+				var enhanced: bool = id in supply.generated.build.get("enhanced", [])
+				names.append("%s\n%s" % [item.name, BuildItems.effect_text(id, enhanced, int(supply.generated.build.version))])
 		if not names.is_empty():
 			var kit: PanelContainer = PanelContainer.new()
-			kit.position = Vector2(16, 460)
+			kit.position = Vector2(16, 540 if third_power_panel != null else 460)
 			kit.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			kit.add_theme_stylebox_override("panel", CampStyle.box(Color(0.045, 0.10, 0.14, 0.90), Color("48646d"), 8))
 			var label: Label = CampStyle.label("\n".join(names), 13, CampStyle.TEAL)
 			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			if get_viewport_rect().size.y - kit.position.y < 80.0:
+				label.text = "专精道具 · %d 件" % names.size()
+				label.tooltip_text = "\n".join(names)
+				label.mouse_filter = Control.MOUSE_FILTER_STOP
+				label.focus_mode = Control.FOCUS_ALL
+				label.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+				var detail: PanelContainer = PanelContainer.new()
+				detail.name = "SpecialtyDetails"
+				detail.position = Vector2(16, kit.position.y - 150)
+				detail.add_theme_stylebox_override("panel", CampStyle.box(Color("10252f"), Color("48646d"), 8))
+				detail.add_child(CampStyle.label("\n".join(names), 13, CampStyle.TEAL))
+				detail.hide()
+				_hud.view.add_child(detail)
+				label.gui_input.connect(func(event: InputEvent) -> void:
+					if (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed) \
+							or (event is InputEventKey and event.pressed and event.keycode in [KEY_ENTER, KEY_SPACE]):
+						detail.visible = not detail.visible
+						label.grab_focus()
+						label.accept_event())
 			kit.add_child(label)
 			_hud.view.add_child(kit)
 	_update_ui()
@@ -1895,7 +1923,7 @@ func _update_ui() -> void:
 		objective = "破阵者已倒地 · 集合回车"
 	var toolbox: SearchSite = _toolbox_site()
 	_hud.refresh({
-		"toolbox":int(toolbox.searched) if toolbox != null else -1,
+		"toolbox":_carried_tools() if supply.generated.has("economy_source") else int(toolbox.searched) if toolbox != null else -1,
 		"exploration_objectives":_exploration_objective_rows() if exploration_mode() else [],
 		"objective":objective,
 		"mission_title":("交火练习" if is_practice else mission_title) if los_setup == null else mission_title, "members":members,
@@ -2222,9 +2250,10 @@ func _make_world_buildings() -> void:
 			var anchor: Vector2 = Vector2(0, 5) if object_site else Vector2(site.prop.door_offset, 28)
 			if not _supply_entrances.is_empty() and site.prop.loot_landmark.is_empty() and site.prop.primary_target and site.kind == &"food":
 				site.prop.loot_landmark = "近点食品" if def.id == supply.generated.objective.site_ids[0] else "追加食品"
-			if String(site.id) == WorkshopSiteV1.site_id(supply.generated):
-				site.prop.loot_landmark = "工具箱 ×1"
-				site.prop.reward_hint += " · 工具箱 ×1"
+			var tool_count: int = _tools_at(String(site.id))
+			if tool_count > 0:
+				site.prop.loot_landmark = "工具 ×%d" % tool_count
+				site.prop.reward_hint += " · 工具 ×%d" % tool_count
 			site.prop.configure_loot_badge(category, anchor)
 		sites.append(site)
 		if site.id==&"cash": _cash_site=site; _shop=site.prop
@@ -2483,10 +2512,10 @@ func toggle_support_aim() -> void:
 
 func _support_input(event: InputEvent) -> bool:
 	if not build_mode(): return false
-	if _hud.view.persona_details.visible and event is InputEventKey and event.keycode in [KEY_Q,KEY_E,KEY_3,KEY_4]: return true
+	if _hud.view.persona_details.visible and event is InputEventKey and event.keycode in [KEY_Q,KEY_E,KEY_3,KEY_4,KEY_5]: return true
 	if event is InputEventKey and event.pressed and not event.echo and power_mode() \
-			and (event.keycode == KEY_3 or (event.keycode == KEY_4 and second_power_panel != null)):
-		if get_viewport().gui_get_focus_owner()==null: request_power(0 if event.keycode == KEY_3 else 1)
+			and (event.keycode == KEY_3 or (event.keycode == KEY_4 and second_power_panel != null) or (event.keycode == KEY_5 and third_power_panel != null)):
+		if get_viewport().gui_get_focus_owner()==null: request_power(0 if event.keycode == KEY_3 else 1 if event.keycode == KEY_4 else 2)
 		return true
 	if event is InputEventKey and event.pressed and not event.echo and get_viewport().gui_get_focus_owner()==null:
 		if support_aiming and event.keycode in [KEY_ESCAPE,KEY_E]: support_aiming=false; return true
@@ -2601,6 +2630,8 @@ func _present_power() -> void:
 	_present_power_slot(power_panel, 0)
 	if second_power_panel != null:
 		_present_power_slot(second_power_panel, 1)
+	if third_power_panel != null:
+		_present_power_slot(third_power_panel, 2)
 	var members: Array[Dictionary]=[]
 	var foes: Array[Dictionary]=[]
 	for actor: FieldActor in survivors: members.append({"position":actor.position,"moving":actor.activity==FieldActor.Activity.MOVING,"alive":actor.health>0 and actor.visible})
@@ -2609,13 +2640,14 @@ func _present_power() -> void:
 
 func _present_power_slot(panel: PowerSlotPanel, slot: int) -> void:
 	var id: String = SpecialPowers.equipped_at(powers, slot)
+	var loadout: Variant = powers.get("loadout")
 	var remaining: float = SpecialPowers.remaining(powers, elapsed, slot)
 	var used: bool = not basic_support.ready(id) if id == SpecialPowers.RADIO else not SpecialPowers.event_at(powers, slot).is_empty()
 	var status: String = "营地装配" if id.is_empty() else "持续 %.1f 秒" % remaining if remaining > 0.0 else "已用" if used else "就绪"
-	var upgraded: bool = powers.get("loadout", {}).get("investments", {}).get("freeze", 0) > 0
 	panel.present("特殊能力空槽" if id.is_empty() else SpecialPowers.definition(id).name,
-		status, remaining, SpecialPowers.duration(id, upgraded) if not id.is_empty() else 0.0,
-		support_available() and not id.is_empty() and not used, id)
+		status, remaining, (SpecialPowers.effect_duration(loadout, id) if loadout is Dictionary else SpecialPowers.duration(id, false)) if not id.is_empty() else 0.0,
+		support_available() and not id.is_empty() and not used, id,
+		SpecialPowers.radio_amount(loadout) if loadout is Dictionary else 24.0)
 
 
 func _exploration_objective_rows() -> Array[Dictionary]:
@@ -2665,7 +2697,14 @@ func _exploration_objective_rows() -> Array[Dictionary]:
 			rows[0].title += " · 道具 %d 件" % generated.build.drops.size()
 		rows[0].hint = "一次性增援已触发。" if task_event.started else "首次开工触发一次增援，工作中可受击。"
 	var toolbox: SearchSite = _toolbox_site()
-	if toolbox != null:
+	if generated.has("economy_source"):
+		for source: Dictionary in EconomyActions.tool_sources(generated):
+			var tool_site: SearchSite = search_site(StringName(source.site_id))
+			rows.insert(1, {"id":"tools:" + String(source.site_id), "title":"工具 ×%d" % int(source.count),
+				"optional":source.site_id not in generated.objective.site_ids, "done":int(tool_site.searched),
+				"total":1,"complete":tool_site.searched,"site_ids":[source.site_id],
+				"hint":"完成此点即可携带，归航确认后入库。"})
+	elif toolbox != null:
 		rows.insert(1, {"id":"toolbox", "title":"工具箱 ×1", "optional":true, "done":int(toolbox.searched),
 			"total":1, "complete":toolbox.searched, "site_ids":[String(toolbox.id)],
 			"hint":"完成此点原搜集即可携带，归航确认后入库。"})
@@ -2678,6 +2717,24 @@ func _exploration_objective_rows() -> Array[Dictionary]:
 			"site_ids":[BillboardActionV1.SITE_ID],
 			"hint":BillboardFieldView.DONE if billboard_site.searched else BillboardFieldView.HINT.replace("\n", " · ")})
 	return rows
+
+
+func _tools_at(site_id: String) -> int:
+	if supply.generated.has("economy_source"):
+		for source: Dictionary in EconomyActions.tool_sources(supply.generated):
+			if source.site_id == site_id:
+				return int(source.count)
+		return 0
+	return int(site_id == WorkshopSiteV1.site_id(supply.generated))
+
+
+func _carried_tools() -> int:
+	var count: int = 0
+	for source: Dictionary in EconomyActions.tool_sources(supply.generated):
+		var site: SearchSite = search_site(StringName(source.site_id))
+		if site != null and site.searched:
+			count += int(source.count)
+	return count
 
 
 func site_discovered(site: SearchSite) -> bool:

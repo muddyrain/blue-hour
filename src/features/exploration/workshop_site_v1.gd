@@ -9,6 +9,9 @@ static var _sources: Dictionary[String, String] = {}
 
 
 static func site_id(action: Dictionary) -> String:
+	if EconomyActions.enabled(action):
+		var sources: Array[Dictionary] = EconomyActions.tool_sources(action)
+		return String(sources[0].site_id) if not sources.is_empty() else ""
 	var marker: Variant = action.get("workshop_tool")
 	if not marker is Dictionary or marker.size() != 2 or not marker.has_all(["version", "site_id"]) \
 			or not SurvivalContracts.integer(marker.version, VERSION, VERSION) or not marker.site_id is String \

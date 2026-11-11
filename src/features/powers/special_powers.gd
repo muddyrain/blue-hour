@@ -13,6 +13,7 @@ const ACCEPTED_KEYS: Array[String] = ["id", "ability_id", "at", "until"]
 const PROGRESSION_VERSION: int = 2
 const WAVE_VERSION: int = 3
 const M47_VERSION: int = 4
+const M48_VERSION: int = 5
 const UPGRADED_FREEZE_SECONDS: float = 7.0
 const FREEZE: String = "map_freeze_v1"
 const SPEED: String = "speed_boost_v1"
@@ -24,18 +25,18 @@ const RADIO_HELP: String = "立即为户外受伤且生命比例最低的在场�
 
 
 static func progression_version(version: Variant) -> bool:
-	return SurvivalContracts.integer(version, PROGRESSION_VERSION, M47_VERSION)
+	return SurvivalContracts.integer(version, PROGRESSION_VERSION, M48_VERSION)
 
 
 static func wave_version(version: Variant) -> bool:
-	return SurvivalContracts.integer(version, WAVE_VERSION, M47_VERSION)
+	return SurvivalContracts.integer(version, WAVE_VERSION, M48_VERSION)
 
 
 static func policy(version: int) -> Dictionary:
 	if wave_version(version):
 		var catalog: Dictionary = POLICY.duplicate()
 		catalog[SUPPRESSION] = SUPPRESSION_DEFINITION
-		if version == M47_VERSION:
+		if version in [M47_VERSION, M48_VERSION]:
 			catalog[RADIO] = RADIO_DEFINITION
 		return catalog
 	return POLICY
@@ -102,7 +103,7 @@ static func request(state: Dictionary, slot: int = 0) -> Dictionary:
 
 static func accept(state: Dictionary, proposal: Dictionary, at: float) -> Dictionary:
 	if progression_version(state.get("version")):
-		if not SurvivalContracts.integer(proposal.get("slot"), 0, 1) \
+		if not SurvivalContracts.integer(proposal.get("slot"), 0, state.get("loadout", {}).get("slots", []).size() - 1) \
 				or not state.get("binding") is Dictionary or not state.get("loadout") is Dictionary \
 				or not problem(state, state.binding, state.loadout, at).is_empty():
 			return {}
@@ -112,7 +113,7 @@ static func accept(state: Dictionary, proposal: Dictionary, at: float) -> Dictio
 		var next: Dictionary = state.duplicate(true)
 		var event: Dictionary = proposal.duplicate(true)
 		event.at = at
-		event.until = at + duration(proposal.ability_id, state.loadout.investments.freeze > 0)
+		event.until = at + effect_duration(state.loadout, proposal.ability_id)
 		next.accepted.append(event)
 		return next if problem(next, next.binding, next.loadout, at).is_empty() else {}
 	if not _keys(state, KEYS) or not state.binding is Dictionary or not state.equipped is String or not problem(state, state.binding, state.equipped, at).is_empty() or not _keys(proposal, REQUEST_KEYS):
@@ -179,12 +180,15 @@ static func duration(id: String, upgraded: bool) -> float:
 static func loadout_valid(loadout: Variant) -> bool:
 	if not _keys(loadout, ["version", "slots", "investments"]) \
 			or not progression_version(loadout.version) \
-			or not _keys(loadout.investments, ["second_slot", "freeze"]) or not loadout.slots is Array:
+			or not _keys(loadout.investments, investment_keys(int(loadout.version))) or not loadout.slots is Array:
 		return false
 	for day: Variant in loadout.investments.values():
 		if not SurvivalContracts.integer(day, 0, RunSave.MAX_COUNTER) or day == 1:
 			return false
-	if loadout.slots.size() != (2 if loadout.investments.second_slot != 0 else 1):
+	if loadout.version == M48_VERSION and loadout.investments.third_slot != 0 and (loadout.investments.second_slot == 0 or loadout.investments.third_slot < loadout.investments.second_slot):
+		return false
+	var count: int = 1 + int(loadout.investments.second_slot != 0) + int(loadout.version == M48_VERSION and loadout.investments.third_slot != 0)
+	if loadout.slots.size() != count:
 		return false
 	var catalog: Dictionary = policy(int(loadout.version))
 	for id: Variant in loadout.slots:
@@ -218,7 +222,7 @@ static func _progression_problem(value: Variant, binding: Dictionary, loadout: D
 			return "POWER_ACTIVATION_ID"
 		if not SurvivalContracts.number(event.at) or not SurvivalContracts.number(event.until) \
 				or event.at < previous_at or event.at > elapsed or event.until <= event.at \
-				or event.until != float(event.at) + duration(id, loadout.investments.freeze != 0):
+				or event.until != float(event.at) + effect_duration(loadout, id):
 			return "POWER_EFFECT_INTERVAL"
 		used.append(slot)
 		previous_at = float(event.at)
@@ -244,3 +248,33 @@ static func _binding_valid(binding: Dictionary) -> bool:
 
 static func _keys(value: Variant, keys: Array) -> bool:
 	return value is Dictionary and value.size() == keys.size() and value.has_all(keys)
+
+
+static func investment_keys(version: int) -> Array[String]:
+	return ["second_slot", "third_slot", "freeze", "speed", "suppression", "radio"] if version == M48_VERSION else ["second_slot", "freeze"]
+
+
+static func upgrade_key(id: String) -> String:
+	return {FREEZE:"freeze", SPEED:"speed", SUPPRESSION:"suppression", RADIO:"radio"}.get(id, "")
+
+
+static func upgraded(loadout: Dictionary, id: String) -> bool:
+	var key: String = upgrade_key(id)
+	if key.is_empty() or not loadout.get("investments") is Dictionary:
+		return false
+	if loadout.get("version") != M48_VERSION and id != FREEZE:
+		return false
+	return loadout.investments.get(key, 0) != 0
+
+
+static func effect_duration(loadout: Dictionary, id: String) -> float:
+	if upgraded(loadout, id):
+		match id:
+			SPEED: return 12.0
+			FREEZE: return 7.0
+			SUPPRESSION: return 16.0
+	return float(definition(id).get("duration", 0.0))
+
+
+static func radio_amount(loadout: Dictionary) -> float:
+	return 40.0 if upgraded(loadout, RADIO) else float(RADIO_DEFINITION.heal_amount)

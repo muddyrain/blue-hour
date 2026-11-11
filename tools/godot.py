@@ -32,7 +32,7 @@ def main():
   if label=='neighborhood-data':cmd+=['--neighborhood-output='+(folder/'data.json').as_posix()]
   if label=='rogue-data':cmd+=['--rogue-data-output='+(folder/'data.json').as_posix()]
   if label=='worldgen-generation':cmd+=['--worldgen-output='+(folder/'data').as_posix()]
-  with (folder/'console.txt').open('xb') as out:z=subprocess.run(cmd,cwd=ROOT,stdout=out,stderr=out,env=env,timeout=150)
+  with (folder/'console.txt').open('xb') as out:z=subprocess.run(cmd,cwd=ROOT,stdout=out,stderr=out,env=env,timeout=300 if label=='m48-sources' else 150)
   text=(folder/'console.txt').read_text(encoding='utf-8',errors='replace');assert z.returncode==expected and not re.search(r'(?m)^(SCRIPT ERROR|ERROR):',text),(label,z.returncode,text[-2000:])
   assert all(int(n)==0 for n in re.findall(r'"failures"\s*:\s*(\d+)',text)),(label,'structured failures')
   if label=='known-hash-cycle':assert 'MINIMAL_HASH_CYCLE=true' in text and 'EXACT_RECORD_ROUNDTRIP=true' in text
@@ -62,6 +62,8 @@ def main():
  execute('known-hash-cycle',['--script','res://tests/known_hash_cycle.gd'])
  execute('record-hash',['--script','res://tests/record_hash.gd'])
  for name in ['r2_art','r2_save_cache','r2_save_failure','level_policy','level_summary','level_generation']:
+  execute(name.replace('_','-'),['--script','res://tests/'+name+'.gd'],[])
+ for name in ['m48_economy','m48_source_codec','m48_build_powers','m48_runtime_effects','m48_patterns','m48_components','m48_sources','m48_drop_grades','m48_record_transport','m48_record_cache','journal_prefix']:
   execute(name.replace('_','-'),['--script','res://tests/'+name+'.gd'],[])
  z=subprocess.run([sys.executable,'tools/validate_assets.py'],cwd=ROOT,capture_output=True);(job/'assets.txt').write_bytes(z.stdout+z.stderr);assert z.returncode==0,z.stderr
  result={'status':'PASS_PUBLIC_SUBSET_WITH_EXACT_RECORD_TRANSPORT','legacy_engine_json_cycle':'REPRODUCED','production_gate':'BLOCKED','cases':rows,'private_archive_matrix':'NOT_INCLUDED','physical_os':'NOT_VERIFIED'}

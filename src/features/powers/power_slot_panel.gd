@@ -24,7 +24,7 @@ func _ready() -> void:
 	_build()
 
 
-func present(title: String, status: String, remaining: float, duration: float, enabled: bool, ability_id: String) -> void:
+func present(title: String, status: String, remaining: float, duration: float, enabled: bool, ability_id: String, radio_amount: float = 24.0) -> void:
 	_build()
 	var key: String = str(3 + slot_index)
 	var short_name: String = SHORT_NAMES.get(ability_id, "疾行")
@@ -39,7 +39,7 @@ func present(title: String, status: String, remaining: float, duration: float, e
 	elif ability_id == SpecialPowers.SUPPRESSION:
 		effect = "%s 秒内普通、疾奔、重压感染者的直接近战伤害减半。" % str(duration)
 	elif ability_id == SpecialPowers.RADIO:
-		effect = SpecialPowers.RADIO_HELP
+		effect = "立即为户外受伤且生命比例最低的在场队员恢复最多 %s HP。没有合格目标时保留次数。" % String.num(radio_amount, 0)
 	activation_button.tooltip_text = title + "\n" + effect + "\n" + status + "\n每次出击一次；营地装配。\n" + key + " 或点击立即释放。"
 	activation_button.disabled = not enabled
 	activation_button.focus_mode = Control.FOCUS_ALL if enabled else Control.FOCUS_NONE

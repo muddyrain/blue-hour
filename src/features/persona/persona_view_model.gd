@@ -11,7 +11,7 @@ static func camp(base: Dictionary, id: int, scope: String = "camp") -> Dictionar
 	var recipe: Dictionary=SurvivorPersona.member(base.journey.build.persona,id,String(member.definition_id))
 	var personal: Dictionary=SurvivorPersona.factors(recipe)
 	if personal.is_empty(): return {}
-	var passive: Dictionary=BuildItems.factors(base.journey.build.slots, BuildState.pool(base))
+	var passive: Dictionary=BuildItems.camp_factors(base)
 	var definition: SurvivorDefinition=SurvivorRoster.definition(id)
 	var positive: Dictionary=SurvivorPersona.POSITIVE[recipe.positive_id]
 	var negative: Dictionary=SurvivorPersona.NEGATIVE[recipe.negative_id]

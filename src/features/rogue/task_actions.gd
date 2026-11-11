@@ -291,7 +291,7 @@ static func outcome(value: Dictionary, report: Dictionary) -> Dictionary:
 		if PumpStationAction.enabled(value) and report.encounter.defeat.is_empty():
 			count = 0
 		var investigation: bool = value.get("mission_policy") == 1 and value.has("investigation")
-		if value.type in ["equipment","airdrop"] and not investigation and report.weapons.is_empty(): count=0
+		if value.type in ["equipment","airdrop"] and not investigation and not EconomyActions.hardware(value) and report.weapons.is_empty(): count=0
 	return {"version":1,"task_id":value.id,"type":value.type,"completed":count,"total":total,"status":"COMPLETED" if report.evacuated and count==total else "TARGET_LOST" if lost else "EARLY" if report.evacuated else "FAILED"}
 
 static func summary_problem(value: Variant) -> String:

@@ -291,6 +291,9 @@ func edit(before: Dictionary, request: Dictionary) -> Dictionary:
 	if TransactionReceipt.same(proposal,before):
 		return state
 	_pending_edit = TrainingRules.intent_for(request).edit_id if request.kind=="train_trait" else String(before.profile_id)+":edit:"+RunSave.new_profile_id()
+	if request.kind == "economy":
+		var intent: Variant = JSON.parse_string(request.value)
+		_pending_edit = String(intent.edit_id)
 	_pending_edit_head = state.hash
 	_pending_edit_request = request.duplicate(true)
 	return _retry_edit()

@@ -16,7 +16,7 @@ static func healing_kind(kind: Variant) -> bool:
 static func radio_equipped(generated: Dictionary) -> bool:
 	var equipment: Variant = generated.get("powers")
 	if not equipment is Dictionary or not SurvivalContracts.integer(equipment.get("version"),
-			SpecialPowers.M47_VERSION, SpecialPowers.M47_VERSION):
+			SpecialPowers.M47_VERSION, SpecialPowers.M48_VERSION):
 		return false
 	var loadout: Variant = PowerState.loadout(equipment)
 	return SpecialPowers.loadout_valid(loadout) and SpecialPowers.RADIO in loadout.slots
@@ -39,13 +39,13 @@ static func support_problem(value: Variant, token: Dictionary, generated: Dictio
 	for event: Dictionary in value.accepted:
 		var facts: Dictionary=event.facts
 		if not SurvivalContracts.integer(facts.get("at_ms"),0,RunSave.MAX_COUNTER) or facts.at_ms<previous or not SurvivalContracts.number(facts.get("at")) or not SortieSnapshot.duration_matches(float(facts.at),facts.at_ms): return "SUPPORT_FACT_TIME"
-		if event.kind in BasicSupport.KINDS and facts.at-last[event.kind]<BasicSupport.POLICY[event.kind+"_cooldown"]-0.00000001: return "SUPPORT_FACT_TIME"
+		if event.kind in BasicSupport.KINDS and facts.at-last[event.kind]<cooldown(generated,event.kind)-0.00000001: return "SUPPORT_FACT_TIME"
 		if not SurvivalContracts.integer(facts.get("member_id"),1,5): return "SUPPORT_FACT_MEMBER"
 		if event.kind in ["heal", SpecialPowers.RADIO]:
 			if facts.size()!=7 or not facts.has_all(["at","at_ms","member_id","health_before","health_after","amount","damage_received"]): return "HEAL_FACT_FIELDS"
 			for key: String in ["health_before","health_after","amount","damage_received"]:
 				if not SurvivalContracts.number(facts[key]): return "HEAL_FACT_NUMBER"
-			var limit: float = float(SpecialPowers.RADIO_DEFINITION.heal_amount) if event.kind == SpecialPowers.RADIO \
+			var limit: float = SpecialPowers.radio_amount(PowerState.loadout(generated.powers)) if event.kind == SpecialPowers.RADIO \
 				else BasicSupport.POLICY.heal_amount * BuildItems.frozen_factors(generated.build).heal
 			if facts.health_before<=0 or facts.amount<=0 or facts.amount>limit or facts.health_after!=facts.health_before+facts.amount or facts.damage_received<0: return "HEAL_FACT_AMOUNT"
 			if not TransactionReceipt.same(event.payload,{"member_id":facts.member_id,"amount":facts.amount}): return "HEAL_REQUEST_SOURCE"
@@ -97,7 +97,7 @@ static func world_problem(world: Dictionary, receipt: Dictionary) -> String:
 		var last_at: float=-1.0
 		for accepted: Dictionary in world.support.accepted:
 			if accepted.kind==kind: last_at=float(accepted.facts.at)
-		var expected: float=maxf(0.0,BasicSupport.POLICY[kind+"_cooldown"]-(float(world.sim.elapsed)-last_at)) if last_at>=0 else 0.0
+		var expected: float=maxf(0.0,cooldown(world.generated,kind)-(float(world.sim.elapsed)-last_at)) if last_at>=0 else 0.0
 		if absf(float(world.support.cooldowns[kind])-expected)>0.00000001: return "SUPPORT_COOLDOWN_CAUSAL_SOURCE"
 	for event: Dictionary in world.support.accepted:
 		if event.facts.at_ms>floori(world.sim.elapsed*1000.0): return "SUPPORT_FUTURE"
@@ -107,7 +107,7 @@ static func world_problem(world: Dictionary, receipt: Dictionary) -> String:
 			var maximum: float = GrowthRules.maximum(SurvivorRoster.member(FieldJoinRules.context(receipt).crew,int(member.id)))
 			if event.facts.health_after > maximum or (event.kind == FirstAidV1.KIND and event.facts.max_health != maximum): return "HEAL_MAXIMUM"
 			if event.kind == SpecialPowers.RADIO and event.facts.amount != minf(
-					float(SpecialPowers.RADIO_DEFINITION.heal_amount), maximum - float(event.facts.health_before)):
+					SpecialPowers.radio_amount(PowerState.loadout(world.generated.powers)), maximum - float(event.facts.health_before)):
 				return "AID_BROADCAST_AMOUNT"
 	return ""
 
@@ -139,7 +139,7 @@ static func plan_radio(world: Dictionary) -> Dictionary:
 			FieldActor.Activity.IDLE, FieldActor.Activity.MOVING, FieldActor.Activity.RECOVERING]
 		members.append({"member_id":state.get("member_id"), "health":state.get("health"),
 			"max_health":state.get("max_health"), "present":outdoors})
-	return BasicSupport.plan_recovery(members, float(SpecialPowers.RADIO_DEFINITION.heal_amount))
+	return BasicSupport.plan_recovery(members, SpecialPowers.radio_amount(PowerState.loadout(world.generated.powers)))
 
 static func plan_first_aid(world: Dictionary) -> Dictionary:
 	if not FirstAidV1.enabled(world.generated):
@@ -283,7 +283,7 @@ static func propose(before: Dictionary, request: Dictionary) -> Dictionary:
 					behavior.observe_frozen_health(row.state.health/float(BossDefinition.POLICY.health),SortieSnapshot._vec(row.state.position))
 				else: behavior.step(0.0,row.state.health/float(BossDefinition.POLICY.health),true,targets,SortieSnapshot._vec(row.state.position))
 				after.encounter.behavior=behavior.snapshot()
-	if not component.accept(request,facts): return {}
+	if not component.accept(request,facts,cooldown(before.generated,"heal")): return {}
 	after.support=component.snapshot()
 	return after
 
@@ -311,3 +311,7 @@ static func transition(previous: Dictionary, next: Dictionary) -> String:
 	if not issue.is_empty(): return "SUPPORT_BEFORE:"+issue
 	var after: Dictionary=propose(before,proof.request)
 	return "" if not after.is_empty() and TransactionReceipt.same(after,next.envelope.world) else "SUPPORT_AFTER_PROOF"
+
+
+static func cooldown(generated: Dictionary, kind: String) -> float:
+	return BuildItems.heal_cooldown(generated.get("build", {})) if kind == "heal" else float(BasicSupport.POLICY.get(kind + "_cooldown", 0.0))

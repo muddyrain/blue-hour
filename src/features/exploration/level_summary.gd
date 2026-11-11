@@ -142,6 +142,8 @@ static func description(value: Dictionary, for_card: bool = false) -> String:
 
 
 static func mission_card_text(value: Dictionary, base: Dictionary = {}, rations: Dictionary = {}) -> String:
+	if EconomyActions.hardware(value):
+		return EconomyActions.card_text(value)
 	var level: Dictionary = value.exploration.level
 	var first: String = level.primary[0]
 	var outbound: int = _mission_route_seconds(level, "bus", first)

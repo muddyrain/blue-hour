@@ -5,7 +5,7 @@ extends Control
 signal action_requested(action: StringName, member_id: int)
 signal facility_requested(choice: String)
 
-const FACILITY_NAMES: Dictionary[String, String] = {"supply": "补给设施", "workshop": "工坊升级"}
+const FACILITY_NAMES: Dictionary[String, String] = {"supply": "补给设施", "workshop": "工坊", "planning": "规划室"}
 
 const CAPTIONS: Dictionary[StringName, String] = {
 	&"bus": "巴士停靠\n选择出击目标 →",
@@ -410,6 +410,16 @@ func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, r
 		_facility_heading.text = "营地建设 · 每个旅程只选一项" if last.get("evacuated", false) or not selected.is_empty() else "营地建设 · 首次确认归航后开放"
 		for choice: String in FACILITY_NAMES:
 			var button: Button = facility_buttons[choice]
+			button.visible = choice != "planning" or EconomyBuildV1.enabled(data)
+			if EconomyBuildV1.enabled(data):
+				var level: int = EconomyBuildV1.level(data, choice)
+				var offer: Dictionary = EconomyBuildV1.offer(data, "build", choice)
+				_facility_heading.text = "营地设施 · 三处独立位置 · 升级与账本见补给页"
+				button.text = "%s · %s\n%s" % [FACILITY_NAMES[choice], "未建" if level == 0 else "%d 级" % level,
+					"%d 币 + %d 工具" % [offer.cost, offer.tools] if level == 0 else "查看设施与升级 →"]
+				button.disabled = false
+				button.tooltip_text = offer.summary if offer.available else offer.reason
+				continue
 			var condition: String = ("成功归航供 %d 粮，受库存上限" % CampFacilities.SUPPLY_FOOD if choice == "supply"
 				else "维修少付 %d 币，最低 1 币" % CampFacilities.REPAIR_DISCOUNT)
 			if choice == CampFacilities.WORKSHOP and workshop_enabled:

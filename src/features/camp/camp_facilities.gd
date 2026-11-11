@@ -17,6 +17,10 @@ static func initial() -> Dictionary:
 	return {"version": VERSION, "facility": "", "built_day": 0}
 
 
+static func initial_tier_two() -> Dictionary:
+	return {"version":TIER_TWO_VERSION, "facility":"", "built_day":0, "upgraded_day":0}
+
+
 static func enable_tier_two(campaign: Dictionary) -> void:
 	assert(campaign.midgame == initial())
 	campaign.midgame = {"version": TIER_TWO_VERSION, "facility": "", "built_day": 0, "upgraded_day": 0}
@@ -45,6 +49,8 @@ static func enabled(camp: Dictionary) -> bool:
 
 
 static func selected(camp: Dictionary) -> String:
+	if EconomyBuildV1.enabled(camp):
+		return WORKSHOP if EconomyBuildV1.level(camp, WORKSHOP) > 0 else SUPPLY if EconomyBuildV1.level(camp, SUPPLY) > 0 else ""
 	return camp.journey.campaign.midgame.facility if enabled(camp) else ""
 
 
@@ -53,10 +59,12 @@ static func tier_two_enabled(camp: Dictionary) -> bool:
 
 
 static func upgraded(camp: Dictionary) -> bool:
+	if EconomyBuildV1.enabled(camp): return EconomyBuildV1.level(camp, WORKSHOP) >= 2
 	return tier_two_enabled(camp) and camp.journey.campaign.midgame.upgraded_day > 0
 
 
 static func can_build(camp: Dictionary, choice: String) -> bool:
+	if EconomyBuildV1.enabled(camp): return false # New purchases require stable M48 edit intents.
 	return (enabled(camp) and choice in [SUPPLY, WORKSHOP] and selected(camp).is_empty()
 		and camp.journey.campaign.outcome == "ACTIVE" and camp.get("cash", 0) >= BUILD_COST
 		and camp.get("last_day", {}).get("evacuated") == true)
@@ -79,6 +87,7 @@ static func upgrade_offer(camp: Dictionary, choice: String) -> Dictionary:
 
 
 static func _upgrade_problem(camp: Dictionary, choice: String) -> String:
+	if EconomyBuildV1.enabled(camp): return "请使用营地设施的独立投资操作"
 	if not tier_two_enabled(camp):
 		return "二级设施仅在新旅程开放"
 	if camp.journey.get("state") != "ACTIVE" or camp.journey.campaign.outcome != "ACTIVE":
@@ -115,6 +124,9 @@ static func upgrade(before: Dictionary, choice: String) -> Dictionary:
 
 
 static func offered_food(camp: Dictionary, day: int, evacuated: bool) -> int:
+	if EconomyBuildV1.enabled(camp):
+		var tier: int = EconomyBuildV1.level_at(camp, SUPPLY, day - 1)
+		return tier + 1 if evacuated and tier > 0 else 0
 	if evacuated and selected(camp) == SUPPLY and day >= int(camp.journey.campaign.midgame.built_day):
 		if upgraded(camp) and day >= int(camp.journey.campaign.midgame.upgraded_day):
 			return UPGRADED_SUPPLY_FOOD
@@ -127,6 +139,13 @@ static func has_food_fields(ledger: Dictionary) -> bool:
 
 
 static func camp_problem(camp: Dictionary) -> String:
+	if EconomyBuildV1.enabled(camp):
+		var issue: String = EconomyBuildV1.problem(camp)
+		if not issue.is_empty(): return issue
+		var current_ledger: Dictionary = camp.get("last_day", {})
+		if current_ledger.is_empty(): return ""
+		var expected_food: int = offered_food(camp, int(current_ledger.get("day", 0)), current_ledger.get("evacuated") == true)
+		return SurvivalContracts.food_problem(current_ledger, expected_food) if expected_food > 0 else "ECONOMY_UNEARNED_FOOD" if has_food_fields(current_ledger) else ""
 	var day: Variant = camp.get("day")
 	var ledger: Variant = camp.get("last_day")
 	if enabled(camp) and (not SurvivalContracts.integer(day, 2, RunSave.MAX_COUNTER)

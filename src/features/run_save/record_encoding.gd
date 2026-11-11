@@ -35,17 +35,24 @@ static func pack(value: Dictionary) -> Dictionary:
 
 
 static func _profiled_pack(value: Dictionary) -> Dictionary:
-	var proof: Dictionary=ValueProofCache.lookup("exact-stringify",value)
+	var proof: Dictionary=ValueProofCache.lookup("exact-stringify-m48-zstd-transport",value)
 	if proof.hit:
 		return proof.result
-	if not SurvivalContracts.json_value(value, -2):
-		return {}
-	var payload: String = JSON.stringify(_encode(value), "", true, true)
-	var digest: String = (VERSION + "\n" + payload).sha256_text()
-	# Preserve the existing sorted envelope while using the same canonical payload for both outputs.
-	var result: Dictionary = {"hash":digest, "text":"{\"payload\":%s,\"record_encoding\":\"%s\",\"sha256\":\"%s\"}\n" % [payload, VERSION, digest]}
+	var result: Dictionary = pack_v1(value)
+	if result.is_empty(): return {}
+	if M48RecordTransport.eligible(value):
+		result = M48RecordTransport.pack(value, result)
+		if result.is_empty(): return {}
 	ValueProofCache.remember(proof,result)
 	return result
+
+
+static func pack_v1(value: Dictionary) -> Dictionary:
+	# Historical canonical bytes and semantic hash are unchanged, including for M48.
+	if not SurvivalContracts.json_value(value, -2): return {}
+	var payload: String = JSON.stringify(_encode(value), "", true, true)
+	var digest: String = (VERSION + "\n" + payload).sha256_text()
+	return {"hash":digest, "text":"{\"payload\":%s,\"record_encoding\":\"%s\",\"sha256\":\"%s\"}\n" % [payload, VERSION, digest]}
 
 
 static func unpack(record: Dictionary) -> Dictionary:
@@ -56,6 +63,12 @@ static func unpack(record: Dictionary) -> Dictionary:
 
 
 static func _profiled_unpack(record: Dictionary) -> Dictionary:
+	if M48RecordTransport.supported(record.get("record_encoding")):
+		return M48RecordTransport.unpack(record)
+	return unpack_v1(record)
+
+
+static func unpack_v1(record: Dictionary) -> Dictionary:
 	if record.size() != 3 or record.get("record_encoding") != VERSION or not record.get("sha256") is String:
 		return {"error":ERR_FILE_CORRUPT, "reason":"RECORD_ENCODING"}
 	var decoded: Dictionary = _decode(record.get("payload"), -2)

@@ -5,6 +5,9 @@ static var _checked: Dictionary = {}
 static var _origins: Dictionary = {}
 
 static func origin(value: Dictionary) -> Dictionary:
+	if value.has("economy_source"):
+		var economy_origin: Dictionary = EconomyActions.origin(value)
+		return origin(economy_origin) if not economy_origin.is_empty() else {}
 	# Reconstruct the original frozen reward/capability source without storing a
 	# duplicate obsolete map in every new receipt. Validate it before projection.
 	var source_type: String = "airdrop" if value.type == EventSortieV1.TYPE else value.type
@@ -23,7 +26,7 @@ static func source_from_task(task: Dictionary, context: Dictionary) -> Dictionar
 	if task.is_empty():
 		return {}
 	var source: Dictionary = CampaignActions._upgrade(WeaponActions._upgrade(task), context.campaign.run_id, int(context.campaign.preparations))
-	source = CombatActions.upgrade(BuildActions.upgrade(source, context.build.owned, context.build.slots, int(context.build.get("version", 1))))
+	source = CombatActions.upgrade(BuildActions.upgrade(source, context.build.owned, context.build.slots, int(context.build.get("version", 1)), context.build.get("enhanced", [])))
 	source = PowerActions.upgrade(source, context.powers.owned, PowerState.loadout(context.powers))
 	return PersonaActions.upgrade(source, context.persona.facts)
 
@@ -130,6 +133,8 @@ static func offers(base: Dictionary) -> Array[Dictionary]:
 	return result
 
 static func problem(value: Variant, camp_source: bool = false) -> String:
+	if value is Dictionary and value.has("economy_source"):
+		return EconomyActions.problem(value, camp_source)
 	if value is Dictionary:
 		if value.has("event_sortie") != (value.get("type") == EventSortieV1.TYPE):
 			return "EVENT_SORTIE_TYPE"
@@ -220,7 +225,9 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 	if not value is Dictionary or not SurvivalContracts.json_value(value) or value.size()!=field_count or value.get("version")!=9 or not value.get("layout") is Dictionary or not value.get("exploration") is Dictionary or not value.get("build") is Dictionary or not value.get("powers") is Dictionary or not value.get("persona") is Dictionary or not value.get("campaign") is Dictionary: return "EXPLORATION_ACTION_FIELDS"
 	if not BuildItems.valid_pool(value.build.get("version")) or content_wave != BuildItems.wave_pool(int(value.build.version)):
 		return "EXPLORATION_BUILD_POOL"
-	if BuildItems.specialty_pool(int(value.build.version)) != (value.powers.get("version") == SpecialPowers.M47_VERSION):
+	var specialty_version: int = SpecialPowers.M48_VERSION if BuildItems.m48_pool(int(value.build.version)) else SpecialPowers.M47_VERSION
+	if BuildItems.specialty_pool(int(value.build.version)) != SurvivalContracts.integer(value.powers.get("version"), specialty_version, specialty_version) \
+			or (not BuildItems.specialty_pool(int(value.build.version)) and SurvivalContracts.integer(value.powers.get("version"), SpecialPowers.M47_VERSION, SpecialPowers.M48_VERSION)):
 		return "EXPLORATION_SPECIALTY_POOL"
 	if not value.get("seed") is String or value.seed.length()!=32 or value.seed.to_lower()!=value.seed or not value.seed.is_valid_hex_number(false) or not SurvivalContracts.integer(value.get("day"),2,RunSave.MAX_COUNTER) or not SurvivalContracts.integer(value.get("slot"),0,2) or (not event_sortie and value.get("type") not in TaskActions.TYPES) or value.layout.get("size") not in NeighborhoodLayout.SIZES or value.layout.get("topology") not in NeighborhoodLayout.TOPOLOGIES or not SurvivalContracts.integer(value.get("recruit"),0,5) or not value.build.get("owned") is Array or not value.build.get("slots") is Array or not value.powers.get("owned") is Array or not PowerState.action_inventory_valid(value.powers.owned, PowerState.loadout(value.powers), int(value.day)) or not value.persona.get("facts") is Dictionary or not value.campaign.get("run_id") is String or value.campaign.run_id.length()!=32 or not value.campaign.run_id.is_valid_hex_number(false) or not SurvivalContracts.integer(value.campaign.get("preparations"),0,3): return "EXPLORATION_ACTION_CONTEXT"
 	var signature: String=RecordEncoding.fingerprint(value) if mission else SurvivalContracts.fingerprint(value)
@@ -311,6 +318,10 @@ static func supply(value: Dictionary) -> MissionSupply:
 	result.cash_reward=int(value.cash)
 	result.food_reward=int(value.food)
 	result.has_weapon_sample = value.weapons == 1
+	if EconomyActions.hardware(value):
+		result.display_name = EconomyActions.HARDWARE_TITLE
+		result.description = EconomyActions.card_text(value)
+		return result
 	if value.type == EventSortieV1.TYPE:
 		result.display_name = EventSortieV1.TITLE
 		result.description = LevelSummary.mission_card_text(value)

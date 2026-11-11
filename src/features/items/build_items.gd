@@ -8,6 +8,15 @@ const WAVE_POOL: int = 3
 const WAVE_CATALOG_POOL: int = 4
 const SPECIALTY_POOL: int = 5
 const SPECIALTY_CATALOG_POOL: int = 6
+const M48_POOL: int = 7
+const M48_CATALOG_POOL: int = 8
+const UPGRADE_COST: int = 10
+const ENHANCED_FACTORS: Dictionary = {
+	"pressure_rounds_v1":1.35, "quick_loader_v1":0.60, "light_boots_v1":1.25,
+	"field_tools_v1":0.60, "wide_blast_v1":1.50, "medical_pack_v1":1.75,
+	"filter_mask_v1":0.35, "impact_liner_v1":0.50, "aid_kit_v1":1.20,
+	"stride_harness_v1":1.20, "guided_mag_v1":0.80,
+}
 const FILTER: String = "filter_mask_v1"
 const FILTER_DEFINITION: Dictionary = {"name":"滤毒面罩", "effect":"毒区周期伤害 ×0.50", "key":"poison", "factor":0.50, "source":"PROJECT_TEMP"}
 const LINER: String = "impact_liner_v1"
@@ -65,11 +74,11 @@ static func ids(pool: int = VERSION) -> Array[String]:
 
 
 static func valid_pool(value: Variant) -> bool:
-	return SurvivalContracts.integer(value, VERSION, SPECIALTY_CATALOG_POOL)
+	return SurvivalContracts.integer(value, VERSION, M48_CATALOG_POOL)
 
 
 static func has_catalog(pool: int) -> bool:
-	return pool in [CATALOG_POOL, WAVE_CATALOG_POOL, SPECIALTY_CATALOG_POOL]
+	return pool in [CATALOG_POOL, WAVE_CATALOG_POOL, SPECIALTY_CATALOG_POOL, M48_CATALOG_POOL]
 
 
 static func wave_pool(pool: int) -> bool:
@@ -77,7 +86,7 @@ static func wave_pool(pool: int) -> bool:
 
 
 static func specialty_pool(pool: int) -> bool:
-	return pool in [SPECIALTY_POOL, SPECIALTY_CATALOG_POOL]
+	return pool in [SPECIALTY_POOL, SPECIALTY_CATALOG_POOL, M48_POOL, M48_CATALOG_POOL]
 
 
 static func _ordinary_pool(pool: int) -> int:
@@ -169,9 +178,16 @@ static func problem(owned: Variant, slots: Variant, pool: int = VERSION) -> Stri
 	return ""
 
 
-static func factors(slots: Array, pool: int = VERSION) -> Dictionary:
-	if not _slots_problem(slots, pool).is_empty():
+static func factors(slots: Array, pool: int = VERSION, enhanced: Array = []) -> Dictionary:
+	if not _slots_problem(slots, pool).is_empty() or not enhancements_valid(enhanced, pool):
 		return {}
+	if m48_pool(pool):
+		var result: Dictionary = BASE_FACTORS.duplicate(true)
+		for id: String in slots:
+			if not id.is_empty():
+				var item: Dictionary = definitions(pool)[id]
+				result[item.key] = float(result.get(item.key, 1.0)) * float(ENHANCED_FACTORS[id] if id in enhanced else item.factor)
+		return result
 	# Start from immutable original factors on every query; never compound a prior view.
 	var result: Dictionary = BASE_FACTORS.duplicate(true)
 	for id: String in slots:
@@ -188,11 +204,13 @@ static func factors(slots: Array, pool: int = VERSION) -> Dictionary:
 
 
 static func frozen_factors(build: Dictionary) -> Dictionary:
-	return factors(build.slots, int(build.get("version", VERSION)))
+	return factors(build.slots, int(build.get("version", VERSION)), build.get("enhanced", []))
 
 
 static func _slots_problem(slots: Variant, pool: int) -> String:
-	if not slots is Array or slots.size() != SLOT_COUNT:
+	if not slots is Array:
+		return "BUILD_ITEMS_SLOT_FIELDS"
+	if (m48_pool(pool) and (slots.size() < SLOT_COUNT or slots.size() > 4)) or (not m48_pool(pool) and slots.size() != SLOT_COUNT):
 		return "BUILD_ITEMS_SLOT_FIELDS"
 	var equipped: Array[String] = []
 	for id: Variant in slots:
@@ -240,3 +258,35 @@ static func _specialty_policy_valid(policy: Variant) -> bool:
 			return false
 		prior = id
 	return true
+
+
+static func m48_pool(pool: int) -> bool:
+	return pool in [M48_POOL, M48_CATALOG_POOL]
+
+
+static func enhancements_valid(enhanced: Variant, pool: int) -> bool:
+	if not enhanced is Array or (not m48_pool(pool) and not enhanced.is_empty()):
+		return false
+	var seen: Array[String] = []
+	for id: Variant in enhanced:
+		if not id is String or id not in ids(pool) or id in seen:
+			return false
+		seen.append(id)
+	return true
+
+
+static func camp_factors(camp: Dictionary) -> Dictionary:
+	return factors(camp.journey.build.slots, BuildState.pool(camp), camp.journey.build.get("progression", {}).get("enhanced", []))
+
+
+static func effect_text(id: String, enhanced: bool = false, pool: int = M48_CATALOG_POOL) -> String:
+	var item: Dictionary = definitions(pool).get(id, {})
+	if item.is_empty():
+		return ""
+	if enhanced and id == AID_KIT:
+		return "基础治疗 Q 恢复上限 ×1.20 · 新施放冷却 24 秒"
+	return "%s ×%.2f" % [{"damage":"枪械直伤", "reload":"枪械换弹时长", "move":"步行速度", "work":"回收工时", "blast":"空袭半径", "heal":"Q 恢复上限", "poison":"毒区周期实伤", "burst":"爆囊冲击实伤"}[item.key], ENHANCED_FACTORS[id] if enhanced else item.factor]
+
+
+static func heal_cooldown(build: Dictionary) -> float:
+	return 24.0 if m48_pool(int(build.get("version", VERSION))) and AID_KIT in build.get("slots", []) and AID_KIT in build.get("enhanced", []) else 30.0

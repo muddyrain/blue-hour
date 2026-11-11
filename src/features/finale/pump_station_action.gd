@@ -73,7 +73,7 @@ static func problem(value: Dictionary) -> String:
 			or not persona is Dictionary or not persona.get("facts") is Dictionary:
 		return "PUMP_ACTION_CONTEXT"
 	if not BuildItems.valid_pool(build.get("version")) \
-			or BuildItems.specialty_pool(int(build.version)) != (powers.version == SpecialPowers.M47_VERSION):
+			or BuildItems.specialty_pool(int(build.version)) != SurvivalContracts.integer(powers.version, SpecialPowers.M47_VERSION, SpecialPowers.M48_VERSION):
 		return "PUMP_ACTION_POOL"
 	var expected: Dictionary = freeze(value)
 	if expected.is_empty() or identity != RecordEncoding.fingerprint(expected):

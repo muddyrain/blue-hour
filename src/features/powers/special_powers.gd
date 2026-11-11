@@ -12,26 +12,38 @@ const REQUEST_KEYS: Array[String] = ["id", "ability_id"]
 const ACCEPTED_KEYS: Array[String] = ["id", "ability_id", "at", "until"]
 const PROGRESSION_VERSION: int = 2
 const WAVE_VERSION: int = 3
+const M47_VERSION: int = 4
 const UPGRADED_FREEZE_SECONDS: float = 7.0
 const FREEZE: String = "map_freeze_v1"
 const SPEED: String = "speed_boost_v1"
 const SUPPRESSION: String = "suppression_pulse_v1"
 const SUPPRESSION_DEFINITION: Dictionary = {"name":"抑制脉冲", "duration":12.0, "move_factor":1.0, "direct_damage_factor":0.5}
+const RADIO: String = "aid_broadcast_v1"
+const RADIO_DEFINITION: Dictionary = {"name":"急救广播", "duration":0.0, "heal_amount":24.0}
+const RADIO_HELP: String = "立即为户外受伤且生命比例最低的在场队员恢复最多 24 HP。没有合格目标时保留次数。"
 
 
 static func progression_version(version: Variant) -> bool:
-	return SurvivalContracts.integer(version, PROGRESSION_VERSION, WAVE_VERSION)
+	return SurvivalContracts.integer(version, PROGRESSION_VERSION, M47_VERSION)
+
+
+static func wave_version(version: Variant) -> bool:
+	return SurvivalContracts.integer(version, WAVE_VERSION, M47_VERSION)
 
 
 static func policy(version: int) -> Dictionary:
-	if version == WAVE_VERSION:
+	if wave_version(version):
 		var catalog: Dictionary = POLICY.duplicate()
 		catalog[SUPPRESSION] = SUPPRESSION_DEFINITION
+		if version == M47_VERSION:
+			catalog[RADIO] = RADIO_DEFINITION
 		return catalog
 	return POLICY
 
 
 static func definition(id: String) -> Dictionary:
+	if id == RADIO:
+		return RADIO_DEFINITION
 	return SUPPRESSION_DEFINITION if id == SUPPRESSION else POLICY.get(id, {})
 
 
@@ -75,7 +87,8 @@ static func request(state: Dictionary, slot: int = 0) -> Dictionary:
 				or not loadout_valid(state.get("loadout")) or not state.get("accepted") is Array:
 			return {}
 		var id: String = equipped_at(state, slot)
-		if id.is_empty() or not event_at(state, slot).is_empty():
+		# Radio consumes its use only alongside the confirmed health change.
+		if id.is_empty() or id == RADIO or not event_at(state, slot).is_empty():
 			return {}
 		return {"id":_request_id(state.binding, id), "ability_id":id, "slot":slot}
 	if slot != 0:
@@ -201,7 +214,7 @@ static func _progression_problem(value: Variant, binding: Dictionary, loadout: D
 			return "POWER_ACTIVATION_ID"
 		var slot: int = int(event.slot)
 		var id: String = loadout.slots[slot]
-		if slot in used or id.is_empty() or event.ability_id != id or event.id != _request_id(binding, id):
+		if slot in used or id.is_empty() or id == RADIO or event.ability_id != id or event.id != _request_id(binding, id):
 			return "POWER_ACTIVATION_ID"
 		if not SurvivalContracts.number(event.at) or not SurvivalContracts.number(event.until) \
 				or event.at < previous_at or event.at > elapsed or event.until <= event.at \

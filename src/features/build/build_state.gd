@@ -12,6 +12,8 @@ static func pool(camp: Dictionary) -> int:
 	var build: Dictionary = camp.get("journey", {}).get("build", {})
 	var catalog: Dictionary = build.get("catalog", {})
 	var catalog_unlocked: bool = not catalog.get("unlock", "").is_empty()
+	if OpeningBuild.is_m47(camp):
+		return BuildItems.SPECIALTY_CATALOG_POOL if catalog_unlocked else BuildItems.SPECIALTY_POOL
 	if build.get("powers", {}).get("version") == SpecialPowers.WAVE_VERSION:
 		return BuildItems.WAVE_CATALOG_POOL if catalog_unlocked else BuildItems.WAVE_POOL
 	return BuildItems.CATALOG_POOL if catalog_unlocked else BuildItems.VERSION
@@ -36,45 +38,48 @@ static func problem(camp: Dictionary) -> String:
 	projected.journey.build = build.duplicate(false)
 	projected.journey.build.erase("opening")
 	projected.journey.build.erase("catalog")
-	return _problem(projected, build.opening.item_id, pool(camp))
+	return _problem(projected, build.opening.item_id, pool(camp), BuildActions.specialization_policy(camp))
 
 
-static func _problem(camp: Dictionary, opening_item: String, item_pool: int) -> String:
+static func _problem(camp: Dictionary, opening_item: String, item_pool: int, specialty: Dictionary = {}) -> String:
 	if ExplorationState.enabled(camp):
 		if camp.journey.build.size()!=(10 if WorldgenState.enabled(camp) else 9): return "EXPLORATION_BUILD_FIELDS"
 		var issue: String=WorldgenState.problem(camp) if WorldgenState.enabled(camp) else ""
 		if not issue.is_empty(): return issue
 		issue=ExplorationState.problem(camp)
 		if not issue.is_empty(): return issue
-		issue=PowerState.problem(camp)
+		issue=PowerState.problem(camp, specialty)
 		if not issue.is_empty(): return issue
 		var old: Dictionary=camp.duplicate(true)
 		old.journey.build.version=4
 		old.journey.build.erase("exploration")
 		old.journey.build.erase("worldgen")
-		for source: Dictionary in old.journey.build.powers.sources: source.generated=ExplorationActions.origin(source.generated)
-		return _problem(old, opening_item, item_pool)
+		if specialty.is_empty():
+			for source: Dictionary in old.journey.build.powers.sources: source.generated=ExplorationActions.origin(source.generated)
+		return _problem(old, opening_item, item_pool, specialty)
 	if PersonaState.enabled(camp):
 		if camp.journey.build.size()!=8: return "PERSONA_BUILD_FIELDS"
 		var issue: String=SurvivorPersona.problem(camp.journey.build.get("persona"),String(camp.journey.get("seed","")))
 		if not issue.is_empty(): return issue
-		issue=PowerState.problem(camp)
-		if not issue.is_empty(): return issue
+		if specialty.is_empty():
+			issue=PowerState.problem(camp)
+			if not issue.is_empty(): return issue
 		var old: Dictionary=camp.duplicate(true)
 		old.journey.build.version=3
 		old.journey.build.erase("persona")
 		# Only already-authenticated full sources are projected for the unchanged
 		# old validator. Legacy camps still reject every persona-bearing source.
-		for source: Dictionary in old.journey.build.powers.sources:
-			source.generated=PersonaActions.legacy(source.generated)
-		return _problem(old, opening_item, item_pool)
+		if specialty.is_empty():
+			for source: Dictionary in old.journey.build.powers.sources:
+				source.generated=PersonaActions.legacy(source.generated)
+		return _problem(old, opening_item, item_pool, specialty)
 	if PowerState.enabled(camp):
 		if camp.journey.build.size()!=7 or camp.journey.build.get("combat_version")!=1: return "POWER_BUILD_FIELDS"
 		var old: Dictionary=camp.duplicate(true)
 		old.journey.build.version=2
 		old.journey.build.erase("powers")
-		var issue: String=_problem(old, opening_item, item_pool)
-		return PowerState.problem(camp) if issue.is_empty() else issue
+		var issue: String=_problem(old, opening_item, item_pool, specialty)
+		return PowerState.problem(camp) if specialty.is_empty() and issue.is_empty() else issue
 	var v: Variant=camp.journey.build
 	if not CampaignState.is_short(camp) or not v is Dictionary or v.size()!=(6 if v.get("version")==2 else 5) or not v.has_all(["version","owned","slots","sources","healing"]) or ((v.version!=1 and v.version!=2) or (v.version==2 and v.get("combat_version")!=1)) or not v.sources is Array: return "BUILD_FIELDS"
 	var issue: String=BuildItems.problem(v.owned,v.slots,item_pool)
@@ -92,7 +97,10 @@ static func _problem(camp: Dictionary, opening_item: String, item_pool: int) -> 
 	var context: Dictionary={}
 	var group_owned: Array=[]
 	for source: Variant in v.sources:
-		if not source is Dictionary or source.size()!=4 or not source.has_all(["item_id","transaction_id","context","owned"]) or source.item_id not in v.owned or source.item_id in seen or not source.context is Dictionary or not source.owned is Array: return "BUILD_ACQUISITION_FIELDS"
+		if not source is Dictionary or not source.has_all(["item_id","transaction_id","context","owned"]) or source.item_id not in v.owned or source.item_id in seen or not source.context is Dictionary or not source.owned is Array: return "BUILD_ACQUISITION_FIELDS"
+		var specialty_item: bool = source.item_id in [BuildItems.STRIDE_HARNESS, BuildItems.GUIDED_MAG]
+		if source.size() != 4 + int(specialty_item) or (specialty_item and not source.get("generated") is Dictionary):
+			return "BUILD_ACQUISITION_FIELDS"
 		if not opening_item.is_empty() and v.owned[seen.size()] != source.item_id: return "BUILD_ACQUISITION_ORDER"
 		if not source.transaction_id is String: return "BUILD_ACQUISITION_ID"
 		var parts: PackedStringArray=source.transaction_id.split(":")
@@ -109,9 +117,21 @@ static func _problem(camp: Dictionary, opening_item: String, item_pool: int) -> 
 			group_owned=prior.duplicate()
 		if not TransactionReceipt.same(context,source.context) or not TransactionReceipt.same({"v":group_owned},{"v":source.owned}): return "BUILD_ACQUISITION_DEPARTURE_OWNED"
 		if source.item_id not in BuildItems.drop(source.context,source.owned,item_pool): return "BUILD_ACQUISITION_SOURCE"
+		if specialty_item and not _specialty_source_valid(source, specialty):
+			return "BUILD_ACQUISITION_SPECIALTY_SOURCE"
 		seen.append(source.item_id)
 		prior.append(source.item_id)
 	return ""
+
+
+static func _specialty_source_valid(source: Dictionary, specialty: Dictionary) -> bool:
+	var generated: Dictionary = source.generated
+	if specialty.is_empty() or not ExplorationActions.problem(generated, true).is_empty():
+		return false
+	return BuildActions.specialization_candidate(generated) == source.item_id \
+		and TransactionReceipt.same(BuildActions.signed_specialization_policy(generated), specialty) \
+		and TransactionReceipt.same(generated.build.drop_context, source.context) \
+		and generated.build.owned == source.owned
 
 static func equip(before: Dictionary, slot: int, item: String) -> Dictionary:
 	if not enabled(before) or slot not in [0,1]: return {}
@@ -130,6 +150,9 @@ static func settled(before: Dictionary, report: Dictionary, generated: Dictionar
 			result.healing[id]=float(result.healing.get(id,0.0))+float(event.facts.amount)
 	for item: String in acquired(generated,report.site_facts,report.evacuated):
 		result.owned.append(item)
-		result.sources.append({"item_id":item,"transaction_id":report.sortie_id,"context":generated.build.drop_context.duplicate(true),"owned":generated.build.owned.duplicate()})
+		var source: Dictionary = {"item_id":item,"transaction_id":report.sortie_id,"context":generated.build.drop_context.duplicate(true),"owned":generated.build.owned.duplicate()}
+		if item in [BuildItems.STRIDE_HARNESS, BuildItems.GUIDED_MAG]:
+			source.generated = generated.duplicate(true)
+		result.sources.append(source)
 	if PowerState.enabled(before): result.powers=PowerState.settled(before,report,generated)
 	return result

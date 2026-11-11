@@ -458,7 +458,8 @@ static func apply(world: Expedition, value: Dictionary) -> String:
 		world.enemies.append(actor)
 	if (value.version==CAMPAIGN_VERSION or (value.version==BUILD_VERSION or combat_version(value.version))): world.encounter.restore(value.encounter)
 	if (value.version==BUILD_VERSION or combat_version(value.version)):
-		world.basic_support.restore(value.support, FirstAidV1.enabled(value.generated))
+		world.basic_support.restore(value.support, FirstAidV1.enabled(value.generated),
+			BuildAuthority.radio_equipped(value.generated))
 	if combat_version(value.version):
 		world.combat.restore(value.combat)
 		world.combat.refresh_toxic(world)

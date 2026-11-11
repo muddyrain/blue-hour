@@ -134,7 +134,7 @@ static func problem(value: Variant, camp_source: bool = false) -> String:
 		if value.has("event_sortie") != (value.get("type") == EventSortieV1.TYPE):
 			return "EVENT_SORTIE_TYPE"
 		var powers: Variant = value.get("powers")
-		var wave_power: bool = powers is Dictionary and powers.get("version") == SpecialPowers.WAVE_VERSION
+		var wave_power: bool = powers is Dictionary and SpecialPowers.wave_version(powers.get("version"))
 		if (value.has("content_wave_policy") and not ContentWaveV1.marked(value)) \
 				or value.has("content_wave_policy") != wave_power:
 			return "CONTENT_WAVE_ACTION_POLICY"
@@ -220,6 +220,8 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 	if not value is Dictionary or not SurvivalContracts.json_value(value) or value.size()!=field_count or value.get("version")!=9 or not value.get("layout") is Dictionary or not value.get("exploration") is Dictionary or not value.get("build") is Dictionary or not value.get("powers") is Dictionary or not value.get("persona") is Dictionary or not value.get("campaign") is Dictionary: return "EXPLORATION_ACTION_FIELDS"
 	if not BuildItems.valid_pool(value.build.get("version")) or content_wave != BuildItems.wave_pool(int(value.build.version)):
 		return "EXPLORATION_BUILD_POOL"
+	if BuildItems.specialty_pool(int(value.build.version)) != (value.powers.get("version") == SpecialPowers.M47_VERSION):
+		return "EXPLORATION_SPECIALTY_POOL"
 	if not value.get("seed") is String or value.seed.length()!=32 or value.seed.to_lower()!=value.seed or not value.seed.is_valid_hex_number(false) or not SurvivalContracts.integer(value.get("day"),2,RunSave.MAX_COUNTER) or not SurvivalContracts.integer(value.get("slot"),0,2) or (not event_sortie and value.get("type") not in TaskActions.TYPES) or value.layout.get("size") not in NeighborhoodLayout.SIZES or value.layout.get("topology") not in NeighborhoodLayout.TOPOLOGIES or not SurvivalContracts.integer(value.get("recruit"),0,5) or not value.build.get("owned") is Array or not value.build.get("slots") is Array or not value.powers.get("owned") is Array or not PowerState.action_inventory_valid(value.powers.owned, PowerState.loadout(value.powers), int(value.day)) or not value.persona.get("facts") is Dictionary or not value.campaign.get("run_id") is String or value.campaign.run_id.length()!=32 or not value.campaign.run_id.is_valid_hex_number(false) or not SurvivalContracts.integer(value.campaign.get("preparations"),0,3): return "EXPLORATION_ACTION_CONTEXT"
 	var signature: String=RecordEncoding.fingerprint(value) if mission else SurvivalContracts.fingerprint(value)
 	var proof_key: String = "camp-source:" + signature if mission and camp_source else signature
@@ -264,6 +266,7 @@ static func _problem(value: Variant, camp_source: bool) -> String:
 		expected = BillboardActionV1.freeze(expected)
 		if not expected.has("billboard"):
 			return "BILLBOARD_ACTION_CONTEXT"
+	expected = BuildActions.with_specialization_drop(expected, BuildActions.signed_specialization_policy(value))
 	var matches: bool = signature == RecordEncoding.fingerprint(expected) if mission else TransactionReceipt.same(value,expected)
 	if not matches and mission and camp_source:
 		# RunSave keeps its historical JSON camp projection. A stored ability source

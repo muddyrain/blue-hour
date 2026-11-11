@@ -183,6 +183,7 @@ func run() -> void:
 	expect(support.plan_airstrike(callers, [], Vector2.ZERO, NAN, legal, clear).is_empty(), "nonfinite strike factor rejects")
 	expect(same(support.snapshot(), checkpoint), "all target planning leaves cooldown ledger immutable")
 	_first_aid()
+	_aid_broadcast()
 	print(JSON.stringify({"suite":"basic_support", "checks":checks, "failures":failures, "policy_source":"PROJECT_TEMP", "scope":"PURE_COMPONENT_ONLY"}))
 	quit(0 if failures == 0 else 1)
 
@@ -263,3 +264,68 @@ func _first_aid() -> void:
 	checkpoint.accepted.append(duplicate)
 	checkpoint.sequence += 1
 	expect(BasicSupport.problem(checkpoint, BINDING, true) == "FIRST_AID_ALREADY_USED", "ledger rejects a second first aid even with fresh identity")
+
+
+func _aid_broadcast() -> void:
+	var radio: String = SpecialPowers.RADIO
+	var equipment: Dictionary = {"version":SpecialPowers.M47_VERSION, "slots":[radio],
+		"investments":{"second_slot":0, "freeze":0}}
+	var outside: Dictionary = _aid_actor(2, 100.0, 50.0, 100.0)
+	var working_outside: Dictionary = _aid_actor(1, 100.0, 100.0)
+	working_outside.activity = FieldActor.Activity.RECOVERING
+	var indoors: Dictionary = _aid_actor(3, 100.0, 5.0)
+	indoors.activity = FieldActor.Activity.SEARCHING
+	var absent: Dictionary = _aid_actor(4, 100.0, 5.0)
+	absent.visible = false
+	var dead: Dictionary = _aid_actor(5, 100.0, 0.0)
+	dead.activity = FieldActor.Activity.DOWN
+	var world: Dictionary = {"version":SortieSnapshot.EXPLORATION_VERSION, "generated":{"powers":equipment},
+		"sim":{"elapsed":2.0}, "survivors":[{"state":outside}, {"state":indoors},
+			{"state":absent}, {"state":working_outside}, {"state":dead}]}
+	var support: BasicSupport = BasicSupport.new()
+	support.configure(BINDING, false, true)
+	world.support = support.snapshot()
+	var plan: Dictionary = BuildAuthority.plan_radio(world)
+	expect(same(plan, {"member_id":1, "amount":24.0}), "broadcast excludes indoor, absent and dead members and breaks ratio ties by ID")
+	expect(SpecialPowers.request(SpecialPowers.initial(BINDING, equipment)).is_empty(),
+		"broadcast cannot be accepted as a separate timed use")
+	equipment.version = SpecialPowers.WAVE_VERSION
+	expect(BuildAuthority.plan_radio(world).is_empty(), "broadcast cannot be equipped under the old power rules")
+	equipment.version = SpecialPowers.M47_VERSION
+	outside.health = 100.0
+	working_outside.health = 190.0
+	expect(same(BuildAuthority.plan_radio(world), {"member_id":1, "amount":10.0}), "broadcast caps healing at missing HP")
+	working_outside.health = 200.0
+	expect(BuildAuthority.plan_radio(world).is_empty() and support.ready(radio), "no eligible target leaves the use available")
+	working_outside.health = 100.0
+	working_outside.damage_received = 100.0
+	var wrong_target: Dictionary = support.request(radio, {"member_id":3, "amount":24.0})
+	expect(BuildAuthority.propose(world, wrong_target).is_empty(), "support authority rejects a forged target")
+	var request: Dictionary = support.request(radio, plan)
+	var after: Dictionary = BuildAuthority.propose(world, request)
+	expect(not after.is_empty() and after.survivors[3].state.health == 124.0
+		and working_outside.health == 100.0, "proposal heals only its canonical target in the candidate world")
+	if after.is_empty():
+		return
+	var serialized: String = RecordEncoding.stringify({"before":world, "request":request})
+	var decoded: Dictionary = RecordEncoding.unpack(JSON.parse_string(serialized)).payload
+	expect(same(BuildAuthority.propose(decoded.before, decoded.request), after),
+		"broadcast replays the same target and health after exact receipt decoding")
+	var accepted: Array = after.support.accepted
+	expect(BuildAuthority.healed(accepted, 1) == 24.0 and BuildAuthority.healed(accepted, 2) == 0.0,
+		"health authority includes the broadcast amount once")
+	expect(BuildAuthority.support_problem(after.support, BINDING, world.generated).is_empty(),
+		"support receipt validates the exact healing fact")
+	var encoded: String = RecordEncoding.stringify(after.support)
+	var resumed: BasicSupport = BasicSupport.new()
+	resumed.restore(RecordEncoding.unpack(JSON.parse_string(encoded)).payload, false, true)
+	expect(not resumed.ready(radio) and resumed.ready("heal") and resumed.ready("airstrike"),
+		"exact restored support keeps the one use consumed and Q/E independent")
+	expect(resumed.accept(request, accepted[0].facts) and same(resumed.snapshot(), after.support),
+		"same acknowledgement cannot consume another use or modify its facts")
+	var duplicate: Dictionary = accepted[0].duplicate(true)
+	duplicate.id = BINDING.transaction_id + ":basic:1"
+	accepted.append(duplicate)
+	after.support.sequence += 1
+	expect(BasicSupport.problem(after.support, BINDING, false, true) == "AID_BROADCAST_ALREADY_USED",
+		"journal denies a duplicate broadcast with a new identity")

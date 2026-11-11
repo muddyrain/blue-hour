@@ -192,7 +192,9 @@ func _ready() -> void:
 	growth_inputs.configure(participants_snapshot)
 	if growth_mode:
 		xp_inputs.configure(growth_binding)
-	if build_mode(): basic_support.configure(growth_binding, FirstAidV1.enabled(supply.generated))
+	if build_mode():
+		basic_support.configure(growth_binding, FirstAidV1.enabled(supply.generated),
+			BuildAuthority.radio_equipped(supply.generated))
 	if power_mode(): powers=SpecialPowers.initial(growth_binding,PowerState.loadout(supply.generated.powers))
 	if combat_mode(): combat.setup(self)
 	if trait_mode:
@@ -1610,6 +1612,8 @@ func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
 	if build_mode() and site.id==&"cash" and not supply.generated.build.drops.is_empty():
 		var names: PackedStringArray=[]
 		for item: String in supply.generated.build.drops: names.append(supply.generated.build.policy.items[item].name)
+		if supply.generated.get("powers", {}).get("sample") == SpecialPowers.RADIO:
+			names.append(SpecialPowers.RADIO_DEFINITION.name)
 		_show_notice("携带道具："+"、".join(names)+" · 归航确认后入库")
 	var investigation: Dictionary = supply.generated.get("investigation", {})
 	if supply.generated.get("mission_policy") == 1 and investigation.get("site_id") == String(site.id):
@@ -1779,6 +1783,21 @@ func _make_ui() -> void:
 			_hud.view.add_child(second_power_panel)
 		power_view=PowerEffectView.new()
 		_effects.add_child(power_view)
+	if player_mode and BuildItems.specialty_pool(int(supply.generated.get("build", {}).get("version", 0))):
+		var names: PackedStringArray = []
+		for id: String in supply.generated.build.slots:
+			if id in [BuildItems.AID_KIT, BuildItems.STRIDE_HARNESS, BuildItems.GUIDED_MAG]:
+				var item: Dictionary = SpecialtyPresentation.definition(id)
+				names.append("%s\n%s" % [item.name, item.effect])
+		if not names.is_empty():
+			var kit: PanelContainer = PanelContainer.new()
+			kit.position = Vector2(16, 460)
+			kit.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			kit.add_theme_stylebox_override("panel", CampStyle.box(Color(0.045, 0.10, 0.14, 0.90), Color("48646d"), 8))
+			var label: Label = CampStyle.label("\n".join(names), 13, CampStyle.TEAL)
+			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			kit.add_child(label)
+			_hud.view.add_child(kit)
 	_update_ui()
 
 
@@ -2414,7 +2433,7 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 		and after.get("combat", {}).get("burst", {}).get("phase") == "cancelled"
 	print("BH_SUPPORT "+JSON.stringify({"kind":request.kind,"status":"ACCEPTED","sequence_before":before.support.sequence,"sequence":after.support.sequence,"cooldowns":after.support.cooldowns,"kills_before":before.sim.kills,"kills":after.sim.kills,"facts":after.support.accepted.back().facts,"elapsed":after.sim.elapsed}))
 	# All fallible validation and I/O preceded this visible state replacement.
-	var preserve_aim: bool = request.kind == FirstAidV1.KIND and support_aiming
+	var preserve_aim: bool = request.kind in [FirstAidV1.KIND, SpecialPowers.RADIO] and support_aiming
 	var was_open: bool = barricade_open
 	var application: int = FreezeProfile.enter("support.apply")
 	for enemy: FieldActor in enemies: enemy.free()
@@ -2437,16 +2456,22 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 			combat.screamer.report_cancelled(self, notice)
 		else:
 			_show_notice(notice)
-	elif request.kind == FirstAidV1.KIND:
-		FreezeProfile.mark("aid_hp_applied")
+	elif request.kind in [FirstAidV1.KIND, SpecialPowers.RADIO]:
+		var first_aid: bool = request.kind == FirstAidV1.KIND
+		if first_aid:
+			FreezeProfile.mark("aid_hp_applied")
 		support_aiming = preserve_aim
 		var facts: Dictionary = after.support.accepted.back().facts
 		var patient: FieldActor = search_member(int(facts.member_id))
 		var amount: String = str(snappedf(float(facts.amount), 0.01))
-		_show_notice("%s · %s +%s HP" % [FirstAidV1.TITLE, patient.call_sign, amount])
+		var title: String = FirstAidV1.TITLE if first_aid else SpecialPowers.RADIO_DEFINITION.name
+		_show_notice("%s · %s +%s HP" % [title, patient.call_sign, amount])
 		_combat_popup(patient.position + Vector2(12, -136), "+%s HP" % amount, Color("a5dfce"))
-		combat_feedback.emit({"kind":FirstAidV1.KIND, "source_id":facts.source_id,
-			"member_id":facts.member_id, "amount":facts.amount, "health":facts.health_after})
+		var feedback: Dictionary = {"kind":request.kind, "member_id":facts.member_id,
+			"amount":facts.amount, "health":facts.health_after}
+		if first_aid:
+			feedback.source_id = facts.source_id
+		combat_feedback.emit(feedback)
 	else:
 		_show_notice("治疗已确认")
 	_update_ui()
@@ -2534,9 +2559,22 @@ func refresh_power_factors() -> void:
 
 func request_power(slot: int = 0) -> bool:
 	if not power_mode() or not support_available() or not pending_power.is_empty() or not survivors.any(func(actor:FieldActor)->bool:return actor.health>0): return false
+	if SpecialPowers.equipped_at(powers, slot) == SpecialPowers.RADIO:
+		return _request_aid_broadcast()
 	var request: Dictionary=SpecialPowers.request(powers,slot)
 	if request.is_empty(): return false
 	return _accept_power(support_world(),request)
+
+func _request_aid_broadcast() -> bool:
+	if not support_commit.is_valid() or not basic_support.ready(SpecialPowers.RADIO):
+		return false
+	var before: Dictionary = support_world()
+	var plan: Dictionary = BuildAuthority.plan_radio(before)
+	if plan.is_empty():
+		_show_notice("急救广播 · 户外没有可治疗的在场队员，次数保留")
+		_update_ui()
+		return false
+	return _accept_support(before, basic_support.request(SpecialPowers.RADIO, plan))
 
 func _accept_power(before: Dictionary, request: Dictionary) -> bool:
 	if not power_commit.is_valid(): return false
@@ -2572,7 +2610,7 @@ func _present_power() -> void:
 func _present_power_slot(panel: PowerSlotPanel, slot: int) -> void:
 	var id: String = SpecialPowers.equipped_at(powers, slot)
 	var remaining: float = SpecialPowers.remaining(powers, elapsed, slot)
-	var used: bool = not SpecialPowers.event_at(powers, slot).is_empty()
+	var used: bool = not basic_support.ready(id) if id == SpecialPowers.RADIO else not SpecialPowers.event_at(powers, slot).is_empty()
 	var status: String = "营地装配" if id.is_empty() else "持续 %.1f 秒" % remaining if remaining > 0.0 else "已用" if used else "就绪"
 	var upgraded: bool = powers.get("loadout", {}).get("investments", {}).get("freeze", 0) > 0
 	panel.present("特殊能力空槽" if id.is_empty() else SpecialPowers.definition(id).name,

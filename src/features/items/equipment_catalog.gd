@@ -34,8 +34,8 @@ func _ready() -> void:
 	column.add_theme_constant_override("separation", 14)
 	panel.add_child(column)
 	column.add_child(CampStyle.label("蓝时归航   /   驿站档案", 15, CampStyle.TEAL))
-	column.add_child(CampStyle.label("装备图鉴", 32))
-	column.add_child(CampStyle.label("图鉴记录跨旅程发现。当前库存与实际配装可在营地整备查看。", 17, CampStyle.MUTED))
+	column.add_child(CampStyle.label("专精进度与装备图鉴", 32))
+	column.add_child(CampStyle.label("专精扩大后续装备池。图鉴记录已确认的发现，当前库存与配装在营地整备查看。", 17, CampStyle.MUTED))
 	var spread: HBoxContainer = HBoxContainer.new()
 	spread.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	spread.add_theme_constant_override("separation", 18)
@@ -87,19 +87,24 @@ func _ready() -> void:
 func present(state: Dictionary) -> void:
 	_state = state.duplicate(true)
 	items.clear()
+	for plan: String in SpecialtyPresentation.PLANS:
+		var xp: String = str(state.get("specialties", {}).get(plan, 0)) if state.get("error", FAILED) == OK else "—"
+		items.add_item("%s · %s 经验" % [OpeningBuild.PLANS[plan].title, xp])
 	for id: String in _ids:
 		items.add_item(_definitions[id].name, MASK_ICON if id == BuildItems.FILTER else null)
-	var last: int = _ids.size() - 1
-	items.select(last)
-	_select(last)
+	items.select(0)
+	_select(0)
 	items.grab_focus()
 
 
 func _select(index: int) -> void:
-	var id: String = _ids[index]
-	var mask: bool = id == BuildItems.FILTER
 	var available: bool = _state.get("error", FAILED) == OK
 	retry_button.visible = not available
+	if index < SpecialtyPresentation.PLANS.size():
+		_select_specialty(SpecialtyPresentation.PLANS[index], available)
+		return
+	var id: String = _ids[index - SpecialtyPresentation.PLANS.size()]
+	var mask: bool = id == BuildItems.FILTER
 	_icon.visible = mask
 	_name.text = _definitions[id].name
 	_effect.text = _definitions[id].effect
@@ -119,3 +124,24 @@ func _select(index: int) -> void:
 	else:
 		status.text = "已发现 · 已收藏"
 		_source.text = "来源 · 普通装备回收。已生还归航并确认入库。\n配装后仅减少毒区周期伤害。"
+
+
+func _select_specialty(plan_id: String, available: bool) -> void:
+	var plan: Dictionary = OpeningBuild.PLANS[plan_id]
+	var id: String = plan.unlock_id
+	var reward: String = SpecialtyPresentation.reward_name(id)
+	_icon.hide()
+	_name.text = "%s · %s" % [plan.title, reward]
+	_effect.text = SpecialPowers.RADIO_HELP if id == SpecialPowers.RADIO else SpecialtyPresentation.definition(id).get("effect", "")
+	_effect.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if not available:
+		status.text = "专精资料待同步"
+		_source.text = "可重试读取与同步。已有旅程继续使用开局时保存的装备池。"
+		return
+	var xp: int = int(_state.get("specialties", {}).get(plan_id, 0))
+	var access: String = "全专精共享" if xp >= 4 else "本专精已开放" if xp >= 2 else "未解锁"
+	var discovery: String = "已发现" if _state.get("specialty_discoveries", {}).has(id) else "未发现"
+	status.text = "%d 经验 · %s · %s" % [xp, access, discovery]
+	var next: String = "达到 2 经验，后续同专精旅程可回收。" if xp < 2 else \
+		("达到 4 经验，后续所有专精旅程均可回收。" if xp < 4 else "后续所有专精旅程均可回收。")
+	_source.text = "%s\n\n至少完成两次已确认归航后，泵站胜利 +2，全灭 +1。普通装备回收后需生还归航并确认入库。" % next

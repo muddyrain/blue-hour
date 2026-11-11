@@ -2,14 +2,15 @@ class_name PowerActions
 extends RefCounted
 ## Explicit capability extension; the full reviewed V8 projection stays unchanged.
 static func drop(generated: Dictionary, owned: Array, version: int = 1) -> String:
-	var field_gear: bool = version == SpecialPowers.WAVE_VERSION and generated.type == "airdrop" \
+	var wave: bool = SpecialPowers.wave_version(version)
+	var field_gear: bool = wave and generated.type == "airdrop" \
 		and generated.day >= 3 and generated.layout.topology == "industrial"
 	if (generated.type!="equipment" and not field_gear) or generated.campaign.is_finale: return ""
 	var missing: Array[String]=[]
-	for id: String in SpecialPowers.policy(version):
+	for id: String in SpecialPowers.policy(SpecialPowers.WAVE_VERSION if wave else version):
 		if id not in owned: missing.append(id)
 	missing.sort()
-	var domain: String = "BH_POWER_DROP_V3" if version == SpecialPowers.WAVE_VERSION else "BH_POWER_DROP_V1"
+	var domain: String = "BH_POWER_DROP_V3" if wave else "BH_POWER_DROP_V1"
 	return missing[("%s:%s:%s:cash"%[domain,generated.seed,generated.id]).sha256_text().substr(0,8).hex_to_int()%missing.size()] if not missing.is_empty() else ""
 
 static func name_for(id: String) -> String:

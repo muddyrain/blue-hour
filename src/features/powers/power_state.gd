@@ -46,13 +46,16 @@ static func inventory_valid(owned: Variant, slot: Variant, version: int = 1) -> 
 		seen.append(id)
 	return true
 
-static func problem(camp: Dictionary) -> String:
+static func problem(camp: Dictionary, specialty: Dictionary = {}) -> String:
 	if not camp.get("journey") is Dictionary or not camp.journey.get("build") is Dictionary or not camp.get("profile_id") is String or not camp.journey.get("seed") is String or not camp.journey.get("root_id") is String or not SurvivalContracts.integer(camp.get("settled_sorties"),0,RunSave.MAX_COUNTER) or not SurvivalContracts.integer(camp.get("day"),2,RunSave.MAX_COUNTER): return "POWER_CAMP_CONTEXT"
 	var value: Variant=camp.journey.build.get("powers")
-	if ContentWaveV1.enabled(camp) != (value is Dictionary and value.get("version") == SpecialPowers.WAVE_VERSION):
+	if specialty.is_empty():
+		specialty = BuildActions.specialization_policy(camp)
+	if ContentWaveV1.enabled(camp) != (value is Dictionary and SpecialPowers.wave_version(value.get("version"))) \
+			or (not specialty.is_empty()) != (value is Dictionary and value.get("version") == SpecialPowers.M47_VERSION):
 		return "POWER_CATALOG_MODE"
 	if value is Dictionary and progression(value):
-		return _progression_problem(camp, value)
+		return _progression_problem(camp, value, specialty)
 	if not value is Dictionary or value.size()!=5 or not value.has_all(["version","owned","slot","sources","uses"]) or value.version!=1 or not inventory_valid(value.owned,value.slot) or not value.sources is Array or value.sources.size()!=value.owned.size() or not value.uses is Array or value.uses.size()>camp.settled_sorties: return "POWER_CAMP_FIELDS"
 	var prior: Array=[]
 	var ordinal: int=0
@@ -122,6 +125,8 @@ static func registration_problem(camp: Dictionary) -> String:
 	if not enabled(camp) or not progression(camp.journey.build.powers):
 		return ""
 	var version: int = SpecialPowers.WAVE_VERSION if ContentWaveV1.enabled(camp) else SpecialPowers.PROGRESSION_VERSION
+	if OpeningBuild.is_m47(camp):
+		version = SpecialPowers.M47_VERSION
 	return "" if TransactionReceipt.same(camp.journey.build.powers, initial_progression(version)) else "POWER_PROGRESSION_REGISTRATION"
 
 static func opening_spend_valid(camp: Dictionary) -> bool:
@@ -130,7 +135,7 @@ static func opening_spend_valid(camp: Dictionary) -> bool:
 		and value.investments.second_slot == 2 and camp.camp_spending == INVESTMENT_COST \
 		and camp.cash == CampRules.INITIAL_CASH - INVESTMENT_COST
 
-static func _progression_problem(camp: Dictionary, value: Dictionary) -> String:
+static func _progression_problem(camp: Dictionary, value: Dictionary, specialty: Dictionary) -> String:
 	if value.size() != 6 or not value.has_all(["version", "owned", "slots", "investments", "sources", "uses"]) \
 			or not action_inventory_valid(value.owned, loadout(value), int(camp.day)) \
 			or not value.sources is Array or value.sources.size() != value.owned.size() \
@@ -141,7 +146,7 @@ static func _progression_problem(camp: Dictionary, value: Dictionary) -> String:
 	var prior: Array = []
 	for source: Variant in value.sources:
 		if not source is Dictionary or source.size() != 3 or not source.has_all(["ability_id", "transaction_id", "generated"]) \
-				or source.ability_id != value.owned[prior.size()] or not _source_problem(camp, source.generated).is_empty():
+				or source.ability_id != value.owned[prior.size()] or not _source_problem(camp, source.generated, specialty).is_empty():
 			return "POWER_SOURCE_FIELDS"
 		var generated: Dictionary = source.generated
 		var day: int = int(generated.day)
@@ -214,7 +219,7 @@ static func settled(before: Dictionary, report: Dictionary, generated: Dictionar
 	return value
 
 
-static func _source_problem(camp: Dictionary, generated: Variant) -> String:
+static func _source_problem(camp: Dictionary, generated: Variant, specialty: Dictionary = {}) -> String:
 	if not PersonaState.enabled(camp): return PowerActions.problem(generated)
 	var issue: String=ExplorationActions.problem(generated, true) if ExplorationState.enabled(camp) else PersonaActions.problem(generated)
 	if not issue.is_empty(): return issue
@@ -227,5 +232,8 @@ static func _source_problem(camp: Dictionary, generated: Variant) -> String:
 		return "INDUSTRIAL_POWER_SOURCE_MODE"
 	if generated.get("layout", {}).has("rescue_court") and not CampaignRules.midgame_enabled(campaign):
 		return "RESCUE_COURT_POWER_SOURCE_MODE"
+	if generated.powers.sample == SpecialPowers.RADIO \
+			and (specialty.is_empty() or not TransactionReceipt.same(BuildActions.signed_specialization_policy(generated), specialty)):
+		return "POWER_SPECIALTY_SOURCE"
 	if not camp.journey.build.get("persona") is Dictionary or not TransactionReceipt.same(generated.persona.facts,camp.journey.build.persona): return "PERSONA_POWER_SOURCE"
 	return ""

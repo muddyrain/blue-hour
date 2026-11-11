@@ -47,7 +47,7 @@ static func freeze(context: Dictionary) -> Dictionary:
 	value.objective = {"task_id":value.id, "site_ids":[String(CONSOLE)], "member_id":0}
 	value.exploration = {"version":1, "optional_objectives":[]}
 	value.route_length = 0
-	if value.powers.version == SpecialPowers.WAVE_VERSION:
+	if SpecialPowers.wave_version(value.powers.version):
 		value = ContentWaveV1.freeze_action(value)
 	return value
 
@@ -72,6 +72,9 @@ static func problem(value: Dictionary) -> String:
 			or not powers is Dictionary or not powers.get("owned") is Array or not PowerState.action_inventory_valid(powers.owned, PowerState.loadout(powers), int(value.day)) \
 			or not persona is Dictionary or not persona.get("facts") is Dictionary:
 		return "PUMP_ACTION_CONTEXT"
+	if not BuildItems.valid_pool(build.get("version")) \
+			or BuildItems.specialty_pool(int(build.version)) != (powers.version == SpecialPowers.M47_VERSION):
+		return "PUMP_ACTION_POOL"
 	var expected: Dictionary = freeze(value)
 	if expected.is_empty() or identity != RecordEncoding.fingerprint(expected):
 		return "PUMP_ACTION_CANONICAL"

@@ -19,14 +19,16 @@ def save_json(path, value):
     path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def run(args, output, phase, profile, script, *, resume=False, more=()):
+def run(args, output, phase, profile, script, *, resume=False, more=(), open_streets=True):
     log_path = output / f"{phase}.txt"
     command = [args.godot, "--path", str(args.project), "--audio-driver", "Dummy",
                "--rendering-method", "gl_compatibility"]
     if args.headless:
         command.append("--headless")
-    command += ["--script", f"res://tests/{script}", "--", "--bh-open-streets",
-                f"--flow-output={(output / phase).as_posix()}", f"--bh-rescue-seed={args.seed}", *more]
+    command += ["--script", f"res://tests/{script}", "--"]
+    if open_streets:
+        command.append("--bh-open-streets")
+    command += [f"--flow-output={(output / phase).as_posix()}", f"--bh-rescue-seed={args.seed}", *more]
     if resume:
         command.append("--flow-resume")
     start = time.monotonic()

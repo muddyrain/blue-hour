@@ -26,6 +26,7 @@ var _problem: String = ""
 var _pending_base: Dictionary = {}
 var _new_root: String = ""
 var _archived: bool = false
+var _archive_specialty: String = ""
 var _expected: String = ""
 var _active_base: Dictionary = {}
 var _active_rules: Dictionary = {}
@@ -216,12 +217,17 @@ func create(base: Dictionary) -> Dictionary:
 	if _pending_base.is_empty():
 		if _expected != _disk_identity():
 			return _blocked("NEW_JOURNEY_DISK_CHANGED")
-		if base.get("journey", {}).get("build", {}).has("catalog"):
+		var catalog_policy: Dictionary = base.get("journey", {}).get("build", {}).get("catalog", {})
+		if _catalog_store != null or not catalog_policy.is_empty():
 			var catalog: Dictionary = refresh_catalog()
 			if catalog.error != OK:
 				return _blocked(catalog.reason)
-			if base.journey.build.catalog.unlock != catalog.unlock_hash:
+			if not catalog_policy.is_empty() and catalog_policy.unlock != catalog.unlock_hash:
 				return _blocked("CATALOG_NEW_RUN_POLICY")
+			if OpeningBuild.is_m47(base) and (base.journey.campaign.open_streets_policy != OpenStreetsV1.VERSION \
+					or OpeningBuild.eligible(base) != CatalogProgress.eligible_for(catalog, OpeningBuild.plan(base))):
+				return _blocked("CATALOG_NEW_SPECIALTY_POLICY")
+			_archive_specialty = catalog.m47_run_id
 		_pending_base = base.duplicate(true)
 		_new_root = base.journey.root_id if battle_mode else RunSave.new_profile_id()
 	elif not TransactionReceipt.same(_pending_base,base):
@@ -234,7 +240,9 @@ func create(base: Dictionary) -> Dictionary:
 		if DirAccess.copy_absolute(_path,archive_path) != OK or FileAccess.get_sha256(archive_path) != FileAccess.get_sha256(_path):
 			return _blocked("OLD_CAMP_ARCHIVE_FAILED")
 	if not _archived and (DirAccess.dir_exists_absolute(_path+".txn") or FileAccess.file_exists(_path+".txn")):
-		if DirAccess.rename_absolute(_path+".txn",_path+".txn.previous-"+RunSave.new_profile_id()) != OK:
+		var archive: String = _path + ".txn.previous-" + RunSave.new_profile_id() if _archive_specialty.is_empty() \
+			else _path + SpecializationProgress.ARCHIVE_PREFIX + _archive_specialty
+		if FileAccess.file_exists(archive) or DirAccess.dir_exists_absolute(archive) or DirAccess.rename_absolute(_path+".txn", archive) != OK:
 			return _blocked("OLD_JOURNAL_ARCHIVE_FAILED")
 	if not _archived and (FileAccess.file_exists(_path+".bak") or DirAccess.dir_exists_absolute(_path+".bak")):
 		if DirAccess.rename_absolute(_path+".bak",_path+".bak.previous-"+RunSave.new_profile_id()) != OK:
@@ -265,6 +273,7 @@ func create(base: Dictionary) -> Dictionary:
 	_pending_edit_request = {}
 	_new_root = ""
 	_archived = false
+	_archive_specialty = ""
 	_expected = _disk_identity()
 	return inspect()
 

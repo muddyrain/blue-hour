@@ -8,7 +8,11 @@ const ICONS: Dictionary = {
 	"speed_boost_v1": preload("res://assets/powers/speed_boost_v1.svg"),
 	"map_freeze_v1": preload("res://assets/powers/map_freeze_v1.svg"),
 	"suppression_pulse_v1": preload("res://assets/powers/suppression_pulse_v1.svg"),
+	SpecialPowers.RADIO: preload("res://assets/powers/heal.svg"),
 	"": preload("res://assets/powers/empty.svg"),
+}
+const SHORT_NAMES: Dictionary = {
+	SpecialPowers.FREEZE:"冻结", SpecialPowers.SUPPRESSION:"抑制", SpecialPowers.RADIO:"急救",
 }
 
 var activation_button: Button
@@ -23,7 +27,7 @@ func _ready() -> void:
 func present(title: String, status: String, remaining: float, duration: float, enabled: bool, ability_id: String) -> void:
 	_build()
 	var key: String = str(3 + slot_index)
-	var short_name: String = "冻结" if ability_id == SpecialPowers.FREEZE else "抑制" if ability_id == SpecialPowers.SUPPRESSION else "疾行"
+	var short_name: String = SHORT_NAMES.get(ability_id, "疾行")
 	var state: String = "%.1fs" % remaining if remaining > 0.0 else status
 	activation_button.text = key + "  空槽" if ability_id.is_empty() else "%s  %s\n%s" % [key,short_name,state]
 	activation_button.icon = ICONS.get(ability_id, ICONS[""])
@@ -34,6 +38,8 @@ func present(title: String, status: String, remaining: float, duration: float, e
 		effect = "全场活敌人暂停行动 %s 秒，期间新敌人同样受冻；已落地毒区继续生效。" % str(duration)
 	elif ability_id == SpecialPowers.SUPPRESSION:
 		effect = "%s 秒内普通、疾奔、重压感染者的直接近战伤害减半。" % str(duration)
+	elif ability_id == SpecialPowers.RADIO:
+		effect = SpecialPowers.RADIO_HELP
 	activation_button.tooltip_text = title + "\n" + effect + "\n" + status + "\n每次出击一次；营地装配。\n" + key + " 或点击立即释放。"
 	activation_button.disabled = not enabled
 	activation_button.focus_mode = Control.FOCUS_ALL if enabled else Control.FOCUS_NONE

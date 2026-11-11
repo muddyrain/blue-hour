@@ -10,6 +10,7 @@ const MILESTONES: Array[String] = ["unlock", "discovery"]
 var _slot: String
 var _folder: String
 var _slot_hash: String
+var _verified_specialty_settlements: Dictionary[String, bool] = {}
 
 
 func _init(slot: String) -> void:
@@ -23,6 +24,10 @@ static func policy_problem(value: Variant) -> String:
 		return "CATALOG_POLICY"
 	var unlock: Variant = value.get("unlock")
 	return "" if unlock is String and (unlock.is_empty() or _hex(unlock, 64)) else "CATALOG_POLICY"
+
+
+static func eligible_for(state: Dictionary, plan: String) -> Array[String]:
+	return SpecializationProgress.eligible_for(state.get("specialties", {}), plan)
 
 
 func refresh(fault: Callable) -> Dictionary:
@@ -65,10 +70,115 @@ func refresh(fault: Callable) -> Dictionary:
 			state[kind] = result.event
 			if kind == "unlock":
 				state.unlock_hash = result.hash
-	if not live.is_empty() and _terminal(live.tip) \
-			and (live.tip.phase != "COMMITTED" or live.tip.revision > live.through):
+	if _terminal_pending(live):
 		return _blocked("CATALOG_TERMINAL_PENDING")
+	return _refresh_specialties(state, live, fault)
+
+
+func _refresh_specialties(state: Dictionary, live: Dictionary, fault: Callable) -> Dictionary:
+	var archive_prefix: String = _slot.get_file() + SpecializationProgress.ARCHIVE_PREFIX
+	var archives: Array[String] = []
+	var parent: String = _slot.get_base_dir()
+	if DirAccess.dir_exists_absolute(parent):
+		var listing: Dictionary = ReceiptJournal.new(parent)._listing(parent)
+		if listing.error != OK:
+			return _blocked("CATALOG_SPECIALTY_ARCHIVE_READ")
+		for entry: String in listing.files + listing.links:
+			if entry.begins_with(archive_prefix):
+				return _blocked("CATALOG_SPECIALTY_ARCHIVE_PATH")
+		for folder: String in listing.directories:
+			if folder.begins_with(archive_prefix):
+				if not _hex(folder.trim_prefix(archive_prefix), 32):
+					return _blocked("CATALOG_SPECIALTY_ARCHIVE_PATH")
+				archives.append(parent.path_join(folder))
+	archives.sort()
+	var names: Dictionary = _specialty_records()
+	if names.has("reason"):
+		return names
+	var experience: Dictionary = SpecializationProgress.initial()
+	var discoveries: Dictionary = {}
+	var seen_runs: Dictionary = {}
+	var seen_roots: Dictionary = {}
+	for folder: String in archives:
+		var history: Dictionary = _history(folder)
+		if history.has("reason"):
+			return history
+		if history.opening.get("version") != OpeningBuild.SPECIALTY_VERSION or history.run_id != folder.get_file().trim_prefix(archive_prefix) \
+				or seen_runs.has(history.run_id) or seen_roots.has(history.root_id) or _terminal_pending(history):
+			return _blocked("CATALOG_SPECIALTY_ARCHIVE_SOURCE")
+		seen_runs[history.run_id] = true
+		seen_roots[history.root_id] = true
+		var projection: Dictionary = _specialty_history(history, names, false, fault)
+		if projection.has("reason"):
+			return projection
+		discoveries.merge(projection.discoveries)
+		if not projection.event.is_empty():
+			experience[projection.event.plan] += int(projection.event.delta)
+	state.specialization_result = {}
+	state.m47_run_id = ""
+	if not live.is_empty() and live.opening.get("version") == OpeningBuild.SPECIALTY_VERSION:
+		if seen_runs.has(live.run_id) or seen_roots.has(live.root_id):
+			return _blocked("CATALOG_SPECIALTY_REUSED_RUN")
+		var plan: String = live.opening.plan
+		var confirmed_eligible: Array[String] = SpecializationProgress.eligible_for(experience, plan)
+		for id: String in live.opening.specialty.eligible:
+			if id not in confirmed_eligible:
+				return _blocked("CATALOG_SPECIALTY_SOURCE_MISSING")
+		var projection: Dictionary = _specialty_history(live, names, true, fault)
+		if projection.has("reason"):
+			return projection
+		state.m47_run_id = live.run_id
+		discoveries.merge(projection.discoveries)
+		state.specialization_result = SpecializationProgress.result_for(projection.event, int(experience[plan]))
+		if not projection.event.is_empty():
+			experience[plan] = state.specialization_result.after
+	if not names.is_empty():
+		return _blocked("CATALOG_SPECIALTY_SOURCE_MISSING")
+	state.specialties = experience
+	state.specialty_discoveries = discoveries
 	return state
+
+
+func _specialty_records() -> Dictionary:
+	var names: Dictionary = {}
+	if not DirAccess.dir_exists_absolute(_folder):
+		return names
+	var listing: Dictionary = ReceiptJournal.new(_folder)._listing(_folder)
+	if listing.error != OK:
+		return _blocked("CATALOG_SPECIALTY_READ")
+	for entry: String in listing.directories + listing.links:
+		if entry.begins_with(SpecializationProgress.RECORD_PREFIX):
+			return _blocked("CATALOG_SPECIALTY_RECORD_PATH")
+	for entry: String in listing.files:
+		if not entry.begins_with(SpecializationProgress.RECORD_PREFIX):
+			continue
+		var name: String = entry.trim_suffix(".json")
+		if name == entry or not _hex(name.trim_prefix(SpecializationProgress.RECORD_PREFIX), 32):
+			return _blocked("CATALOG_SPECIALTY_RECORD_PATH")
+		names[name] = true
+	return names
+
+
+func _specialty_history(history: Dictionary, names: Dictionary, live: bool, fault: Callable) -> Dictionary:
+	var projection: Dictionary = SpecializationProgress.derive(history, _slot_hash, _verified_specialty_settlements)
+	if projection.has("reason"):
+		return _blocked(projection.reason)
+	var kind: String = SpecializationProgress.RECORD_PREFIX + history.run_id
+	var event: Dictionary = projection.event
+	var award: bool = int(event.get("delta", 0)) > 0
+	if names.erase(kind):
+		var saved: Dictionary = _read_event(kind)
+		if saved.has("reason"):
+			return saved
+		if not award or not TransactionReceipt.same(saved.get("event", {}), event):
+			return _blocked("CATALOG_SPECIALTY_SOURCE")
+	elif award:
+		if not live:
+			return _blocked("CATALOG_SPECIALTY_RECORD_MISSING")
+		var published: Dictionary = _publish(kind, event, fault)
+		if published.has("reason"):
+			return published
+	return projection
 
 
 func _history(folder: String) -> Dictionary:
@@ -92,8 +202,13 @@ func _history(folder: String) -> Dictionary:
 			or verified.hashes.get(1) != binding.get("root_hash") \
 			or verified.receipt.base.profile_id != binding.run_id or verified.receipt.root_id != binding.root_id:
 		return _blocked("CATALOG_HISTORY_ANCHOR")
+	var root: Dictionary = journal._read_record(journal.directory.path_join("00000001/record.json"), false)
+	if root.error != OK or root.hash != binding.root_hash:
+		return _blocked("CATALOG_HISTORY_CHANGED")
+	var initial: Dictionary = root.receipt.base.get("journey", {})
 	return {"journal":journal, "hashes":verified.hashes, "through":revision, "tip":verified.receipt,
-		"run_id":binding.run_id, "root_id":binding.root_id}
+		"run_id":binding.run_id, "root_id":binding.root_id,
+		"opening":initial.get("build", {}).get("opening", {}), "open_streets":initial.get("campaign", {}).get("open_streets_policy", 0)}
 
 
 func _source_history(event: Dictionary, live: Dictionary) -> Dictionary:
@@ -184,8 +299,13 @@ func _publish(kind: String, event: Dictionary, fault: Callable) -> Dictionary:
 		return _blocked("CATALOG_WRITE")
 	if fault.is_valid() and fault.call("before_catalog_publish") != OK:
 		return _blocked("CATALOG_WRITE")
+	var specialty: bool = kind.begins_with(SpecializationProgress.RECORD_PREFIX)
+	if specialty and fault.is_valid() and fault.call("before_specialty_publish") != OK:
+		return _blocked("CATALOG_SPECIALTY_PENDING")
 	if FileAccess.file_exists(path) or DirAccess.rename_absolute(staged, path) != OK:
 		return _blocked("CATALOG_PUBLISH")
+	if specialty and fault.is_valid() and fault.call("after_specialty_publish") != OK:
+		return _blocked("CATALOG_SPECIALTY_PENDING")
 	return _read_event(kind)
 
 
@@ -205,6 +325,11 @@ static func _terminal(receipt: Dictionary) -> bool:
 	return campaign.outcome == "VICTORY" and battle.evacuated and battle.mission_outcome == "EXTRACTED"
 
 
+static func _terminal_pending(history: Dictionary) -> bool:
+	return not history.is_empty() and _terminal(history.tip) \
+		and (history.tip.phase != "COMMITTED" or history.tip.revision > history.through)
+
+
 static func _found(receipt: Dictionary, battle: Dictionary, unlock_hash: String) -> bool:
 	var before: Dictionary = receipt.base.journey.build
 	var generated: Dictionary = receipt.rules.mission.generated
@@ -219,4 +344,5 @@ static func _hex(value: Variant, length: int) -> bool:
 
 
 static func _blocked(reason: String) -> Dictionary:
-	return {"error":ERR_UNAVAILABLE, "reason":reason, "unlock":{}, "discovery":{}, "unlock_hash":""}
+	return {"error":ERR_UNAVAILABLE, "reason":reason, "unlock":{}, "discovery":{}, "unlock_hash":"",
+		"specialties":{}, "specialty_discoveries":{}, "specialization_result":{}}

@@ -906,9 +906,10 @@ func _pool_initial() -> Dictionary:
 
 
 func _open_opening_choice() -> void:
+	_opening_picker.present(progress_session.catalog_state())
 	_opening_picker.reset_choice()
 	_opening_confirm_pending = true
-	_new_game_confirmation.popup_centered(Vector2i(740, 372))
+	_new_game_confirmation.popup_centered(Vector2i(950, 496))
 	_opening_picker.link_focus.call_deferred(_new_game_confirmation.get_ok_button(), _new_game_confirmation.get_cancel_button())
 
 
@@ -924,10 +925,12 @@ func _confirm_new_journey() -> void:
 		if phase == Phase.RESULT:
 			return_to_title()
 		if phase == Phase.TITLE:
-			_new_game(_opening_picker.selected_plan, {"version":CatalogProgress.VERSION, "unlock":catalog.unlock_hash})
+			var plan: String = _opening_picker.selected_plan
+			var policy: Dictionary = {"version":OpeningBuild.POLICY_VERSION, "eligible":CatalogProgress.eligible_for(catalog, plan)}
+			_new_game(plan, {"version":CatalogProgress.VERSION, "unlock":catalog.unlock_hash}, policy)
 
 
-func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}) -> void:
+func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}, m47_policy: Dictionary = {}) -> void:
 	if not opening_plan.is_empty() and (not playable_entry or not OpeningBuild.PLANS.has(opening_plan)):
 		return
 	if rescue_mode: _recruits = []
@@ -973,13 +976,18 @@ func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}) -> vo
 			_battle_meta.campaign.recon_policy = ReconActionV1.SOURCE_VERSION
 			_battle_meta.campaign.barricade_policy = BarricadeV1.VERSION
 			_battle_meta.campaign.billboard_policy = BillboardActionV1.VERSION
-			if "--bh-open-streets" in OS.get_cmdline_user_args() and CampSceneLayout.isolated(ProjectSettings.globalize_path(progress_path)):
+			var pilot: bool = "--bh-open-streets" in OS.get_cmdline_user_args() and CampSceneLayout.isolated(ProjectSettings.globalize_path(progress_path))
+			if not m47_policy.is_empty() or pilot:
 				_battle_meta.campaign.open_streets_policy = OpenStreetsV1.VERSION
 		_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true, true)
-		_battle_meta.build.powers = PowerState.initial_progression(
-			SpecialPowers.WAVE_VERSION if latest_rules else SpecialPowers.PROGRESSION_VERSION)
+		var powers_version: int = SpecialPowers.PROGRESSION_VERSION
+		if not m47_policy.is_empty():
+			powers_version = SpecialPowers.M47_VERSION
+		elif latest_rules:
+			powers_version = SpecialPowers.WAVE_VERSION
+		_battle_meta.build.powers = PowerState.initial_progression(powers_version)
 		if not opening_plan.is_empty():
-			var starter: Dictionary = OpeningBuild.source(opening_plan, profile_id, _battle_meta.root_id, _battle_meta.seed)
+			var starter: Dictionary = OpeningBuild.source(opening_plan, profile_id, _battle_meta.root_id, _battle_meta.seed, m47_policy)
 			_battle_meta.build.opening = starter
 			_battle_meta.build.owned.append(starter.item_id)
 			_battle_meta.build.slots[0] = starter.item_id
@@ -1026,21 +1034,16 @@ func _on_expedition_finished(report: Dictionary, sortie_id: String) -> void:
 	else:
 		_pending_settlement = CampEconomy.preview(camp_snapshot(), report, sortie_id, camp_rules)
 	if battle_mode and not _pending_settlement.is_empty():
-		if _pending_settlement.journey.state == "FAILED":
-			var frozen: Dictionary = _pending_settlement.duplicate(true)
-			if _accept_transaction(progress_session.commit_result(),true):
-				_pending_settlement = {}
-			_show_battle_result(frozen,_pending_settlement.is_empty())
-		elif report.evacuated and expedition.layout.world_data.has("open_streets") and expedition.bus_view != null:
+		if report.evacuated and expedition.layout.world_data.has("open_streets") and expedition.bus_view != null:
 			phase = Phase.EXPEDITION
 			_screen.hide()
 			_result.hide()
-			expedition.bus_view.departed.connect(
-				func() -> void: _show_battle_result(_pending_settlement, false), CONNECT_ONE_SHOT)
+			expedition.bus_view.departed.connect(_present_finished_battle, CONNECT_ONE_SHOT)
 			expedition.bus_view.departure()
 		else:
-			_show_battle_result(_pending_settlement,false)
-			if report.evacuated and expedition.bus_view != null:
+			var failed: bool = _pending_settlement.journey.state == "FAILED"
+			_present_finished_battle()
+			if report.evacuated and not failed and expedition.bus_view != null:
 				_screen.hide()
 				expedition.bus_view.departed.connect(func() -> void: _screen.show(),CONNECT_ONE_SHOT)
 				expedition.bus_view.departure()
@@ -1826,6 +1829,16 @@ func _transaction_message(reason: String) -> String:
 	return "保存或事务确认未完成，出击已阻止；可重试或退出，原件保留。"
 
 
+func _present_finished_battle() -> void:
+	var frozen: Dictionary = _pending_settlement
+	var durable: bool = false
+	if frozen.journey.state == "FAILED":
+		durable = _accept_transaction(progress_session.commit_result(), true)
+		if durable:
+			_pending_settlement = {}
+	_show_battle_result(frozen, durable)
+
+
 func _show_battle_result(snapshot: Dictionary, durable: bool) -> void:
 	phase = Phase.RESULT
 	_screen.show()
@@ -2099,6 +2112,7 @@ func _setup_progress() -> void:
 		_new_game_confirmation.ok_button_text = "确认开始旅程"
 		_new_game_confirmation.theme = CampStyle.blue_hour_theme(_screen.theme)
 		_new_game_confirmation.theme.set_stylebox("panel", "AcceptDialog", CampStyle.box(CampStyle.INK, Color("48646d")))
+		_new_game_confirmation.theme.set_constant("buttons_min_height", "AcceptDialog", 42)
 		CampStyle.blue_hour_primary(_new_game_confirmation.get_ok_button())
 		_opening_picker = OpeningBuildPicker.new()
 		_new_game_confirmation.add_child(_opening_picker)
@@ -2523,6 +2537,7 @@ func _camp_action(action: StringName, member_id: int) -> void:
 				open_training()
 			else:
 				camp_scene.open_info(action)
+		&"specialties": _show_equipment_catalog(progress_session.refresh_catalog())
 		&"sound": open_sound_settings()
 		&"legacy":
 			_camp_legacy = true
@@ -2661,7 +2676,7 @@ func _setup_blue_hour_title() -> void:
 	_title.add_child(_blue_hour_title_art)
 	_title.move_child(_blue_hour_title_art, 0)
 	_catalog_button = Button.new()
-	_catalog_button.text = "装备图鉴"
+	_catalog_button.text = "专精 / 图鉴"
 	_catalog_button.pressed.connect(func() -> void: _show_equipment_catalog(progress_session.refresh_catalog()))
 	_title.add_child(_catalog_button)
 	var title_font: SystemFont = SystemFont.new()
@@ -2716,6 +2731,9 @@ func _refresh_blue_hour_title() -> void:
 	CampStyle.place(_home_button, Rect2(91, 316 if live_camp else 367, 276, 44))
 	CampStyle.place(reset, Rect2(91, 367, 276, 44))
 	CampStyle.place(sound, Rect2(91, 418, 126, 44))
+	var catalog_ready: bool = progress_session.catalog_state().get("error", FAILED) == OK
+	_catalog_button.text = "专精 / 图鉴" if catalog_ready else "专精待同步"
+	_catalog_button.tooltip_text = "" if catalog_ready else "打开专精资料，重试读取与同步"
 	_catalog_button.show()
 	CampStyle.place(_catalog_button, Rect2(223, 418, 144, 44))
 	CampStyle.place(exit, Rect2(91, 469, 276, 44))
@@ -2865,10 +2883,14 @@ func _catalog_result_notice(snapshot: Dictionary) -> String:
 		return ""
 	var catalog: Dictionary = progress_session.catalog_state()
 	if catalog.get("error", FAILED) != OK:
-		return "装备图鉴待同步 · 可重启补记"
+		return "专精与图鉴待同步 · 可在标题重试" if OpeningBuild.is_m47(snapshot) else "装备图鉴待同步 · 可重启补记"
+	var result: Dictionary = catalog.get("specialization_result", {})
+	var notices: PackedStringArray = []
+	if result.get("run_id") == snapshot.profile_id and result.get("transaction_id") == snapshot.last_settlement_id:
+		notices.append(SpecialtyPresentation.result_text(result))
 	if catalog.unlock.get("receipt", {}).get("transaction_id") == snapshot.last_settlement_id:
-		return "已解锁 · 滤毒面罩"
-	return ""
+		notices.append("已解锁 · 滤毒面罩")
+	return "\n".join(notices)
 
 
 func _show_equipment_catalog(state: Dictionary) -> void:
@@ -2889,7 +2911,11 @@ func _close_equipment_catalog() -> void:
 	_equipment_catalog.hide()
 	if phase == Phase.TITLE:
 		_title.show()
-		_catalog_button.grab_focus()
+		if _camp_open:
+			camp_scene.restore_focus()
+		else:
+			_refresh_blue_hour_title()
+			_catalog_button.grab_focus()
 	elif phase == Phase.RESULT:
 		_show_battle_result(camp_snapshot(), true)
 		if _pump_victory != null and _pump_victory.visible:

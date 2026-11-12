@@ -31,6 +31,13 @@ static func eligible_for(state: Dictionary, plan: String) -> Array[String]:
 
 
 func refresh(fault: Callable) -> Dictionary:
+	var stamp: int = FreezeProfile.enter("catalog.refresh")
+	var result: Dictionary = _profiled_refresh(fault)
+	FreezeProfile.leave("catalog.refresh", stamp)
+	return result
+
+
+func _profiled_refresh(fault: Callable) -> Dictionary:
 	if not ProgressWriter._unlinked(_folder) or FileAccess.file_exists(_folder):
 		return _blocked("CATALOG_PATH")
 	var live_path: String = _slot + ".txn"
@@ -160,7 +167,7 @@ func _specialty_records() -> Dictionary:
 
 
 func _specialty_history(history: Dictionary, names: Dictionary, live: bool, fault: Callable) -> Dictionary:
-	var projection: Dictionary = SpecializationProgress.derive(history, _slot_hash, _verified_specialty_settlements)
+	var projection: Dictionary = _specialty_projection(history)
 	if projection.has("reason"):
 		return _blocked(projection.reason)
 	var kind: String = SpecializationProgress.RECORD_PREFIX + history.run_id
@@ -181,7 +188,28 @@ func _specialty_history(history: Dictionary, names: Dictionary, live: bool, faul
 	return projection
 
 
+func _specialty_projection(history: Dictionary) -> Dictionary:
+	var stamp: int = FreezeProfile.enter("catalog.specialty_projection")
+	var key: String = _projection_key(history, "specialty", "")
+	var memo: Dictionary = _projection_get(history, key)
+	var result: Dictionary
+	if memo.has("value"):
+		result = memo.value
+	else:
+		result = SpecializationProgress.derive(history, _slot_hash, _verified_specialty_settlements)
+		_projection_put(history, key, result)
+	FreezeProfile.leave("catalog.specialty_projection", stamp)
+	return result
+
+
 func _history(folder: String) -> Dictionary:
+	var stamp: int = FreezeProfile.enter("catalog.history")
+	var result: Dictionary = _profiled_history(folder)
+	FreezeProfile.leave("catalog.history", stamp)
+	return result
+
+
+func _profiled_history(folder: String) -> Dictionary:
 	if not ProgressWriter._unlinked(folder.path_join("binding.json")) or not ProgressWriter._unlinked(folder.path_join("journal")):
 		return _blocked("CATALOG_HISTORY_PATH")
 	var decoded: Dictionary = RunTransaction.read_binding(folder.path_join("binding.json"))
@@ -208,7 +236,8 @@ func _history(folder: String) -> Dictionary:
 	var initial: Dictionary = root.receipt.base.get("journey", {})
 	return {"journal":journal, "hashes":verified.hashes, "through":revision, "tip":verified.receipt,
 		"run_id":binding.run_id, "root_id":binding.root_id,
-		"opening":initial.get("build", {}).get("opening", {}), "open_streets":initial.get("campaign", {}).get("open_streets_policy", 0)}
+		"opening":initial.get("build", {}).get("opening", {}), "open_streets":initial.get("campaign", {}).get("open_streets_policy", 0),
+		"memo_token":journal.prefix_memo_token()}
 
 
 func _source_history(event: Dictionary, live: Dictionary) -> Dictionary:
@@ -229,6 +258,20 @@ func _source_history(event: Dictionary, live: Dictionary) -> Dictionary:
 
 
 func _derive(history: Dictionary, kind: String, unlock_hash: String) -> Dictionary:
+	var stamp: int = FreezeProfile.enter("catalog.derive." + kind)
+	var key: String = _projection_key(history, kind, unlock_hash)
+	var memo: Dictionary = _projection_get(history, key)
+	var result: Dictionary
+	if memo.has("value"):
+		result = memo.value
+	else:
+		result = _scan_derive(history, kind, unlock_hash)
+		_projection_put(history, key, result)
+	FreezeProfile.leave("catalog.derive." + kind, stamp)
+	return result
+
+
+func _scan_derive(history: Dictionary, kind: String, unlock_hash: String) -> Dictionary:
 	if not history.has("journal") or (kind == "discovery" and unlock_hash.is_empty()) \
 			or not history.tip.base.get("journey", {}).get("build", {}).has("catalog"):
 		return {}
@@ -255,6 +298,41 @@ func _derive(history: Dictionary, kind: String, unlock_hash: String) -> Dictiona
 		return {"version":VERSION, "slot":_slot_hash, "kind":kind, "run_id":history.run_id,
 			"root_id":history.root_id, "receipt":ref, "returns":returned}
 	return {}
+
+
+func _projection_key(history: Dictionary, kind: String, unlock_hash: String) -> String:
+	if not history.has("journal") or String(history.get("memo_token", "")).is_empty():
+		return ""
+	# This key selects a pure projection inside an already byte-witnessed prefix.
+	# Its hashes are never used to authenticate a file or replace read_all/binding checks.
+	# Journal revisions are integer dictionary keys, while Exact V1 accepts only
+	# string dictionary keys. Preserve every revision/hash as an ordered value pair.
+	var revisions: Array = history.hashes.keys()
+	revisions.sort()
+	var hashes: Array = []
+	for revision: int in revisions:
+		hashes.append([revision, history.hashes[revision]])
+	var context: Dictionary = {"slot":_slot_hash, "kind":kind, "unlock":unlock_hash,
+		"through":history.through, "run_id":history.run_id, "root_id":history.root_id,
+		"opening":history.opening, "open_streets":history.open_streets, "hashes":hashes,
+		"catalog_policy":history.tip.base.get("journey", {}).get("build", {}).get("catalog", null)}
+	return RecordEncoding.pack_v1(context).get("hash", "")
+
+
+func _projection_get(history: Dictionary, key: String) -> Dictionary:
+	if key.is_empty():
+		return {}
+	var journal: ReceiptJournal = history.journal
+	var result: Dictionary = journal.prefix_memo_get(key, history.memo_token)
+	FreezeProfile.count("catalog_projection_hits" if result.has("value") else "catalog_projection_misses")
+	return result
+
+
+func _projection_put(history: Dictionary, key: String, result: Dictionary) -> void:
+	if key.is_empty() or result.has("reason"):
+		return
+	var journal: ReceiptJournal = history.journal
+	journal.prefix_memo_put(key, result, history.memo_token)
 
 
 func _read_event(kind: String) -> Dictionary:

@@ -10,6 +10,8 @@ WorldActions/WorldLayout/WorldSites提供V2有限街区、站点预算与事实�
 
 # 架构与所有权
 
+M49 由 Main 将同一个 ProductionProgress/Writer 的耗时操作串行交给后台 worker，主线程只绘制和发布独立结果快照，交回前不调用 session。退出等待安全边界；恢复核验后的关闭不消费旧世界，已消费或已出发的世界须沿原暂存事务保存后才能退出。ReceiptJournal 的多目录完整字节证明和 Catalog 纯投影共享原 64 MiB 总预算，记录缓存仍为 32 MiB；实际目录、原字节与绑定每次重读，变化完整认证，缓存不拥有当前营地或 ACK。见 [M49 边界](design/m49-runtime-perf-01.md)。
+
 M48 用 `campaign.economy` V1 记录工具单位、营地编辑、实例来源、售出历史和独立设施。`EconomyActions` 认证原完整行动后精确重建五金与普通工具来源；`EconomyBuildV1` 只生成纯提案及重算结果。`CampEdit` 与 `ProductionProgress` 保持单次编辑写入权，`FrozenSettlement` 仍唯一计算并提交工具、设施供粮、旧闲置枪自动维修和最终存活队员的规划进度。新能力版本5与被动池7/8冻结强化和动态槽位；场上仍由原模拟时钟、伤害、工作和弹匣拥有实际效果。旧版本独立保留，新状态先严格验证，再用只读旧形状复用人物与永久死亡校验；投影不写盘，也不授予实例或收益。[M48合同](design/m48-economy-build-01.md)。原生已有进度启动由同一 `ProductionProgress` 在单后台线程独占原 Writer 完成 `inspect → refresh_catalog`；主线程仅显示等待并消费输入，join 后接收完整结果，不并发读取或编辑进度。
 
 M15 的 LevelPolicy/LevelSummary 只生成局部任务用途、最终导航路线及只读卡片事实。新旅程在 build6 的 worldgen 标识中显式选择 version2/BH_LEVEL_V1，原 marker1/policy3 与 layout4 独立保留。布局、站点和摘要一起有界重试；原保存、工作、伤害、救援与结算 owner 不变。新成功纯结果仅按完整输入复用原 ValueProofCache，见[任务关卡合同](design/m15-level-01.md)。

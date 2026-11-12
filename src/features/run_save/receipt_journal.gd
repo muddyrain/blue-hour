@@ -13,16 +13,21 @@ const MAX_CACHED_BYTES: int = 33_554_432
 const CACHE_METADATA_BYTES: int = 2048
 const MAX_NATIVE_DTO_BYTES: int = MAX_BYTES
 const MAX_CACHED_TRANSITIONS: int = 128
-# One complete legal journal worth of original bytes, never decoded rows per generation.
-# Cache entries may alias these exact buffers; only verified aliases avoid a second
-# raw charge. Caller-held snapshots and transient reads are not a process RSS bound.
+# All directory proofs share one original-journal-sized budget, including their
+# boundary and projection metadata. Only actual active-prefix buffer aliases avoid
+# a second raw charge in the record cache; transient snapshots are not an RSS bound.
 const MAX_PREFIX_BYTES: int = MAX_TOTAL_BYTES
+const MAX_CACHED_PREFIXES: int = 128
+const PREFIX_RECORD_METADATA_BYTES: int = 512
 
 ## Pure proofs are shared across coordinator recreation; every caller still rereads its own files.
 static var _record_cache: Dictionary = {}
 static var _transition_cache: Dictionary = {}
 static var _cached_bytes: int = 0
 static var _verified_prefix: Dictionary = {}
+static var _verified_prefixes: Dictionary = {}
+static var _prefix_bytes: int = 0
+static var _prefix_serial: int = 0
 static var _prefix_mutex: Mutex = Mutex.new() # One short critical section owns prefix, cache and byte accounting.
 static var _prefix_generation: int = 0
 static var _cache_serial: int = 0
@@ -388,12 +393,18 @@ func _profiled_decode_record(bytes: PackedByteArray, isolate: bool=true) -> Dict
 func _cache_lookup(identity: String, bytes: PackedByteArray) -> Dictionary:
 	_prefix_mutex.lock()
 	var cached: Dictionary = _record_cache.get(identity, {})
-	var snapshot: Dictionary = {}
+	var snapshot: Dictionary = cached.duplicate(false)
+	_prefix_mutex.unlock()
 	# Hash is only an index. The whole freshly read byte buffer remains the proof.
-	if not cached.is_empty() and cached.raw.size() == bytes.size() and cached.raw == bytes:
-		snapshot = cached.duplicate(false)
+	if snapshot.is_empty() or snapshot.raw.size() != bytes.size() or snapshot.raw != bytes:
+		return {}
+	_prefix_mutex.lock()
+	if _record_cache.has(identity) and _record_cache[identity].serial == snapshot.serial:
+		# Prefix publication may have rebound this same serial while bytes were
+		# compared. Touch its current accounting/alias instead of restoring the old one.
+		var current: Dictionary = _record_cache[identity]
 		_record_cache.erase(identity)
-		_record_cache[identity] = cached
+		_record_cache[identity] = current
 	_prefix_mutex.unlock()
 	return snapshot
 
@@ -441,12 +452,16 @@ func _cache_record(identity: String, bytes: PackedByteArray, result: Dictionary,
 		FreezeProfile.count("record_dto_cache_stores")
 	else:
 		# Genuine pre-M48 receipts keep their complete decoded result and byte proof.
-		entry = {"raw":bytes, "result":result.duplicate(true), "decoded_bytes":var_to_bytes(result).size()}
+		entry = {"raw":bytes, "result":result.duplicate(true), "decoded_bytes":var_to_bytes(result).size(), "raw_identity":identity}
+	var prefix_state: Dictionary = _prefix_state()
+	_cache_reprice(entry, prefix_state.active)
 	_prefix_mutex.lock()
 	_cache_remove_locked(identity)
 	_cache_serial += 1
 	entry.serial = _cache_serial
-	_cache_reprice_locked(entry)
+	if int(prefix_state.generation) != _prefix_generation:
+		_cache_unshare(entry)
+	entry.shared_generation = _prefix_generation if entry.raw_shared else -1
 	var charge: int = int(entry.cache_bytes)
 	if charge <= MAX_CACHED_BYTES:
 		_cache_trim_locked(charge, 1)
@@ -475,20 +490,23 @@ func _cache_trim_locked(incoming_bytes: int = 0, incoming_entries: int = 0) -> v
 		FreezeProfile.count("record_cache_evictions")
 
 
-func _cache_reprice_locked(entry: Dictionary) -> void:
-	entry.raw_shared = false
-	entry.shared_generation = -1
-	if not _verified_prefix.is_empty():
-		for original: PackedByteArray in _verified_prefix.raw_records:
-			if original.size() == entry.raw.size() and original == entry.raw:
-				# Rebind on EVERY publication, even when the fresh bytes have equal values.
-				entry.raw = original
-				if is_same(entry.raw, original):
-					entry.raw_shared = true
-					entry.shared_generation = _prefix_generation
-				break
+func _cache_reprice(entry: Dictionary, prefix: Dictionary) -> void:
+	_cache_unshare(entry)
+	if not prefix.is_empty():
+		var original: PackedByteArray = prefix.raw_index.get(entry.raw_identity, PackedByteArray())
+		# Hashes narrow the lookup; the complete bytes still prove the alias.
+		if not original.is_empty() and original == entry.raw:
+			entry.raw = original
+			entry.raw_shared = is_same(entry.raw, original)
 	var payload_bytes: int = entry.dto.size() if entry.has("dto") else int(entry.decoded_bytes)
 	entry.cache_bytes = (0 if entry.raw_shared else entry.raw.size()) + payload_bytes + CACHE_METADATA_BYTES
+
+
+func _cache_unshare(entry: Dictionary) -> void:
+	entry.raw_shared = false
+	entry.shared_generation = -1
+	var payload_bytes: int = entry.dto.size() if entry.has("dto") else int(entry.decoded_bytes)
+	entry.cache_bytes = entry.raw.size() + payload_bytes + CACHE_METADATA_BYTES
 
 
 func _cache_profile() -> void:
@@ -517,27 +535,158 @@ func _cache_profile() -> void:
 
 func _replace_prefix(value: Dictionary) -> void:
 	# Only complete authenticated publication or a trusted in-process snapshot may
-	# call this memo control. Never reconstruct a prefix proof from a disk summary.
-	var stamp: int = FreezeProfile.enter("journal.cache_prefix_rebind")
+	# reset this memo control. Normal publication retains other bounded directories.
+	_install_prefix(value, true)
+
+
+func _prefix_state() -> Dictionary:
 	_prefix_mutex.lock()
-	_prefix_generation += 1
-	_verified_prefix = value
-	_cached_bytes = 0
-	for entry: Dictionary in _record_cache.values():
-		_cache_reprice_locked(entry)
-		_cached_bytes += int(entry.cache_bytes)
-	_cache_trim_locked()
+	var value: Dictionary = {"generation":_prefix_generation, "serial":_prefix_serial,
+		"prefixes":_verified_prefixes.duplicate(), "active":_verified_prefix,
+		"records":_record_cache.duplicate()}
 	_prefix_mutex.unlock()
-	FreezeProfile.leave("journal.cache_prefix_rebind", stamp)
-	_cache_profile()
+	return value
 
 
 func _prefix_snapshot() -> Dictionary:
 	_prefix_mutex.lock()
 	# Published contents are private and immutable; validation happens outside the lock.
-	var value: Dictionary = _verified_prefix
+	var value: Dictionary = _verified_prefixes.get(directory, {})
 	_prefix_mutex.unlock()
 	return value
+
+
+func prefix_memo_token() -> String:
+	return String(_prefix_snapshot().get("token", ""))
+
+
+func prefix_memo_get(key: String, expected_token: String) -> Dictionary:
+	var prefix: Dictionary = _prefix_snapshot()
+	if expected_token.is_empty() or prefix.get("token") != expected_token:
+		return {}
+	var candidate: Variant = prefix.get("memo", {}).get(key, {})
+	if not candidate is Dictionary:
+		FreezeProfile.count("journal_projection_corruptions")
+		return {}
+	var memo: Dictionary = candidate
+	if memo.is_empty():
+		return {}
+	# A private primitive DTO is checked before decoding; objects are never enabled.
+	if not memo.get("raw") is PackedByteArray or not M48RecordTransport._hash(memo.get("sha256")):
+		FreezeProfile.count("journal_projection_corruptions")
+		return {}
+	var raw: PackedByteArray = memo.raw
+	if raw.is_empty() or raw.size() > MAX_BYTES or M48RecordTransport._bytes_hash(raw) != memo.sha256:
+		FreezeProfile.count("journal_projection_corruptions")
+		return {}
+	var value: Variant = bytes_to_var(raw)
+	if not value is Dictionary:
+		return {}
+	FreezeProfile.count("journal_projection_hits")
+	return {"value":value}
+
+
+func prefix_memo_put(key: String, value: Dictionary, expected_token: String) -> void:
+	if key.is_empty() or key.to_utf8_buffer().size() > 512 or expected_token.is_empty():
+		return
+	var raw: PackedByteArray = var_to_bytes(value)
+	# A single pure projection must not consume more than an ordinary record.
+	if raw.is_empty() or raw.size() > MAX_BYTES:
+		return
+	var memo: Dictionary = {"raw":raw, "sha256":M48RecordTransport._bytes_hash(raw)}
+	_install_prefix({}, false, expected_token, key, memo)
+
+
+func _prefix_charge(value: Dictionary) -> int:
+	var total: int = int(value.raw_bytes) + var_to_bytes(value.boundary).size() \
+		+ CACHE_METADATA_BYTES + value.raw_records.size() * PREFIX_RECORD_METADATA_BYTES
+	for memo: Dictionary in value.memo.values():
+		total += memo.raw.size() + CACHE_METADATA_BYTES
+	return total
+
+
+func _install_prefix(value: Dictionary, reset: bool = false, expected_token: String = "", memo_key: String = "", memo: Dictionary = {}) -> void:
+	var stamp: int = FreezeProfile.enter("journal.cache_prefix_rebind")
+	while true:
+		var snapshot: Dictionary = _prefix_state()
+		var prefixes: Dictionary = {} if reset else snapshot.prefixes.duplicate()
+		var next: Dictionary = value.duplicate()
+		var serial: int = int(snapshot.serial)
+		if not memo_key.is_empty():
+			var current: Dictionary = prefixes.get(directory, {})
+			if current.get("token", "") != expected_token:
+				break
+			next = current.duplicate()
+			next.memo = current.memo.duplicate()
+			next.memo[memo_key] = memo
+		elif not next.is_empty():
+			var current: Dictionary = prefixes.get(next.directory, {})
+			var identical: bool = not current.is_empty() and current.raw_records.size() == next.raw_records.size() \
+				and _matching_prefix(current, next.raw_records) == next.raw_records.size()
+			if identical:
+				next.token = current.token
+				next.memo = current.memo
+			elif not next.has("token") or not reset:
+				serial += 1
+				next.token = str(serial)
+				next.memo = {}
+		var evictions: int = 0
+		if not next.is_empty():
+			next.charge = _prefix_charge(next)
+			prefixes.erase(next.directory)
+			if int(next.charge) <= MAX_PREFIX_BYTES:
+				prefixes[next.directory] = next
+			else:
+				# Oversized memo additions are optional; retain the authenticated source proof.
+				if not memo_key.is_empty():
+					break
+				next = {}
+		var bytes: int = 0
+		for prefix: Dictionary in prefixes.values():
+			bytes += int(prefix.charge)
+		while not prefixes.is_empty() and (bytes > MAX_PREFIX_BYTES or prefixes.size() > MAX_CACHED_PREFIXES):
+			var oldest: String = String(prefixes.keys()[0])
+			bytes -= int(prefixes[oldest].charge)
+			prefixes.erase(oldest)
+			evictions += 1
+		var planned: Dictionary = {}
+		for identity: String in snapshot.records:
+			var entry: Dictionary = snapshot.records[identity].duplicate()
+			_cache_reprice(entry, next)
+			planned[identity] = entry
+		# Directory/byte comparisons, serialization and copy work all happened outside.
+		_prefix_mutex.lock()
+		if int(snapshot.generation) != _prefix_generation:
+			_prefix_mutex.unlock()
+			continue
+		_verified_prefixes = prefixes
+		_verified_prefix = next
+		_prefix_bytes = bytes
+		_prefix_serial = serial
+		_prefix_generation += 1
+		_cached_bytes = 0
+		for identity: String in _record_cache:
+			var entry: Dictionary = _record_cache[identity]
+			if planned.has(identity) and planned[identity].serial == entry.serial:
+				entry = planned[identity]
+				entry.shared_generation = _prefix_generation if entry.raw_shared else -1
+				_record_cache[identity] = entry
+			else:
+				# Another publisher may already hold this entry in a shallow snapshot.
+				# Replace its accounting without mutating that immutable snapshot.
+				entry = entry.duplicate(false)
+				_cache_unshare(entry)
+				_record_cache[identity] = entry
+			_cached_bytes += int(entry.cache_bytes)
+		_cache_trim_locked()
+		_prefix_mutex.unlock()
+		for index: int in range(evictions):
+			FreezeProfile.count("journal_prefix_evictions")
+		FreezeProfile.scale("journal_prefix_entries", prefixes.size())
+		FreezeProfile.scale("journal_prefix_charged_bytes", bytes)
+		break
+	FreezeProfile.leave("journal.cache_prefix_rebind", stamp)
+	_cache_profile()
 
 
 func _prefix_shape_proven(bytes: PackedByteArray) -> bool:
@@ -568,9 +717,12 @@ func _matching_prefix(prefix: Dictionary, observed_raw: Array[PackedByteArray]) 
 
 func _publish_prefix(raw_records: Array[PackedByteArray], boundary: Dictionary, raw_bytes: int) -> void:
 	if raw_bytes > MAX_PREFIX_BYTES: return
+	var raw_index: Dictionary = {}
+	for raw: PackedByteArray in raw_records:
+		raw_index[M48RecordTransport._bytes_hash(raw)] = raw
 	var value: Dictionary = {"directory":directory, "raw_records":raw_records.duplicate(),
-		"boundary":boundary.duplicate(true), "raw_bytes":raw_bytes}
-	_replace_prefix(value)
+		"boundary":boundary.duplicate(true), "raw_bytes":raw_bytes, "raw_index":raw_index, "memo":{}}
+	_install_prefix(value)
 	FreezeProfile.scale("journal_prefix_bytes", raw_bytes)
 
 

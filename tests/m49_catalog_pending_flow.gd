@@ -87,6 +87,10 @@ func _catalog_fault_and_retry() -> void:
 	_check(retry.is_visible_in_tree() and not retry.disabled and app._progress_message.contains("营地已保存")
 		and app._progress_message.contains("核验未完成"),
 		"pending screen distinguishes saved camp from incomplete catalog and exposes its real retry control")
+	var camp_label: String = app.get_node("Interface/Screen/Title/Camp").text
+	_check(camp_label.contains("营地已保存") and not camp_label.contains("存档未加载")
+		and not app._camp_backdrop._names.text.contains("名册尚未载入"),
+		"acknowledged pending-sync camp and roster never claim that the saved data was not loaded")
 	await _shot("catalog-pending-real-retry")
 	var reset: Button = app.get_node("Interface/Screen/Title/Reset")
 	if reset.is_visible_in_tree() and not reset.disabled:

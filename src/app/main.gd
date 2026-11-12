@@ -1407,7 +1407,9 @@ func _update_camp() -> void:
 	_continue_button.visible = _requires_continue
 	_backup_button.visible = _progress_blocked and not _backup_save.is_empty()
 	_retry_button.visible = _progress_dirty
-	if _requires_continue and _pending_save.is_empty() and safe_suspend:
+	if _progress_view.get("state") == "CATALOG_PENDING" and _progress_view.get("camp_saved", false):
+		$Interface/Screen/Title/Camp.text = "营地已保存：第 %d 天 / 货币 %d / 食物 %d\n专精与图鉴待同步；请重试资料核验，完成前出击保持锁定。" % [day, cash, food]
+	elif _requires_continue and _pending_save.is_empty() and safe_suspend:
 		$Interface/Screen/Title/Camp.text = "已有未完成的出击暂存；请继续原战场。暂存没有回营、结算、扣粮或推进日期。"
 	elif _requires_continue:
 		$Interface/Screen/Title/Camp.text = "已保存：第 %d 天 / 货币 %d / 食物 %d\n点击“继续游戏”恢复营地；旧档不会自动改写。\n%s" % [int(_pending_save.day), int(_pending_save.cash), int(_pending_save.food), _migration_notice]
@@ -2717,8 +2719,9 @@ func _refresh_presentation() -> void:
 			if child is CanvasItem and child != camp_scene:
 				child.show()
 	var shown: Dictionary = _pending_save if _requires_continue else camp_snapshot()
-	_camp_backdrop.show_roster(battle_mode, [] if _progress_blocked else shown.get("crew",[]),
-		[] if _progress_blocked or not battle_mode else shown.get("journey", {}).get("active_member_ids", []))
+	var confirmed_camp: bool = not _progress_blocked or (_progress_view.get("state") == "CATALOG_PENDING" and _progress_view.get("camp_saved", false))
+	_camp_backdrop.show_roster(battle_mode, shown.get("crew",[]) if confirmed_camp else [],
+		shown.get("journey", {}).get("active_member_ids", []) if confirmed_camp and battle_mode else [])
 	var heading: Label = $Interface/Screen/Title/Heading
 	var eyebrow: Label = $Interface/Screen/Title/Eyebrow
 	var description: Label = $Interface/Screen/Title/Description

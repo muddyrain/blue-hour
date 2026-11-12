@@ -75,7 +75,9 @@ func _mark(index: int) -> bool:
 func observe(member_id: int, point: Vector2, elapsed: float) -> bool:
 	var changed: bool = reveal(point)
 	if changed and _source_version and elapsed > 0.0:
-		_reveals.append([member_id, elapsed, point.x, point.y])
+		# Exact receipts decode numbers as float. Keep live history in that same
+		# representation so strict nested-prefix equality survives an ACK.
+		_reveals.append([float(member_id), elapsed, point.x, point.y])
 	return changed
 
 
@@ -87,7 +89,7 @@ func record_work(member_id: int, point: Vector2, start: float, end: float) -> vo
 		if last[0] == member_id and absf(float(last[2]) - start) <= CLOCK_EPSILON:
 			last[2] = end
 			return
-	_work.append([member_id, start, end, point.x, point.y])
+	_work.append([float(member_id), start, end, point.x, point.y])
 
 
 func snapshot(progress: float) -> Dictionary:

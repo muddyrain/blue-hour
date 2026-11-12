@@ -6,7 +6,7 @@ ROOT=Path(__file__).resolve().parents[1]
 LOCK=(ROOT/'.godot-version').read_text(encoding='utf-8').strip()
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('action',choices=['check','run']);p.add_argument('--godot');entry=p.add_mutually_exclusive_group();entry.add_argument('--enemy-trial',action='store_true');entry.add_argument('--legacy-entry',action='store_true');entry.add_argument('--open-streets',action='store_true');p.add_argument('--profile',type=Path);p.add_argument('--output',type=Path);a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('action',choices=['check','run']);p.add_argument('--godot');entry=p.add_mutually_exclusive_group();entry.add_argument('--enemy-trial',action='store_true');entry.add_argument('--legacy-entry',action='store_true');entry.add_argument('--open-streets',action='store_true');p.add_argument('--profile',type=Path);p.add_argument('--output',type=Path);p.add_argument('--only',nargs='+',help='Rerun selected public case labels after a diagnosed failure; assets still checked');a=p.parse_args()
  exe=a.godot or os.environ.get('GODOT_BIN') or shutil.which('godot') or shutil.which('godot4')
  if not exe:raise RuntimeError('Specify --godot or GODOT_BIN with the pinned engine')
  version=subprocess.check_output([exe,'--version'],text=True,timeout=15).strip();assert version==LOCK,(version,LOCK)
@@ -22,9 +22,10 @@ def main():
  env=dict(os.environ,HOME=str(job/'home'),APPDATA=str(job/'user'),XDG_DATA_HOME=str(job/'user'))
  rows=[]
  def execute(label,args,flags=None,expected=0):
+  if a.only and label not in a.only:return
   folder=job/label;folder.mkdir();cmd=[exe,'--headless','--path',str(ROOT),'--audio-driver','Dummy',*args]
   flags=list(flags if flags is not None else ([] if label=='startup-default' else ['--bh-legacy-entry']))
-  cmd+=['--',*flags,'--bh-progress='+str(folder/('run.enemy-v1.json' if label in ['startup-default','rogue-contracts','world-contracts','neighborhood-contracts','task-contracts','task-data','campaign-contracts','journal-cache','world-bus','r2-save-failure','m48-sources','m48-record-transport','m48-record-cache','journal-prefix'] or '--bh-enemy-trial' in flags else 'run.json')),'--bh-audio-settings='+str(folder/'audio.json')]
+  cmd+=['--',*flags,'--bh-progress='+str(folder/('run.enemy-v1.json' if label in ['startup-default','rogue-contracts','world-contracts','neighborhood-contracts','task-contracts','task-data','campaign-contracts','journal-cache','world-bus','r2-save-failure','m48-sources','m48-record-transport','m48-record-cache','journal-prefix','m49-journal-cache','m49-catalog-proof'] or '--bh-enemy-trial' in flags else 'run.json')),'--bh-audio-settings='+str(folder/'audio.json')]
   if label=='known-hash-cycle':cmd+=['--cycle-output='+(folder/'cycle.json').as_posix()]
   if label=='record-hash':cmd+=['--record-output='+(folder/'data').as_posix()]
   if label=='closeout-view':cmd+=['--view-output='+(folder/'frames').as_posix()]
@@ -63,10 +64,11 @@ def main():
  execute('record-hash',['--script','res://tests/record_hash.gd'])
  for name in ['r2_art','r2_save_cache','r2_save_failure','level_policy','level_summary','level_generation']:
   execute(name.replace('_','-'),['--script','res://tests/'+name+'.gd'],[])
- for name in ['m48_economy','m48_source_codec','m48_build_powers','m48_runtime_effects','m48_patterns','m48_components','m48_sources','m48_drop_grades','m48_record_transport','m48_record_cache','journal_prefix']:
+ for name in ['m48_economy','m48_source_codec','m48_build_powers','m48_runtime_effects','m48_patterns','m48_components','m48_sources','m48_drop_grades','m48_record_transport','m48_record_cache','journal_prefix','m49_journal_cache','m49_catalog_proof','m49_recon_prefix']:
   execute(name.replace('_','-'),['--script','res://tests/'+name+'.gd'],[])
  z=subprocess.run([sys.executable,'tools/validate_assets.py'],cwd=ROOT,capture_output=True);(job/'assets.txt').write_bytes(z.stdout+z.stderr);assert z.returncode==0,z.stderr
- result={'status':'PASS_PUBLIC_SUBSET_WITH_EXACT_RECORD_TRANSPORT','legacy_engine_json_cycle':'REPRODUCED','production_gate':'BLOCKED','cases':rows,'private_archive_matrix':'NOT_INCLUDED','physical_os':'NOT_VERIFIED'}
+ if a.only and set(a.only)-{row['case'] for row in rows}:raise RuntimeError('Unknown public case label')
+ result={'status':'PASS_SELECTED_PUBLIC_CASES' if a.only else 'PASS_PUBLIC_SUBSET_WITH_EXACT_RECORD_TRANSPORT','legacy_engine_json_cycle':'NOT_RUN' if a.only and 'known-hash-cycle' not in a.only else 'REPRODUCED','production_gate':'BLOCKED','cases':rows,'private_archive_matrix':'NOT_INCLUDED','physical_os':'NOT_VERIFIED'}
  (job/'summary.json').write_text(json.dumps(result,indent=2),encoding='utf-8');print(json.dumps(result));return 0
 
 if __name__=='__main__':

@@ -202,7 +202,9 @@ func activate() -> Dictionary:
 	if confirmed.error == OK:
 		_expected = _disk_identity()
 		if _catalog_store != null:
-			refresh_catalog()
+			var catalog: Dictionary = refresh_catalog()
+			if catalog.error != OK:
+				return _catalog_pending(confirmed, catalog)
 	return confirmed
 
 
@@ -460,8 +462,21 @@ func commit_result() -> Dictionary:
 	_expected = _disk_identity()
 	var committed: Dictionary = inspect()
 	if committed.error == OK and _catalog_store != null:
-		refresh_catalog()
+		var catalog: Dictionary = refresh_catalog()
+		if catalog.error != OK:
+			return _catalog_pending(committed, catalog)
 	return committed
+
+
+func _catalog_pending(confirmed: Dictionary, catalog: Dictionary) -> Dictionary:
+	# The original ACK remains authoritative. A failed projection cannot turn it
+	# into a second settlement or grant unverified new-journey qualifications.
+	var result: Dictionary = confirmed.duplicate(true)
+	result.error = catalog.error
+	result.state = "CATALOG_PENDING"
+	result.camp_saved = true
+	result.reason = "CATALOG_SYNC:" + String(catalog.get("reason", "UNKNOWN"))
+	return result
 
 
 func retry() -> Dictionary:

@@ -139,6 +139,20 @@ var _startup_worker: Thread
 var _startup_overlay: PanelContainer
 var _startup_label: Label
 var _startup_exit_requested: bool = false
+var _progress_worker: Thread
+var _progress_busy: bool = false
+var _progress_request_id: int = 0
+var _progress_operation: String = ""
+var _progress_started_usec: int = 0
+var _progress_view: Dictionary = {}
+var _catalog_view: Dictionary = {}
+var _operation_overlay: PanelContainer
+var _operation_label: Label
+var _safe_exit_requested: bool = false
+var _safe_exit_running: bool = false
+var _progress_last_timing: Dictionary = {}
+var _unstarted_progress_payload: Dictionary = {}
+var _uncertain_progress_payload: Dictionary = {}
 
 @onready var _title: Control = $Interface/Screen/Title
 @onready var _status: Label = $Interface/Screen/Status
@@ -192,18 +206,27 @@ func _ready() -> void:
 	var startup_state: Dictionary = {}
 	if playable_entry and transactional_mode and DisplayServer.get_name() != "headless" and _has_progress_sources():
 		_startup_pending = true
+		_progress_started_usec = Time.get_ticks_usec()
 		_show_startup_verification()
 		# Paint before acquiring the writer or hashing existing source files.
 		await get_tree().process_frame
 		await get_tree().process_frame
-		progress_session = _create_progress_session()
 		_startup_worker = Thread.new()
-		if _startup_worker.start(_inspect_startup.bind(progress_session)) == OK:
+		if _startup_worker.start(_bootstrap_progress.bind(_progress_options())) == OK:
 			while _startup_worker.is_alive():
 				await get_tree().process_frame
-			startup_state = _startup_worker.wait_to_finish()
+			var returned: Variant = _startup_worker.wait_to_finish()
+			if returned is Dictionary and returned.get("session") is ProductionProgress and returned.get("state") is Dictionary:
+				progress_session = returned.session
+				startup_state = returned.state
+				_catalog_view = returned.get("catalog", {})
+				_progress_last_timing = returned.get("timing", {})
+			else:
+				progress_session = _create_progress_session()
+				startup_state = {"error":ERR_SCRIPT_FAILED, "state":"BLOCKED", "reason":"PROGRESS_WORKER_FAILED_RETRY_REQUIRED", "camp":{}}
 		else:
-			startup_state = _inspect_startup(progress_session)
+			progress_session = _create_progress_session()
+			startup_state = {"error":ERR_CANT_CREATE, "state":"BLOCKED", "reason":"PROGRESS_WORKER_START_FAILED", "camp":{}}
 		_startup_worker = null
 	_setup_progress(startup_state)
 	audio_preferences = AudioPreferences.new(audio_settings_path)
@@ -264,7 +287,8 @@ func _ready() -> void:
 		_startup_overlay.queue_free()
 		_startup_pending = false
 		if _startup_exit_requested:
-			request_exit("quit")
+			_safe_exit_requested = true
+			_finish_safe_exit.call_deferred()
 	print("BH_READY phase=TITLE renderer=%s" % RenderingServer.get_current_rendering_method())
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with("--verify-quality="):
@@ -495,7 +519,19 @@ func _ready() -> void:
 			break
 
 
+func _process(_delta: float) -> void:
+	if _startup_pending and is_instance_valid(_startup_label):
+		_startup_label.text = "正在核验旅程与资料…\n已等待 %.1f 秒%s" % [float(Time.get_ticks_usec() - _progress_started_usec) / 1000000.0, " · 完成后退出" if _startup_exit_requested else ""]
+	if _progress_busy and is_instance_valid(_operation_label):
+		_operation_label.text = "%s\n已等待 %.1f 秒%s" % [_operation_caption(_progress_operation), float(Time.get_ticks_usec() - _progress_started_usec) / 1000000.0, " · 完成当前操作后退出" if _safe_exit_requested else ""]
+
+
 func _exit_tree() -> void:
+	# Normal close reaches here only after the worker's safe boundary. The fallback
+	# joins protect callers which forcibly remove this node instead of requesting exit.
+	if _progress_worker != null and _progress_worker.is_started():
+		_progress_worker.wait_to_finish()
+		_progress_worker = null
 	if _startup_worker != null and _startup_worker.is_started():
 		_startup_worker.wait_to_finish()
 		_startup_worker = null
@@ -509,7 +545,14 @@ func _exit_tree() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if _progress_busy:
+		if event.is_action_pressed("return_to_title") and not event.is_echo():
+			request_exit("quit")
+		get_viewport().set_input_as_handled()
+		return
 	if _startup_pending:
+		if event.is_action_pressed("return_to_title") and not event.is_echo():
+			_startup_exit_requested = true
 		get_viewport().set_input_as_handled()
 		return
 	if is_instance_valid(_equipment_catalog) and _equipment_catalog.visible and event.is_action_pressed("return_to_title") and not event.is_echo():
@@ -546,6 +589,9 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _progress_busy:
+		get_viewport().set_input_as_handled()
+		return
 	if _startup_pending:
 		get_viewport().set_input_as_handled()
 		return
@@ -620,7 +666,7 @@ func open_validation() -> void:
 func _confirm_result_ui() -> void:
 	if _camp_commit_busy: return
 	if not EconomyBuildV1.enabled(camp_snapshot()):
-		return_to_title()
+		await return_to_title()
 		return
 	var button: Button = $Interface/Screen/Result/Continue
 	var caption: String = button.text
@@ -628,9 +674,7 @@ func _confirm_result_ui() -> void:
 	_camp_commit_label = "return"
 	button.text = "正在确认归航并保存…"
 	button.disabled = true
-	await get_tree().process_frame
-	await get_tree().process_frame
-	return_to_title()
+	await return_to_title()
 	_camp_commit_busy = false
 	_camp_commit_label = ""
 	if button.text == "正在确认归航并保存…": button.text = caption
@@ -647,16 +691,192 @@ func _begin_camp_commit(before: Dictionary, kind: String) -> void:
 	if is_instance_valid(supply_panel) and supply_panel.visible:
 		supply_panel.refresh(before,CampEconomy.rations(day,before.crew,food,camp_rules),"正在保存设施，请稍候…",true)
 		supply_panel._retry.hide()
-	await get_tree().process_frame
-	await get_tree().process_frame
+
+
+func _run_progress_operation(kind: String, before: Dictionary = {}, request: Dictionary = {}) -> Dictionary:
+	if _progress_busy or _startup_pending:
+		return {"error":ERR_BUSY, "state":"BLOCKED", "reason":"PROGRESS_OPERATION_IN_FLIGHT", "camp":{}}
+	if kind == "retry" and not _unstarted_progress_payload.is_empty():
+		kind = _unstarted_progress_payload.kind
+		before = _unstarted_progress_payload.before
+		request = _unstarted_progress_payload.request
+	elif kind == "retry" and not _uncertain_progress_payload.is_empty():
+		kind = "retry_unknown"
+		before = _uncertain_progress_payload.before
+		request = {"original_kind":_uncertain_progress_payload.kind, "original_request":_uncertain_progress_payload.request}
+	_progress_busy = true
+	_camp_commit_busy = true
+	_progress_request_id += 1
+	var request_id: int = _progress_request_id
+	_progress_operation = kind
+	if _camp_commit_label.is_empty():
+		_camp_commit_label = kind
+	_progress_started_usec = Time.get_ticks_usec()
+	# These copies are the original intent; the worker never reads mutable UI state.
+	var payload: Dictionary = {"id":request_id, "kind":kind, "before":before.duplicate(true), "request":request.duplicate(true)}
+	var completed: Dictionary
+	if DisplayServer.get_name() == "headless":
+		_unstarted_progress_payload = {}
+		completed = _execute_progress_operation(progress_session, payload)
+	else:
+		_show_operation_wait()
+		await get_tree().process_frame
+		await get_tree().process_frame
+		_progress_worker = Thread.new()
+		var error: Error = _progress_worker.start(_execute_progress_operation.bind(progress_session, payload))
+		if error == OK:
+			_unstarted_progress_payload = {}
+			while _progress_worker.is_alive():
+				await get_tree().process_frame
+			var returned: Variant = _progress_worker.wait_to_finish()
+			if returned is Dictionary and returned.get("result") is Dictionary and returned.result.has("error"):
+				completed = returned
+			else:
+				if kind != "retry_unknown":
+					_uncertain_progress_payload = payload
+				completed = {"id":request_id, "result":{"error":ERR_SCRIPT_FAILED, "state":"BLOCKED", "reason":"PROGRESS_WORKER_FAILED_RETRY_REQUIRED", "camp":{}}}
+		else:
+			# No worker ran, so the session cannot contain this request yet. Retry
+			# must redispatch these exact inputs instead of accepting the old camp.
+			_unstarted_progress_payload = payload
+			completed = {"id":request_id, "result":{"error":error, "state":"BLOCKED", "reason":"PROGRESS_WORKER_START_FAILED", "camp":{}}}
+		_progress_worker = null
+	# No UI or session call is allowed while the worker owns the writer. Returned
+	# values are independent snapshots made by the worker before ownership returns.
+	if completed.has("view"):
+		_progress_view = completed.view
+	if completed.has("catalog"):
+		_catalog_view = completed.catalog
+	_progress_last_timing = completed.get("timing", {})
+	if kind == "retry_unknown" and completed.result.get("error", FAILED) == OK:
+		_uncertain_progress_payload = {}
+	_progress_busy = false
+	_camp_commit_busy = false
+	_camp_commit_label = ""
+	if is_instance_valid(_operation_overlay):
+		_operation_overlay.hide()
+	if _safe_exit_requested:
+		_finish_safe_exit.call_deferred()
+	if int(completed.get("id", -1)) != request_id:
+		return {"error":ERR_INVALID_DATA, "state":"BLOCKED", "reason":"PROGRESS_REQUEST_ID", "camp":{}}
+	return completed.result
+
+
+static func _execute_progress_operation(session: ProductionProgress, payload: Dictionary) -> Dictionary:
+	var began: int = Time.get_ticks_usec()
+	var result: Dictionary
+	var kind: String = payload.kind
+	var before: Dictionary = payload.before
+	var request: Dictionary = payload.request
+	match kind:
+		"edit": result = session.edit(before, request)
+		"retry": result = session.retry()
+		"retry_unknown":
+			# An exception may follow a successful publication. Always use the
+			# original session recovery before deciding whether the request ran.
+			result = session.retry()
+			if result.error == OK and request.original_kind in ["edit", "create"]:
+				var expected: Dictionary = CampEdit.propose(before, request.original_request) if request.original_kind == "edit" else before
+				if expected.is_empty() or not TransactionReceipt.same(result.get("camp", {}), expected):
+					result = {"error":ERR_SCRIPT_FAILED, "state":"BLOCKED", "reason":"PROGRESS_ORIGINAL_REQUEST_NOT_CONFIRMED", "camp":{}}
+		"commit_result": result = session.commit_result()
+		"catalog": result = session.refresh_catalog()
+		"create": result = session.create(before)
+		"activate": result = session.activate()
+		"continue":
+			result = session.inspect()
+			if result.error == OK:
+				result = session.resume_offer() if result.state == "SUSPENDED" else session.activate()
+		"finish": result = session.finish(request.report, request.carried)
+		"begin": result = session.begin(before, request.supply)
+		"claim": result = session.claim_world(request.world_hash)
+		"suspend": result = session.suspend_world(request.world)
+		"death_equipment": result = {"error":OK, "equipment":session.death_equipment(before)}
+		_: result = {"error":ERR_INVALID_PARAMETER, "state":"BLOCKED", "reason":"PROGRESS_OPERATION_KIND", "camp":{}}
+	var operated: int = Time.get_ticks_usec()
+	var completed: Dictionary = {"id":payload.id, "result":result, "catalog":session.catalog_state()}
+	if result.has("receipt"):
+		completed.view = result.duplicate(true)
+	elif kind == "finish" and result.error == OK:
+		completed.view = session.inspect()
+	completed.timing = {"request_id":payload.id, "operation":kind, "operation_usec":operated - began, "snapshot_usec":Time.get_ticks_usec() - operated, "thread_id":OS.get_thread_caller_id()}
+	return completed
+
+
+func _show_operation_wait() -> void:
+	if not is_instance_valid(_operation_overlay):
+		_operation_overlay = PanelContainer.new()
+		_operation_overlay.name = "ProgressOperationWait"
+		_operation_overlay.z_index = 4000
+		_operation_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_operation_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+		_operation_overlay.theme = CampStyle.blue_hour_theme(_screen.theme)
+		_operation_overlay.add_theme_stylebox_override("panel", CampStyle.box(Color(0.025, 0.07, 0.10, 0.92), CampStyle.TEAL))
+		_operation_label = Label.new()
+		_operation_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_operation_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_operation_label.add_theme_font_size_override("font_size", 24)
+		_operation_overlay.add_child(_operation_label)
+		_screen.add_child(_operation_overlay)
+	_operation_label.text = _operation_caption(_progress_operation) + "\n已等待 0.0 秒"
+	_operation_overlay.show()
+	_screen.show()
+
+
+static func _operation_caption(kind: String) -> String:
+	match kind:
+		"catalog": return "正在核验并同步专精与图鉴…"
+		"commit_result", "finish": return "正在核验归航并保存…"
+		"continue", "activate": return "正在核验并继续旅程…"
+		"create": return "正在确认新旅程…"
+		"begin": return "正在确认本次出击…"
+		"claim": return "正在确认恢复原战场…"
+		"suspend": return "正在暂存原战场…"
+		"death_equipment": return "正在核验幸存者资料…"
+		"retry", "retry_unknown": return "正在重试原保存与资料同步…"
+	return "正在保存整备，请稍候…"
+
+
+func _finish_safe_exit() -> void:
+	if _safe_exit_running:
+		return
+	_safe_exit_running = true
+	while _progress_busy or _startup_pending or (_mission_worker != null and _mission_worker.is_alive()):
+		await get_tree().process_frame
+	# A Begin/claim may already have durably started an outing. Preserve its real
+	# initial/restored world before closing; never leave STARTED or consume a
+	# suspended world merely because close arrived during that confirmation.
+	if safe_suspend and phase == Phase.EXPEDITION and is_instance_valid(expedition) \
+			and not expedition.is_practice and expedition.phase != Expedition.Phase.FINISHED:
+		_lock_menu_world()
+		if _frozen_world.is_empty():
+			# The snapshot's original arrival skip changes visible crew positions.
+			# Apply the same normal display pass used after restore before freezing.
+			if expedition.bus_view != null and expedition.bus_view.stage in ["arriving", "disembarking"]:
+				expedition.bus_view.skip()
+			expedition._update_ui()
+			_frozen_world = SortieSnapshot.capture(expedition)
+		expedition.suspend_sealed = true
+		var saved: Dictionary = await _run_progress_operation("suspend", {}, {"world":_frozen_world})
+		if saved.error != OK:
+			_safe_exit_requested = false
+			_safe_exit_running = false
+			pause_menu.suspend_message = "安全退出暂存未确认；原战场保持暂停，请重试暂存。\n" + _suspend_problem(saved)
+			pause_menu.show_pause(true)
+			return
+	print("BH_EXIT requested safe_boundary")
+	if is_instance_valid(audio):
+		audio.shutdown()
+	get_tree().quit()
 
 
 func return_to_title() -> void:
+	if _progress_busy: return
 	if phase != Phase.VALIDATION and phase != Phase.RESULT:
 		return
 	if battle_mode and not _pending_settlement.is_empty() and (_pending_settlement.journey.state=="FAILED" or CampaignState.ended(_pending_settlement)):
 		var terminal: Dictionary=_pending_settlement.duplicate(true)
-		if not _accept_transaction(progress_session.commit_result(),true):
+		if not _accept_transaction(await _run_progress_operation("commit_result"),true):
 			_show_battle_result(_pending_settlement,false)
 			return
 		_pending_settlement={}
@@ -666,7 +886,10 @@ func return_to_title() -> void:
 	_disconnect_sortie_events()
 	if phase == Phase.RESULT and not _pending_settlement.is_empty():
 		if transactional_mode:
-			if not _accept_transaction(progress_session.commit_result(),true): return
+			if not _accept_transaction(await _run_progress_operation("commit_result"),true):
+				if _progress_view.get("state") == "CATALOG_PENDING":
+					_show_battle_result(_pending_settlement, false)
+				return
 		elif _pending_settlement.last_settlement_id != last_settlement_id:
 			_apply_progress(_pending_settlement)
 			_progress_dirty = true
@@ -696,6 +919,7 @@ func return_to_title() -> void:
 
 
 func open_mission_select() -> void:
+	if _progress_busy: return
 	if phase != Phase.TITLE or _settings_open() or $Interface/Screen/Title/Start.disabled:
 		return
 	if hunger_trial and not _hunger_consented:
@@ -735,8 +959,12 @@ func _load_mission_cards() -> void:
 		await get_tree().process_frame
 	if _mission_worker != worker:
 		return
-	var prepared: Dictionary = worker.wait_to_finish()
+	var returned: Variant = worker.wait_to_finish()
 	_mission_worker = null
+	var prepared: Dictionary = {}
+	if returned is Dictionary and returned.get("offers") is Array and returned.get("supplies") is Array \
+			and returned.offers.size() == returned.supplies.size():
+		prepared = returned
 	if not mission_select.visible or _mission_request_key.is_empty():
 		return
 	if phase != Phase.TITLE or $Interface/Screen/Title/Start.disabled:
@@ -745,7 +973,7 @@ func _load_mission_cards() -> void:
 	if _mission_request_key != request_key or not TransactionReceipt.same(base, camp_snapshot()):
 		_load_mission_cards()
 		return
-	if prepared.offers.is_empty():
+	if prepared.is_empty() or prepared.offers.is_empty():
 		mission_select.show_waiting(base, rations, true)
 		return
 	mission_select.refresh_daily(base, rations, prepared)
@@ -782,6 +1010,7 @@ func close_mission_select() -> void:
 
 
 func _select_mission(supply: MissionSupply) -> void:
+	if _progress_busy: return
 	if _departure_pending or (mission_select.visible and mission_select.loading) or (is_instance_valid(_blue_hour_title_art) and phase != Phase.TITLE):
 		return
 	var from_menu: bool = is_instance_valid(_blue_hour_title_art) and mission_select.visible
@@ -790,7 +1019,7 @@ func _select_mission(supply: MissionSupply) -> void:
 	_mission_request_key = ""
 	selected_supply = supply
 	mission_select.hide()
-	open_expedition()
+	await open_expedition()
 	_departure_pending = false
 	if not from_menu:
 		return
@@ -817,14 +1046,15 @@ func _fade_departure() -> void:
 
 
 func open_expedition() -> void:
-	_open_sortie(false)
+	await _open_sortie(false)
 
 
 func open_practice() -> void:
-	_open_sortie(true)
+	await _open_sortie(true)
 
 
 func _open_sortie(practice: bool, resume: Dictionary = {}) -> void:
+	if _progress_busy: return
 	if phase != Phase.TITLE or _settings_open():
 		return
 	if hunger_trial and not _hunger_consented:
@@ -836,7 +1066,7 @@ func _open_sortie(practice: bool, resume: Dictionary = {}) -> void:
 	if not practice and (_requires_continue or _progress_blocked):
 		return
 	if not practice and transactional_mode and resume.is_empty():
-		var started: Dictionary = progress_session.begin(camp_snapshot(),selected_supply)
+		var started: Dictionary = await _run_progress_operation("begin", camp_snapshot(), {"supply":selected_supply})
 		if started.error != OK:
 			_accept_transaction(started)
 			return
@@ -927,7 +1157,7 @@ func _open_sortie(practice: bool, resume: Dictionary = {}) -> void:
 			return
 		expedition.suspend_sealed = true
 		_frozen_world = world.duplicate(true)
-		var claimed: Dictionary = progress_session.claim_world(resume.receipt.envelope.world_hash)
+		var claimed: Dictionary = await _run_progress_operation("claim", {}, {"world_hash":resume.receipt.envelope.world_hash})
 		if claimed.error == OK:
 			expedition.suspend_sealed = false
 			_frozen_world = {}
@@ -942,6 +1172,7 @@ func _open_sortie(practice: bool, resume: Dictionary = {}) -> void:
 
 
 func reset_demo() -> void:
+	if _progress_busy: return
 	if phase != Phase.TITLE or _settings_open():
 		return
 	if battle_mode and _progress_dirty:
@@ -978,7 +1209,8 @@ func _pool_initial() -> Dictionary:
 
 
 func _open_opening_choice() -> void:
-	_opening_picker.present(progress_session.catalog_state())
+	if _progress_busy: return
+	_opening_picker.present(_catalog_view)
 	_opening_picker.reset_choice()
 	_opening_confirm_pending = true
 	_new_game_confirmation.popup_centered(Vector2i(950, 496))
@@ -986,23 +1218,28 @@ func _open_opening_choice() -> void:
 
 
 func _confirm_new_journey() -> void:
+	if _progress_busy: return
 	if not playable_entry:
 		_new_game()
 	elif _opening_confirm_pending:
 		_opening_confirm_pending = false
-		var catalog: Dictionary = progress_session.refresh_catalog()
+		var chosen_plan: String = _opening_picker.selected_plan
+		var catalog: Dictionary = await _run_progress_operation("catalog")
+		if _safe_exit_requested:
+			return
 		if catalog.error != OK:
 			_show_equipment_catalog(catalog)
 			return
 		if phase == Phase.RESULT:
-			return_to_title()
+			await return_to_title()
 		if phase == Phase.TITLE:
-			var plan: String = _opening_picker.selected_plan
+			var plan: String = chosen_plan
 			var policy: Dictionary = {"version":OpeningBuild.POLICY_VERSION, "eligible":CatalogProgress.eligible_for(catalog, plan)}
 			_new_game(plan, {"version":CatalogProgress.VERSION, "unlock":catalog.unlock_hash}, policy)
 
 
 func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}, m47_policy: Dictionary = {}) -> void:
+	if _progress_busy: return
 	if not opening_plan.is_empty() and (not playable_entry or not OpeningBuild.PLANS.has(opening_plan)):
 		return
 	if rescue_mode: _recruits = []
@@ -1079,7 +1316,7 @@ func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}, m47_p
 	_progress_message = "新游戏尚未保存；正式回营或确认营地配装后保存。"
 	if transactional_mode:
 		_transactional_new_pending = true
-		_accept_transaction(progress_session.create(camp_snapshot()),true)
+		_accept_transaction(await _run_progress_operation("create", camp_snapshot()),true)
 	_update_camp()
 	_request_audio(&"ui_confirm")
 
@@ -1100,7 +1337,7 @@ func _on_expedition_finished(report: Dictionary, sortie_id: String) -> void:
 		return
 	if transactional_mode:
 		var carried: Dictionary = {"loot":expedition.loot,"food":expedition.food_loot,"weapons":expedition.weapon_loot.duplicate(true)}
-		var prepared: Dictionary = progress_session.finish(report,carried)
+		var prepared: Dictionary = await _run_progress_operation("finish", {}, {"report":report,"carried":carried})
 		if prepared.error == OK:
 			_pending_settlement = prepared.camp.duplicate(true)
 		else:
@@ -1187,6 +1424,7 @@ func _quit() -> void:
 
 
 func open_pause_menu() -> void:
+	if _progress_busy: return
 	if phase != Phase.EXPEDITION or expedition.phase == Expedition.Phase.FINISHED or pause_menu.root.visible:
 		return
 	_lock_menu_world()
@@ -1241,6 +1479,7 @@ func close_pause_menu() -> void:
 
 
 func suspend_sortie() -> void:
+	if _progress_busy: return
 	if not safe_suspend or phase != Phase.EXPEDITION or not is_instance_valid(expedition) or not pause_menu.root.visible:
 		return
 	var quit_after_save: bool = pause_menu.confirming and _exit_target == "quit"
@@ -1253,7 +1492,7 @@ func suspend_sortie() -> void:
 	# Once publication is attempted, a failure may still leave a durable snapshot.
 	# Seal the original world until that anchor is consumed or publication is confirmed.
 	expedition.suspend_sealed = true
-	var saved: Dictionary = progress_session.suspend_world(_frozen_world)
+	var saved: Dictionary = await _run_progress_operation("suspend", {}, {"world":_frozen_world})
 	if saved.error != OK:
 		print("BH_SUSPEND_BLOCK ",saved.get("reason",""))
 		pause_menu.suspend_message = "未保存成功，原场景保持暂停；可重试暂存或继续确认安全消费。\n" + _suspend_problem(saved)
@@ -1307,6 +1546,10 @@ func _suspend_problem(result: Dictionary) -> String:
 
 
 func request_exit(target: String) -> void:
+	if _progress_busy:
+		if target == "quit":
+			_safe_exit_requested = true
+		return
 	if _startup_pending:
 		if target == "quit":
 			_startup_exit_requested = true
@@ -1349,7 +1592,7 @@ func request_exit(target: String) -> void:
 			message = "全灭终局与阵亡记录已保存；重启不能复活或返回旧营地。"
 		elif not transactional_mode:
 			message = "旧 v5：当前只是结果预览，尚未回营保存。\n关闭后仅保留上次营地；要保存请取消并选择返回营地。"
-	elif transactional_mode and _requires_continue and progress_session.inspect().get("state") == "RECOVERY_READY":
+	elif transactional_mode and _requires_continue and _progress_view.get("state") == "RECOVERY_READY":
 		title = "已有完整冻结结果待继续"
 		message = "已有 RESULT_READY 保留。重启后明确继续将复用原冻结结果并提交一次。\n关闭不会重新计算，也不会回退到出击前营地。"
 	elif safe_suspend and _requires_continue and _pending_save.is_empty() and not _progress_blocked:
@@ -1375,6 +1618,10 @@ func _cancel_exit() -> void:
 
 
 func _confirm_exit() -> void:
+	if _progress_busy or (_mission_worker != null and _mission_worker.is_alive()):
+		_safe_exit_requested = true
+		_finish_safe_exit()
+		return
 	if _exit_target == "home":
 		close_pause_menu()
 		if pause_menu.root.visible:
@@ -1436,6 +1683,7 @@ func _settings_open() -> bool:
 
 
 func open_roster() -> void:
+	if _progress_busy: return
 	if phase != Phase.TITLE or _settings_open() or _requires_continue or _progress_blocked:
 		return
 	if not is_instance_valid(roster_panel):
@@ -1456,7 +1704,8 @@ func open_roster() -> void:
 	_title.hide()
 	roster_panel.show()
 	if roster_mode:
-		roster_panel.death_equipment = progress_session.death_equipment(camp_snapshot())
+		var equipment: Dictionary = await _run_progress_operation("death_equipment", camp_snapshot())
+		roster_panel.death_equipment = equipment.get("equipment", {})
 	roster_panel.refresh(camp_snapshot())
 	roster_panel.buttons_by_id[roster_panel.selected_member_id].grab_focus()
 	_request_audio(&"ui_confirm")
@@ -1507,6 +1756,7 @@ func close_growth() -> void:
 
 
 func rename_survivor(member_id: int, value: String) -> void:
+	if _progress_busy: return
 	if phase != Phase.TITLE or not is_instance_valid(roster_panel) or not roster_panel.visible:
 		return
 	var problem: String = SurvivorRoster.name_problem(value)
@@ -1520,7 +1770,7 @@ func rename_survivor(member_id: int, value: String) -> void:
 		roster_panel.refresh(camp_snapshot(), "呼号未改变，未重复保存。")
 		return
 	if transactional_mode:
-		if _accept_transaction(progress_session.edit(camp_snapshot(),{"kind":"rename","member_id":member_id,"value":value}),true):
+		if _accept_transaction(await _run_progress_operation("edit", camp_snapshot(),{"kind":"rename","member_id":member_id,"value":value}),true):
 			_request_audio(&"ui_confirm")
 		roster_panel.refresh(camp_snapshot(),_progress_message)
 		return
@@ -1545,6 +1795,7 @@ func _roster_equipment(member_id: int, discard_pending: bool = false) -> void:
 
 
 func open_loadout(workshop: bool = false) -> void:
+	if _progress_busy: return
 	if phase != Phase.TITLE or _settings_open() or _requires_continue or _progress_blocked:
 		return
 	if not is_instance_valid(loadout_panel):
@@ -1612,7 +1863,7 @@ func equip_weapon(member_id: int, identity: String) -> void:
 			loadout_panel.refresh(before, "配装或持有人已变化，请重新预览。", _progress_dirty)
 			return
 		if EconomyBuildV1.enabled(before): await _begin_camp_commit(before, "weapon_equip")
-		if _accept_transaction(progress_session.edit(before,{"kind":"equip","member_id":member_id,"value":identity}),true):
+		if _accept_transaction(await _run_progress_operation("edit", before,{"kind":"equip","member_id":member_id,"value":identity}),true):
 			_request_audio(&"ui_confirm")
 		_camp_commit_busy = false
 		_camp_commit_label = ""
@@ -1630,7 +1881,7 @@ func repair_weapon(identity: String) -> void:
 	if transactional_mode:
 		var before: Dictionary = camp_snapshot()
 		if EconomyBuildV1.enabled(before): await _begin_camp_commit(before, "weapon_repair")
-		if _accept_transaction(progress_session.edit(before,{"kind":"repair","member_id":0,"value":identity}),true):
+		if _accept_transaction(await _run_progress_operation("edit", before,{"kind":"repair","member_id":0,"value":identity}),true):
 			_request_audio(&"ui_confirm")
 		_camp_commit_busy = false
 		_camp_commit_label = ""
@@ -1651,7 +1902,7 @@ func install_workshop_mod(identity: String, mod: String) -> void:
 	if not issue.is_empty():
 		loadout_panel.refresh(before, issue, _progress_dirty)
 		return
-	var saved: bool = _accept_transaction(progress_session.edit(before, {"kind":mod, "member_id":0, "value":identity}), true)
+	var saved: bool = _accept_transaction(await _run_progress_operation("edit", before, {"kind":mod, "member_id":0, "value":identity}), true)
 	if saved:
 		_request_audio(&"ui_confirm")
 	loadout_panel.refresh(camp_snapshot(), "已安装%s · 使用工具箱 ×1、8 币" % WorkshopV1.name_for(mod) if saved else _progress_message, _progress_dirty)
@@ -1666,7 +1917,7 @@ func confirm_economy_edit(request: Dictionary) -> void:
 	var before: Dictionary = camp_snapshot()
 	var frozen_request: Dictionary = request.duplicate(true)
 	await _begin_camp_commit(before,"economy")
-	var saved: bool = _accept_transaction(progress_session.edit(before, frozen_request), true)
+	var saved: bool = _accept_transaction(await _run_progress_operation("edit", before, frozen_request), true)
 	_camp_commit_busy = false
 	_camp_commit_label = ""
 	if saved:
@@ -1833,15 +2084,18 @@ func _migration_reason(reason: String) -> String:
 
 
 func continue_game() -> void:
+	if _progress_busy: return
 	if phase != Phase.TITLE or _settings_open() or not _requires_continue:
 		return
 	if hunger_trial and not _hunger_consented:
 		_hunger_confirmation.popup_centered(Vector2i(700,260))
 		return
 	if transactional_mode:
-		var inspected: Dictionary = progress_session.inspect()
+		var inspected: Dictionary = await _run_progress_operation("continue")
+		if _safe_exit_requested:
+			return
 		if inspected.error == OK and inspected.state == "SUSPENDED":
-			var offer: Dictionary = progress_session.resume_offer()
+			var offer: Dictionary = inspected
 			if offer.error != OK:
 				_accept_transaction(offer)
 				return
@@ -1849,9 +2103,9 @@ func continue_game() -> void:
 			selected_supply = SortieSnapshot.supply_for_world(offer.receipt.envelope.world)
 			_requires_continue = false
 			_progress_blocked = false
-			_open_sortie(false,offer)
+			await _open_sortie(false,offer)
 			return
-		if _accept_transaction(progress_session.activate(),true):
+		if _accept_transaction(inspected,true):
 			_request_audio(&"ui_confirm")
 			if battle_mode and (_battle_meta.state == "FAILED" or CampaignState.ended(camp_snapshot())):
 				_show_battle_result(camp_snapshot(),true)
@@ -1877,10 +2131,11 @@ func use_backup() -> void:
 
 
 func save_camp() -> void:
+	if _progress_busy: return
 	if phase != Phase.TITLE or not _progress_dirty:
 		return
 	if transactional_mode:
-		_accept_transaction(progress_session.retry(),true)
+		_accept_transaction(await _run_progress_operation("retry"),true)
 		return
 	var error: Error = run_save.save(camp_snapshot(), _allow_invalid_replacement)
 	_progress_message = run_save.diagnostic
@@ -1895,6 +2150,15 @@ func save_camp() -> void:
 
 
 func _accept_transaction(result: Dictionary, retryable: bool = false) -> bool:
+	if result.get("state") == "CATALOG_PENDING" and result.get("camp_saved", false):
+		_apply_progress(result.camp)
+		_pending_save.clear()
+		_progress_dirty = true
+		_progress_blocked = true
+		_progress_message = "营地已保存；专精与图鉴核验未完成。请重试原保存以同步资料，完成前不能出击或开始新旅程。"
+		print("BH_TXN_CATALOG_PENDING reason=%s" % result.get("reason", ""))
+		_update_camp()
+		return false
 	if result.get("state")=="BUSINESS_REJECTED":
 		_progress_message = result.message
 		_update_camp()
@@ -1947,13 +2211,17 @@ func _present_finished_battle() -> void:
 	var frozen: Dictionary = _pending_settlement
 	var durable: bool = false
 	if frozen.journey.state == "FAILED":
-		durable = _accept_transaction(progress_session.commit_result(), true)
+		durable = _accept_transaction(await _run_progress_operation("commit_result"), true)
 		if durable:
 			_pending_settlement = {}
 	_show_battle_result(frozen, durable)
 
 
 func _show_battle_result(snapshot: Dictionary, durable: bool) -> void:
+	var catalog_pending: bool = _progress_view.get("state") == "CATALOG_PENDING" and _progress_view.get("camp_saved", false) \
+		and _progress_view.get("receipt", {}).get("transaction_id") == snapshot.last_settlement_id
+	if catalog_pending:
+		durable = true
 	phase = Phase.RESULT
 	_screen.show()
 	_title.hide()
@@ -1994,10 +2262,15 @@ func _show_battle_result(snapshot: Dictionary, durable: bool) -> void:
 			$Interface/Screen/Result/Continue.text = "确认归航并保存胜利 →" if not _progress_blocked else "重试保存终局 →"
 		if victory and durable and CampaignRules.pump_station_enabled(snapshot.journey.campaign):
 			_show_pump_victory(snapshot)
+	if catalog_pending:
+		$Interface/Screen/Result/Heading.text = "归航已保存 · 资料待同步"
+		$Interface/Screen/Result/Continue.text = "重试同步专精与图鉴 →"
+		_battle_new_button.disabled = true
+		_status.text = _progress_message
 
 
 func _show_pump_victory(snapshot: Dictionary) -> void:
-	var inspected: Dictionary = progress_session.inspect()
+	var inspected: Dictionary = _progress_view
 	var receipt: Dictionary = inspected.get("receipt", {})
 	var frozen: Dictionary = receipt.get("envelope", {}).get("result", {})
 	var generated: Dictionary = frozen.get("rules", {}).get("mission", {}).get("generated", {})
@@ -2074,7 +2347,7 @@ func _member_fate(snapshot: Dictionary, id: int) -> String:
 
 func _hunger_result_text(snapshot: Dictionary, durable: bool) -> String:
 	# Read the published envelope, including after a fresh-process Continue. Never rerun selection.
-	var state: Dictionary = progress_session.inspect()
+	var state: Dictionary = _progress_view
 	var frozen: Dictionary = state.get("receipt",{}).get("envelope",{}).get("result",{})
 	var text: String = "任务与口粮 / PROJECT_TEMP\n"
 	if rescue_mode:
@@ -2182,9 +2455,35 @@ func _show_startup_verification() -> void:
 
 
 func _create_progress_session() -> ProductionProgress:
-	var session: ProductionProgress = ProductionProgress.new(progress_path,battle_mode,survival_mode,hunger_trial,rescue_mode,growth_mode,field_join_mode,trait_mode,training_mode,pool_mode,roster_mode,quality_mode,enemy_mode,playable_entry)
-	session.suspend_enabled = safe_suspend
+	return _session_from_options(_progress_options())
+
+
+func _progress_options() -> Dictionary:
+	return {"path":progress_path, "battle":battle_mode, "survival":survival_mode, "hunger":hunger_trial,
+		"rescue":rescue_mode, "growth":growth_mode, "field":field_join_mode, "trait":trait_mode,
+		"training":training_mode, "pool":pool_mode, "roster":roster_mode, "quality":quality_mode,
+		"enemy":enemy_mode, "playable":playable_entry, "suspend":safe_suspend}
+
+
+static func _session_from_options(options: Dictionary) -> ProductionProgress:
+	var session: ProductionProgress = ProductionProgress.new(options.path, options.battle, options.survival,
+		options.hunger, options.rescue, options.growth, options.field, options.trait, options.training,
+		options.pool, options.roster, options.quality, options.enemy, options.playable)
+	session.suspend_enabled = options.suspend
 	return session
+
+
+static func _bootstrap_progress(options: Dictionary) -> Dictionary:
+	var began: int = Time.get_ticks_usec()
+	var session: ProductionProgress = _session_from_options(options)
+	var constructed: int = Time.get_ticks_usec()
+	var state: Dictionary = _inspect_startup(session)
+	var operated: int = Time.get_ticks_usec()
+	var catalog: Dictionary = session.catalog_state()
+	return {"session":session, "state":state, "catalog":catalog,
+		"timing":{"operation":"startup", "construction_usec":constructed - began,
+			"operation_usec":operated - constructed, "snapshot_usec":Time.get_ticks_usec() - operated,
+			"thread_id":OS.get_thread_caller_id()}}
 
 
 static func _inspect_startup(session: ProductionProgress) -> Dictionary:
@@ -2206,6 +2505,9 @@ func _setup_progress(preloaded_state: Dictionary = {}) -> void:
 			state = progress_session.inspect()
 			if playable_entry:
 				progress_session.refresh_catalog()
+		_progress_view = state
+		if _catalog_view.is_empty():
+			_catalog_view = progress_session.catalog_state()
 		if state.error == OK and state.state == "SUSPENDED":
 			_requires_continue = true
 			_progress_message = "已有未完成的出击暂存。继续将恢复原战场并消费本次快照，不返回旧营地。"
@@ -2606,10 +2908,11 @@ func _offer_camp_facility(choice: String, upgrade: bool = false) -> void:
 
 
 func _confirm_camp_facility() -> void:
+	if _progress_busy: return
 	if not _economy_request.is_empty():
 		var request: Dictionary = _economy_request
 		_economy_request = {}
-		confirm_economy_edit(request)
+		await confirm_economy_edit(request)
 		_restore_facility_focus.call_deferred()
 		return
 	var choice: String = _facility_choice
@@ -2617,7 +2920,7 @@ func _confirm_camp_facility() -> void:
 	if phase != Phase.TITLE or not _camp_open or not transactional_mode or not CampSceneView.FACILITY_NAMES.has(choice):
 		return
 	var kind: String = "facility_upgrade" if _facility_upgrade else "facility"
-	if _accept_transaction(progress_session.edit(camp_snapshot(), {"kind":kind, "member_id":0, "value":choice}), true):
+	if _accept_transaction(await _run_progress_operation("edit", camp_snapshot(), {"kind":kind, "member_id":0, "value":choice}), true):
 		var label: String = CampSupplyPanel.UPGRADES[choice] if _facility_upgrade else CampSupplyPanel.NAMES[choice]
 		_progress_message = "%s已建成，支出已保存。" % label
 		_request_audio(&"ui_confirm")
@@ -2634,6 +2937,7 @@ func _restore_facility_focus() -> void:
 
 
 func open_supplies() -> void:
+	if _progress_busy: return
 	if phase != Phase.TITLE or _settings_open() or _requires_continue or _progress_blocked:
 		return
 	if not is_instance_valid(supply_panel):
@@ -2660,7 +2964,7 @@ func _retry_facility() -> void:
 	if _camp_commit_busy: return
 	if not _progress_dirty or not transactional_mode:
 		return
-	_accept_transaction(progress_session.retry(), true)
+	_accept_transaction(await _run_progress_operation("retry"), true)
 	_refresh_supply_panel()
 
 
@@ -2721,7 +3025,7 @@ func _camp_action(action: StringName, member_id: int) -> void:
 				open_training()
 			else:
 				camp_scene.open_info(action)
-		&"specialties": _show_equipment_catalog(progress_session.refresh_catalog())
+		&"specialties": _open_equipment_catalog()
 		&"sound": open_sound_settings()
 		&"legacy":
 			_camp_legacy = true
@@ -2796,6 +3100,7 @@ func _roster_training(id: int) -> void:
 		training_panel.refresh(camp_snapshot())
 
 func open_training() -> void:
+	if _progress_busy: return
 	if not training_mode or phase!=Phase.TITLE or not _camp_open or _settings_open() or _requires_continue or _progress_blocked or not _pending_settlement.is_empty():
 		return
 	if not is_instance_valid(training_panel):
@@ -2823,20 +3128,22 @@ func close_training() -> void:
 
 
 func confirm_training(request: Dictionary) -> void:
+	if _progress_busy: return
 	if not request.get("kind") is String or request.kind!="train_trait":
 		return
 	if not training_mode or phase!=Phase.TITLE or not _camp_open or not is_instance_valid(training_panel) or not training_panel.visible or _requires_continue or _progress_blocked or not _pending_settlement.is_empty():
 		return
-	var accepted: bool = _accept_transaction(progress_session.edit(camp_snapshot(),request),true)
+	var accepted: bool = _accept_transaction(await _run_progress_operation("edit", camp_snapshot(),request),true)
 	training_panel.refresh(camp_snapshot(),"训练已保存。粮食与本人Trait已同时确认；下次出击按新等级生效。" if accepted else _progress_message,_progress_blocked)
 	if accepted:
 		_request_audio(&"ui_confirm")
 
 
 func retry_training() -> void:
+	if _progress_busy: return
 	if not training_mode or not is_instance_valid(training_panel) or not training_panel.visible or not _progress_dirty:
 		return
-	var accepted: bool = _accept_transaction(progress_session.retry(),true)
+	var accepted: bool = _accept_transaction(await _run_progress_operation("retry"),true)
 	training_panel.refresh(camp_snapshot(),"原训练已保存确认；没有再次扣粮或增加进度。" if accepted else _progress_message,not accepted)
 
 
@@ -2863,7 +3170,7 @@ func _setup_blue_hour_title() -> void:
 	_title.move_child(_blue_hour_title_art, 0)
 	_catalog_button = Button.new()
 	_catalog_button.text = "专精 / 图鉴"
-	_catalog_button.pressed.connect(func() -> void: _show_equipment_catalog(progress_session.refresh_catalog()))
+	_catalog_button.pressed.connect(func() -> void: _open_equipment_catalog())
 	_title.add_child(_catalog_button)
 	var title_font: SystemFont = SystemFont.new()
 	title_font.font_names = PackedStringArray(["STZhongsong", "SimSun", "Noto Serif CJK SC", "Microsoft YaHei"])
@@ -2917,7 +3224,7 @@ func _refresh_blue_hour_title() -> void:
 	CampStyle.place(_home_button, Rect2(91, 316 if live_camp else 367, 276, 44))
 	CampStyle.place(reset, Rect2(91, 367, 276, 44))
 	CampStyle.place(sound, Rect2(91, 418, 126, 44))
-	var catalog_ready: bool = progress_session.catalog_state().get("error", FAILED) == OK
+	var catalog_ready: bool = _catalog_view.get("error", FAILED) == OK
 	_catalog_button.text = "专精 / 图鉴" if catalog_ready else "专精待同步"
 	_catalog_button.tooltip_text = "" if catalog_ready else "打开专精资料，重试读取与同步"
 	_catalog_button.show()
@@ -2976,7 +3283,7 @@ func _restore_blue_hour_title_focus() -> void:
 
 func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	# Presentation reads the already-frozen result; it never recalculates rewards/deaths.
-	var state: Dictionary = progress_session.inspect()
+	var state: Dictionary = _progress_view
 	var frozen: Dictionary = state.get("receipt",{}).get("envelope",{}).get("result",{})
 	var meal: Dictionary = frozen.get("food",snapshot.last_day)
 	var battle: Dictionary = frozen.get("battle",{})
@@ -3067,7 +3374,7 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 func _catalog_result_notice(snapshot: Dictionary) -> String:
 	if not snapshot.journey.get("build", {}).has("catalog"):
 		return ""
-	var catalog: Dictionary = progress_session.catalog_state()
+	var catalog: Dictionary = _catalog_view
 	if catalog.get("error", FAILED) != OK:
 		return "专精与图鉴待同步 · 可在标题重试" if OpeningBuild.is_m47(snapshot) else "装备图鉴待同步 · 可重启补记"
 	var result: Dictionary = catalog.get("specialization_result", {})
@@ -3086,14 +3393,25 @@ func _show_equipment_catalog(state: Dictionary) -> void:
 		_screen.add_child(_equipment_catalog)
 		_equipment_catalog.closed.connect(_close_equipment_catalog)
 		_equipment_catalog.retry_requested.connect(func() -> void:
-			_equipment_catalog.present(progress_session.refresh_catalog()))
+			_open_equipment_catalog())
 	_title.hide()
 	_result.hide()
 	_equipment_catalog.show()
 	_equipment_catalog.present(state)
 
 
+func _open_equipment_catalog() -> void:
+	if _progress_busy or _startup_pending:
+		return
+	var catalog: Dictionary = await _run_progress_operation("catalog")
+	if _safe_exit_requested:
+		return
+	_show_equipment_catalog(catalog)
+
+
 func _close_equipment_catalog() -> void:
+	if _progress_busy:
+		return
 	_equipment_catalog.hide()
 	if phase == Phase.TITLE:
 		_title.show()
@@ -3115,7 +3433,7 @@ func equip_build_item(slot: int, item: String) -> void:
 	if phase!=Phase.TITLE or not loadout_panel.visible or _progress_blocked or not BuildState.enabled(camp_snapshot()): return
 	var before: Dictionary = camp_snapshot()
 	if EconomyBuildV1.enabled(before): await _begin_camp_commit(before, "build_slot")
-	var saved: bool=_accept_transaction(progress_session.edit(before,{"kind":"build_slot","member_id":slot,"value":item}),true)
+	var saved: bool=_accept_transaction(await _run_progress_operation("edit", before,{"kind":"build_slot","member_id":slot,"value":item}),true)
 	_camp_commit_busy = false
 	_camp_commit_label = ""
 	loadout_panel.refresh(camp_snapshot(),"本局道具配装已保存；下一行动生效。" if saved else _progress_message,_progress_dirty)
@@ -3149,7 +3467,7 @@ func _edit_power(request: Dictionary, success: String) -> void:
 	var before: Dictionary = camp_snapshot()
 	var frozen_request: Dictionary = request.duplicate(true)
 	if EconomyBuildV1.enabled(before): await _begin_camp_commit(before,String(request.kind))
-	var saved: bool = _accept_transaction(progress_session.edit(before,frozen_request),true)
+	var saved: bool = _accept_transaction(await _run_progress_operation("edit", before,frozen_request),true)
 	_camp_commit_busy = false
 	_camp_commit_label = ""
 	loadout_panel.refresh(camp_snapshot(),success if saved else _progress_message,_progress_dirty)
@@ -3163,7 +3481,7 @@ func retry_power_edit() -> void:
 		return
 	var before: Dictionary = camp_snapshot()
 	if EconomyBuildV1.enabled(before): await _begin_camp_commit(before, "retry_edit")
-	var saved: bool = _accept_transaction(progress_session.retry(),true)
+	var saved: bool = _accept_transaction(await _run_progress_operation("retry"),true)
 	_camp_commit_busy = false
 	_camp_commit_label = ""
 	loadout_panel.refresh(camp_snapshot(),"本次整备已保存；余额与状态已更新。" if saved else _progress_message,not saved)

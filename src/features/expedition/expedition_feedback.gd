@@ -2,6 +2,7 @@ class_name ExpeditionFeedback
 extends RefCounted
 ## Presentation hooks for future hitstop, camera shake, animation and audio.
 
+var _atmosphere: ExpeditionAtmosphere = ExpeditionAtmosphere.new()
 var x: Expedition
 
 
@@ -88,33 +89,46 @@ func _show_notice(message: String) -> void:
 func _refresh_night_lighting() -> void:
 	if x._night_lighting == null:
 		return
-	var daylight: float = x.tuning.daylight_seconds
-	var dusk: float = daylight * x.threat.rules.late_fraction
-	var deep_night: float = daylight * x.threat.rules.deep_fraction
-	var night_grade: float = 0.78
-	var amount: float = night_grade * smoothstep(dusk, daylight, x.elapsed)
-	if x.elapsed >= daylight:
-		amount = lerpf(night_grade, 1.0, smoothstep(daylight, deep_night, x.elapsed))
+	var daylight: float = maxf(1.0, x.tuning.daylight_seconds)
+	var amount: float = clampf(x.elapsed / daylight, 0.0, 1.0)
+	_atmosphere.refresh(x, amount)
 	x._night_lighting.refresh(amount, x._bus_sprite.get_global_transform_with_canvas().origin, x.camera.zoom.x)
+	_keep_squad_in_view()
+
+
+func _keep_squad_in_view() -> void:
+	if x.camera == null or x.phase == Expedition.Phase.FINISHED:
+		return
+	if x.bus_view != null and x.bus_view.running():
+		return
+	var points: Array[Vector2] = []
+	for actor: FieldActor in x.survivors:
+		if actor.visible and actor.health > 0.0 and actor.activity != FieldActor.Activity.DOWN:
+			points.append(actor.position)
+	x.camera.keep_points_visible(points)
 
 
 func _street_camera_start() -> Vector2:
+	var focus: Vector2
 	if ReconActionV1.enabled(x.supply.generated):
-		return x.layout.bus_door
-	var view_size: Vector2 = x.get_viewport_rect().size / x.camera.zoom
-	var yard: Dictionary = x.layout.world_data.get("loading_yard", x.layout.world_data.get("rescue_court", {}))
-	if not yard.is_empty():
-		var scene: Rect2 = WorldLayout.rect(yard.bounds).expand(x.layout.bus_door + Vector2(0, 42))
-		if scene.size.x <= view_size.x - 144 and scene.size.y <= view_size.y - 160:
-			return scene.get_center() - Vector2(0, 32)
-	if x._supply_entrances.is_empty():
-		return x.layout.camera_start
-	var focus: Rect2 = Rect2(x.layout.bus_door, Vector2.ZERO).expand(x._supply_entrances[0])
-	var both: Rect2 = focus.expand(x._supply_entrances[1])
-	if both.size.x <= view_size.x - 192 and both.size.y <= view_size.y - 192:
-		focus = both
-	var roof_room: float = clampf((view_size.y - focus.size.y) * 0.5 - 96, 0, 72)
-	return focus.get_center() - Vector2(0, roof_room)
+		focus = x.layout.bus_door
+	else:
+		var view_size: Vector2 = x.get_viewport_rect().size / x.camera.zoom
+		var yard: Dictionary = x.layout.world_data.get("loading_yard", x.layout.world_data.get("rescue_court", {}))
+		if not yard.is_empty():
+			var scene: Rect2 = WorldLayout.rect(yard.bounds).expand(x.layout.bus_door + Vector2(0, 42))
+			if scene.size.x <= view_size.x - 144 and scene.size.y <= view_size.y - 160:
+				focus = scene.get_center() - Vector2(0, 32)
+		if focus == Vector2.ZERO and x._supply_entrances.is_empty():
+			focus = x.layout.camera_start
+		elif focus == Vector2.ZERO:
+			var area: Rect2 = Rect2(x.layout.bus_door, Vector2.ZERO).expand(x._supply_entrances[0])
+			var both: Rect2 = area.expand(x._supply_entrances[1])
+			if both.size.x <= view_size.x - 192 and both.size.y <= view_size.y - 192:
+				area = both
+			var roof_room: float = clampf((view_size.y - area.size.y) * 0.5 - 96, 0, 72)
+			focus = area.get_center() - Vector2(0, roof_room)
+	return x.camera.framed_position(focus)
 
 func _present_support() -> void:
 	if not x.build_mode() or x.support_panel==null: return

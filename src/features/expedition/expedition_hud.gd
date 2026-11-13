@@ -38,13 +38,13 @@ func _ready() -> void:
 	# Preserve M2-01's ratio and gradient beside C's independent sortie time text.
 	_time_bar = ProgressBar.new()
 	_time_bar.name = "SortieTimeRatio"
-	_time_bar.custom_minimum_size.y = 4
+	_time_bar.custom_minimum_size.y = 8
 	_time_bar.max_value = 1.0
 	_time_bar.step = 0.0
 	_time_bar.show_percentage = false
 	_time_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var track: StyleBoxFlat = StyleBoxFlat.new()
-	track.bg_color = Color("344d54")
+	track.bg_color = Color("13120f")
 	_time_bar.add_theme_stylebox_override("background", track)
 	_time_fill = StyleBoxFlat.new()
 	_time_bar.add_theme_stylebox_override("fill", _time_fill)
@@ -105,8 +105,9 @@ func refresh(state: Dictionary) -> void:
 	_burst_warning.visible = not _burst_warning.text.is_empty()
 	var fraction: float = state["time_fraction"]
 	# Existing TMP-114 interpolation is a display choice, not night rules.
-	var colour: Color = Color("ed9682").lerp(Color("f1d18e"), fraction * 2.0) if fraction < 0.5 else Color("f1d18e").lerp(Color("9acbdc"), (fraction - 0.5) * 2.0)
+	var colour: Color = ExpeditionHudTheme.AMBER.lerp(ExpeditionHudTheme.DANGER, clampf((0.2 - fraction) / 0.2, 0.0, 1.0))
 	view._time_text.add_theme_color_override("font_color", colour)
+	_time_fill = _time_bar.get_theme_stylebox("fill") as StyleBoxFlat
 	_time_fill.bg_color = colour
 	_time_bar.value = fraction
 	view._time_hint.add_theme_color_override("font_color", colour)

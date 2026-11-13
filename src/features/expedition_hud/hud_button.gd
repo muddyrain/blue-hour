@@ -5,6 +5,8 @@ extends Button
 ## its completed click releases focus so the next Space returns to the world.
 
 var _confirm_armed: bool = false
+var _normal_style: StyleBox
+var _hover_style: StyleBox
 
 
 func _ready() -> void:
@@ -29,6 +31,8 @@ func _on_gui_input(event: InputEvent) -> void:
 	if event.is_echo():
 		return
 	if event.is_pressed():
+		_normal_style = get_theme_stylebox("normal")
+		_hover_style = get_theme_stylebox("hover")
 		_confirm_armed = true
 		# button_pressed represents toggle state, not a momentary key press.
 		# Use the same pressed theme style without turning this action into a toggle.
@@ -46,5 +50,5 @@ func _cancel_confirm() -> void:
 	if not _confirm_armed:
 		return
 	_confirm_armed = false
-	remove_theme_stylebox_override("normal")
-	remove_theme_stylebox_override("hover")
+	add_theme_stylebox_override("normal", _normal_style)
+	add_theme_stylebox_override("hover", _hover_style)

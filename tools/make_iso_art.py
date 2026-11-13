@@ -624,8 +624,8 @@ def make_bike() -> Image.Image:
 
 
 def stone_bridge() -> Image.Image:
-    # Canal is 128 map units wide; deck follows the 192-deep EW road.
-    w, d, h = 140, 192, 22
+    # Canal is 96 map units wide; deck follows the 128-deep EW road.
+    w, d, h = 128, 136, 22
     drop = 34
     img, vx, _ = sprite_canvas(w, d, h + drop, pad=24)
     dr = ImageDraw.Draw(img)
@@ -659,7 +659,7 @@ def stone_bridge() -> Image.Image:
 
 
 def wood_bridge() -> Image.Image:
-    w, d, h = 160, 96, 18
+    w, d, h = 128, 64, 16
     img, vx, _ = sprite_canvas(w, d, h + 16, pad=16)
     dr = ImageDraw.Draw(img)
     sw, se, nw, ne = vx(-w / 2, 0), vx(w / 2, 0), vx(-w / 2, -d), vx(w / 2, -d)

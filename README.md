@@ -20,8 +20,7 @@ python tools/godot.py run --godot <Godot 可执行文件>
 ## 测试
 
 ```bash
-python tools/godot.py check --godot <Godot 可执行文件>        # 导入 + 启动 + 单元/契约测试
-python tools/playable_flow.py --godot <Godot> --output .local/pf   # 完整一局：搜刮/战斗/撤离/结算/重进
+python tools/godot.py check --godot <Godot 可执行文件>   # 导入 + 启动 + 单元/契约测试 + 完整一局冒烟（tests/smoke_loop.gd）
 ```
 
 所有输出写在被忽略的 `.local/` 下，不会碰真实玩家存档。

@@ -26,6 +26,8 @@ const BusTexture: Texture2D = preload("res://assets/candidates/bus_02.png")
 
 var _feedback: ExpeditionFeedback
 var _ui: ExpeditionUi
+var _orders: ExpeditionOrders = ExpeditionOrders.new(self)
+var _squad: ExpeditionSquad = ExpeditionSquad.new(self)
 
 var tuning: ExpeditionTuning = ExpeditionTuning.new()
 var navigation: FieldNavigation = FieldNavigation.new()
@@ -349,38 +351,7 @@ func _draw() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if phase == Phase.FINISHED:
-		return
-	if _support_input(event):
-		get_viewport().set_input_as_handled()
-		return
-	if event.is_action_pressed("pause_sortie"):
-		toggle_pause()
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("squad_command"):
-		var point: Vector2 = get_global_mouse_position()
-		if event is InputEventMouseButton:
-			# Use the click's coordinates, not a later position of the desktop cursor.
-			point = get_global_transform_with_canvas().affine_inverse() * event.position
-		if rescue_target != null and rescue_target.contains(point):
-			rescue_target.request()
-		elif not layout.world_data.is_empty() and _clicked_site(point):
-			pass
-		elif layout.world_data.is_empty() and supply.supports(&"cash") and layout.hit_area(&"cash").has_point(point):
-			if searched:
-				command_move(point)
-			else:
-				request_search()
-		elif layout.world_data.is_empty() and supply.supports(&"food") and layout.hit_area(&"food").has_point(point):
-			if _food_site.searched:
-				command_move(point)
-			else:
-				request_search(&"food")
-		elif layout.bus_block.grow(18.0).has_point(point):
-			request_extraction()
-		elif layout.world_bounds.has_point(point):
-			command_move(point)
-		get_viewport().set_input_as_handled()
+	_orders._unhandled_input(event)
 
 
 func step(delta: float) -> void:
@@ -508,230 +479,67 @@ func step(delta: float) -> void:
 
 
 func candidate_id() -> int:
-	return RescuePoolState.choice(field_departure,sortie_id)
+	return _orders.candidate_id()
 
 
 func join_target(at_ms: int) -> bool:
-	if not field_join_gate.is_valid():
-		return false
-	var confirmed: Dictionary = field_join_gate.call(at_ms)
-	if confirmed.error != OK:
-		field_join_error = confirmed.get("reason","FIELD_JOIN_ACK_FAILED")
-		_show_notice("接纳尚未保存成功，已暂停；请点击重试完成援救。")
-		if not is_paused:
-			toggle_pause()
-		return false
-	field_join_error = ""
-	promote_target(confirmed.receipt.joins[0])
-	return true
+	return _orders.join_target(at_ms)
 
 
 func promote_target(event: Dictionary, restoring: bool = false) -> void:
-	var id: int = int(event.member_id)
-	if survivors.any(func(actor: FieldActor) -> bool: return actor.member_id == id):
-		return
-	var action: Dictionary = FieldJoinRules.action_base(field_departure,[event])
-	var profile: Dictionary = SurvivorRoster.member(action.crew,id)
-	var gun: Dictionary = WeaponInventory.for_member(action,id)
-	var actor: FieldActor = rescue_target.npc
-	actor.actor_id = survivors.size()
-	actor.call_sign = profile.call_sign
-	actor.weapon_instance_id = gun.instance_id
-	actor.weapon_definition = WeaponModifiers.combat_definition(gun)
-	actor.visual.set_weapon(actor.weapon_definition.presentation)
-	if int(supply.generated.get("version", 0)) in [5, 6, 7, 8, 9] and not CombatEquipment.melee(String(actor.weapon_definition.id)):
-		actor.magazine = WeaponMagazine.new(actor.weapon_instance_id, String(actor.weapon_definition.id),
-			WorkshopV1.mod_for(action, actor.weapon_instance_id))
-	actor.clear_order()
-	TraitRules.apply(actor,profile,tuning.survivor_speed)
-	if build_mode(): apply_build(actor,profile,gun)
-	survivors.append(actor)
-	# Match the existing participant/snapshot execution order, including 5 then 3/4.
-	survivors.sort_custom(func(a: FieldActor,b: FieldActor) -> bool: return a.member_id<b.member_id)
-	for index: int in range(survivors.size()):
-		survivors[index].actor_id = index
-	_setup_crew.append(profile.duplicate(true))
-	loadout_snapshot.append({"member_id":id,"instance":gun.duplicate(true)})
-	participants_snapshot = SurvivalContracts.participants(_setup_crew,loadout_snapshot,true,true)
-	growth_inputs.register_member(id)
-	field_joins.assign([event.duplicate(true)])
-	rescue_target.status = "IN_FIELD_JOINED"
-	rescue_target.progress = RescueTarget.SECONDS
-	rescue_target.worker = 0
-	if not restoring and goal != Vector2.ZERO:
-		_move_to_group_goal(actor)
-	rescue_target.refresh()
-	membership_committed.emit()
-	_update_ui()
+	_orders.promote_target(event, restoring)
 
 
 func toggle_pause() -> void:
-	if not pending_burst.is_empty():
-		accept_burst(pending_burst)
-		return
-	if not pending_power.is_empty():
-		_accept_power(pending_power.before,pending_power.request)
-		return
-	if combat_mode(): combat.cancel_unavailable(self)
-	support_aiming=false
-	if not pending_support.is_empty():
-		_accept_support(pending_support.before,pending_support.request)
-		return
-	if is_paused and not field_join_error.is_empty():
-		return
-	if suspend_sealed:
-		return
-	if phase == Phase.FINISHED:
-		return
-	is_paused = not is_paused
-	pause_changed.emit(is_paused)
-	_effects.process_mode = Node.PROCESS_MODE_DISABLED if is_paused else Node.PROCESS_MODE_INHERIT
-	_update_ui()
-	print("BH_SORTIE paused=%s" % is_paused)
+	_orders.toggle_pause()
 
 
 func command_move(point: Vector2) -> void:
-	if bus_view != null and bus_view.running(): return
-	if not field_join_error.is_empty():
-		return
-	if rescue_target != null: rescue_target.cancel()
-	if phase == Phase.FINISHED:
-		return
-	if event_sortie_panel != null:
-		event_sortie_panel.hide()
-	goal = point
-	for index: int in range(survivors.size()):
-		var actor: FieldActor = survivors[index]
-		if has_search_job(actor.member_id) or actor.activity == FieldActor.Activity.DOWN:
-			continue
-		_move_to_group_goal(actor)
-	queue_redraw()
+	_orders.command_move(point)
 
 
 func request_search(kind: StringName = &"cash") -> void:
-	if (bus_view != null and bus_view.running()) or not field_join_error.is_empty():
-		return
-	var site: SearchSite = search_site(kind)
-	if phase == Phase.FINISHED or site == null or site.searched or not site_discovered(site):
-		return
-	var event_site: bool = _is_event_site(site)
-	if site != recon_site and site != billboard_site and not event_site and not pump_station_mode() and not supply.supports(site.kind):
-		return
-	var previous: int = search_assignments.member_for(String(site.id))
-	if previous > 0:
-		_release_searcher(previous)
-		_show_notice(SearchWorkView.notice("cancelled",site_label(site)))
-		_update_ui()
-		return
-	if event_site and task_event.branch == "" and _near_event_worker(site) != null:
-		event_sortie_panel.present()
-		return
-	if not parallel_search:
-		if rescue_target != null:
-			rescue_target.cancel()
-		_release_searcher()
-	var candidates: Array[Dictionary] = []
-	var paths: Dictionary = {}
-	var free_count: int = 0
-	for actor: FieldActor in survivors:
-		if actor.health <= 0 or not actor.visible or has_search_job(actor.member_id) or actor.activity not in [FieldActor.Activity.IDLE,FieldActor.Activity.MOVING]:
-			continue
-		if rescue_target != null and rescue_target.status == "IN_PROGRESS" and rescue_target.worker == actor.member_id:
-			continue
-		free_count += 1
-		var path: PackedVector2Array = navigation.path_between(actor.position,site.door)
-		var reachable: bool = not path.is_empty() and path[-1].distance_to(site.door) <= 14.0
-		if actor.position.distance_to(site.door) <= 14.0:
-			path = PackedVector2Array([actor.position])
-			reachable = true
-		paths[actor.member_id] = path
-		candidates.append({"member_id":actor.member_id,"distance":actor.position.distance_to(site.door),"reachable":reachable,"available":true})
-	var chosen: int = SearchAssignments.pick(candidates)
-	if chosen == 0:
-		_show_notice(SearchWorkView.notice("no_idle" if free_count == 0 else "unreachable",site_label(site)))
-		return
-	if _assign_search(site, search_member(chosen), paths[chosen]):
-		_update_ui()
+	_orders.request_search(kind)
 
 
 func _assign_search(site: SearchSite, actor: FieldActor, path: PackedVector2Array) -> bool:
-	if not search_assignments.assign(actor.member_id, String(site.id)):
-		return false
-	actor.command_path(path)
-	_show_notice(SearchWorkView.notice("assigned",site_label(site),actor.call_sign))
-	queue_redraw()
-	return true
+	return _orders._assign_search(site, actor, path)
 
 
 func _is_event_site(site: SearchSite) -> bool:
-	return String(site.id) == EventSortieV1.site_id(supply.generated)
+	return _squad._is_event_site(site)
 
 
 func _near_event_worker(site: SearchSite) -> FieldActor:
-	var nearest: FieldActor
-	var limit: float = 14.0
-	for actor: FieldActor in survivors:
-		if actor.health <= 0.0 or not actor.visible or has_search_job(actor.member_id) \
-				or actor.activity not in [FieldActor.Activity.IDLE, FieldActor.Activity.MOVING]:
-			continue
-		var distance: float = actor.position.distance_to(site.door)
-		if distance <= limit:
-			nearest = actor
-			limit = distance
-	return nearest
+	return _squad._near_event_worker(site)
 
 
 func confirm_event_choice(branch: String) -> bool:
-	if event_sortie_panel == null or not event_sortie_panel.visible or task_event.branch != "" \
-			or phase == Phase.FINISHED or suspend_sealed or not field_join_error.is_empty() \
-			or (bus_view != null and bus_view.running()) or branch not in [EventSortieV1.QUIET, EventSortieV1.FORCE]:
-		return false
-	var site: SearchSite = search_site(StringName(EventSortieV1.site_id(supply.generated)))
-	var worker: FieldActor = _near_event_worker(site)
-	if worker == null or not _assign_search(site, worker, PackedVector2Array([worker.position])):
-		return false
-	task_event.branch = branch
-	event_sortie_panel.hide()
-	_update_ui()
-	return true
+	return _squad.confirm_event_choice(branch)
 
 
 func has_search_job(member_id: int) -> bool:
-	return not search_assignments.site_for(member_id).is_empty()
+	return _squad.has_search_job(member_id)
 
 
 func search_member(member_id: int) -> FieldActor:
-	for actor: FieldActor in survivors:
-		if actor.member_id == member_id:
-			return actor
-	return null
+	return _squad.search_member(member_id)
 
 
 func member_site(member_id: int) -> SearchSite:
-	var id: String = search_assignments.site_for(member_id)
-	return search_site(StringName(id)) if not id.is_empty() else null
+	return _squad.member_site(member_id)
 
 
 func site_label(site: SearchSite) -> String:
-	return _ui.site_label(site)
+	return _squad.site_label(site)
 
 
 func _toolbox_site() -> SearchSite:
-	return search_site(StringName(WorkshopSiteV1.site_id(supply.generated)))
+	return _squad._toolbox_site()
 
 
 func search_site(kind: StringName) -> SearchSite:
-	if recon_site != null and kind == recon_site.id:
-		return recon_site
-	if billboard_site != null and kind == billboard_site.id:
-		return billboard_site
-	for site: SearchSite in sites:
-		if site.id == kind: return site
-	if kind == &"cash":
-		return _cash_site
-	if kind == &"food":
-		return _food_site
-	return null
+	return _squad.search_site(kind)
 
 
 func request_extraction() -> void:
@@ -843,43 +651,19 @@ func living_count() -> int:
 
 
 func _move_to_group_goal(actor: FieldActor) -> void:
-	actor.command_path(navigation.path_between(actor.position, goal + _group_offset(actor)))
+	_orders._move_to_group_goal(actor)
 
 
 func _group_offset(actor: FieldActor) -> Vector2:
-	var gap: float = minf(tuning.squad_spacing, tuning.boarding_radius * 1.2 / maxi(1, survivors.size() - 1))
-	return Vector2.ONE * ((float(actor.actor_id) - float(survivors.size() - 1) * 0.5) * gap)
+	return _orders._group_offset(actor)
 
 
 func _arrival(index: int) -> Vector2:
-	if index < layout.arrivals.size():
-		return layout.arrivals[index]
-	var anchor: Vector2 = layout.arrivals[0]
-	for ring: int in range(1, 17):
-		for x: int in range(-ring, ring + 1):
-			for y: int in range(-ring, ring + 1):
-				var point: Vector2 = anchor + Vector2(x,y) * 48.0
-				if not navigation.is_clear(point) or survivors.any(func(actor: FieldActor) -> bool: return actor.position.distance_to(point) < 32.0):
-					continue
-				if not navigation.path_between(anchor, point).is_empty():
-					return point
-	# Explicit construction error; never drop members from the participant set.
-	setup_problem = "本图没有足够的合法出生位置"
-	return anchor
+	return _squad._arrival(index)
 
 
 func _release_searcher(member_id: int = 0) -> void:
-	if member_id == 0:
-		if search_actor == null:
-			return
-		member_id = search_actor.member_id
-	search_assignments.release_member(member_id)
-	var released: FieldActor = search_member(member_id)
-	if released != null:
-		released.clear_order()
-		if released.health > 0 and goal != Vector2.ZERO:
-			_move_to_group_goal(released)
-	queue_redraw()
+	_squad._release_searcher(member_id)
 
 
 func _make_actor(enemy: bool, index: int, point: Vector2, profile: Dictionary = {}, kind: String = "") -> FieldActor:
@@ -1297,157 +1081,19 @@ func _attack_target(actor: FieldActor) -> FieldActor:
 
 
 func work_state_matches(actor: FieldActor, site: SearchSite) -> bool:
-	if site == null: return false
-	var outdoor: bool = TaskActions.outdoor_site(supply.generated,site.id)
-	return actor.health>0 and actor.activity == (FieldActor.Activity.RECOVERING if outdoor else FieldActor.Activity.SEARCHING) and actor.visible == outdoor and (not outdoor or actor.position.distance_to(site.door)<=14.0)
+	return _squad.work_state_matches(actor, site)
 
 
 func _clear_dead_worker() -> void:
-	for job: Dictionary in search_assignments.ordered():
-		var actor: FieldActor = search_member(int(job.member_id))
-		if actor != null and (actor.health <= 0 or actor.activity == FieldActor.Activity.DOWN):
-			var site: SearchSite = search_site(StringName(job.site_id))
-			if site != recon_site and site != billboard_site:
-				site.progress = 0.0
-			_release_searcher(actor.member_id)
-			if pump_station_mode():
-				_show_notice("操作员已阵亡 · 控制柜停机中断，可派其他存活者")
+	_squad._clear_dead_worker()
 
 
 func _update_search(delta: float) -> void:
-	_clear_dead_worker()
-	for job: Dictionary in search_assignments.ordered():
-		if is_paused:
-			return
-		var actor: FieldActor = search_member(int(job.member_id))
-		var site: SearchSite = search_site(StringName(job.site_id))
-		var outdoor: bool = TaskActions.outdoor_site(supply.generated,site.id)
-		if job.phase == "approach":
-			if actor.position.distance_to(site.door) > 14.0:
-				if actor._path_index >= actor.path.size():
-					var route: PackedVector2Array = navigation.path_between(actor.position,site.door)
-					if route.is_empty() or route[-1].distance_to(site.door)>14.0:
-						_release_searcher(actor.member_id)
-						_show_notice(SearchWorkView.notice("unreachable",site_label(site)))
-					else:
-						actor.command_path(route)
-				continue
-			if _is_event_site(site) and task_event.branch == "":
-				search_assignments.release_member(actor.member_id)
-				actor.clear_order()
-				event_sortie_panel.present()
-				continue
-			actor.clear_order()
-			actor.activity = FieldActor.Activity.RECOVERING if outdoor else FieldActor.Activity.SEARCHING
-			actor.visible = outdoor
-			search_assignments.begin(actor.member_id)
-			if combat_mode():
-				combat.cancel_unavailable(self)
-			if outdoor and (not exploration_mode() or (site.id==&"cash" and supply.generated.type=="airdrop")):
-				_trigger_airdrop()
-			# A movement step ending in range cannot also count as billboard work.
-			if site == billboard_site:
-				continue
-		if not work_state_matches(actor,site):
-			_release_searcher(actor.member_id)
-			continue
-		var prior_progress: float = site.progress
-		if site == recon_site:
-			site.progress += delta
-			if is_equal_approx(site.progress, site.seconds):
-				site.progress = site.seconds
-			var worked: float = minf(site.progress, site.seconds) - prior_progress
-			if worked > 0.0:
-				var start: float = elapsed - delta
-				recon_knowledge.record_work(actor.member_id, actor.position, start, minf(elapsed, start + worked))
-		elif site == billboard_site:
-			site.progress = minf(site.seconds, prior_progress + delta)
-			if site.seconds - site.progress <= 0.000000001:
-				site.progress = site.seconds
-			var worked: float = site.progress - prior_progress
-			if worked > 0.0:
-				var start: float = elapsed - delta
-				billboard_work.record(actor.member_id, actor.position, start, minf(elapsed, start + worked))
-		else:
-			site.progress += delta / (actor.trait_search_factor * actor.persona_work_factor * (BuildItems.frozen_factors(supply.generated.build).work if build_mode() else 1.0))
-		if site.progress > prior_progress and _is_event_site(site) and task_event.work_at < 0.0:
-			task_event.work_at = maxf(0.0, elapsed - delta)
-			if task_event.branch == EventSortieV1.FORCE:
-				task_event.first_enemy_id = _spawn_count
-				task_event.first_attempt = _spawn_attempts
-				_request_task_wave(site, int(supply.generated.event_sortie.requests), {"source":"event_sortie"})
-				_show_notice("强开物资柜 · 警报已触发，留意来袭。")
-		if site.progress >= _site_seconds(site):
-			if not _complete_search(actor,site):
-				site.progress = prior_progress
-				return
+	_squad._update_search(delta)
 
 
 func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
-	if site == billboard_site:
-		site.searched = true
-		_release_searcher(actor.member_id)
-		_show_notice("已调查 · 生还归航并确认后，下次选卡保证有超市补给")
-		return true
-	if site == recon_site:
-		site.progress = site.seconds
-		site.searched = true
-		_release_searcher(actor.member_id)
-		_show_notice("侦察完成 · 已标记 2 处")
-		refresh_recon_view()
-		return true
-	if exploration_mode() and site.searched: return false
-	if not trait_inputs.events.any(func(e: Dictionary) -> bool: return e.site == String(site.kind)) and not trait_inputs.accept_search(self,actor,site.kind,site.id):
-		_show_notice("特性搜集来源未确认，已暂停；不会重复发放收益。")
-		toggle_pause()
-		return false
-	site.searched = true
-	if exploration_mode(): site.progress=_site_seconds(site)
-	var reward: int = site.reward if not layout.world_data.is_empty() else supply.reward(site.kind)
-	if _is_event_site(site):
-		var carried: Dictionary = EventSortieV1.reward(supply.generated, task_event.branch)
-		loot += int(carried.cash)
-		food_loot += int(carried.food)
-		_release_searcher(actor.member_id)
-		site.prop.searched = true
-		site.prop.queue_redraw()
-		_show_notice("应急补给站 · 已携带%s，归航后入库。" % _ui._event_reward_text(carried))
-		search_completed.emit(int(carried.cash) + int(carried.food))
-		return true
-	if site.kind == &"cash":
-		loot += reward
-		if (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
-			weapon_loot.append(_site_weapon(site))
-	else:
-		food_loot += reward
-	_release_searcher(actor.member_id)
-	site.prop.searched = true
-	site.prop.queue_redraw()
-	if pump_station_mode():
-		station_art.set_stopped(true)
-		encounter.activate_pump()
-		_show_notice("停机完成 · 破阵者出现，留意地面冲锋预警")
-		search_completed.emit(0)
-		return true
-	_show_notice("搜集完成 · 携带%s +%d（撤离后带回）" % ["货币" if site.kind == &"cash" else "食物",reward])
-	if site.kind == &"cash" and (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
-		_show_notice("获得损坏%s · 回营后入库维修"%WeaponInventory.definition(weapon_loot.back().weapon_id).display_name)
-	if power_mode() and site.id == &"cash" and (supply.generated.type == "equipment" or not supply.generated.powers.sample.is_empty()):
-		_show_notice("已携带能力样本：%s · 归航确认后入库"%SpecialPowers.definition(supply.generated.powers.sample).name if not supply.generated.powers.sample.is_empty() else "特殊能力已集齐。")
-	if build_mode() and site.id==&"cash" and not supply.generated.build.drops.is_empty():
-		var names: PackedStringArray=[]
-		for item: String in supply.generated.build.drops: names.append(supply.generated.build.policy.items[item].name)
-		if supply.generated.get("powers", {}).get("sample") == SpecialPowers.RADIO:
-			names.append(SpecialPowers.RADIO_DEFINITION.name)
-		_show_notice("携带道具："+"、".join(names)+" · 归航确认后入库")
-	var investigation: Dictionary = supply.generated.get("investigation", {})
-	if supply.generated.get("mission_policy") == 1 and investigation.get("site_id") == String(site.id):
-		_show_notice("已携带线索：%s · 生还归航并确认后登记" % CampaignRules.CLUE_NAMES[investigation.clue_id])
-	var tool_count: int = _tools_at(String(site.id))
-	if tool_count > 0:
-		_show_notice("已携带工具 ×%d · 归航确认后入库" % tool_count)
-	search_completed.emit(reward)
-	return true
+	return _squad._complete_search(actor, site)
 
 
 func _finish(evacuated: bool, boarding: Vector2i = Vector2i.ZERO) -> void:
@@ -1566,7 +1212,7 @@ class SearchSite:
 
 
 func _kind_searched(kind: StringName) -> bool:
-	return sites.any(func(site: SearchSite) -> bool: return site.kind==kind and site.searched)
+	return _squad._kind_searched(kind)
 
 
 func _street_supply_entrances() -> Array[Vector2]:
@@ -1586,47 +1232,12 @@ func _street_supply_entrances() -> Array[Vector2]:
 
 
 func _searched_count() -> int:
-	return sites.filter(func(site: SearchSite) -> bool: return site.searched).size()
+	return _squad._searched_count()
+
 
 func _clicked_site(point: Vector2) -> bool:
-	if billboard_site != null and billboard_site.hit.has_point(point):
-		if billboard_site.searched:
-			_show_notice(BillboardFieldView.DONE)
-		else:
-			request_search(billboard_site.id)
-		return true
-	if recon_site != null and recon_site.door.distance_squared_to(point) <= 32.0 * 32.0:
-		if recon_site.searched:
-			locate_objective("recon")
-		else:
-			request_search(recon_site.id)
-		return true
-	if supply.generated.get("mission_policy") == 1:
-		# The marked work entrance is a precise target even where two facade hit areas overlap.
-		for site: SearchSite in sites:
-			if site_discovered(site) and (site.prop.primary_target or _is_recon_target(site.id) or (supply.generated.has("rare_policy") and not site.prop.loot_landmark.is_empty())) \
-					and site.door.distance_squared_to(point) <= 24.0 * 24.0:
-				if not site.searched:
-					request_search(site.id)
-				else:
-					command_move(site.door)
-				return true
-	# Foreground object art takes precedence over the broad building facade hit.
-	var candidates: Array[SearchSite]=[]
-	if exploration_mode():
-		for site: SearchSite in sites:
-			if site.prop is ExplorationProp: candidates.append(site)
-	for site: SearchSite in sites:
-		if not candidates.has(site): candidates.append(site)
-	if layout.world_data.get("version")==5:
-		candidates.sort_custom(func(a:SearchSite,b:SearchSite)->bool:return a.prop.position.y>b.prop.position.y if a.prop.position.y!=b.prop.position.y else String(a.id)<String(b.id))
-	for site: SearchSite in candidates:
-		if site_discovered(site) and site.hit.has_point(point):
-			if layout.world_data.get("version")==5 and site.prop.world_asset and not site.prop.scaled_hit_contains(point):continue
-			if not site.searched: request_search(site.id)
-			else: command_move(site.door)
-			return true
-	return false
+	return _orders._clicked_site(point)
+
 
 func _make_pump_station() -> void:
 	var station: Dictionary = layout.world_data.pump_station
@@ -1781,7 +1392,7 @@ func _make_world_buildings() -> void:
 
 
 func _site_seconds(site: SearchSite) -> float:
-	return site.seconds if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9)))) else tuning.search_seconds
+	return _squad._site_seconds(site)
 
 
 func _trigger_airdrop() -> void:
@@ -1803,9 +1414,7 @@ func _request_task_wave(site: SearchSite, requests: int, provenance: Dictionary 
 
 
 func _site_weapon(site: SearchSite) -> Dictionary:
-	for definition: Dictionary in supply.generated.get("sites",[]):
-		if definition.id==String(site.id):return WeaponInventory.site_reward(sortie_id,supply.generated,definition,WeaponState.is_family(field_departure))
-	return WeaponInventory.reward(sortie_id,WeaponState.is_family(field_departure))
+	return _squad._site_weapon(site)
 
 
 func _ammo_text(actor: FieldActor) -> String:
@@ -2005,27 +1614,12 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 	return true
 
 func toggle_support_aim() -> void:
-	if support_available() and basic_support.snapshot().cooldowns.airstrike==0.0:
-		support_aiming=not support_aiming
+	_orders.toggle_support_aim()
+
 
 func _support_input(event: InputEvent) -> bool:
-	if not build_mode(): return false
-	if _hud.view.persona_details.visible and event is InputEventKey and event.keycode in [KEY_Q,KEY_E,KEY_3,KEY_4,KEY_5]: return true
-	if event is InputEventKey and event.pressed and not event.echo and power_mode() \
-			and (event.keycode == KEY_3 or (event.keycode == KEY_4 and second_power_panel != null) or (event.keycode == KEY_5 and third_power_panel != null)):
-		if get_viewport().gui_get_focus_owner()==null: request_power(0 if event.keycode == KEY_3 else 1 if event.keycode == KEY_4 else 2)
-		return true
-	if event is InputEventKey and event.pressed and not event.echo and get_viewport().gui_get_focus_owner()==null:
-		if support_aiming and event.keycode in [KEY_ESCAPE,KEY_E]: support_aiming=false; return true
-		if event.keycode==KEY_Q: request_heal(); return true
-		if event.keycode==KEY_E: toggle_support_aim(); return true
-	if support_aiming and event is InputEventMouseButton and event.pressed:
-		if event.button_index==MOUSE_BUTTON_RIGHT: support_aiming=false; return true
-		if event.button_index==MOUSE_BUTTON_LEFT:
-			FreezeProfile.mark("left_received")
-			request_airstrike(get_global_transform_with_canvas().affine_inverse()*event.position)
-			return true
-	return false
+	return _orders._support_input(event)
+
 
 func _present_support() -> void:
 	_feedback._present_support()
@@ -2113,21 +1707,11 @@ func _exploration_objective_rows() -> Array[Dictionary]:
 
 
 func _tools_at(site_id: String) -> int:
-	if supply.generated.has("economy_source"):
-		for source: Dictionary in EconomyActions.tool_sources(supply.generated):
-			if source.site_id == site_id:
-				return int(source.count)
-		return 0
-	return int(site_id == WorkshopSiteV1.site_id(supply.generated))
+	return _squad._tools_at(site_id)
 
 
 func _carried_tools() -> int:
-	var count: int = 0
-	for source: Dictionary in EconomyActions.tool_sources(supply.generated):
-		var site: SearchSite = search_site(StringName(source.site_id))
-		if site != null and site.searched:
-			count += int(source.count)
-	return count
+	return _squad._carried_tools()
 
 
 func site_discovered(site: SearchSite) -> bool:

@@ -77,7 +77,7 @@ def analyze_assets():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("check", "audition"))
+    parser.add_argument("action", choices=("check",))
     parser.add_argument("--godot", help="Pinned Godot executable (or B's .local/toolchain.json)")
     args = parser.parse_args()
     common = shared_tools()
@@ -87,14 +87,6 @@ def main():
     (LOGS / "godot-help.txt").write_text(help_result.stdout, encoding="utf-8")
     if help_result.returncode or not all(token in help_result.stdout for token in ("--log-file", "--audio-driver", '"Dummy"', "--headless")):
         raise RuntimeError("Pinned engine does not advertise required isolation options")
-    if args.action == "audition":
-        settings = LOCAL / "b1-user-data/audio.json"
-        command = [engine, "--path", str(ROOT), "--rendering-method", "gl_compatibility",
-                   "--log-file", str(LOGS / "audition-engine.log"),
-                   "res://src/features/audio_settings/audition.tscn", "--", f"--b1-settings={settings.as_posix()}"]
-        print("Audition (use only during the agreed desktop/listening slot):", flush=True)
-        print(subprocess.list2cmdline(command), flush=True)
-        return subprocess.run(command, cwd=ROOT).returncode
     try:
         # Run the unchanged shared check flow, adding mandatory process isolation at
         # its invoke boundary. No shared source or project configuration is edited.

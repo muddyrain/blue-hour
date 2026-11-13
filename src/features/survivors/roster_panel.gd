@@ -9,7 +9,6 @@ signal training_requested(member_id: int)
 signal closed
 signal navigation_requested(action: StringName)
 
-var player_mode: bool = false
 
 var member_buttons: Array[Button] = []
 var buttons_by_id: Dictionary[int,Button] = {}
@@ -180,17 +179,14 @@ func _ready() -> void:
 	back_button.text = "返回营地 / Esc"
 	back_button.custom_minimum_size.y = 44
 	back_button.pressed.connect(func() -> void: closed.emit())
-	if player_mode:
-		var footer: HBoxContainer = HBoxContainer.new()
-		column.add_child(footer)
-		footer.add_child(back_button)
-		for action: StringName in [&"weapons", &"workshop", &"supplies", &"bus"]:
-			var button: Button = Button.new()
-			button.text = {&"weapons":"装备仓", &"workshop":"工坊", &"supplies":"补给", &"bus":"巴士"}[action]
-			button.pressed.connect(navigation_requested.emit.bind(action))
-			footer.add_child(button)
-	else:
-		column.add_child(back_button)
+	var footer: HBoxContainer = HBoxContainer.new()
+	column.add_child(footer)
+	footer.add_child(back_button)
+	for action: StringName in [&"weapons", &"workshop", &"supplies", &"bus"]:
+		var button: Button = Button.new()
+		button.text = {&"weapons":"装备仓", &"workshop":"工坊", &"supplies":"补给", &"bus":"巴士"}[action]
+		button.pressed.connect(navigation_requested.emit.bind(action))
+		footer.add_child(button)
 	get_viewport().size_changed.connect(_fit_viewport)
 
 
@@ -200,7 +196,7 @@ func refresh(data: Dictionary, feedback: String = "") -> void:
 	_fit_viewport()
 	var persona_mode: bool=PersonaState.enabled(_data)
 	growth_button.visible=not persona_mode
-	back_button.visible=player_mode or not persona_mode
+	back_button.visible=true
 	equipment_button.visible=not persona_mode
 	_history_link.visible=persona_mode
 	message.visible=not persona_mode or not feedback.is_empty()
@@ -213,7 +209,7 @@ func refresh(data: Dictionary, feedback: String = "") -> void:
 		_detail_host.add_child(_legacy_detail)
 	if persona_mode:
 		persona_details.present(PersonaViewModel.camp(_data, selected_member_id))
-		persona_details.close_button.visible = not player_mode
+		persona_details.close_button.visible = false
 		persona_details.custom_minimum_size.y = maxf(220.0, _detail_host.size.y)
 	if SurvivorRoster.member(_data.crew,selected_member_id).is_empty():
 		selected_member_id = int(_data.crew[0].id)
@@ -254,19 +250,18 @@ func refresh(data: Dictionary, feedback: String = "") -> void:
 	if GrowthState.is_family(_data):
 		_service.text = "等级 Lv%d · 累计 %d XP · 下一级 %d XP\n出击 %d 次 / 击退 %d / 受伤 %.0f\n特性和食物训练尚未开放。" % [int(member.growth.level),int(member.growth.xp_total),GrowthRules.threshold(int(member.growth.level)+1),int(member.service.sorties),int(member.service.kills),float(member.service.damage_received)]
 	if TraitState.is_family(_data):
-		_service.text = "普通 Lv%d · %d XP · 下一级 %d XP\n%s\n出击%d / 击退%d · %s" % [int(member.growth.level),int(member.growth.xp_total),GrowthRules.threshold(int(member.growth.level)+1),(TraitRules.description(member).replace(" · PROJECT_TEMP", "") if player_mode else TraitRules.description(member)),int(member.service.sorties),int(member.service.kills),("阵亡历史只读，不能训练" if member.health<=0 else "可在篝火查看训练资格") if TrainingState.is_family(_data) else "食物训练未开放"]
+		_service.text = "普通 Lv%d · %d XP · 下一级 %d XP\n%s\n出击%d / 击退%d · %s" % [int(member.growth.level),int(member.growth.xp_total),GrowthRules.threshold(int(member.growth.level)+1),(TraitRules.description(member).replace(" · PROJECT_TEMP", "")),int(member.service.sorties),int(member.service.kills),("阵亡历史只读，不能训练" if member.health<=0 else "可在篝火查看训练资格") if TrainingState.is_family(_data) else "食物训练未开放"]
 	if member.condition=="dead":
 		for death: Dictionary in _data.journey.deaths:
 			if int(death.member_id)==selected_member_id:
-				_service.text += ("\n死亡："+("缺粮减员" if death.cause=="STARVATION" else "战斗阵亡")) if player_mode else "\n死亡：%s · 事务%s" % [death.cause,death.transaction_id]
+				_service.text += ("\n死亡："+("缺粮减员" if death.cause=="STARVATION" else "战斗阵亡"))
 		var previous: Dictionary = member.growth.last_action
 		if not previous.get("recent",[]).is_empty():
 			_equipment.text += "\n最近使用：%s" % WeaponInventory.definition(previous.recent[-1].weapon_id).display_name
-			if not player_mode: _equipment.tooltip_text += "\n历史实例："+String(previous.recent[-1].instance_id)
 		var archived: Dictionary = death_equipment.get(selected_member_id,{})
 		if not archived.is_empty():
-			_equipment.text += ("\n阵亡时装备：%s" if player_mode else "\n阵亡时装备：%s（原事务记录）") % WeaponInventory.definition(archived.weapon_id).display_name
-			_equipment.tooltip_text = "阵亡时的原武器保留在库存，当前归属以库存为准。" if player_mode else "历史实例：%s\n死亡事务：%s；当前归属以库存为准" % [archived.instance_id,archived.transaction_id]
+			_equipment.text += ("\n阵亡时装备：%s") % WeaponInventory.definition(archived.weapon_id).display_name
+			_equipment.tooltip_text = "阵亡时的原武器保留在库存，当前归属以库存为准。"
 			if WeaponState.is_family(_data):
 				_equipment.text += "\n"+WeaponModifiers.description(WeaponInventory.find(_data,archived.instance_id))
 	name_edit.text = member.call_sign
@@ -312,9 +307,4 @@ func _exit_tree() -> void:
 
 
 func _fit_viewport() -> void:
-	if player_mode:
-		offset_top = 24.0
-		return
-	# Compact views need 420px for the shared detail body, including its 140px
-	# scroll area with the Windows font metrics. Reclaim the unused title gap.
-	offset_top=48.0 if PersonaState.enabled(_data) and get_viewport_rect().size.y<700.0 else 104.0
+	offset_top = 24.0

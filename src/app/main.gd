@@ -57,12 +57,7 @@ var sound_settings: SoundSettingsPanel
 var _settings_diagnostic: String = ""
 var progress_path: String = "user://saves/run.json"
 var run_save: RunSave
-const transactional_mode: bool = true
-const survival_mode: bool = true
-const safe_suspend: bool = true
 var _frozen_world: Dictionary = {}
-const survival_pilot: bool = true
-const rescue_mode: bool = true
 var training_panel: TrainingPanel
 var _training: Array = []
 var camp_scene: CampSceneView
@@ -74,7 +69,6 @@ var _facility_upgrade: bool = false
 var _economy_request: Dictionary = {}
 var _camp_leave_action: Callable
 var _recruits: Array = []
-const hunger_trial: bool = true
 var _hunger_consented: bool = false
 var _hunger_confirmation: ConfirmationDialog
 var _camp_backdrop: CampBackdrop
@@ -172,10 +166,7 @@ func _ready() -> void:
 	add_child(audio)
 	$Interface/Screen/Title/Start.pressed.connect(open_mission_select)
 	mission_select = MissionSelect.new()
-	mission_select.player_mode = true
 	mission_select.review_enabled = not _developer_menu
-	mission_select.rescue_enabled = true
-	mission_select.field_join_mode = true
 	_screen.add_child(mission_select)
 	mission_select.hide()
 	mission_select.selected.connect(_select_mission)
@@ -560,27 +551,17 @@ func _open_sortie(practice: bool, resume: Dictionary = {}) -> void:
 	expedition = ExpeditionScene.instantiate() as Expedition
 	expedition.restoring_world = not resume.is_empty()
 	expedition.is_practice = practice
-	expedition.player_mode = true
 	expedition.battle_survival = true
-	expedition.battle_drill = false
-	expedition.hunger_trial = true
-	expedition.field_join_mode = true
 	expedition.field_departure = camp_snapshot()
 	expedition.field_join_gate = progress_session.join_field
 	if not resume.is_empty():
 		expedition.field_joins.assign(resume.receipt.joins.duplicate(true))
 	expedition.membership_committed.connect(_attach_damage_gates)
-	expedition.growth_mode = true
-	expedition.enemy_mode = true
-	expedition.trait_mode = true
-	expedition.training_mode = true
-	expedition.pool_mode = true
 	expedition.rescue_completed = RescuePoolState.available(expedition.field_departure).is_empty()
 	expedition.support_commit=progress_session.accept_support
 	expedition.power_commit=progress_session.accept_power
 	expedition.burst_commit=progress_session.accept_burst
 	expedition.growth_binding = progress_session.token.duplicate(true)
-	expedition.rescue_mode = true
 	expedition.rescue_completed = RescuePoolState.available(expedition.field_departure).is_empty()
 	expedition.battle_seed = "NONE"
 	expedition.ui_theme = _screen.theme
@@ -1089,7 +1070,6 @@ func open_roster() -> void:
 		return
 	if not is_instance_valid(roster_panel):
 		roster_panel = RosterPanel.new()
-		roster_panel.player_mode = true
 		_screen.add_child(roster_panel)
 		roster_panel.call_sign_requested.connect(rename_survivor)
 		roster_panel.equipment_requested.connect(_roster_equipment)
@@ -1138,7 +1118,6 @@ func open_growth(member_id: int, discard_pending: bool = false) -> void:
 	roster_panel.hide()
 	if not is_instance_valid(growth_panel):
 		growth_panel = GrowthPanel.new()
-		growth_panel.player_mode = true
 		_screen.add_child(growth_panel)
 		growth_panel.closed.connect(close_growth)
 	growth_panel.selected_member_id = member_id
@@ -1179,11 +1158,7 @@ func _roster_equipment(member_id: int, discard_pending: bool = false) -> void:
 	close_roster(true)
 	_return_roster_member = member_id
 	open_loadout()
-	if loadout_panel.player_mode:
-		loadout_panel.select_for_member(member_id)
-	else:
-		loadout_panel._selected_id = WeaponInventory.for_member(camp_snapshot(), member_id).get("instance_id", "")
-		loadout_panel.refresh(camp_snapshot())
+	loadout_panel.select_for_member(member_id)
 
 
 func open_loadout(workshop: bool = false) -> void:
@@ -1191,7 +1166,6 @@ func open_loadout(workshop: bool = false) -> void:
 		return
 	if not is_instance_valid(loadout_panel):
 		loadout_panel = LoadoutPanel.new()
-		loadout_panel.player_mode = true
 		_screen.add_child(loadout_panel)
 		loadout_panel.equip_requested.connect(equip_weapon)
 		loadout_panel.build_requested.connect(equip_build_item)
@@ -1209,13 +1183,10 @@ func open_loadout(workshop: bool = false) -> void:
 	_title.hide()
 	loadout_panel.show()
 	loadout_panel.refresh(camp_snapshot())
-	if loadout_panel.player_mode:
-		if workshop:
-			loadout_panel.show_workshop()
-		else:
-			loadout_panel.show_inventory()
+	if workshop:
+		loadout_panel.show_workshop()
 	else:
-		loadout_panel.items.grab_focus()
+		loadout_panel.show_inventory()
 	_request_audio(&"ui_confirm")
 
 
@@ -1249,7 +1220,7 @@ func equip_weapon(member_id: int, identity: String) -> void:
 	if phase != Phase.TITLE or not is_instance_valid(loadout_panel) or not loadout_panel.visible or _progress_blocked:
 		return
 	var before: Dictionary = camp_snapshot()
-	if loadout_panel.player_mode and not loadout_panel.matches_equip(before, member_id, identity):
+	if not loadout_panel.matches_equip(before, member_id, identity):
 		loadout_panel.refresh(before, "配装或持有人已变化，请重新预览。", _progress_dirty)
 		return
 	if EconomyBuildV1.enabled(before): await _begin_camp_commit(before, "weapon_equip")
@@ -2155,7 +2126,6 @@ func open_training() -> void:
 		return
 	if not is_instance_valid(training_panel):
 		training_panel = TrainingPanel.new()
-		training_panel.player_mode = true
 		_screen.add_child(training_panel)
 		training_panel.closed.connect(close_training)
 		training_panel.confirmed.connect(confirm_training)

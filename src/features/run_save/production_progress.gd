@@ -6,18 +6,6 @@ var daily_actions: bool = false
 var fault_hook: Callable
 var token: Dictionary = {}
 var packet: Dictionary = {}
-var battle_mode: bool = false
-var survival_mode: bool = false
-var rescue_mode: bool = false
-var growth_mode: bool = false
-var field_join_mode: bool = false
-var trait_mode: bool = false
-var training_mode: bool = false
-var pool_mode: bool = false
-var roster_mode: bool = false
-var enemy_mode: bool = false
-var quality_mode: bool = false
-var hunger_trial: bool = false
 var suspend_enabled: bool = false
 var _path: String
 var _writer: ProgressWriter
@@ -40,42 +28,11 @@ var _catalog_state: Dictionary = {}
 
 func _init(save_path: String, battle: bool = false, survival: bool = false, hunger: bool = false, rescue: bool = false, growth: bool = false, field: bool = false, traits: bool = false, training: bool = false, pool: bool = false, roster: bool = false, quality: bool = false, enemy: bool = false, playable: bool = false) -> void:
 	daily_actions = playable
-	enemy_mode = enemy
-	quality_mode = quality or enemy
-	roster_mode = roster or quality_mode
-	pool_mode = pool or roster_mode
-	training_mode = training or pool_mode
-	trait_mode = traits or training_mode
-	field_join_mode = field or trait_mode
-	growth = growth or field_join_mode
-	rescue_mode = rescue or growth
-	growth_mode = growth
-	if growth and not (survival and hunger):
-		_problem = "GROWTH_ISOLATED_SURVIVAL_REQUIRED"
-		return
-	survival_mode = survival
-	hunger_trial = hunger
-	battle_mode = battle or survival
-	if hunger_trial and not survival_mode:
-		_problem = "HUNGER_ISOLATED_SURVIVAL_REQUIRED"
-		return
 	_path = ProjectSettings.globalize_path(save_path).replace("\\", "/").simplify_path()
 	var user_path: String = OS.get_user_data_dir().replace("\\", "/").to_lower()
 	# An exported build has a different res:// root. Require explicit isolated storage instead.
-	var required: String = "run.battle-v1.json" if battle_mode else "run.txn-v1.json"
-	if survival_mode:
-		required = "run.survival-v1.json"
-	if rescue_mode:
-		required = "run.rescue-v1.json"
-	if growth_mode:
-		required = "run.growth-v1.json"
-	if field_join_mode:
-		required = "run.field-join-v1.json"
-	if trait_mode:
-		required = "run.trait-v1.json"
-	if training_mode:
-		required = "run.enemy-v1.json" if enemy_mode else "run.weapon-quality-v1.json" if quality_mode else "run.roster-v1.json" if roster_mode else "run.rescue-pool-v1.json" if pool_mode else "run.training-v1.json"
-	var dedicated_playable: bool = playable and enemy_mode and survival_mode and hunger_trial and PlayableEntry.owns_path(_path)
+	var required: String = "run.enemy-v1.json"
+	var dedicated_playable: bool = playable and PlayableEntry.owns_path(_path)
 	var isolated_test: bool = save_path.is_absolute_path() and _path.get_file().to_lower()==required and "/.local/" in _path.to_lower() and "/.local/" in user_path and user_path.get_slice("/.local/",0)==_path.to_lower().get_slice("/.local/",0)
 	if not dedicated_playable and not isolated_test:
 		_problem = "EXPLICIT_ISOLATED_TRANSACTION_PATH_REQUIRED"
@@ -150,12 +107,11 @@ func inspect() -> Dictionary:
 	if recovered.error != OK:
 		return recovered
 	var receipt: Dictionary = recovered.receipt
-	if SurvivalState.is_extended(receipt.base) != battle_mode or SurvivalState.is_survival(receipt.base) != survival_mode or RescueState.is_family(receipt.base) != rescue_mode or GrowthState.is_family(receipt.base) != growth_mode or FieldJoinState.is_family(receipt.base) != field_join_mode or TraitState.is_family(receipt.base) != trait_mode or TrainingState.is_family(receipt.base) != training_mode or RescuePoolState.is_family(receipt.base) != pool_mode or RosterState.is_family(receipt.base) != roster_mode or WeaponState.is_family(receipt.base) != quality_mode or EnemyState.is_state(receipt.base) != enemy_mode:
+	if not SurvivalState.is_extended(receipt.base) or not SurvivalState.is_survival(receipt.base) or not RescueState.is_family(receipt.base) or not GrowthState.is_family(receipt.base) or not FieldJoinState.is_family(receipt.base) or not TraitState.is_family(receipt.base) or not TrainingState.is_family(receipt.base) or not RescuePoolState.is_family(receipt.base) or not RosterState.is_family(receipt.base) or not WeaponState.is_family(receipt.base) or not EnemyState.is_state(receipt.base):
 		return _blocked("UNSUPPORTED_PROGRESS_FORMAT")
-	if survival_mode:
-		var migrated: String = SaveMigration.activation_problem(_path, TransactionReceipt.camp(receipt).get("origin", receipt.base.origin))
-		if not migrated.is_empty():
-			return _blocked(migrated)
+	var migrated: String = SaveMigration.activation_problem(_path, TransactionReceipt.camp(receipt).get("origin", receipt.base.origin))
+	if not migrated.is_empty():
+		return _blocked(migrated)
 	if receipt.phase == "SUSPEND_READY":
 		if not suspend_enabled:
 			return _blocked("SUSPEND_EXPLICIT_ENTRY_REQUIRED")
@@ -164,29 +120,12 @@ func inspect() -> Dictionary:
 		var blocked: Dictionary = _blocked("UNFINISHED_ACTION_POLICY_REQUIRED:"+receipt.phase)
 		blocked.confirmed_deaths = receipt.deaths.duplicate(true)
 		return blocked
-	var scope: String = FrozenSettlement.BATTLE if battle_mode else FrozenSettlement.FOUNDATION
-	if survival_mode:
-		scope = FrozenSettlement.SURVIVAL
-		var has_starvation: bool = receipt.base.journey.deaths.any(func(death: Dictionary) -> bool: return death.cause == "STARVATION")
-		if receipt.phase in ["RESULT_READY","COMMITTED"] and receipt.envelope.result.get("scope") == FrozenSettlement.HUNGER_PILOT:
-			has_starvation = true
-			if hunger_trial:
-				scope = FrozenSettlement.HUNGER_PILOT
-		if has_starvation and not hunger_trial:
-			return _blocked("HUNGER_EXPLICIT_TRIAL_REQUIRED")
-	if rescue_mode:
-		scope = RescueState.SCOPE
-	if growth_mode:
-		scope = RescuePoolState.SCOPE if pool_mode else TraitState.SCOPE if trait_mode else FieldJoinState.SCOPE if field_join_mode else GrowthState.SCOPE
+	var scope: String = RescuePoolState.SCOPE
 	if receipt.phase in ["RESULT_READY","COMMITTED"] and receipt.envelope.result.get("scope") != scope:
 		return _blocked("UNSUPPORTED_RESULT_SCOPE")
 	var ready: bool = receipt.phase in ["RESULT_READY","EDIT_READY"]
-	if not ready and not battle_mode:
-		for member: Dictionary in TransactionReceipt.camp(receipt).crew:
-			if member.health <= 0:
-				return _blocked("LEGACY_ZERO_HP_NOT_ENROLLED")
 	var camp: Dictionary = TransactionReceipt.camp(receipt).duplicate(true)
-	return {"error":OK,"state":"RECOVERY_READY" if ready else ("ENDED" if battle_mode and (camp.journey.state == "FAILED" or CampaignState.ended(camp)) else "CAMP"),"camp":camp,
+	return {"error":OK,"state":"RECOVERY_READY" if ready else ("ENDED" if (camp.journey.state == "FAILED" or CampaignState.ended(camp)) else "CAMP"),"camp":camp,
 		"receipt":receipt,"hash":recovered.hash,"reason":recovered.state}
 
 
@@ -209,7 +148,7 @@ func activate() -> Dictionary:
 func create(base: Dictionary) -> Dictionary:
 	if not _problem.is_empty():
 		return _blocked(_problem)
-	if not TransactionReceipt.camp_problem(base).is_empty() or base.settled_sorties != 0 or SurvivalState.is_extended(base) != battle_mode or SurvivalState.is_survival(base) != survival_mode or RescueState.is_family(base) != rescue_mode or GrowthState.is_family(base) != growth_mode or FieldJoinState.is_family(base) != field_join_mode or TraitState.is_family(base) != trait_mode or TrainingState.is_family(base) != training_mode or RescuePoolState.is_family(base) != pool_mode or RosterState.is_family(base) != roster_mode or WeaponState.is_family(base) != quality_mode or EnemyState.is_state(base) != enemy_mode:
+	if not TransactionReceipt.camp_problem(base).is_empty() or base.settled_sorties != 0 or not SurvivalState.is_extended(base) or not SurvivalState.is_survival(base) or not RescueState.is_family(base) or not GrowthState.is_family(base) or not FieldJoinState.is_family(base) or not TraitState.is_family(base) or not TrainingState.is_family(base) or not RescuePoolState.is_family(base) or not RosterState.is_family(base) or not WeaponState.is_family(base) or not EnemyState.is_state(base):
 		return _blocked("NEW_BASE_FORMAT")
 	var opening_issue: String = OpeningBuild.registration_problem(base)
 	if not opening_issue.is_empty():
@@ -229,7 +168,7 @@ func create(base: Dictionary) -> Dictionary:
 				return _blocked("CATALOG_NEW_SPECIALTY_POLICY")
 			_archive_specialty = catalog.m47_run_id
 		_pending_base = base.duplicate(true)
-		_new_root = base.journey.root_id if battle_mode else RunSave.new_profile_id()
+		_new_root = base.journey.root_id
 	elif not TransactionReceipt.same(_pending_base,base):
 		return _blocked("RETRY_SAME_CONFIRMED_BASE_REQUIRED")
 	if _fault("before_foundation_write") != OK:
@@ -247,11 +186,11 @@ func create(base: Dictionary) -> Dictionary:
 	if not _archived and (FileAccess.file_exists(_path+".bak") or DirAccess.dir_exists_absolute(_path+".bak")):
 		if DirAccess.rename_absolute(_path+".bak",_path+".bak.previous-"+RunSave.new_profile_id()) != OK:
 			return _blocked("OLD_BACKUP_ARCHIVE_FAILED")
-	if not _archived and survival_mode and (FileAccess.file_exists(_path+".migration") or DirAccess.dir_exists_absolute(_path+".migration")):
+	if not _archived and (FileAccess.file_exists(_path+".migration") or DirAccess.dir_exists_absolute(_path+".migration")):
 		if DirAccess.rename_absolute(_path+".migration",_path+".migration.previous-"+RunSave.new_profile_id()) != OK:
 			return _blocked("OLD_MIGRATION_ARCHIVE_FAILED")
 	_archived = true
-	var save: RunSave = RunSave.new(_path,battle_mode and not survival_mode,survival_mode and not rescue_mode,rescue_mode and not growth_mode,growth_mode and not field_join_mode,field_join_mode and not trait_mode,trait_mode and not training_mode,training_mode and not pool_mode,pool_mode and not roster_mode,roster_mode and not quality_mode,quality_mode and not enemy_mode,enemy_mode)
+	var save: RunSave = RunSave.new(_path,false,false,false,false,false,false,false,false,false,false,true)
 	var disk: Dictionary = save.read_transaction_exact()
 	if disk.error != OK or not TransactionReceipt.same(disk.data,base):
 		var error: Error = save.save(base,true,_writer)
@@ -300,13 +239,13 @@ func edit(before: Dictionary, request: Dictionary) -> Dictionary:
 
 
 func preview_migration(source: String, choice: String) -> Dictionary:
-	if not survival_mode or not _problem.is_empty() or _writer == null or not _writer.owns(_path):
+	if not _problem.is_empty() or _writer == null or not _writer.owns(_path):
 		return _blocked("MIGRATION_ISOLATED_WRITER_REQUIRED")
 	return SaveMigration.preview(source, _path, choice, _writer)
 
 
 func migrate(source: String, intent: Dictionary) -> Dictionary:
-	if not survival_mode or not _problem.is_empty() or _writer == null or not _writer.owns(_path):
+	if not _problem.is_empty() or _writer == null or not _writer.owns(_path):
 		return _blocked("MIGRATION_ISOLATED_WRITER_REQUIRED")
 	var migration: SaveMigration = SaveMigration.new(_path, _writer, _fault)
 	var result: Dictionary = migration.confirm(source, intent)
@@ -336,21 +275,10 @@ func begin(before: Dictionary, supply: MissionSupply) -> Dictionary:
 	var state: Dictionary = inspect()
 	if state.error != OK or state.state != "CAMP" or not TransactionReceipt.same(state.camp,before):
 		return _blocked("CAMP_NOT_CONFIRMED")
-	for member: Dictionary in before.crew:
-		if member.health <= 0 and not battle_mode:
-			return _blocked("LEGACY_ZERO_HP_NOT_ENROLLED")
 	if daily_actions and (supply==null or not DailyActions.matches(before,supply.generated)):
 		return _blocked("DAILY_SELECTION_NOT_CURRENT")
 	_active_base = before.duplicate(true)
-	_active_rules = FrozenSettlement.battle_rules(supply) if battle_mode else FrozenSettlement.foundation_rules(supply)
-	if survival_mode:
-		_active_rules = FrozenSettlement.survival_hunger_rules(supply) if hunger_trial else FrozenSettlement.survival_rules(supply)
-	if rescue_mode:
-		_active_rules = FrozenSettlement.rescue_rules(supply)
-	if growth_mode:
-		_active_rules = FrozenSettlement.trait_rules(supply) if trait_mode else FrozenSettlement.field_join_rules(supply) if field_join_mode else FrozenSettlement.growth_rules(supply)
-	if pool_mode:
-		_active_rules = FrozenSettlement.pool_rules(before,supply)
+	_active_rules = FrozenSettlement.pool_rules(before,supply)
 	var started: Dictionary = _transaction.begin(before,"%s:%d" % [before.profile_id,int(before.settled_sorties)+1],_active_rules)
 	if started.error == OK:
 		token = started.token.duplicate(true)
@@ -363,7 +291,7 @@ func active_supply() -> MissionSupply:
 
 
 func join_field(at_ms: int) -> Dictionary:
-	if not field_join_mode or _transaction == null or token.is_empty():
+	if _transaction == null or token.is_empty():
 		return _blocked("FIELD_JOIN_ENTRY_REQUIRED")
 	return _transaction.join_field(token,FieldJoinRules.event(_active_base,token.transaction_id,at_ms))
 
@@ -373,7 +301,7 @@ func damage_gate(actor: FieldActor) -> PersistedDamageGate:
 
 
 func suspend_world(world: Dictionary) -> Dictionary:
-	if not suspend_enabled or not survival_mode or _transaction == null or token.is_empty():
+	if not suspend_enabled or _transaction == null or token.is_empty():
 		return _blocked("SUSPEND_EXPLICIT_ENTRY_REQUIRED")
 	# Freeze the intended publication before I/O, including an unknown publication ACK.
 	var preview: Dictionary = _transaction.preview_suspend(token,world)
@@ -384,7 +312,7 @@ func suspend_world(world: Dictionary) -> Dictionary:
 
 
 func preview_suspend(world: Dictionary) -> Dictionary:
-	if not suspend_enabled or not survival_mode or _transaction == null or token.is_empty() or world.is_empty():
+	if not suspend_enabled or _transaction == null or token.is_empty() or world.is_empty():
 		return _blocked("SUSPEND_STATE_OR_ENTRY_UNAVAILABLE")
 	if not _writer.owns(_path):
 		return _blocked("SESSION_WRITER_LOST")
@@ -400,7 +328,7 @@ func resume_offer() -> Dictionary:
 		return _blocked("WORLD_DAILY_BUILD_MISMATCH")
 	if SortieSnapshot.old_outdoor(receipt.envelope.world):
 		return _blocked("WORLD_OUTDOOR_BUILD_MISMATCH")
-	if receipt.envelope.world.hunger != hunger_trial:
+	if not receipt.envelope.world.hunger:
 		return _blocked("SUSPEND_HUNGER_ENTRY_MISMATCH")
 	_active_base = receipt.base.duplicate(true)
 	_active_rules = receipt.rules.duplicate(true)
@@ -437,9 +365,9 @@ func _profiled_finish(report: Dictionary, carried: Dictionary) -> Dictionary:
 	if _transaction == null or token.is_empty():
 		return _blocked("NO_ACTIVE_TRANSACTION")
 	var input: Dictionary = {"before":_active_base.duplicate(true),"token":token.duplicate(true),
-		"participants":SurvivalContracts.participants(_active_base.crew,WeaponInventory.snapshot(_active_base),true,growth_mode),
+		"participants":SurvivalContracts.participants(_active_base.crew,WeaponInventory.snapshot(_active_base),true,true),
 		"rules":_active_rules.duplicate(true),"report":report.duplicate(true),"carried":carried.duplicate(true),
-		"prior_deaths":_active_base.journey.deaths.duplicate(true) if battle_mode else [],"completion":"COMPLETED","searching_member_ids":[]}
+		"prior_deaths":_active_base.journey.deaths.duplicate(true),"completion":"COMPLETED","searching_member_ids":[]}
 	var computed: Dictionary = FrozenSettlement.compute(input)
 	if not computed.error.is_empty():
 		return _blocked(computed.reason)
@@ -485,19 +413,7 @@ func retry() -> Dictionary:
 
 
 func _prepare_packet() -> Dictionary:
-	if pool_mode:
-		return FrozenSettlement.prepare_pool(_transaction,packet)
-	if trait_mode:
-		return FrozenSettlement.prepare_traits(_transaction,packet)
-	if field_join_mode:
-		return FrozenSettlement.prepare_field_join(_transaction,packet)
-	if growth_mode:
-		return FrozenSettlement.prepare_growth(_transaction,packet)
-	if rescue_mode:
-		return FrozenSettlement.prepare_rescue(_transaction,packet)
-	if survival_mode:
-		return FrozenSettlement.prepare_survival_hunger(_transaction,packet) if hunger_trial else FrozenSettlement.prepare_survival(_transaction,packet)
-	return FrozenSettlement.prepare_battle(_transaction,packet) if battle_mode else FrozenSettlement.prepare_foundation(_transaction,packet)
+	return FrozenSettlement.prepare_pool(_transaction,packet)
 
 
 func _disk_identity() -> String:

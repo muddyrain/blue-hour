@@ -28,9 +28,6 @@ var _description_scrolls: Array[ScrollContainer] = []
 var _campaign_pressures: Array[Label] = []
 var _heading: Label
 var _subtitle: Label
-var rescue_enabled: bool = false
-var player_mode: bool = false
-var field_join_mode: bool = false
 var rescue_completed: bool = false
 var cancel_button: Button
 var depart_button: Button
@@ -46,34 +43,32 @@ var _review_nav: Array[Button] = []
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	if player_mode:
-		add_child(CampStyle.blue_hour_background(YARD))
+	add_child(CampStyle.blue_hour_background(YARD))
 	var background: ColorRect = ColorRect.new()
-	background.color = Color(0.023, 0.061, 0.09, 0.66) if player_mode else CampStyle.INK
+	background.color = Color(0.023, 0.061, 0.09, 0.66)
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
 	var margins: MarginContainer = MarginContainer.new()
 	margins.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side: String in ["left","right"]:
-		margins.add_theme_constant_override("margin_" + side, 48 if player_mode else 80)
+		margins.add_theme_constant_override("margin_" + side, 48)
 	for side: String in ["top","bottom"]:
-		var inset: int = 42 if player_mode else 104
-		margins.add_theme_constant_override("margin_" + side, inset if side == "top" else (34 if player_mode else 32))
+		var inset: int = 42
+		margins.add_theme_constant_override("margin_" + side, inset if side == "top" else (34))
 	add_child(margins)
 	var column: VBoxContainer = VBoxContainer.new()
-	column.add_theme_constant_override("separation", 12 if player_mode else 16)
+	column.add_theme_constant_override("separation", 12)
 	margins.add_child(column)
-	_heading = CampStyle.label("准备出击" if review_enabled else ("选择行动" if player_mode else "行动地图 / 旧街"), 34 if player_mode else 32)
+	_heading = CampStyle.label("准备出击" if review_enabled else ("选择行动"), 34)
 	column.add_child(_heading)
 	_subtitle = CampStyle.label("选择此行的补给方向，准备好后出发。", 18, CampStyle.MUTED)
 	column.add_child(_subtitle)
 	var row: HBoxContainer = HBoxContainer.new()
 	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	if player_mode:
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 16 if player_mode else 24)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 16)
 	if review_enabled:
 		var content: HBoxContainer = HBoxContainer.new()
 		content.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -84,20 +79,17 @@ func _ready() -> void:
 	else:
 		column.add_child(row)
 	var available: Array[MissionSupply] = Supplies.duplicate()
-	if rescue_enabled: available.append(preload("res://src/features/camp/rescue.tres"))
+	available.append(preload("res://src/features/camp/rescue.tres"))
 	_active.assign(available)
 	for index: int in range(available.size()):
 		var supply: MissionSupply = available[index]
 		var panel: PanelContainer = PanelContainer.new()
 		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		if player_mode:
-			panel.add_theme_stylebox_override("panel", _card_style(false))
-		else:
-			panel.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.PANEL, CampStyle.TEAL if index == 0 else CampStyle.AMBER))
+		panel.add_theme_stylebox_override("panel", _card_style(false))
 		row.add_child(panel)
 		_card_panels.append(panel)
 		var card: VBoxContainer = VBoxContainer.new()
-		card.add_theme_constant_override("separation", 10 if player_mode else 12)
+		card.add_theme_constant_override("separation", 10)
 		panel.add_child(card)
 		var rescue: bool = supply.id == &"rescue"
 		var title: Label = CampStyle.label("%02d / %s" % [index + 1, RescueTarget.ACTION_TITLE if rescue else supply.layout.display_name], 24)
@@ -105,18 +97,15 @@ func _ready() -> void:
 			title.add_theme_font_size_override("font_size", 18)
 			title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		if player_mode:
-			var top: HBoxContainer = HBoxContainer.new()
-			top.add_theme_constant_override("separation", 10)
-			card.add_child(top)
-			var mark: CardMark = CardMark.new()
-			mark.custom_minimum_size = Vector2(34, 34)
-			mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			top.add_child(mark)
-			_role_marks.append(mark)
-			top.add_child(title)
-		else:
-			card.add_child(title)
+		var top: HBoxContainer = HBoxContainer.new()
+		top.add_theme_constant_override("separation", 10)
+		card.add_child(top)
+		var mark: CardMark = CardMark.new()
+		mark.custom_minimum_size = Vector2(34, 34)
+		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		top.add_child(mark)
+		_role_marks.append(mark)
+		top.add_child(title)
 		_titles.append(title)
 		_build_thumbnail(card, SHOP if index == 0 else MARKET)
 		var pressure: Label = CampStyle.label("", 15, CampStyle.TEAL)
@@ -124,40 +113,34 @@ func _ready() -> void:
 		card.add_child(pressure)
 		_campaign_pressures.append(pressure)
 		var description: String = _rescue_card_text(supply) if rescue else supply.description
-		if player_mode:
-			description += "\n搜完货币点可带回%d币；%s。武器以实际搜获为准。\n夜间敌人增援变密；阵亡不可恢复，归航需留足口粮。" % [supply.cash_reward,"食物点%d份" % supply.food_reward if supply.food_reward>0 else "此行没有食物点"]
+		description += "\n搜完货币点可带回%d币；%s。武器以实际搜获为准。\n夜间敌人增援变密；阵亡不可恢复，归航需留足口粮。" % [supply.cash_reward,"食物点%d份" % supply.food_reward if supply.food_reward>0 else "此行没有食物点"]
 		var text: Label = CampStyle.label(description, 17, CampStyle.MUTED)
 		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		text.custom_minimum_size.y = 52
-		if player_mode:
-			var scroll: ScrollContainer = ScrollContainer.new()
-			scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-			scroll.custom_minimum_size.y = 124
-			card.add_child(scroll)
-			text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			text.add_theme_color_override("font_color", Color("d4e0dd"))
-			text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			scroll.add_child(text)
-			_description_scrolls.append(scroll)
-		else:
-			card.add_child(text)
+		var scroll: ScrollContainer = ScrollContainer.new()
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll.custom_minimum_size.y = 124
+		card.add_child(scroll)
+		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		text.add_theme_color_override("font_color", Color("d4e0dd"))
+		text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		scroll.add_child(text)
+		_description_scrolls.append(scroll)
 		_descriptions.append(text)
 		var button: Button = Button.new()
 		button.text = "前往救援 →" if index == 2 else ("出发搜集 →" if index == 0 else "前往超市 →")
-		button.custom_minimum_size.y = 46 if player_mode else 52
+		button.custom_minimum_size.y = 46
 		button.pressed.connect(_choose.bind(index))
 		card.add_child(button)
 		choices.append(button)
-		if player_mode:
-			button.focus_entered.connect(func() -> void: panel.add_theme_stylebox_override("panel", _card_style(true)))
-			button.focus_exited.connect(func() -> void: panel.add_theme_stylebox_override("panel", _card_style(false)))
+		button.focus_entered.connect(func() -> void: panel.add_theme_stylebox_override("panel", _card_style(true)))
+		button.focus_exited.connect(func() -> void: panel.add_theme_stylebox_override("panel", _card_style(false)))
 	cancel_button = Button.new()
-	cancel_button.text = "返回营地 / Esc" if player_mode else "取消 / 返回营地"
+	cancel_button.text = "返回营地 / Esc"
 	cancel_button.custom_minimum_size.y = 44
 	cancel_button.pressed.connect(func() -> void: cancelled.emit())
-	if player_mode:
-		cancel_button.custom_minimum_size.x = 184
-		cancel_button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	cancel_button.custom_minimum_size.x = 184
+	cancel_button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	if review_enabled:
 		var footer: HBoxContainer = HBoxContainer.new()
 		column.add_child(footer)
@@ -175,19 +158,17 @@ func _ready() -> void:
 		_retry_button.hide()
 	else:
 		column.add_child(cancel_button)
-	if player_mode:
-		_link_choices()
+	_link_choices()
 
 
 func refresh_rescue(completed: bool, reason: String = "") -> void:
 	rescue_completed = completed
-	if rescue_enabled and choices.size() > 2:
+	if choices.size() > 2:
 		choices[2].disabled = completed
 		choices[2].text = "救援已结束" if completed else "前往救援 →"
 		if completed and not reason.is_empty():
 			choices[2].text = reason
-	if player_mode:
-		_link_choices()
+	_link_choices()
 
 
 func refresh_daily(base: Dictionary, rations: Dictionary = {}, prepared: Dictionary = {}) -> void:
@@ -207,20 +188,19 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}, prepared: Diction
 	var action_choices: bool = CampaignRules.action_choices_enabled(base.get("journey", {}).get("campaign"))
 	var has_mission_cards: bool = daily_offers.any(func(offer: Dictionary) -> bool: return offer.get("mission_policy") == 1)
 	_subtitle.text = "比较主收益、路线与风险。物资和线索随生还归航确认。" if has_mission_cards else "选择此行的补给方向，准备好后出发。"
-	_heading.text = "选择行动 · 第 %d 天" % int(base.day) if player_mode else "第%d天 · 选择一项行动" % int(base.day)
+	_heading.text = "选择行动 · 第 %d 天" % int(base.day)
 	if CampaignState.is_short(base):
 		var display: Dictionary=CampaignRules.display(base.journey.campaign)
-		_heading.text = ("选择行动" if player_mode else String(display.title)) + " · " + String(display.progress)
-		if action_choices and player_mode:
+		_heading.text = ("选择行动") + " · " + String(display.progress)
+		if action_choices:
 			_heading.text = "选择行动 · 第 %d 天 · %s" % [int(base.day), display.progress]
 	if review_enabled:
 		_heading.text = _heading.text.replace("选择行动", "准备出击")
 	for index: int in range(choices.size()):
 		var panel: PanelContainer = _card_panels[index]
 		panel.visible = index < daily_offers.size()
-		if player_mode:
-			panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER if daily_offers.size() == 1 else Control.SIZE_EXPAND_FILL
-			panel.custom_minimum_size.x = 366 if daily_offers.size() == 1 else 0
+		panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER if daily_offers.size() == 1 else Control.SIZE_EXPAND_FILL
+		panel.custom_minimum_size.x = 366 if daily_offers.size() == 1 else 0
 		if index>=daily_offers.size(): continue
 		var supply: MissionSupply = DailyActions.supply(daily_offers[index]) if prepared.is_empty() else prepared.supplies[index]
 		_active[index] = supply
@@ -297,7 +277,7 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}, prepared: Diction
 		var picture: Texture2D = MARKET if supply.id == &"supermarket" else SHOP
 		if pump_card:
 			picture = BuildingLibrary.definition("warehouse").texture
-		elif mission_card or (player_mode and supply.generated.get("exploration", {}).has("level")):
+		elif mission_card or (supply.generated.get("exploration", {}).has("level")):
 			picture = _mission_picture(supply.generated, picture)
 		elif outdoor:
 			picture = null
@@ -306,10 +286,8 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}, prepared: Diction
 		choices[index].disabled = false
 		choices[index].text = "选择此行动 →"
 		choices[index].tooltip_text = "只有真实搜集并成功撤离，确认结算才入账。"
-		if player_mode:
-			_refresh_blue_hour_card(index, supply.generated)
-	if player_mode:
-		_link_choices()
+		_refresh_blue_hour_card(index, supply.generated)
+	_link_choices()
 
 
 func show_waiting(base: Dictionary, rations: Dictionary, failed: bool = false) -> void:
@@ -438,7 +416,7 @@ static func _event_card_text(generated: Dictionary) -> String:
 func _rescue_card_text(supply: MissionSupply) -> String:
 	var size: String = {"small":"小型", "medium":"中型", "large":"大型"}.get(supply.generated.get("layout", {}).get("size"), "")
 	var area: String = (size + "街区 · " if not size.is_empty() else "") + supply.layout.display_name
-	var goal: String = "援救 10 秒后现场接纳，生还归航后登记入营。" if field_join_mode else "援救 10 秒，护送至巴士，生还归航后登记入营。"
+	var goal: String = "援救 10 秒后现场接纳，生还归航后登记入营。"
 	var route: String = LevelSummary.description(supply.generated, true)
 	var text: String = "%s ×1\n%s\n%s" % [RescueTarget.ANONYMOUS_NAME, area, goal]
 	if not route.is_empty():
@@ -490,13 +468,6 @@ func _build_thumbnail(card: VBoxContainer, source: Texture2D) -> void:
 	crate.hide()
 	_pictures.append(picture)
 	_crates.append(crate)
-	if not player_mode:
-		picture.custom_minimum_size = Vector2(240 if rescue_enabled else 400, 192)
-		picture.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		card.add_child(picture)
-		picture.add_child(crate)
-		picture.resized.connect(func() -> void: crate.position = picture.size * 0.5 + Vector2(-12, 28))
-		return
 	var well: ThumbnailPlate = ThumbnailPlate.new()
 	well.custom_minimum_size.y = 160
 	well.size_flags_vertical = Control.SIZE_EXPAND_FILL

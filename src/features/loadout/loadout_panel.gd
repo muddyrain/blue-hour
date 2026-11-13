@@ -14,7 +14,6 @@ signal navigation_requested(action: StringName)
 
 var power_panel: PowerLoadoutPanel
 var build_panel: BuildItemsPanel
-var player_mode: bool = false
 var armory: CampArmoryView
 
 var items: ItemList
@@ -50,109 +49,7 @@ func _ready() -> void:
 	background.color = Color("10232d")
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
-	if player_mode:
-		_setup_armory()
-		return
-	var margins: MarginContainer = MarginContainer.new()
-	margins.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for side: String in ["left", "right"]:
-		margins.add_theme_constant_override("margin_" + side, 72)
-	for side: String in ["top", "bottom"]:
-		margins.add_theme_constant_override("margin_" + side, 24)
-	add_child(margins)
-	var column: VBoxContainer = VBoxContainer.new()
-	column.add_theme_constant_override("separation", 8)
-	var scroll: ScrollContainer=ScrollContainer.new()
-	scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.follow_focus = true
-	margins.add_child(scroll)
-	column.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	scroll.add_child(column)
-	var heading: Label = Label.new()
-	heading.text = "武器整备 / 装备仓"
-	heading.add_theme_font_size_override("font_size", 32)
-	column.add_child(heading)
-	var crew_row: HBoxContainer = HBoxContainer.new()
-	crew_row.add_theme_constant_override("separation", 24)
-	column.add_child(crew_row)
-	_crew = Label.new()
-	_crew.add_theme_font_size_override("font_size", 16)
-	_crew.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_crew.custom_minimum_size = Vector2(140, 56)
-	_crew.add_theme_color_override("font_color", Color("a5dfce"))
-	crew_row.add_child(_crew)
-	_crew_grid = GridContainer.new()
-	_crew_grid.columns = 2
-	_crew_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	crew_row.add_child(_crew_grid)
-	_build_workshop(column)
-	var row: HBoxContainer = HBoxContainer.new()
-	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	row.add_theme_constant_override("separation", 28)
-	column.add_child(row)
-	items = ItemList.new()
-	items.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	items.fixed_icon_size = Vector2i(112, 48)
-	items.add_theme_font_size_override("font_size", 18)
-	items.add_theme_constant_override("v_separation", 20)
-	items.item_selected.connect(_select)
-	row.add_child(items)
-	var detail_column: VBoxContainer = VBoxContainer.new()
-	detail_column.custom_minimum_size.x = 430
-	detail_column.add_theme_constant_override("separation", 8)
-	row.add_child(detail_column)
-	_preview = TextureRect.new()
-	_preview.custom_minimum_size = Vector2(400, 64)
-	_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	detail_column.add_child(_preview)
-	var detail_scroll: ScrollContainer = ScrollContainer.new()
-	detail_scroll.custom_minimum_size.y = 210
-	detail_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	detail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	detail_column.add_child(detail_scroll)
-	_detail = Label.new()
-	_detail.add_theme_font_size_override("font_size", 18)
-	_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	detail_scroll.add_child(_detail)
-	build_panel=BuildItemsPanel.new()
-	build_panel.requested.connect(func(slot:int,item:String)->void: build_requested.emit(slot,item))
-	build_panel.investment_requested.connect(build_investment_requested.emit)
-	column.add_child(build_panel)
-	power_panel=PowerLoadoutPanel.new()
-	power_panel.requested.connect(func(id:String)->void:power_requested.emit(id))
-	column.add_child(power_panel)
-	var actions: HBoxContainer = HBoxContainer.new()
-	actions.add_theme_constant_override("separation", 16)
-	column.add_child(actions)
-	_actions = actions
-	repair_button = Button.new()
-	repair_button.text = "维修…"
-	repair_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	repair_button.pressed.connect(_confirm_repair)
-	actions.add_child(repair_button)
-	var note: Label = Label.new()
-	note.text = "损坏武器须先维修。配装会在营地保存，下次出击生效。"
-	note.add_theme_font_size_override("font_size", 16)
-	note.add_theme_color_override("font_color", Color("d9c390"))
-	column.add_child(note)
-	message = Label.new()
-	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	message.custom_minimum_size.y = 36
-	message.add_theme_font_size_override("font_size", 17)
-	column.add_child(message)
-	back_button = Button.new()
-	back_button.text = "返回营地 / Esc"
-	back_button.custom_minimum_size.y = 44
-	back_button.pressed.connect(func() -> void: closed.emit())
-	column.add_child(back_button)
-	confirmation = ConfirmationDialog.new()
-	confirmation.title = "维修确认"
-	confirmation.ok_button_text = "确认维修"
-	confirmation.cancel_button_text = "取消"
-	confirmation.confirmed.connect(func() -> void: repair_requested.emit(_confirmation_id))
-	add_child(confirmation)
+	_setup_armory()
 
 
 func refresh(data: Dictionary, feedback: String = "", retry_power: bool = false) -> void:
@@ -185,9 +82,9 @@ func refresh(data: Dictionary, feedback: String = "", retry_power: bool = false)
 		if not mod.is_empty():
 			items.set_item_text(index, items.get_item_text(index) + "\n工坊 · " + WorkshopV1.name_for(mod))
 		items.set_item_metadata(index, item.instance_id)
-		items.set_item_tooltip(index, "归属 " + ownership + ("" if player_mode else "\n实例 " + item.instance_id))
+		items.set_item_tooltip(index, "归属 " + ownership)
 		if WeaponState.is_family(_data):
-			items.set_item_tooltip(index,items.get_item_tooltip(index)+"\n"+WeaponModifiers.description(item)+("\n完整比较见右侧详情" if player_mode else "\nPROJECT_TEMP；完整比较见右侧可滚动详情"))
+			items.set_item_tooltip(index,items.get_item_tooltip(index)+"\n"+WeaponModifiers.description(item)+("\n完整比较见右侧详情"))
 		if not mod.is_empty():
 			items.set_item_tooltip(index, items.get_item_tooltip(index) + "\n工坊 · " + WorkshopV1.name_for(mod))
 		items.set_item_custom_fg_color(index, CampStyle.AMBER if item.condition == "damaged" else CampStyle.TEXT)
@@ -369,9 +266,8 @@ func _select(index: int) -> void:
 		repair_button.disabled = true
 	repair_button.text = "维修 %d 货币…" % repair_quote if item.condition == "damaged" else "无需维修"
 
-	if player_mode:
-		_detail.text = _detail.text.replace(" · PROJECT_TEMP", "")
-		_detail.tooltip_text = "属性以右侧实际数值和当前持有者为准；维修不会重抽词条。"
+	_detail.text = _detail.text.replace(" · PROJECT_TEMP", "")
+	_detail.tooltip_text = "属性以右侧实际数值和当前持有者为准；维修不会重抽词条。"
 	_refresh_workshop(item, owner_id, index)
 
 

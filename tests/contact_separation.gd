@@ -171,7 +171,6 @@ func _world_cases() -> void:
 	for kind: String in [EnemyRules.NORMAL,EnemyRules.RUSH,EnemyRules.HEAVY]:
 		var world: Expedition = Expedition.new()
 		world.is_practice = true
-		world.enemy_mode = true
 		world._practice_manual_waves = true
 		root.add_child(world)
 		world.set_physics_process(false)
@@ -210,7 +209,6 @@ func _world_crossings() -> void:
 	for direction: Vector2 in [Vector2.LEFT,Vector2.UP,Vector2.RIGHT,Vector2.DOWN]:
 		var world: Expedition = Expedition.new()
 		world.is_practice = true
-		world.enemy_mode = true
 		world._practice_manual_waves = true
 		root.add_child(world)
 		world.set_physics_process(false)

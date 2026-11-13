@@ -30,7 +30,6 @@ func scenario(mode:String) -> void:
 	var world:ComponentWorld=ComponentWorld.new()
 	world.set_process(false);world.set_physics_process(false);root.add_child(world)
 	world._effects=Node2D.new();world.add_child(world._effects)
-	world.growth_mode=true
 	var camp:Dictionary={"profile_id":"0123456789abcdef0123456789abcdef","crew":SurvivorRoster.new_crew()}
 	WeaponInventory.initialize(camp,"initial")
 	world.loadout_snapshot=WeaponInventory.snapshot(camp)

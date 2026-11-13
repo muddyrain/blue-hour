@@ -194,7 +194,6 @@ func _actual_rifle_affixes() -> void:
 			var wall: Vector2 = shot.hit_to + direction * 28.0 + Vector2.DOWN * AttackRules.HIT_HEIGHT
 			sortie.shot_obstacles.append(ShotObstacle.new(&"pierce_test_wall", Rect2(wall - Vector2(4, 20), Vector2(8, 40)), true))
 		elif scenario in ["capacity", "lethal_pair"]:
-			sortie.growth_mode = true
 			primary.health = 1.0
 			second.health = 1.0
 			if scenario == "capacity":

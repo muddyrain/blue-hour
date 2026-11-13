@@ -13,7 +13,7 @@ func configure(token: Dictionary) -> void:
 
 func accept_search(world: Expedition, actor: FieldActor, site: StringName, site_id: StringName = &"") -> bool:
 	var active: Expedition.SearchSite = world.search_site(site_id) if site_id != &"" else world._active_site
-	if not world.trait_mode or world.is_paused or world.phase == Expedition.Phase.FINISHED or not world.has_search_job(actor.member_id) or not world.survivors.has(actor) or actor.health <= 0 or active == null or world.member_site(actor.member_id) != active or not world.work_state_matches(actor,active):
+	if world.is_paused or world.phase == Expedition.Phase.FINISHED or not world.has_search_job(actor.member_id) or not world.survivors.has(actor) or actor.health <= 0 or active == null or world.member_site(actor.member_id) != active or not world.work_state_matches(actor,active):
 		return false
 	if active == null or active.kind != site or active.progress < world._site_seconds(active) or events.any(func(row: Dictionary) -> bool: return row.site == String(site)):
 		return false

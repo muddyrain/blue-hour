@@ -196,7 +196,6 @@ func camp_scenario(size: Vector2i) -> void:
 	var camp_theme: Theme = CampStyle.theme((template.get_node("Interface/Screen") as Control).theme)
 	template.free()
 	var panel: RosterPanel = RosterPanel.new()
-	panel.player_mode = true
 	panel.theme = camp_theme
 	viewport.add_child(panel)
 	panel.refresh(base)

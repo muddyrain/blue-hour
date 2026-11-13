@@ -18,7 +18,7 @@ var label: Label
 
 func _ready() -> void:
 	npc = world._make_actor(false,99,world.layout.rescue_point,{"id":world.candidate_id(),"definition_id":"crew_%d" % world.candidate_id()})
-	npc.weapon_definition = WeaponInventory.definition("long_rifle" if world.pool_mode and world.candidate_id()==4 else "carbine")
+	npc.weapon_definition = WeaponInventory.definition("long_rifle" if world.candidate_id()==4 else "carbine")
 	npc.visual.set_weapon(npc.weapon_definition.presentation)
 	label = Label.new()
 	label.add_theme_font_size_override("font_size",17)
@@ -81,12 +81,12 @@ func candidate_name() -> String:
 
 
 func contains(point: Vector2) -> bool:
-	return not (world.field_join_mode and status == "IN_FIELD_JOINED") and Rect2(npc.position-Vector2(56,92),Vector2(112,116)).has_point(point)
+	return not (status == "IN_FIELD_JOINED") and Rect2(npc.position-Vector2(56,92),Vector2(112,116)).has_point(point)
 
 
 func request() -> void:
 	if world.bus_view!=null and world.bus_view.running(): return
-	if world.field_join_mode and progress >= SECONDS and status == "IN_PROGRESS":
+	if progress >= SECONDS and status == "IN_PROGRESS":
 		_complete_field_join()
 		return
 	if status in ["RESCUED","FAILED","IN_FIELD_JOINED"] or world.phase == Expedition.Phase.FINISHED:
@@ -135,16 +135,9 @@ func step(delta: float) -> void:
 		elif actor.position.distance_to(npc.position) <= 52.0:
 			progress = minf(SECONDS,progress+delta)
 			if progress >= SECONDS:
-				if world.field_join_mode:
-					_complete_field_join()
-					refresh()
-					return
-				status = "RESCUED"
-				worker = 0
-				npc.command_path(world.navigation.path_between(npc.position,world.layout.bus_door))
-				world._show_notice(candidate_name()+"已获救，正在前往巴士；归航结算后正式加入。下一次多一人，多一份口粮。")
-	if status == "RESCUED":
-		npc.advance(delta)
+				_complete_field_join()
+				refresh()
+				return
 	refresh()
 
 
@@ -157,15 +150,13 @@ func _complete_field_join() -> void:
 
 
 func delivered() -> bool:
-	if world.field_join_mode:
-		return status == "IN_FIELD_JOINED" and npc.health > 0 and npc.position.distance_to(world.layout.bus_door) <= world.tuning.boarding_radius
-	return status == "RESCUED" and npc.position.distance_to(world.layout.bus_door) <= world.tuning.boarding_radius
+	return status == "IN_FIELD_JOINED" and npc.health > 0 and npc.position.distance_to(world.layout.bus_door) <= world.tuning.boarding_radius
 
 
 func refresh() -> void:
 	# Keep the real actor and its visual state for promotion and snapshot replay.
 	npc.visual.visible = revealed()
-	label.visible = not (world.field_join_mode and status == "IN_FIELD_JOINED")
+	label.visible = not (status == "IN_FIELD_JOINED")
 	label.position = npc.position + Vector2(-100,-132)
 	var display_name: String = candidate_name()
 	match status:
@@ -195,7 +186,7 @@ func fact(evacuated: bool) -> Dictionary:
 
 
 func snapshot() -> Dictionary:
-	if world.field_join_mode and status == "IN_FIELD_JOINED":
+	if status == "IN_FIELD_JOINED":
 		return {"status":status,"progress":progress,"worker":0}
 	var path: Array = []
 	for point: Vector2 in npc.path: path.append([point.x,point.y])
@@ -206,7 +197,7 @@ func restore(value: Dictionary) -> void:
 	status = value.status
 	progress = float(value.progress)
 	worker = int(value.worker)
-	if world.field_join_mode and status == "IN_FIELD_JOINED":
+	if status == "IN_FIELD_JOINED":
 		refresh()
 		return
 	npc.position = Vector2(value.position[0],value.position[1])

@@ -112,7 +112,6 @@ func scenario(party: int) -> void:
 	world.growth_binding = source.support.binding.duplicate(true)
 	world.sortie_id = String(source.support.binding.transaction_id)
 	world.ui_theme = theme
-	world.player_mode = true
 	viewport.add_child(world)
 	world.set_process(false)
 	world.set_physics_process(false)

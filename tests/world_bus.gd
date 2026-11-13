@@ -45,7 +45,6 @@ func check_boarding_boundaries(supply: MissionSupply) -> void:
 	# the old independent NPC and original world owners without a camp writer.
 	var world: Expedition = EXPEDITION.instantiate() as Expedition
 	world.supply = supply
-	world.rescue_mode = true
 	root.add_child(world)
 	world.set_process(false)
 	world.set_physics_process(false)

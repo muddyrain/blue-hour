@@ -15,7 +15,8 @@ python tools/godot.py check --godot <engine>                 # 导入 + 启动 +
 ## 代码约定
 
 - 类型化 GDScript，显式依赖；不加 Autoload。
-- 新代码放进 `src/features/<feature>/`，不要继续往 `src/app/main.gd` 和 `src/features/expedition/expedition.gd` 里堆逻辑。
+- 新代码放进 `src/features/<feature>/`。`main.gd` / `expedition.gd` 只是协调层：逻辑放进对应的 `app_*.gd` / `expedition_*.gd` helper（单文件尽量 < 600 行），根上只留状态、信号和一行转发；约定见 `docs/architecture.md`。
+- 手感与美术改动只改表现模块（`expedition_feedback.gd`、`expedition_ui.gd`、`app_presentation.gd`、`app_results.gd`），不要混进规则代码。
 - 只有一个入口和一种存档格式。不要再加 `--bh-*` 试验开关、平行的“旧版/新版”分支或版本分叉。
 - 原型阶段允许存档断档：改格式时直接改，不写迁移代码，不为旧档保留兼容分支。
 - 数值都是临时值，改数值要在 PR 里说明。

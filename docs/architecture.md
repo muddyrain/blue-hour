@@ -8,7 +8,41 @@
 - `src/app/playable_entry.gd`：固定存档目录 `user://playable-v1/`（`run.enemy-v1.json` 与 `audio.json`）。命令行只接受 `--bh-progress=` / `--bh-audio-settings=` 覆盖路径（测试用）。
 - 一局循环：营地（`camp`/`camp_scene`/`loadout`/`survivors`）→ `MissionSelect` 选当日行动 → `Expedition`（`src/features/expedition/expedition.gd`）运行街区：派工搜刮、战斗、救援、夜间压力 → 巴士集合撤离 → `FrozenSettlement` 计算结算 → `RunTransaction` 写入存档 → 回营。
 
-`main.gd`（约 2.5k 行）和 `expedition.gd`（约 2.8k 行）仍然过大，计划在下一轮按职责拆分。
+## 组合方式：根节点 = 协调层 + 职责 helper
+
+`main.gd` 与 `expedition.gd` 只保留共享状态变量、信号、`_ready`/`_process`/输入分发和一行转发方法；逻辑放在同目录的 `RefCounted` helper 里。约定：
+
+- helper 在成员声明处构造（`var _camp: AppCamp = AppCamp.new(self)`），`_init` 只保存显式回指引用；测试可以不入树直接调用根方法。
+- 公开方法、信号/按钮连接的方法、测试和其他模块用到的方法都留在根上做同签名转发；helper 之间互调也经根转发（保留测试子类的覆写）。
+- 根上的协程转发要 `await` helper。
+- 规则/模拟与表现分开：手感（顿帧、震屏、动画、音效）和 2.5D 换皮只应改表现模块（`ExpeditionFeedback`、`ExpeditionUi`、`AppPresentation`、`AppResults`），不碰规则模块。
+
+### `src/app/`（`Main`）
+
+| 文件 | 职责 |
+| --- | --- |
+| `main.gd` | 协调层：应用阶段状态、输入分发、转发 |
+| `app_session.gd` | 启动/命令行参数、存档会话、新旅程、读档/备份、事务落盘 |
+| `app_sortie.gd` | 任务选择 → 出击生命周期 → 出击事件接线 → 暂存/挂起 → 结算确认回营 |
+| `app_results.gd` | 战斗结果、抽水站胜利与结算文本（表现） |
+| `app_camp.gd` | 营地场景与设施、名册/成长/训练、配装/维修/改装、构筑与能力编辑 |
+| `app_presentation.gd` | 标题画面与通用表现刷新（表现） |
+| `app_menus.gd` | 暂停、退出确认、音量设置、返回标题 |
+
+### `src/features/expedition/`（`Expedition`）
+
+| 文件 | 职责 |
+| --- | --- |
+| `expedition.gd` | 协调层：场内共享状态、信号、`step()` 编排、转发 |
+| `expedition_world.gd` | 场景/角色/建筑/抽水站构建（`_ready` 的世界搭建） |
+| `expedition_orders.gd` | 玩家输入、选择、移动/搜刮指令、支援瞄准、队形目标 |
+| `expedition_squad.gd` | 派工搜刮作业、站点查询、事件站点选择 |
+| `expedition_combat.gd` | 战斗循环：目标选择、攻击判定、远程命中结算 |
+| `expedition_threat.gd` | 刷怪、夜间压力、敌人寻路、空投/任务波次 |
+| `expedition_extraction.gd` | 巴士集合/登车/撤离与出击结束 |
+| `expedition_support.gd` | 支援、能力、构筑、急救、路障、侦察规则 |
+| `expedition_feedback.gd` | 表现：射击/命中特效、飘字、通知、夜间光照、镜头、能力/侦察展示（未来顿帧/震屏/音效挂这里） |
+| `expedition_ui.gd` | 表现：HUD 构建与刷新、文本格式化 |
 
 ## 模块（`src/features/`）
 
@@ -18,7 +52,7 @@
 | `exploration/` | 探索行动（daily action v9）、站点/道具/目标、`ExplorationLayout` 导航与校验、`LevelSummary`。 |
 | `rogue/` | `DailyActions` 行动派发（只剩 Exploration / Investigation 两条），以及仍被当前数据结构复用的旧行动/布局工具类（`TaskActions`、`WeaponActions`、`NeighborhoodLayout`、`WorldLayout` 等）。 |
 | `campaign/` | 短流程战役规则 `CampaignRules/CampaignState`、调查日、事件出击、侦察、路障、广告牌、跨日压力。 |
-| `expedition/` | 场内运行时：角色/敌人、导航、巴士撤离 `BusJourney`、镜头、出击快照 `SortieSnapshot`（暂存/恢复）。 |
+| `expedition/` | 场内运行时：`Expedition` 及其职责 helper（见上）、角色/敌人、导航、巴士撤离 `BusJourney`、镜头、出击快照 `SortieSnapshot`（暂存/恢复）。 |
 | `expedition_hud/` | 场内 HUD。 |
 | `combat_v1/`, `encounter/` | 战斗规则与运行时（武器、毒气、爆发、尖叫者、遭遇终止）。 |
 | `search/` | 多人派工搜刮。 |

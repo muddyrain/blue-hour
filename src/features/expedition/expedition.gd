@@ -400,7 +400,8 @@ func _spawn_screamer_batch(event: Dictionary) -> void:
 func visible_world_rect() -> Rect2:
 	var inverse: Transform2D = get_global_transform_with_canvas().affine_inverse()
 	var corner: Vector2 = inverse * Vector2.ZERO
-	return Rect2(corner, inverse * get_viewport_rect().size - corner)
+	var view_rect: Rect2 = Rect2(corner, inverse * get_viewport_rect().size - corner)
+	return IsoSpace.map_bounds_from_view(view_rect)
 
 func threat_status() -> Dictionary:
 	return _threat.threat_status()

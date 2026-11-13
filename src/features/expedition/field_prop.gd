@@ -76,6 +76,15 @@ func _ready() -> void:
 	background.bg_color = Color("25454d")
 	_bar.add_theme_stylebox_override("background", background)
 	add_child(_bar)
+	_roof.visible = false
+	_wall.visible = false
+	for child: Node in get_children():
+		if child is ShopFurniture or child is Polygon2D:
+			child.visible = false
+	_work.position = Vector2(-72, 10)
+	_work.size = Vector2(144, 22)
+	_bar.position = Vector2(-48, 32)
+	_bar.size = Vector2(96, 7)
 	update_work(-1, 0.0, false)
 
 
@@ -92,53 +101,68 @@ func _part(region: Rect2, point: Vector2, factor: float) -> Sprite2D:
 
 
 func _draw() -> void:
+	var depth: float = maxf(body_depth, 64.0)
+	var height: float = 96.0 if is_market else (72.0 if is_residence else 88.0)
+	var roof: Color = IsoDraw.SHOP_ROOF if is_market else (IsoDraw.ROOF if is_residence else IsoDraw.WARE_ROOF)
+	var left: Color = IsoDraw.SHOP_LEFT if is_market else (IsoDraw.WALL_LEFT if is_residence else IsoDraw.WARE_LEFT)
+	var right: Color = IsoDraw.SHOP_RIGHT if is_market else (IsoDraw.WALL_RIGHT if is_residence else IsoDraw.WARE_RIGHT)
+	if world_asset and not is_market and not is_residence:
+		if "仓" in title or "厂" in title or "库" in title:
+			roof = IsoDraw.WARE_ROOF
+			left = IsoDraw.WARE_LEFT
+			right = IsoDraw.WARE_RIGHT
+			height = 100.0
+		elif "店" in title or "超" in title or "市" in title:
+			roof = IsoDraw.SHOP_ROOF
+			left = IsoDraw.SHOP_LEFT
+			right = IsoDraw.SHOP_RIGHT
+			height = 96.0
+		else:
+			height = clampf(56.0 + front_width * 0.08, 64.0, 120.0)
+	var roof_alpha: float = 1.0
+	IsoDraw.box(self, Vector2(front_width, depth), height, roof, left, right, roof_alpha)
+	if is_market or "店" in title or "超" in title:
+		IsoDraw.shop_stripe(self, Vector2(front_width, depth), height, Color("c45c4a"))
 	if primary_target and loot_category.is_empty():
-		draw_arc(Vector2(door_offset,20),18,0,TAU,24,Color("a8ebd4") if searched else Color("ffd385"),3,true)
-		draw_colored_polygon(PackedVector2Array([Vector2(door_offset,-9),Vector2(door_offset-6,-19),Vector2(door_offset+6,-19)]),Color("ffd385"))
-	if calibrated and not soft_contact:
-		var shadow: PackedVector2Array=PackedVector2Array([Vector2(-front_width/2,-body_depth),Vector2(front_width/2,-body_depth),Vector2(front_width/2+26,8),Vector2(-front_width/2+16,10)])
-		draw_colored_polygon(shadow,Color(0.08,0.14,0.17,0.23))
-		draw_rect(Rect2(-front_width/2,-5,front_width,9),Color(0.06,0.12,0.15,0.35))
-		return
-	# Soft narrow contact shadows replace the old rectangular footprint carpet.
-	draw_set_transform(Vector2(front_width * 0.04, 0), 0, Vector2(1, 0.10))
-	for layer: int in range(3):
-		draw_circle(Vector2.ZERO, front_width * (0.44 + layer * 0.018), Color(0.08, 0.15, 0.17, 0.055))
-	draw_set_transform(Vector2.ZERO)
+		IsoDraw.marker(self, Vector2(door_offset, 0), Color("a8ebd4") if searched else IsoDraw.AMBER)
 
 
 func obscures(world_point: Vector2) -> bool:
+	# Gameplay still tests this in map space. Closed-roof presentation does not fade.
+	var foot: Vector2 = _map_foot()
 	if calibrated:
-		if world_point.y>=global_position.y-16: return false
-		# A roof can cover legs while the head is already above its silhouette.
-		for height: float in [0.0,32.0,64.0]:
-			var pixel: Vector2=(world_point-global_position-Vector2(0,height))/(front_width/reference_width)+render_anchor
+		if world_point.y >= foot.y - 16:
+			return false
+		for height: float in [0.0, 32.0, 64.0]:
+			var pixel: Vector2 = (world_point - foot - Vector2(0, height)) / (front_width / reference_width) + render_anchor
 			if fixed_roof:
 				if Rect2(Vector2.ZERO, Vector2(native_size.x, roof_cut)).has_point(pixel):
 					return true
 				continue
-			if pixel.x>=0 and pixel.x<native_size.x and pixel.y>=0 and pixel.y<roof_cut and _alpha!=null and _alpha.get_pixel(int(pixel.x),int(pixel.y)).a>0.15:return true
+			if pixel.x >= 0 and pixel.x < native_size.x and pixel.y >= 0 and pixel.y < roof_cut and _alpha != null and _alpha.get_pixel(int(pixel.x), int(pixel.y)).a > 0.15:
+				return true
 		return false
 	var factor: float = front_width / 448.0
-	return Rect2(global_position + Vector2(-front_width / 2, (-576 if world_asset else -384) * factor), Vector2(front_width, (480 if world_asset else 288) * factor)).has_point(world_point)
+	return Rect2(foot + Vector2(-front_width / 2, (-576 if world_asset else -384) * factor), Vector2(front_width, (480 if world_asset else 288) * factor)).has_point(world_point)
 
 
 func show_behind_roof(friend_behind: bool) -> void:
 	_roof.modulate.a = 0.40 if friend_behind else 1.0
 
 
+func _map_foot() -> Vector2:
+	return IsoSpace.map_of(self)
+
+
 func scaled_hit_bounds() -> Rect2:
-	var factor: float=front_width/reference_width
-	var pixels: Rect2=Rect2(_alpha.get_used_rect())
-	var visible_body: Rect2=Rect2(global_position+(pixels.position-render_anchor)*factor,pixels.size*factor)
-	return visible_body.merge(Rect2(global_position+Vector2(door_offset-28,0),Vector2(56,64)))
+	var foot: Vector2 = _map_foot()
+	var depth: float = maxf(body_depth, 80.0)
+	var body: Rect2 = Rect2(Vector2(foot.x - front_width * 0.5, foot.y - depth), Vector2(front_width, depth + 40.0))
+	return body.merge(Rect2(foot + Vector2(door_offset - 28, 0), Vector2(56, 64)))
 
 
 func scaled_hit_contains(point: Vector2) -> bool:
-	# New compact buildings use visible pixels and their real entrance, not an old tall box.
-	if Rect2(global_position+Vector2(door_offset-28,0),Vector2(56,64)).has_point(point): return true
-	var pixel: Vector2=(point-global_position)/(front_width/reference_width)+render_anchor
-	return pixel.x>=0 and pixel.y>=0 and pixel.x<_alpha.get_width() and pixel.y<_alpha.get_height() and _alpha.get_pixel(int(pixel.x),int(pixel.y)).a>0.15
+	return scaled_hit_bounds().has_point(point)
 
 
 func update_work(actor_id: int, fraction: float, inside: bool, call_sign: String = "", work_text: String = "") -> void:

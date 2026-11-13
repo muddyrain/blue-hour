@@ -71,26 +71,32 @@ func _ready() -> void:
 
 
 func _draw() -> void:
+	if has_meta("iso_view"):
+		return
+	draw_overlays(self)
+
+
+func draw_overlays(canvas: CanvasItem) -> void:
 	if activity == Activity.DOWN:
 		return
 	if not is_enemy:
 		if visual != null and visual.position != Vector2.ZERO:
-			draw_line(Vector2.ZERO, visual.position, Color(ActorVisual.COLOURS[actor_id % 2], 0.5), 1.0)
+			canvas.draw_line(Vector2.ZERO, visual.position, Color(ActorVisual.COLOURS[actor_id % 2], 0.5), 1.0)
 		return
 	var display: Vector2 = visual._body.position if visual != null else Vector2.ZERO
 	var bar_y: float = -94.0 if enemy_behavior != null and enemy_behavior.kind == EnemyRules.HEAVY else -78.0
 	if enemy_behavior != null and enemy_behavior.kind == NightHoundV1.KIND:
 		bar_y = -44.0
-	draw_rect(Rect2(Vector2(-22, bar_y) + display, Vector2(44, 5)), Color("182b35"))
-	draw_rect(Rect2(Vector2(-21, bar_y + 1) + display, Vector2(42 * clampf(health / max_health, 0.0, 1.0), 3)), Color("df9a70"))
+	canvas.draw_rect(Rect2(Vector2(-22, bar_y) + display, Vector2(44, 5)), Color("182b35"))
+	canvas.draw_rect(Rect2(Vector2(-21, bar_y + 1) + display, Vector2(42 * clampf(health / max_health, 0.0, 1.0), 3)), Color("df9a70"))
 	if enemy_behavior!=null and enemy_behavior.state=="windup":
-		draw_circle(Vector2.ZERO,EnemyRules.POLICY.melee_range,Color(1,0.57,0.20,0.16))
-		draw_arc(Vector2.ZERO,EnemyRules.POLICY.melee_range,-PI*0.5,-PI*0.5+TAU*(1.0-enemy_behavior.windup_remaining/enemy_behavior.windup_duration()),32,Color("ffb65f"),3,true)
+		canvas.draw_circle(Vector2.ZERO,EnemyRules.POLICY.melee_range,Color(1,0.57,0.20,0.16))
+		canvas.draw_arc(Vector2.ZERO,EnemyRules.POLICY.melee_range,-PI*0.5,-PI*0.5+TAU*(1.0-enemy_behavior.windup_remaining/enemy_behavior.windup_duration()),32,Color("ffb65f"),3,true)
 	elif enemy_behavior!=null and enemy_behavior.state=="rush":
 		var heading: Vector2 = visual._facing
 		for offset: float in [17.0,25.0]:
 			var tip: Vector2 = heading*offset
-			draw_polyline(PackedVector2Array([tip-heading.rotated(0.65)*8,tip,tip-heading.rotated(-0.65)*8]),Color("69e2d4"),2,true)
+			canvas.draw_polyline(PackedVector2Array([tip-heading.rotated(0.65)*8,tip,tip-heading.rotated(-0.65)*8]),Color("69e2d4"),2,true)
 
 
 func command_path(points: PackedVector2Array) -> void:

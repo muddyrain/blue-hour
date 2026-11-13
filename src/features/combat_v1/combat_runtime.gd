@@ -102,8 +102,8 @@ func attack(world: Expedition,actor: FieldActor,delta: float) -> void:
 	for ray: Dictionary in plan.rays:
 		if (ray.to-muzzle).dot(actor.aim)<=0: continue
 		var line: Line2D=Line2D.new()
-		line.add_point(muzzle)
-		line.add_point(ray.to)
+		line.add_point(IsoSpace.to_view(muzzle))
+		line.add_point(IsoSpace.to_view(ray.to))
 		line.width=1.8
 		line.default_color=Color("ffd78b")
 		world._effects.add_child(line)

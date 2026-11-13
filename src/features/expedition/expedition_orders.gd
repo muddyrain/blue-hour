@@ -18,10 +18,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		expedition.toggle_pause()
 		expedition.get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("squad_command"):
-		var point: Vector2 = expedition.get_global_mouse_position()
+		var point: Vector2 = IsoSpace.to_map(expedition.get_global_mouse_position())
 		if event is InputEventMouseButton:
 			# Use the click's coordinates, not a later position of the desktop cursor.
-			point = expedition.get_global_transform_with_canvas().affine_inverse() * event.position
+			point = IsoSpace.to_map(expedition.get_global_transform_with_canvas().affine_inverse() * event.position)
 		if expedition.rescue_target != null and expedition.rescue_target.contains(point):
 			expedition.rescue_target.request()
 		elif not expedition.layout.world_data.is_empty() and expedition._clicked_site(point):
@@ -260,7 +260,7 @@ func _support_input(event: InputEvent) -> bool:
 		if event.button_index==MOUSE_BUTTON_RIGHT: expedition.support_aiming=false; return true
 		if event.button_index==MOUSE_BUTTON_LEFT:
 			FreezeProfile.mark("left_received")
-			expedition.request_airstrike(expedition.get_global_transform_with_canvas().affine_inverse()*event.position)
+			expedition.request_airstrike(IsoSpace.to_map(expedition.get_global_transform_with_canvas().affine_inverse()*event.position))
 			return true
 	return false
 

@@ -86,7 +86,7 @@ func draw_warning(world: Expedition) -> void:
 	var released: bool = state.phase == "released"
 	if released and world.elapsed - float(state.event.at) >= 0.30:
 		return
-	var foot: Vector2 = SortieSnapshot._vec(state.origin)
+	var foot: Vector2 = IsoSpace.to_view(SortieSnapshot._vec(state.origin))
 	var tint: Color = Color("ffb44b")
 	world.draw_circle(foot, RADIUS, Color(tint, 0.16 if released else 0.09))
 	world.draw_arc(foot, RADIUS, 0.0, TAU, 64, tint, 3.0, true)

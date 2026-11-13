@@ -23,3 +23,9 @@ func update_work(actor_id: int, fraction: float, inside: bool, call_sign: String
 		_work.text = "操作员前往 · 再点取消"
 	else:
 		_work.text = "控制柜 · 点击派工停机"
+
+
+func _draw() -> void:
+	IsoDraw.box(self, Vector2(48, 28), 40, Color("4d5a66"), Color("8a9098"), Color("6d757c"))
+	IsoDraw.marker(self, Vector2.ZERO, Color("a8ebd4") if searched else IsoDraw.AMBER)
+

@@ -250,11 +250,11 @@ class HouseView extends Node2D:
 	var depth: float
 
 	func _draw() -> void:
-		PumpStationArt._draw_house(self, width, depth)
+		IsoDraw.box(self, Vector2(width, depth), 110.0, IsoDraw.WARE_ROOF, IsoDraw.WARE_LEFT, IsoDraw.WARE_RIGHT)
 
 
 class CabinetView extends Node2D:
 	var stopped: bool
 
 	func _draw() -> void:
-		PumpStationArt._draw_cabinet(self, Vector2.ZERO, stopped)
+		IsoDraw.box(self, Vector2(48, 28), 40.0, Color("4d5a66"), Color("8a9098"), Color("6d757c"))

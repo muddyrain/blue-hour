@@ -36,7 +36,7 @@ func configure(owner_world: Expedition, bus: Sprite2D, data: Dictionary) -> void
 	for actor: FieldActor in world.survivors:
 		starts.append(actor.position)
 		actor.hide()
-	sprite.position=WorldLayout.point(route.entry)
+	IsoSpace.place(sprite, WorldLayout.point(route.entry))
 	if route.has("in_path"):
 		stop = WorldLayout.point(route.stop)
 		_entry_path = JourneyPath.new(_route_points(route.in_path))
@@ -86,7 +86,7 @@ func advance(delta: float) -> void:
 	clock+=delta
 	match stage:
 		"arriving":
-			sprite.position=WorldLayout.point(route.entry).lerp(stop,smoothstep(0,1,minf(clock/DRIVE_IN,1)))
+			IsoSpace.place(sprite, WorldLayout.point(route.entry).lerp(stop,smoothstep(0,1,minf(clock/DRIVE_IN,1))))
 			if clock>=DRIVE_IN: stage="disembarking"; clock=0; skip_button.text="队员下车 · 跳过演出"
 		"disembarking":
 			for i: int in range(world.survivors.size()):
@@ -104,7 +104,7 @@ func advance(delta: float) -> void:
 				stage="departing"; clock=0; skip_button.text="巴士驶离 · 跳过演出"
 				_show_boarding("巴士驶离")
 		"departing":
-			sprite.position=stop.lerp(WorldLayout.point(route.exit),smoothstep(0,1,minf(clock/DRIVE_OUT,1)))
+			IsoSpace.place(sprite, stop.lerp(WorldLayout.point(route.exit),smoothstep(0,1,minf(clock/DRIVE_OUT,1))))
 			if clock>=DRIVE_OUT: skip()
 
 func skip() -> void:
@@ -113,13 +113,13 @@ func skip() -> void:
 			_place_open_bus(_entry_path, _entry_path.length)
 			_open_body.show_door(false)
 		else:
-			sprite.position=stop
+			IsoSpace.place(sprite, stop)
 		for i: int in range(world.survivors.size()):
 			world.survivors[i].position=starts[i]; world.survivors[i].show()
 		stage="exploring"
 	elif stage in ["embarking","departing"]:
 		if _open_body != null: return
-		sprite.position=WorldLayout.point(route.exit)
+		IsoSpace.place(sprite, WorldLayout.point(route.exit))
 		for actor: FieldActor in world.survivors:
 			if actor.health>0: actor.hide()
 		stage="done"
@@ -239,7 +239,7 @@ func _advance_open_departure(delta: float) -> void:
 
 
 func _place_open_bus(path: JourneyPath, distance: float) -> void:
-	sprite.position = path.point_at(distance)
+	IsoSpace.place(sprite, path.point_at(distance))
 	var before: Vector2 = path.point_at(distance - 32.0)
 	var after: Vector2 = path.point_at(distance + 32.0)
 	if not before.is_equal_approx(after):
@@ -253,11 +253,10 @@ func _follow_bus() -> void:
 
 func _entire_bus_outside() -> bool:
 	var bounds: Rect2 = world.layout.world_bounds
-	var front: Vector2 = Vector2.RIGHT.rotated(sprite.rotation)
-	var side: Vector2 = front.orthogonal()
-	var extent: Vector2 = front.abs() * BODY_HALF_SIZE.x + side.abs() * BODY_HALF_SIZE.y
-	return (sprite.position.x + extent.x < bounds.position.x or sprite.position.x - extent.x > bounds.end.x
-		or sprite.position.y + extent.y < bounds.position.y or sprite.position.y - extent.y > bounds.end.y)
+	var foot: Vector2 = IsoSpace.map_of(sprite)
+	var extent: Vector2 = BODY_HALF_SIZE
+	return (foot.x + extent.x < bounds.position.x or foot.x - extent.x > bounds.end.x
+		or foot.y + extent.y < bounds.position.y or foot.y - extent.y > bounds.end.y)
 
 
 func _move_boarding_actor(actor: FieldActor, point: Vector2, delta: float) -> void:

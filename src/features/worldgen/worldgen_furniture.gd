@@ -4,23 +4,17 @@ extends Node2D
 var detail: Dictionary
 
 func _draw() -> void:
-	if detail.has("slot"):
-		var sprite: Texture2D = WarehouseDressingArt.texture(detail.slot)
-		if sprite != null:
-			var width: float = float(detail.get("width", sprite.get_width()))
-			var height: float = width * sprite.get_height() / sprite.get_width()
-			draw_texture_rect(sprite, Rect2(-width * 0.5, -height, width, height), false)
-		return
-	var texture: Texture2D=WorldgenArt.texture(detail.kind)
-	var width: float=float(detail.width)
-	if detail.kind == "courtyard_edge":
-		# Source padding and the open interior never become a solid rectangle.
-		var ratio: float = width / StreetModuleArt.COURTYARD_REFERENCE_WIDTH
-		var origin: Vector2 = -StreetModuleArt.COURTYARD_ANCHOR * ratio
-		draw_texture_rect(texture, Rect2(origin, StreetModuleArt.COURTYARD_NATIVE * ratio), false)
-		return
-	var height: float=width*texture.get_height()/texture.get_width()
-	draw_set_transform(Vector2(5,-2),0,Vector2(1,0.2))
-	draw_circle(Vector2.ZERO,width*0.48,Color(0.07,0.12,0.14,0.22))
-	draw_set_transform(Vector2.ZERO)
-	draw_texture_rect(texture,Rect2(-width/2,-height,width,height),false)
+	var kind: String = str(detail.get("kind", detail.get("slot", "")))
+	var width: float = float(detail.get("width", 36.0))
+	if kind == "wall" or kind == "courtyard_edge":
+		IsoDraw.wall(self, maxf(width, 16.0), 16.0)
+	elif kind == "lamp" or kind.ends_with("lamp") or kind == "LAMP":
+		IsoDraw.lamp(self)
+	elif "tree" in kind or "planter" in kind:
+		IsoDraw.tree(self) if "tree" in kind else IsoDraw.planter(self)
+	elif "crate" in kind or "box" in kind:
+		IsoDraw.crate(self)
+	elif "vending" in kind:
+		IsoDraw.vending(self)
+	else:
+		IsoDraw.box(self, Vector2(maxf(width * 0.35, 22.0), 20.0), 28.0, IsoDraw.ROOF, IsoDraw.WALL_LEFT, IsoDraw.WALL_RIGHT)

@@ -4,23 +4,12 @@ extends RefCounted
 const PREFIX: String="worldgen_v1_"
 const KEYS: Array[String]=["version","seed","size","topology","attempt","fallback","bounds","entities","roads","barriers","gates","bus","arrivals","enemy_points","rescue","id","objects","graph","parcels","art_revision"]
 
-static func policy(level: bool = false, industrial: bool = false, residential_rescue: bool = false, open_streets: int = 0) -> Dictionary:
-	var value: Dictionary = {"version":1,"revision":3,"policy_id":"BH_WORLDGEN_V1","status":"PROJECT_TEMP","layout_version":5,"attempts":3,"fallback":"same_size_theme_bounded_partition","base_walk_speed":125,"scale":WorldgenScale.WIDTH}
+static func policy(_level: bool = false, industrial: bool = false, residential_rescue: bool = false, open_streets: int = 0) -> Dictionary:
+	var value: Dictionary = {"version":2,"revision":3 if residential_rescue else 2 if industrial else 1,"policy_id":"BH_LEVEL_V1","status":"PROJECT_TEMP","layout_version":5,"attempts":3,"fallback":"same_size_theme_bounded_partition","base_walk_speed":125,"scale":WorldgenScale.WIDTH}
 
-	if level:
-		value.version=2
-		value.revision = 3 if residential_rescue else 2 if industrial else 1
-		value.policy_id="BH_LEVEL_V1"
 	if open_streets > 0:
 		value.open_streets = open_streets
 	return value
-
-static func generate(seed: String, size: String, topology: String, task: String = "") -> Dictionary:
-	if (not task.is_empty() and task not in TaskActions.TYPES) or seed.is_empty() or seed.length()>128 or size not in NeighborhoodLayout.SIZES or topology not in NeighborhoodLayout.TOPOLOGIES: return {}
-	for attempt: int in range(3):
-		var data: Dictionary=_assemble(seed,size,topology,attempt,false,task)
-		if not data.is_empty(): return data
-	return _assemble(seed,size,topology,0,true,task)
 
 static func _assemble(seed: String,size: String,topology: String,attempt: int,fallback: bool,
 		task: String = "", industrial: bool = false, residential_rescue: bool = false, open_streets: int = 0, trace: Array[String] = []) -> Dictionary:

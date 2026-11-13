@@ -647,37 +647,26 @@ func _new_game(opening_plan: String = "", catalog_policy: Dictionary = {}, m47_p
 	last_day = {}
 	_pending_settlement = {}
 	profile_id = RunSave.new_profile_id()
-	var latest_rules: bool = not catalog_policy.is_empty()
 	_battle_meta.campaign = CampaignRules.initial_mission(profile_id, true, true, true, true,
-		latest_rules, latest_rules, latest_rules, latest_rules, latest_rules, latest_rules)
-	if latest_rules:
-		CampFacilities.enable_tier_two(_battle_meta.campaign)
-		_battle_meta.campaign.night_hound_policy = NightHoundV1.VERSION
-		_battle_meta.campaign.workshop = WorkshopV1.initial()
-		_battle_meta.campaign.event_sortie_policy = EventSortieV1.VERSION
-		_battle_meta.campaign.recon_policy = ReconActionV1.SOURCE_VERSION
-		_battle_meta.campaign.barricade_policy = BarricadeV1.VERSION
-		_battle_meta.campaign.billboard_policy = BillboardActionV1.VERSION
-		var pilot: bool = "--bh-open-streets" in OS.get_cmdline_user_args() and CampSceneLayout.isolated(ProjectSettings.globalize_path(progress_path))
-		if not m47_policy.is_empty() or pilot:
-			_battle_meta.campaign.open_streets_policy = OpenStreetsV1.VERSION
+		true, true, true, true, true, true)
+	CampFacilities.enable_tier_two(_battle_meta.campaign)
+	_battle_meta.campaign.night_hound_policy = NightHoundV1.VERSION
+	_battle_meta.campaign.workshop = WorkshopV1.initial()
+	_battle_meta.campaign.event_sortie_policy = EventSortieV1.VERSION
+	_battle_meta.campaign.recon_policy = ReconActionV1.SOURCE_VERSION
+	_battle_meta.campaign.barricade_policy = BarricadeV1.VERSION
+	_battle_meta.campaign.billboard_policy = BillboardActionV1.VERSION
+	_battle_meta.campaign.open_streets_policy = OpenStreetsV1.VERSION
 	_battle_meta.build=WorldgenState.initial_build(_battle_meta.seed, true, true)
-	var powers_version: int = SpecialPowers.PROGRESSION_VERSION
-	if not m47_policy.is_empty():
-		powers_version = SpecialPowers.M48_VERSION
-		_battle_meta.campaign.economy = EconomyBuildV1.initial()
-	elif latest_rules:
-		powers_version = SpecialPowers.WAVE_VERSION
-	_battle_meta.build.powers = PowerState.initial_progression(powers_version)
-	if not m47_policy.is_empty():
-		BuildState.enable_m48(_battle_meta.build)
+	_battle_meta.campaign.economy = EconomyBuildV1.initial()
+	_battle_meta.build.powers = PowerState.initial_progression(SpecialPowers.M48_VERSION)
+	BuildState.enable_m48(_battle_meta.build)
 	if not opening_plan.is_empty():
 		var starter: Dictionary = OpeningBuild.source(opening_plan, profile_id, _battle_meta.root_id, _battle_meta.seed, m47_policy)
 		_battle_meta.build.opening = starter
 		_battle_meta.build.owned.append(starter.item_id)
 		_battle_meta.build.slots[0] = starter.item_id
-		if not catalog_policy.is_empty():
-			_battle_meta.build.catalog = catalog_policy.duplicate(true)
+		_battle_meta.build.catalog = catalog_policy.duplicate(true)
 	_initialize_weapons("initial")
 	last_settlement_id = ""
 	_pending_save.clear()

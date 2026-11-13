@@ -30,8 +30,8 @@ func blockers() -> Array[Rect2]:
 	if not world_data.is_empty():
 		var blocks: Array[Rect2] = [bus_block]
 		blocks.append_array(residences)
-		if (world_data.get("version")==3 or world_data.get("version")==4 or world_data.get("version")==5): blocks.append_array(fences)
-		if (world_data.get("version")==4 or world_data.get("version")==5):
+		if (world_data.get("version")==3 or world_data.get("version")==5): blocks.append_array(fences)
+		if world_data.get("version")==5:
 			for object: Dictionary in world_data.objects:
 				var rect: Array=object.collision
 				blocks.append(Rect2(float(rect[0]),float(rect[1]),float(rect[2]),float(rect[3])))
@@ -59,7 +59,7 @@ func shot_obstacles() -> Array[ShotObstacle]:
 	if not world_data.is_empty():
 		var walls: Array[ShotObstacle] = []
 		for row: Dictionary in world_data.entities: walls.append(ShotObstacle.new(StringName(row.id),Rect2(row.rect[0],row.rect[1],row.rect[2],row.rect[3]),true))
-		if (world_data.get("version")==3 or world_data.get("version")==4 or world_data.get("version")==5):
+		if (world_data.get("version")==3 or world_data.get("version")==5):
 			for i: int in range(fences.size()): walls.append(ShotObstacle.new(StringName("yard_wall_%d"%i),fences[i],true))
 		walls.append(ShotObstacle.new(&"bus",bus_block,false))
 		return walls

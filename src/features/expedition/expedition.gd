@@ -269,7 +269,7 @@ func _ready() -> void:
 		for block: Rect2 in layout.residences:
 			_make_building(block,"柳巷住宅",preload("res://assets/m402/rowhouse.png"),false,true)
 		sites.assign([_cash_site,_food_site])
-	for block: Rect2 in ([] if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4 or layout.world_data.get("version")==5) else layout.fences):
+	for block: Rect2 in ([] if layout.world_data.get("version")==5 else layout.fences):
 		var fence: StreetFence = StreetFence.new()
 		fence.footprint = block
 		fence.position = Vector2(block.position.x,block.end.y)
@@ -1596,7 +1596,7 @@ func _make_ui() -> void:
 		event_sortie_panel.generated = supply.generated
 		event_sortie_panel.choice_confirmed.connect(confirm_event_choice)
 		_hud.view.add_child(event_sortie_panel)
-	if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4 or layout.world_data.get("version")==5):
+	if layout.world_data.get("version")==5:
 		_hud.view.place_help_above_lane()
 	if battle_survival:
 		drill_panel = BattleDrillPanel.new()
@@ -1964,7 +1964,7 @@ func _make_pump_station() -> void:
 
 
 func _make_world_buildings() -> void:
-	if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4 or layout.world_data.get("version")==5):
+	if layout.world_data.get("version")==5:
 		var yard: Dictionary = layout.world_data.get("loading_yard", layout.world_data.get("rescue_court", {}))
 		var yard_bounds: Rect2 = WorldLayout.rect(yard.bounds) if not yard.is_empty() else Rect2()
 		for wall: Rect2 in layout.fences:
@@ -1975,13 +1975,9 @@ func _make_world_buildings() -> void:
 				masonry.position = Vector2(wall.get_center().x, wall.end.y)
 				_sort.add_child(masonry)
 				continue
-			if layout.world_data.get("version")==5:
-				var stone: WorldgenFurniture=WorldgenFurniture.new()
-				stone.detail={"kind":"wall","width":wall.size.x};stone.position=Vector2(wall.get_center().x,wall.end.y);_sort.add_child(stone)
-				continue
-			var barrier: NeighborhoodWall=NeighborhoodWall.new()
-			barrier.footprint=wall;barrier.position=wall.position+Vector2(0,wall.size.y);_sort.add_child(barrier)
-	if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4 or layout.world_data.get("version")==5):
+			var stone: WorldgenFurniture=WorldgenFurniture.new()
+			stone.detail={"kind":"wall","width":wall.size.x};stone.position=Vector2(wall.get_center().x,wall.end.y);_sort.add_child(stone)
+	if layout.world_data.get("version")==5:
 		for detail: Dictionary in NeighborhoodDecor.placements(layout):
 			var prop: WorldFurniture = WorldFurniture.new()
 			prop.kind = detail.kind
@@ -2007,7 +2003,7 @@ func _make_world_buildings() -> void:
 	var props: Dictionary = {}
 	for entity: Dictionary in layout.world_data.entities:
 		var block: Rect2 = WorldLayout.rect(entity.rect)
-		var definition: Dictionary = WorldgenArt.definition(entity) if layout.world_data.get("version")==5 else NeighborhoodArt.definition(entity.archetype) if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4) else BuildingLibrary.definition(entity.archetype)
+		var definition: Dictionary = WorldgenArt.definition(entity)
 		var building: FieldProp = FieldProp.new()
 		building.facade = definition.texture
 		building.fixed_roof = definition.get("fixed_roof", false)
@@ -2026,7 +2022,7 @@ func _make_world_buildings() -> void:
 			building.roof_tint *= Color(0.69, 0.81, 1.0)
 			building.facade_tint = Color(0.87, 0.91, 0.98)
 		building.world_asset = true
-		if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4 or layout.world_data.get("version")==5):
+		if layout.world_data.get("version")==5:
 			building.calibrated=true;building.roof_cut=int(definition.roof_split);building.body_depth=block.size.y
 			building.door_offset=WorldLayout.point(entity.door).x-block.get_center().x
 		building.title = definition.title
@@ -2064,7 +2060,7 @@ func _make_world_buildings() -> void:
 			site.hit=Rect2(site.door-Vector2(48,100),Vector2(96,150))
 		else:
 			site.prop=props[def.building]
-			site.hit=Rect2(site.prop.position-Vector2(site.prop.front_width/2,280),Vector2(site.prop.front_width,340)) if (layout.world_data.get("version")==3 or layout.world_data.get("version")==4 or layout.world_data.get("version")==5) else Rect2(WorldLayout.rect(entity.rect).position-Vector2(0,160),WorldLayout.rect(entity.rect).size+Vector2(0,220))
+			site.hit=Rect2(site.prop.position-Vector2(site.prop.front_width/2,280),Vector2(site.prop.front_width,340)) if layout.world_data.get("version")==5 else Rect2(WorldLayout.rect(entity.rect).position-Vector2(0,160),WorldLayout.rect(entity.rect).size+Vector2(0,220))
 			if layout.world_data.get("version")==5: site.hit=site.prop.scaled_hit_bounds()
 			site.prop.primary_target=supply.generated.get("objective",{}).get("site_ids",[]).has(def.id)
 		site.prop.reward_hint=("货币" if site.kind==&"cash" else "食物")+" +%d"%site.reward+(" / 武器" if site.weapon else "")

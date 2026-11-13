@@ -64,26 +64,20 @@ static func upgrade(source: Dictionary, worldgen: bool = false, level: bool = fa
 		if value.type == "equipment" or (rare_policy != 0 and value.type == "supply"):
 			value.weapons = 0
 	var content: Dictionary = {}
-	if level:
-		var map: Dictionary
-		if billboard_target.is_empty():
-			map = level_map(source, value.id, mission_policy, industrial, residential_rescue, rare_policy, false, open_streets, trace)
-		else:
-			if mission_policy != 1 or rare_policy != 0 or source.type != "supply" or source.slot != BillboardActionV1.SLOT \
-					or source.layout["size"] != billboard_target.get("size") or source.layout.topology != billboard_target.get("topology"):
-				return {}
-			map = BillboardActionV1.target_map(source.seed, int(source.day), billboard_target)
-			value.id = BillboardActionV1.action_id(source.seed, int(source.day), int(source.slot))
-			value.billboard_target = BillboardActionV1.target(source.seed, int(source.day))
-		if map.is_empty():
-			return {}
-		value.layout = map.layout
-		content = map.content
+	var map: Dictionary
+	if billboard_target.is_empty():
+		map = level_map(source, value.id, mission_policy, industrial, residential_rescue, rare_policy, false, open_streets, trace)
 	else:
-		value.layout=WorldgenLayout.generate("BH_WORLDGEN_V1:"+source.id,source.layout["size"],source.layout.topology) if worldgen else ExplorationLayout.generate("BH_EXPLORATION_V1:"+source.id,source.layout["size"],source.layout.topology)
-		if value.layout.is_empty():
+		if mission_policy != 1 or rare_policy != 0 or source.type != "supply" or source.slot != BillboardActionV1.SLOT \
+				or source.layout["size"] != billboard_target.get("size") or source.layout.topology != billboard_target.get("topology"):
 			return {}
-		content=ExplorationSites.generate(value.layout,value.type,int(source.cash),int(source.food),int(source.weapons),value.id)
+		map = BillboardActionV1.target_map(source.seed, int(source.day), billboard_target)
+		value.id = BillboardActionV1.action_id(source.seed, int(source.day), int(source.slot))
+		value.billboard_target = BillboardActionV1.target(source.seed, int(source.day))
+	if map.is_empty():
+		return {}
+	value.layout = map.layout
+	content = map.content
 	if content.is_empty(): return {}
 	value.sites=content.sites
 	value.objective=content.objective

@@ -65,6 +65,11 @@ func setup() -> void:
 	expedition._sort.name = "ActorsAndProps"
 	expedition._sort.y_sort_enabled = true
 	expedition.add_child(expedition._sort)
+	var markers: Node2D = Node2D.new()
+	markers.name = "IsoMarkers"
+	markers.z_index = 8
+	expedition.add_child(markers)
+	expedition.set_meta("iso_markers", markers)
 	var logic: Node2D = Node2D.new()
 	logic.name = "LogicalActors"
 	expedition.add_child(logic)

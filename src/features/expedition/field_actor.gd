@@ -54,17 +54,17 @@ func _ready() -> void:
 	if enemy_behavior!=null:
 		_enemy_tag = Label.new()
 		_enemy_tag.theme = enemy_theme
-		_enemy_tag.position = Vector2(-48,-106 if enemy_behavior.kind==EnemyRules.HEAVY else -94)
-		_enemy_tag.size = Vector2(96,24)
+		_enemy_tag.position = Vector2(-40, ActorVisual.field_scale(-106.0 if enemy_behavior.kind==EnemyRules.HEAVY else -94.0))
+		_enemy_tag.size = Vector2(80,18)
 		if enemy_behavior.kind == NightHoundV1.KIND:
-			_enemy_tag.position = Vector2(-70, -64)
+			_enemy_tag.position = Vector2(-56, ActorVisual.field_scale(-64.0))
 			_enemy_tag.size.x = 140.0
 			_enemy_tag.z_index = 1
 			_enemy_tag.add_theme_color_override("font_outline_color", Color("1b2430"))
 			_enemy_tag.add_theme_constant_override("outline_size", 4)
 		_enemy_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_enemy_tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_enemy_tag.add_theme_font_size_override("font_size",15)
+		_enemy_tag.add_theme_font_size_override("font_size",11)
 		_enemy_tag.add_theme_color_override("font_color",Color("69e2d4") if enemy_behavior.kind==EnemyRules.RUSH else Color("ffc080") if enemy_behavior.kind==EnemyRules.HEAVY else Color("cad1cc"))
 		add_child(_enemy_tag)
 		sync_enemy_visual()
@@ -84,11 +84,13 @@ func draw_overlays(canvas: CanvasItem) -> void:
 			canvas.draw_line(Vector2.ZERO, visual.position, Color(ActorVisual.COLOURS[actor_id % 2], 0.5), 1.0)
 		return
 	var display: Vector2 = visual._body.position if visual != null else Vector2.ZERO
-	var bar_y: float = -94.0 if enemy_behavior != null and enemy_behavior.kind == EnemyRules.HEAVY else -78.0
+	var bar_y: float = ActorVisual.field_scale(-94.0 if enemy_behavior != null and enemy_behavior.kind == EnemyRules.HEAVY else -78.0)
 	if enemy_behavior != null and enemy_behavior.kind == NightHoundV1.KIND:
-		bar_y = -44.0
-	canvas.draw_rect(Rect2(Vector2(-22, bar_y) + display, Vector2(44, 5)), Color("182b35"))
-	canvas.draw_rect(Rect2(Vector2(-21, bar_y + 1) + display, Vector2(42 * clampf(health / max_health, 0.0, 1.0), 3)), Color("df9a70"))
+		bar_y = ActorVisual.field_scale(-44.0)
+	var bar_w: float = ActorVisual.field_scale(44.0)
+	var bar_h: float = maxf(3.0, ActorVisual.field_scale(5.0))
+	canvas.draw_rect(Rect2(Vector2(-bar_w * 0.5, bar_y) + display, Vector2(bar_w, bar_h)), Color("182b35"))
+	canvas.draw_rect(Rect2(Vector2(-bar_w * 0.5 + 1.0, bar_y + 1.0) + display, Vector2((bar_w - 2.0) * clampf(health / max_health, 0.0, 1.0), maxf(2.0, bar_h - 2.0))), Color("df9a70"))
 	if enemy_behavior!=null and enemy_behavior.state=="windup":
 		canvas.draw_circle(Vector2.ZERO,EnemyRules.POLICY.melee_range,Color(1,0.57,0.20,0.16))
 		canvas.draw_arc(Vector2.ZERO,EnemyRules.POLICY.melee_range,-PI*0.5,-PI*0.5+TAU*(1.0-enemy_behavior.windup_remaining/enemy_behavior.windup_duration()),32,Color("ffb65f"),3,true)
@@ -150,7 +152,7 @@ func present_motion(delta: float, previous: Vector2) -> void:
 	visual.contact_vector = visual_contact.call() if visual_contact.is_valid() else Vector2.INF
 	visual.advance(delta, (position - previous) / maxf(delta, 0.001), aim)
 	if _enemy_tag != null and enemy_behavior.kind != NightHoundV1.KIND:
-		_enemy_tag.position = Vector2(-48, -120 if enemy_behavior.kind == EnemyRules.HEAVY else -94) + visual._body.position
+		_enemy_tag.position = Vector2(-40, ActorVisual.field_scale(-120.0 if enemy_behavior.kind == EnemyRules.HEAVY else -94.0)) + visual._body.position
 	queue_redraw()
 
 
@@ -204,7 +206,7 @@ func sync_enemy_visual() -> void:
 		_enemy_tag.visible = health>0
 		_enemy_tag.text = EnemyRules.name_for(enemy_behavior.kind)+(" 预备%.1fs" % enemy_behavior.windup_remaining if visual.enemy_windup else " 冲刺" if enemy_behavior.state=="rush" else "")
 		if enemy_behavior.kind == NightHoundV1.KIND:
-			_enemy_tag.position.y = 20.0 if visual.enemy_windup else -64.0
+			_enemy_tag.position.y = ActorVisual.field_scale(20.0 if visual.enemy_windup else -64.0)
 			_enemy_tag.text = "夜间感染犬 · %.2fs" % enemy_behavior.windup_remaining if visual.enemy_windup else EnemyRules.name_for(enemy_behavior.kind)
 			_enemy_tag.add_theme_color_override("font_color", Color("ffca82") if visual.enemy_windup else Color("cad1dc"))
 

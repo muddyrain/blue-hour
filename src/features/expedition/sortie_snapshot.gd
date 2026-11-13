@@ -71,7 +71,7 @@ static func supply_for_world(value: Dictionary) -> MissionSupply:
 
 
 static func capture(world: Expedition) -> Dictionary:
-	if not world.field_join_error.is_empty() or not world.is_paused or not world.battle_survival or world.is_practice or world.los_setup != null or world.threat_rehearsal or world._practice_manual_waves or world.phase == Expedition.Phase.FINISHED:
+	if not world.field_join_error.is_empty() or not world.is_paused or not world.battle_survival or world.phase == Expedition.Phase.FINISHED:
 		return {}
 	if world.bus_view != null and world.bus_view.stage in ["arriving","disembarking"]: world.bus_view.skip()
 	var rows: Array = []

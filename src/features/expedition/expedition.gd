@@ -22,7 +22,6 @@ enum Phase {
 	FINISHED,
 }
 
-const BUILD_ID: String = "M5-UX-01"
 const BusTexture: Texture2D = preload("res://assets/candidates/bus_02.png")
 
 var tuning: ExpeditionTuning = ExpeditionTuning.new()
@@ -79,7 +78,6 @@ var participants_snapshot: Array[Dictionary] = []
 var setup_problem: String = ""
 var _setup_crew: Array[Dictionary] = []
 var ui_theme: Theme
-var is_practice: bool = false
 var battle_survival: bool = false
 var battle_seed: String = "NONE"
 var drill_panel: BattleDrillPanel
@@ -92,11 +90,7 @@ var growth_binding: Dictionary = {}
 var xp_inputs: XpInputs = XpInputs.new()
 var rescue_completed: bool = false
 var rescue_target: RescueTarget
-var los_practice: bool = false
-var los_range_case: bool = false
-var los_setup: LosPracticeSetup
 var threat: ThreatDirector = ThreatDirector.new()
-var threat_rehearsal: bool = false
 var combat: CombatRuntime=CombatRuntime.new()
 var combat_delta: float=0.0
 var powers: Dictionary = {}
@@ -136,7 +130,6 @@ var last_contact_metrics: Dictionary = {}
 var _notice_clock: float = 0.0
 var _corpses: Array[FieldActor] = []
 var _corpse_times: Array[float] = []
-var _practice_manual_waves: bool = false
 var _readouts: SquadReadouts
 var _cash_site: SearchSite = SearchSite.new(&"cash", Vector2.ZERO)
 var _food_site: SearchSite = SearchSite.new(&"food", Vector2.ZERO)
@@ -165,16 +158,16 @@ func _ready() -> void:
 	task_event = TaskActions.empty_event(supply.generated)
 	parallel_search = combat_mode()
 	_setup_crew.assign(crew_snapshot.duplicate(true) if not crew_snapshot.is_empty() else SurvivorRoster.new_crew())
-	if crew_snapshot.is_empty() or is_practice:
+	if crew_snapshot.is_empty():
 		for index: int in range(_setup_crew.size()):
 			if index < starting_health.size():
 				_setup_crew[index].health = starting_health[index]
 	setup_problem = SurvivalContracts.identity_problem(_setup_crew,true)
 	if setup_problem.is_empty() and not loadout_snapshot.is_empty():
-		setup_problem = WeaponInventory.snapshot_problem(_setup_crew, loadout_snapshot, not is_practice,WeaponState.is_family(field_departure))
-	if setup_problem.is_empty() and not is_practice and not crew_snapshot.is_empty() and loadout_snapshot.is_empty():
+		setup_problem = WeaponInventory.snapshot_problem(_setup_crew, loadout_snapshot, true,WeaponState.is_family(field_departure))
+	if setup_problem.is_empty() and not crew_snapshot.is_empty() and loadout_snapshot.is_empty():
 		setup_problem = "正式名册缺少出击配装快照"
-	participants_snapshot = SurvivalContracts.participants(_setup_crew, loadout_snapshot, not is_practice,true) if setup_problem.is_empty() else []
+	participants_snapshot = SurvivalContracts.participants(_setup_crew, loadout_snapshot, true,true) if setup_problem.is_empty() else []
 	if participants_snapshot.is_empty():
 		setup_problem = setup_problem if not setup_problem.is_empty() else "没有可行动的参与者"
 		set_physics_process(false)
@@ -188,11 +181,6 @@ func _ready() -> void:
 	if power_mode(): powers=SpecialPowers.initial(growth_binding,PowerState.loadout(supply.generated.powers))
 	if combat_mode(): combat.setup(self)
 	trait_inputs.configure(growth_binding)
-	if is_practice and participants_snapshot.size() != 2:
-		setup_problem = "当前独立练习仅支持原双人配置"
-		set_physics_process(false)
-		set_process_unhandled_input(false)
-		return
 	if SurvivalContracts.integer(supply.generated.get("version"), 6, 9):
 		tuning.spawn_seconds *= CampaignPressureV1.spawn_factor(supply.generated)
 	layout = supply.layout
@@ -206,8 +194,6 @@ func _ready() -> void:
 	else:
 		navigation.configure(layout.blockers(), layout.world_bounds)
 	shot_obstacles = layout.shot_obstacles()
-	if is_practice and los_practice:
-		los_setup = LosPracticeSetup.for_layout(layout, los_range_case)
 	if pump_station_mode():
 		var station_ground: PumpStationGround = PumpStationGround.new()
 		station_ground.layout = layout
@@ -296,8 +282,6 @@ func _ready() -> void:
 			set_physics_process(false)
 			set_process_unhandled_input(false)
 			return
-		if los_setup != null:
-			start = los_setup.starts[index]
 		var actor: FieldActor = _make_actor(false, index, start, profile)
 		actor.health = float(participant.health_before)
 		actor.call_sign = profile.call_sign
@@ -306,8 +290,8 @@ func _ready() -> void:
 			if int(entry.member_id) == actor.member_id:
 				item = entry.instance
 		if item.is_empty():
-			# Standalone/practice scenes have no campaign inventory; retain their old views.
-			actor.weapon_definition = WeaponInventory.Definitions[1 if not is_practice and actor.definition_id == &"crew_2" else 0].duplicate() as WeaponDefinition
+			# Standalone scenes have no campaign inventory; retain their old views.
+			actor.weapon_definition = WeaponInventory.Definitions[1 if actor.definition_id == &"crew_2" else 0].duplicate() as WeaponDefinition
 		else:
 			actor.weapon_instance_id = item.instance_id
 			actor.weapon_definition = WeaponModifiers.combat_definition(item)
@@ -338,30 +322,18 @@ func _ready() -> void:
 	readout_layer.add_child(_readouts)
 	_spawn_clock = tuning.spawn_seconds
 	threat.update(elapsed, tuning.daylight_seconds, tuning.spawn_seconds)
-	if is_practice:
-		_spawn_clock = 1.4
-		camera.zoom_at(Vector2(640, 360), 1.10 / camera.zoom.x)
-		camera.pan_by(Vector2(1040, 744) - camera.position)
-		_show_notice("交火练习 · 先观察生命200；即将近身来袭。I/J/K/L：指定来袭方位")
-		if los_setup != null:
-			camera.pan_by(los_setup.camera_center - camera.position)
-			_show_notice("项目验收演练 · 实墙挡枪，左键绕角后自动恢复；正式进度不改变。")
-	if not is_practice:
-		if recon_site != null:
-			_show_notice("主装备点待发现 · 可沿街探索或先到侦察点。")
-		else:
-			_show_notice(layout.route_hint if _supply_entrances.is_empty() else
-				"先搜近点食品 · 可回巴士撤离，也可沿街追加第二处。")
-		if threat_rehearsal:
-			_show_notice("短时压力演练 · 21秒夜间候选；正常出击105秒，规则均待校准。")
+	if recon_site != null:
+		_show_notice("主装备点待发现 · 可沿街探索或先到侦察点。")
+	else:
+		_show_notice(layout.route_hint if _supply_entrances.is_empty() else
+			"先搜近点食品 · 可回巴士撤离，也可沿街追加第二处。")
 	if not layout.world_data.is_empty():
 		bus_view = BusJourney.new()
 		bus_view.configure(self,_bus_sprite,layout.world_data.bus)
 		add_child(bus_view)
-	if not is_practice:
-		_night_lighting = NightLighting.new()
-		add_child(_night_lighting)
-	print("BH_SORTIE build=%s start day=%d members=%d" % [BUILD_ID, day, survivors.size()])
+	_night_lighting = NightLighting.new()
+	add_child(_night_lighting)
+	print("BH_SORTIE start day=%d members=%d" % [day, survivors.size()])
 
 
 func _process(delta: float) -> void:
@@ -398,23 +370,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _support_input(event):
 		get_viewport().set_input_as_handled()
 		return
-	if is_practice and event.is_action_pressed("practice_far_target"):
-		practice_far_target()
-	elif is_practice and event.is_action_pressed("practice_cross"):
-		practice_cross()
-	elif is_practice and event.is_action_pressed("practice_long_rifle"):
-		practice_weapon(ActorVisual.LongRifleView)
-	elif is_practice and event.is_action_pressed("practice_carbine"):
-		practice_weapon(ActorVisual.CarbineView)
-	elif is_practice and event.is_action_pressed("practice_north"):
-		practice_incoming(Vector2.UP)
-	elif is_practice and event.is_action_pressed("practice_south"):
-		practice_incoming(Vector2.DOWN)
-	elif is_practice and event.is_action_pressed("practice_west"):
-		practice_incoming(Vector2.LEFT)
-	elif is_practice and event.is_action_pressed("practice_east"):
-		practice_incoming(Vector2.RIGHT)
-	elif event.is_action_pressed("pause_sortie"):
+	if event.is_action_pressed("pause_sortie"):
 		toggle_pause()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("squad_command"):
@@ -471,23 +427,22 @@ func step(delta: float) -> void:
 		basic_support.advance(delta,true)
 		if support_aim!=null: support_aim.advance(delta,true)
 	_notice_clock = maxf(0.0, _notice_clock - delta)
-	if not is_practice and threat.update(elapsed, tuning.daylight_seconds, tuning.spawn_seconds):
+	if threat.update(elapsed, tuning.daylight_seconds, tuning.spawn_seconds):
 		# Tighten the next deadline, without owing any historical spawns.
 		if is_finite(_spawn_clock):
 			_spawn_clock = minf(_spawn_clock, threat.interval)
 		var state: Dictionary = threat_status()
 		threat_changed.emit(state)
 		_show_notice("%s · 增援更密集；仍可发动巴士集合撤离。" % state.label)
-		print("BH_THREAT " + JSON.stringify(state))
 	_spawn_clock -= delta
 	_ai_clock -= delta
-	if _spawn_clock <= 0.0 and not _practice_manual_waves:
+	if _spawn_clock <= 0.0:
 		if enemies.size() < threat.rules.enemy_cap:
 			_spawn_enemy()
-		elif not is_practice:
+		else:
 			_record_spawn(&"capacity", Vector2.INF)
 		# No while-loop or accumulated debt, including when full or all points are visible.
-		_spawn_clock = tuning.spawn_seconds if is_practice else threat.interval
+		_spawn_clock = threat.interval
 	if _ai_clock <= 0.0:
 		if not power_frozen: _update_enemy_paths()
 		_ai_clock = 0.7
@@ -624,7 +579,6 @@ func promote_target(event: Dictionary, restoring: bool = false) -> void:
 	rescue_target.refresh()
 	membership_committed.emit()
 	_update_ui()
-	print("BH_FIELD_JOIN member=%d at_ms=%d same_npc=true" % [id,int(event.at_ms)])
 
 
 func toggle_pause() -> void:
@@ -668,7 +622,6 @@ func command_move(point: Vector2) -> void:
 			continue
 		_move_to_group_goal(actor)
 	queue_redraw()
-	print("BH_ORDER move %s" % point)
 
 
 func request_search(kind: StringName = &"cash") -> void:
@@ -684,7 +637,6 @@ func request_search(kind: StringName = &"cash") -> void:
 	if previous > 0:
 		_release_searcher(previous)
 		_show_notice(SearchWorkView.notice("cancelled",site_label(site)))
-		_search_log("cancelled",site)
 		_update_ui()
 		return
 	if event_site and task_event.branch == "" and _near_event_worker(site) != null:
@@ -723,7 +675,6 @@ func _assign_search(site: SearchSite, actor: FieldActor, path: PackedVector2Arra
 		return false
 	actor.command_path(path)
 	_show_notice(SearchWorkView.notice("assigned",site_label(site),actor.call_sign))
-	_search_log("assigned",site)
 	queue_redraw()
 	return true
 
@@ -792,15 +743,6 @@ func _toolbox_site() -> SearchSite:
 	return search_site(StringName(WorkshopSiteV1.site_id(supply.generated)))
 
 
-func _search_log(stage: String, site: SearchSite) -> void:
-	var rows: Array[Dictionary] = []
-	for job: Dictionary in search_assignments.ordered():
-		var entry: Dictionary = job.duplicate()
-		entry.progress = search_site(StringName(job.site_id)).progress
-		rows.append(entry)
-	print("BH_SEARCH "+JSON.stringify({"stage":stage,"site_id":String(site.id),"jobs":rows,"elapsed":elapsed,"loot":loot,"food":food_loot}))
-
-
 func search_site(kind: StringName) -> SearchSite:
 	if recon_site != null and kind == recon_site.id:
 		return recon_site
@@ -819,9 +761,6 @@ func request_extraction() -> void:
 	if bus_view != null and bus_view.running(): return
 	if not field_join_error.is_empty():
 		return
-	if is_practice and phase != Phase.FINISHED:
-		_finish(true)
-		return
 	if phase != Phase.ACTIVE:
 		return
 	if elapsed < tuning.bus_ready_seconds:
@@ -831,11 +770,10 @@ func request_extraction() -> void:
 	_engine_clock = tuning.engine_seconds
 	engine_started.emit()
 	_show_notice("引擎发动中 · 队伍仍可移动，请前往巴士旁集合。")
-	print("BH_EXTRACTION engine")
 
 
 func request_bus_action() -> void:
-	if phase == Phase.BOARDING and not is_practice:
+	if phase == Phase.BOARDING:
 		request_bus_gather()
 	else:
 		request_extraction()
@@ -881,7 +819,7 @@ func _rescue_waiting_for_bus() -> bool:
 func request_bus_gather() -> void:
 	if not field_join_error.is_empty():
 		return
-	if phase != Phase.BOARDING or is_practice or living_count() == 0:
+	if phase != Phase.BOARDING or living_count() == 0:
 		return
 	# Validate the same formation destinations before acknowledging the whole order.
 	# Hidden workers will use their entrance and the latest goal when work completes.
@@ -908,30 +846,6 @@ func request_bus_gather() -> void:
 	_show_notice("已下令集合 · 搜集中的队员完成后归队。" if boarding.working > 0 else "已下令集合 · 队员正前往巴士。")
 	_update_ui()
 	bus_gather_ordered.emit(boarding)
-	print("BH_BUS_GATHER " + JSON.stringify({"goal":goal,"paused":is_paused,"boarding":boarding,"elapsed":elapsed}))
-
-
-func practice_incoming(direction: Vector2, distance: float = 175.0, target_health: float = 0.0) -> void:
-	if not is_practice or phase == Phase.FINISHED:
-		return
-	_practice_manual_waves = true
-	var point: Vector2 = survivors[0].position + direction.normalized() * distance
-	var enemy: FieldActor = _make_actor(true, _spawn_count, point)
-	if target_health > 0.0:
-		enemy.max_health = target_health
-		enemy.health = target_health
-	enemies.append(enemy)
-	_spawn_count += 1
-	_show_notice("项目验收演练 · 实墙影响合法目标，左键绕角后自动开火。" if los_setup != null else "交火练习 · 1/2：卡宾枪/长管步枪 · I/J/K/L：来袭方位 · H：交错")
-	print("BH_PRACTICE incoming=%s" % direction)
-
-
-func practice_far_target() -> void:
-	if not is_practice or phase == Phase.FINISHED:
-		return
-	# TMP-112: durable practice fixture allows retreat/re-entry before it dies; combat is shared.
-	practice_incoming(Vector2.RIGHT, 350.0, 540.0)
-	_show_notice("远距耐久靶 · 540生命 · 左键接近/退离，观察开火与停止")
 
 
 func time_status() -> Dictionary:
@@ -941,25 +855,6 @@ func time_status() -> Dictionary:
 		"bus_seconds": maxi(0, ceili(tuning.bus_ready_seconds - elapsed)),
 		"engine_seconds": maxi(0, ceili(_engine_clock)),
 	}
-
-
-func practice_weapon(view: WeaponPresentation) -> void:
-	if not is_practice or phase == Phase.FINISHED:
-		return
-	for actor: FieldActor in survivors:
-		actor.visual.set_weapon(view)
-	_show_notice("交火练习 · %s · I/J/K/L：来袭方位 · H：交错" % view.display_name)
-
-
-func practice_cross() -> void:
-	if not is_practice or phase == Phase.FINISHED:
-		return
-	var first: Vector2 = survivors[0].position
-	var second: Vector2 = survivors[1].position
-	survivors[0].command_path(navigation.path_between(first, second))
-	survivors[1].command_path(navigation.path_between(second, first))
-	goal = Vector2.ZERO
-	_show_notice("交错演练 · 青色1 / 琥珀2 · 地面脚底与路径保持不变")
 
 
 func living_count() -> int:
@@ -980,8 +875,6 @@ func _group_offset(actor: FieldActor) -> Vector2:
 
 
 func _arrival(index: int) -> Vector2:
-	if is_practice:
-		return Vector2(1008 + index * 48, 720 + index * 48)
 	if index < layout.arrivals.size():
 		return layout.arrivals[index]
 	var anchor: Vector2 = layout.arrivals[0]
@@ -1032,7 +925,7 @@ func _make_actor(enemy: bool, index: int, point: Vector2, profile: Dictionary = 
 	actor.health = actor.max_health
 	if enemy:
 		actor.enemy_behavior = EnemyBehavior.new()
-		actor.enemy_behavior.kind = kind if not kind.is_empty() else EnemyRules.NORMAL if index>=10000 or is_practice else combat.pick_spawn(self,index) if combat_mode() else EnemyRules.pick(sortie_id,index,int(threat.stage))
+		actor.enemy_behavior.kind = kind if not kind.is_empty() else EnemyRules.NORMAL if index>=10000 else combat.pick_spawn(self,index) if combat_mode() else EnemyRules.pick(sortie_id,index,int(threat.stage))
 		actor.enemy_behavior.spawn_stage = int(threat.stage)
 		if combat_mode() and actor.enemy_behavior.kind==CombatEnemyRules.TOXIC: combat.toxic.casters[str(index)]=ToxicV1._caster(index)
 		actor.enemy_theme = ui_theme
@@ -1061,9 +954,6 @@ func _visual_contact(enemy: FieldActor) -> Vector2:
 
 
 func _spawn_enemy(forced_kind: String = "", pressure_point: Vector2 = Vector2.INF, provenance: Dictionary = {}) -> Dictionary:
-	if is_practice:
-		_spawn_practice_enemy()
-		return {"reason":"practice","enemy_id":-1}
 	var point: Vector2 = _safe_spawn_point(pressure_point)
 	if not point.is_finite():
 		_record_spawn(&"no_safe_point", point, -1, provenance)
@@ -1101,9 +991,9 @@ func visible_world_rect() -> Rect2:
 
 func threat_status() -> Dictionary:
 	var state: Dictionary = threat.snapshot()
-	state.merge({"enabled":not is_practice, "elapsed":elapsed, "spawned":_spawn_count,
+	state.merge({"enabled":true, "elapsed":elapsed, "spawned":_spawn_count,
 		"attempts":_spawn_attempts, "next_spawn":_spawn_clock, "active_enemies":enemies.size(),
-		"cap":threat.rules.enemy_cap, "rehearsal":threat_rehearsal,
+		"cap":threat.rules.enemy_cap,
 		"overtime":maxf(0.0,elapsed - tuning.daylight_seconds)})
 	return state
 
@@ -1170,23 +1060,6 @@ func _record_spawn(reason: StringName, point: Vector2, enemy_id: int = -1,
 				event.enemy_speed = actor.speed
 	event.merge(provenance, true)
 	spawn_resolved.emit(event)
-	print("BH_SPAWN " + JSON.stringify(event))
-
-
-func _spawn_practice_enemy() -> void:
-	# An explicit practice fixture uses the normal attacks, health and cooldowns.
-	var offset: Vector2 = Vector2(24, 0) if _spawn_count == 0 else Vector2(220, -40)
-	var point: Vector2 = survivors[0].position + offset
-	if los_setup != null:
-		point = los_setup.blocked_spawn
-		_practice_manual_waves = true
-	var enemy: FieldActor = _make_actor(true, _spawn_count, point)
-	enemies.append(enemy)
-	_spawn_count += 1
-	if los_setup != null:
-		_show_notice("项目验收演练 · 射程进退，不改变正式进度。" if los_range_case else "项目验收演练 · 实墙挡枪，绕开后恢复；不改变正式进度。")
-	else:
-		_show_notice("交火练习 · 近身来袭可受伤；移动和自动开火规则与出击相同。")
 
 
 func _update_enemy_paths(idle_only: bool = false) -> void:
@@ -1292,7 +1165,6 @@ func _update_combat() -> void:
 				"applied_damage": health_before - target.health, "elapsed": elapsed}
 			feedback.merge({"enemy_id":enemy.actor_id,"enemy_type":behavior.kind})
 			combat_feedback.emit(feedback)
-			print("BH_HIT member=%d health=%.0f source=enemy_attack" % [target.member_id, target.health])
 	_update_enemy_behaviors(0.0)
 	_reap_defeated_enemies()
 
@@ -1317,7 +1189,6 @@ func _reap_defeated_enemies() -> void:
 				enemies[index].enemy_behavior.cancel(self,enemies[index])
 			_corpses.append(enemies[index])
 			_corpse_times.append(0.95)
-			print("BH_DEFEAT enemy=%d" % enemies[index].actor_id)
 			combat_feedback.emit({"kind": "defeat", "actor": enemies[index].actor_id, "elapsed": elapsed})
 			enemies.remove_at(index)
 
@@ -1356,7 +1227,7 @@ func _fire_ranged(actor: FieldActor, target: FieldActor, decision: AttackRules.D
 		_show_notice("成长账本达到安全容量，已暂停；不能丢弃事件或虚报保存成功。")
 		toggle_pause()
 		return
-	if not is_practice and (not _ranged_hit_recordable(actor, target, weapon.damage)
+	if (not _ranged_hit_recordable(actor, target, weapon.damage)
 			or (secondary != null and not _ranged_hit_recordable(actor, secondary, secondary_damage))):
 		_show_notice("成长来源不可提交，已暂停；生命、弹量与开火均未应用。")
 		toggle_pause()
@@ -1419,7 +1290,7 @@ func _commit_ranged_hit(actor: FieldActor, target: FieldActor, damage: float, re
 	if target.activity == FieldActor.Activity.DOWN:
 		kills += 1
 		actor.confirmed_kills += 1
-		if not is_practice and not loadout_snapshot.is_empty():
+		if not loadout_snapshot.is_empty():
 			var receipt: Dictionary = growth_inputs.accept_defeat(actor, target, elapsed)
 			if not receipt.is_empty():
 				if not xp_inputs.accept(self, actor, target, receipt):
@@ -1464,7 +1335,6 @@ func _clear_dead_worker() -> void:
 			_release_searcher(actor.member_id)
 			if pump_station_mode():
 				_show_notice("操作员已阵亡 · 控制柜停机中断，可派其他存活者")
-			_search_log("worker_dead",site)
 
 
 func _update_search(delta: float) -> void:
@@ -1498,13 +1368,11 @@ func _update_search(delta: float) -> void:
 				combat.cancel_unavailable(self)
 			if outdoor and (not exploration_mode() or (site.id==&"cash" and supply.generated.type=="airdrop")):
 				_trigger_airdrop()
-			_search_log("entered",site)
 			# A movement step ending in range cannot also count as billboard work.
 			if site == billboard_site:
 				continue
 		if not work_state_matches(actor,site):
 			_release_searcher(actor.member_id)
-			_search_log("interrupted",site)
 			continue
 		var prior_progress: float = site.progress
 		if site == recon_site:
@@ -1543,7 +1411,6 @@ func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
 		site.searched = true
 		_release_searcher(actor.member_id)
 		_show_notice("已调查 · 生还归航并确认后，下次选卡保证有超市补给")
-		_search_log("completed",site)
 		return true
 	if site == recon_site:
 		site.progress = site.seconds
@@ -1551,7 +1418,6 @@ func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
 		_release_searcher(actor.member_id)
 		_show_notice("侦察完成 · 已标记 2 处")
 		refresh_recon_view()
-		_search_log("completed",site)
 		return true
 	if exploration_mode() and site.searched: return false
 	if not trait_inputs.events.any(func(e: Dictionary) -> bool: return e.site == String(site.kind)) and not trait_inputs.accept_search(self,actor,site.kind,site.id):
@@ -1570,11 +1436,10 @@ func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
 		site.prop.queue_redraw()
 		_show_notice("应急补给站 · 已携带%s，归航后入库。" % _event_reward_text(carried))
 		search_completed.emit(int(carried.cash) + int(carried.food))
-		_search_log("completed",site)
 		return true
 	if site.kind == &"cash":
 		loot += reward
-		if not is_practice and (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
+		if (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
 			weapon_loot.append(_site_weapon(site))
 	else:
 		food_loot += reward
@@ -1586,12 +1451,10 @@ func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
 		encounter.activate_pump()
 		_show_notice("停机完成 · 破阵者出现，留意地面冲锋预警")
 		search_completed.emit(0)
-		_search_log("completed",site)
 		return true
 	_show_notice("搜集完成 · 携带%s +%d（撤离后带回）" % ["货币" if site.kind == &"cash" else "食物",reward])
-	if site.kind == &"cash" and not is_practice and (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
+	if site.kind == &"cash" and (site.weapon if not layout.world_data.is_empty() else supply.has_weapon_sample):
 		_show_notice("获得损坏%s · 回营后入库维修"%WeaponInventory.definition(weapon_loot.back().weapon_id).display_name)
-		print("BH_WEAPON_FOUND %s" % JSON.stringify(weapon_loot.back()))
 	if power_mode() and site.id == &"cash" and (supply.generated.type == "equipment" or not supply.generated.powers.sample.is_empty()):
 		_show_notice("已携带能力样本：%s · 归航确认后入库"%SpecialPowers.definition(supply.generated.powers.sample).name if not supply.generated.powers.sample.is_empty() else "特殊能力已集齐。")
 	if build_mode() and site.id==&"cash" and not supply.generated.build.drops.is_empty():
@@ -1606,9 +1469,7 @@ func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
 	var tool_count: int = _tools_at(String(site.id))
 	if tool_count > 0:
 		_show_notice("已携带工具 ×%d · 归航确认后入库" % tool_count)
-	print("BH_SEARCH completed kind=%s reward=%d cash=%d food=%d" % [site.kind,reward,loot,food_loot])
 	search_completed.emit(reward)
-	_search_log("completed",site)
 	return true
 
 
@@ -1646,7 +1507,7 @@ func _finish(evacuated: bool, boarding: Vector2i = Vector2i.ZERO) -> void:
 		"contract_version":SurvivalContracts.VERSION,"sortie_id":sortie_id,
 		"participants":participants_snapshot.duplicate(true),"member_results":member_results,
 		"mission_outcome":"EXTRACTED" if evacuated else "FAILED",
-		"weapons":weapon_loot.duplicate(true) if evacuated and not is_practice else [],
+		"weapons":weapon_loot.duplicate(true) if evacuated else [],
 		"food":food_loot if evacuated else 0,"food_searched":_kind_searched(&"food"),
 		"sites_searched":_searched_count(),
 		"kills": kills, "searched": _kind_searched(&"cash"), "health": remaining_health, "elapsed": elapsed}
@@ -1656,7 +1517,7 @@ func _finish(evacuated: bool, boarding: Vector2i = Vector2i.ZERO) -> void:
 	if supply.generated.get("version")==4 or (supply.generated.get("version")==5 or (supply.generated.get("version")==6 or (supply.generated.get("version")==7 or (supply.generated.get("version")==8 or supply.generated.get("version")==9)))): report.task_event=task_event.duplicate(true)
 	if build_mode(): report.support=basic_support.snapshot()
 	if power_mode(): report.powers=powers.duplicate(true)
-	if not is_practice and not loadout_snapshot.is_empty():
+	if not loadout_snapshot.is_empty():
 		report.growth_inputs = growth_inputs.snapshot(sortie_id,layout.id,elapsed)
 	report.rescue = rescue_target.fact(evacuated) if rescue_target != null else {"rescue_id":RescueState.TARGET,"status":"UNAVAILABLE"}
 	report.xp_inputs = xp_inputs.snapshot(self)
@@ -1856,8 +1717,6 @@ func _update_ui() -> void:
 		engine_text = "等待幸存者"
 	elif elapsed < tuning.bus_ready_seconds:
 		engine_text = "巴士准备 %d 秒" % timing["bus_seconds"]
-	if is_practice:
-		engine_text = "结束交火练习 →"
 	var members: Array[Dictionary] = []
 	var activities: Array[String] = ["警戒", "移动", "搜集中", "倒地", "回收中"]
 	for actor: FieldActor in survivors:
@@ -1903,11 +1762,11 @@ func _update_ui() -> void:
 		"toolbox":_carried_tools() if supply.generated.has("economy_source") else int(toolbox.searched) if toolbox != null else -1,
 		"exploration_objectives":_exploration_objective_rows() if exploration_mode() else [],
 		"objective":objective,
-		"mission_title":("交火练习" if is_practice else mission_title) if los_setup == null else mission_title, "members":members,
-		"can_extract":phase != Phase.FINISHED if is_practice else phase == Phase.ACTIVE and elapsed >= tuning.bus_ready_seconds,
+		"mission_title":mission_title, "members":members,
+		"can_extract":phase == Phase.ACTIVE and elapsed >= tuning.bus_ready_seconds,
 		"boarding":boarding,
-		"engine_running":not is_practice and phase == Phase.ENGINE,
-		"can_gather":not is_practice and phase == Phase.BOARDING and boarding.required > 0,
+		"engine_running":phase == Phase.ENGINE,
+		"can_gather":phase == Phase.BOARDING and boarding.required > 0,
 		"day": day, "seconds": timing["sortie_seconds"], "time_fraction": timing["sortie_fraction"],
 		"paused": is_paused, "cash": initial_cash, "loot": loot,
 		"food":initial_food,"food_loot":food_loot,"sites_searched":_searched_count(),
@@ -1917,7 +1776,6 @@ func _update_ui() -> void:
 		"weapon_loot":weapon_loot.size(),
 		"searched": searched, "kills": kills, "engine": engine_text,
 		"notice": _notice_text, "notice_visible": _notice_clock > 0.0,
-		"practice": is_practice,
 		"threat":threat_status(),
 		"burst_warning":combat.burst.warning_text() if combat.burst != null and phase != Phase.FINISHED else "",
 	})
@@ -2256,7 +2114,6 @@ func _request_task_wave(site: SearchSite, requests: int, provenance: Dictionary 
 			task_event.resolutions.append({"reason":"capacity","enemy_id":-1})
 		else:
 			task_event.resolutions.append(_spawn_enemy(EnemyRules.NORMAL, site.door, provenance))
-	print("BH_TASK_EVENT "+JSON.stringify(task_event))
 
 
 func _site_weapon(site: SearchSite) -> Dictionary:
@@ -2336,7 +2193,6 @@ func accept_burst(before: Dictionary) -> bool:
 		is_paused = true
 		support_aiming = false
 		_show_notice("爆囊冲击待确认 · 已暂停，继续后重试。")
-		print("BH_BURST_PENDING ", result.get("reason", "BURST_COMMIT_UNAVAILABLE"))
 		_update_ui()
 		queue_redraw()
 		return false
@@ -2369,7 +2225,7 @@ func request_heal() -> bool:
 	return _accept_support(before,basic_support.request("heal",plan))
 
 func first_aid_status() -> String:
-	if is_practice or not FirstAidV1.enabled(supply.generated):
+	if not FirstAidV1.enabled(supply.generated):
 		return ""
 	if not basic_support.ready(FirstAidV1.KIND):
 		return "已用"
@@ -2379,7 +2235,7 @@ func first_aid_status() -> String:
 	return "可用" if present else "暂不可用"
 
 func request_first_aid() -> bool:
-	if is_practice or not FirstAidV1.enabled(supply.generated) or not support_available() \
+	if not FirstAidV1.enabled(supply.generated) or not support_available() \
 			or not support_commit.is_valid() or not basic_support.ready(FirstAidV1.KIND):
 		return false
 	var stamp: int = FreezeProfile.enter("support.first_aid_plan")
@@ -2424,7 +2280,6 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 	FreezeProfile.leave("support.confirm", confirmation)
 	if result.get("error",ERR_UNAVAILABLE)!=OK:
 		pending_support={"before":before,"request":request}
-		print("BH_SUPPORT "+JSON.stringify({"kind":request.kind,"status":"PENDING","reason":result.get("reason",""),"sequence":before.support.sequence,"elapsed":before.sim.elapsed}))
 		is_paused=true
 		support_aiming=false
 		_show_notice("支援尚未确认，已暂停；请重试或暂存继续。"+String(result.get("reason","")))
@@ -2436,7 +2291,6 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 		and after.get("combat", {}).get("screamer", {}).get("phase") == "cancelled"
 	var burst_interrupted: bool = before.get("combat", {}).get("burst", {}).get("phase") == "windup" \
 		and after.get("combat", {}).get("burst", {}).get("phase") == "cancelled"
-	print("BH_SUPPORT "+JSON.stringify({"kind":request.kind,"status":"ACCEPTED","sequence_before":before.support.sequence,"sequence":after.support.sequence,"cooldowns":after.support.cooldowns,"kills_before":before.sim.kills,"kills":after.sim.kills,"facts":after.support.accepted.back().facts,"elapsed":after.sim.elapsed}))
 	# All fallible validation and I/O preceded this visible state replacement.
 	var preserve_aim: bool = request.kind in [FirstAidV1.KIND, SpecialPowers.RADIO] and support_aiming
 	var was_open: bool = barricade_open
@@ -2586,7 +2440,6 @@ func _accept_power(before: Dictionary, request: Dictionary) -> bool:
 	var result: Dictionary=power_commit.call(before,request)
 	if result.get("error",ERR_UNAVAILABLE)!=OK:
 		pending_power={"before":before,"request":request}
-		print("BH_POWER "+JSON.stringify({"status":"PENDING","reason":result.get("reason",""),"at":elapsed}))
 		is_paused=true
 		support_aiming=false
 		_show_notice("能力尚未确认，已暂停；解除故障后继续重试。"+String(result.get("reason","")))
@@ -2597,7 +2450,6 @@ func _accept_power(before: Dictionary, request: Dictionary) -> bool:
 	is_paused=false
 	refresh_power_factors()
 	_show_notice("%s已生效 · 本次使用已保存"%SpecialPowers.definition(request.ability_id).name)
-	print("BH_POWER "+JSON.stringify({"status":"ACCEPTED","event":SpecialPowers.event_at(powers,int(request.get("slot",0))),"elapsed":elapsed}))
 	_update_ui()
 	return true
 

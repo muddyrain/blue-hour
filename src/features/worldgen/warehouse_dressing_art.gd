@@ -62,11 +62,9 @@ static func _region(pack: String, slot: String) -> Image:
 	if not REGIONS.has(slot):
 		return null
 	if not _atlases.has(pack):
-		var started: int = Time.get_ticks_usec()
 		var path: String = PACKS[pack]
 		var atlas: Texture2D = load(path) as Texture2D if ResourceLoader.exists(path, "Texture2D") else null
 		_atlases[pack] = atlas.get_image() if atlas != null else null
-		print("BH_WAREHOUSE_ART pack=%s atlas_us=%d" % [pack, Time.get_ticks_usec() - started])
 	var source: Image = _atlases[pack]
 	var region: Rect2i = REGIONS[slot]
 	if source == null or not Rect2i(Vector2i.ZERO, source.get_size()).encloses(region):

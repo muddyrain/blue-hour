@@ -127,7 +127,7 @@ func _commit(world: Expedition,actor: FieldActor,plan: Array,state: Dictionary) 
 		if target==null: return false
 		if target.health<=actor.weapon_definition.damage*float(hit.hits):
 			fatal+=1
-			if not world.is_practice and (not world.growth_inputs.can_record(actor,target,world.elapsed) or not world.xp_inputs.can_record(world,actor,target)): return _blocked(world)
+			if (not world.growth_inputs.can_record(actor,target,world.elapsed) or not world.xp_inputs.can_record(world,actor,target)): return _blocked(world)
 	if world.xp_inputs.events.size()+fatal>GrowthRules.MAX_EVENTS: return _blocked(world)
 	# Validate the complete batch before any HP, ammo, feedback or XP changes.
 	for hit: Dictionary in plan:
@@ -235,7 +235,6 @@ func advance_toxic(world: Expedition,delta: float) -> void:
 		world._update_enemy_behaviors(0.0)
 		world._hit_effect(victim.position,amount,true)
 		world.combat_feedback.emit({"kind":"toxic_hit","zone_id":hit.zone_id,"tick":hit.tick,"member_id":hit.member_id,"health":victim.health,"elapsed":world.elapsed})
-		print("BH_TOXIC_HIT zone=%s tick=%d member=%d health=%.2f"%[hit.zone_id,hit.tick,hit.member_id,victim.health])
 	refresh_toxic(world)
 
 func refresh_toxic(world: Expedition) -> void:

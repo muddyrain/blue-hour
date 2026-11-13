@@ -38,12 +38,11 @@ func accept(world: Expedition, shooter: FieldActor, enemy: FieldActor, accepted:
 	receipt.member_id = shooter.member_id
 	events.append(receipt)
 	_seen[enemy.actor_id] = true
-	diagnostic = diagnostic or world.is_practice or world.threat_rehearsal or world.los_setup != null
 	return true
 
 
 func snapshot(world: Expedition) -> Dictionary:
-	return {"ruleset_id":GrowthRules.RULESET,"binding":binding.duplicate(true),"diagnostic":diagnostic or world.is_practice or world.threat_rehearsal or world.los_setup != null,
+	return {"ruleset_id":GrowthRules.RULESET,"binding":binding.duplicate(true),"diagnostic":diagnostic,
 		"spawn_count":world._spawn_count,"events":events.duplicate(true)}
 
 

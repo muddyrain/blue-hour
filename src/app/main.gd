@@ -5,19 +5,16 @@ signal audio_requested(cue: StringName, world: bool, accepted: bool)
 
 enum Phase {
 	TITLE,
-	VALIDATION,
 	EXPEDITION,
 	RESULT,
 }
 
-const ValidationScene: PackedScene = preload("res://src/features/validation/validation.tscn")
 const ExpeditionScene: PackedScene = preload("res://src/features/expedition/expedition.tscn")
 const BLUE_HOUR_TITLE_ART: Texture2D = preload("res://assets/ui/m20/title-blue-hour.png")
 const BLUE_HOUR_CAMP_ART: Texture2D = preload("res://assets/ui/m20/camp-blue-hour.png")
 const SLOW_DEPARTURE_MS: int = 120
 
 var phase: Phase = Phase.TITLE
-var _validation: Node2D
 var expedition: Expedition
 var cash: int = 53
 var day: int = 2
@@ -49,7 +46,6 @@ var _return_roster_member: int = 0
 var _camp_open: bool = false
 var _home_button: Button
 var _home_return: Button
-var _developer_menu: bool = false
 var audio_settings_path: String = "user://settings/audio.json"
 var audio_preferences: AudioPreferences
 var audio: B1AudioService
@@ -166,15 +162,13 @@ func _ready() -> void:
 	add_child(audio)
 	$Interface/Screen/Title/Start.pressed.connect(open_mission_select)
 	mission_select = MissionSelect.new()
-	mission_select.review_enabled = not _developer_menu
+	mission_select.review_enabled = true
 	_screen.add_child(mission_select)
 	mission_select.hide()
 	mission_select.selected.connect(_select_mission)
 	mission_select.cancelled.connect(close_mission_select)
 	mission_select.retry_requested.connect(_retry_mission_cards)
 	mission_select.navigation_requested.connect(_leave_departure_for)
-	$Interface/Screen/Title/Practice.pressed.connect(open_practice)
-	$Interface/Screen/Title/Probe.pressed.connect(open_validation)
 	$Interface/Screen/Title/Reset.pressed.connect(reset_demo)
 	$Interface/Screen/Title/Quit.pressed.connect(_quit)
 	$Interface/Screen/Title/Sound.pressed.connect(open_sound_settings)
@@ -187,9 +181,8 @@ func _ready() -> void:
 	$Interface/Screen/Result/Continue.pressed.connect(_confirm_result_ui)
 	_back.pressed.connect(return_to_title)
 	_setup_presentation()
-	if not _developer_menu:
-		_setup_blue_hour_title()
-		mission_select.theme = CampStyle.blue_hour_theme(_screen.theme)
+	_setup_blue_hour_title()
+	mission_select.theme = CampStyle.blue_hour_theme(_screen.theme)
 	_setup_camp_scene()
 	pause_menu = SortiePauseMenu.new()
 	add_child(pause_menu)
@@ -314,22 +307,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("return_to_title") and is_instance_valid(sound_settings) and sound_settings.visible:
 		sound_settings.close_panel()
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("return_to_title") and phase == Phase.VALIDATION:
-		return_to_title()
-		get_viewport().set_input_as_handled()
-
-
-func open_validation() -> void:
-	if phase != Phase.TITLE or _settings_open():
-		return
-	_validation = ValidationScene.instantiate() as Node2D
-	$World.add_child(_validation)
-	phase = Phase.VALIDATION
-	_request_audio(&"ui_confirm")
-	_title.hide()
-	_back.show()
-	_status.text = "验证场景 / 点击网格放置标记 · Esc 返回"
-	print("BH_PHASE VALIDATION")
 
 
 func _confirm_result_ui() -> void:
@@ -367,7 +344,7 @@ func _begin_camp_commit(before: Dictionary, kind: String) -> void:
 
 
 func return_to_title() -> void:
-	if phase != Phase.VALIDATION and phase != Phase.RESULT:
+	if phase != Phase.RESULT:
 		return
 	if not _pending_settlement.is_empty() and (_pending_settlement.journey.state=="FAILED" or CampaignState.ended(_pending_settlement)):
 		var terminal: Dictionary=_pending_settlement.duplicate(true)
@@ -385,10 +362,6 @@ func return_to_title() -> void:
 	_damage_gates.clear()
 	if _progress_blocked:
 		_camp_open = false
-	if _validation != null:
-		$World.remove_child(_validation)
-		_validation.queue_free()
-		_validation = null
 	if expedition != null:
 		$World.remove_child(expedition)
 		expedition.queue_free()
@@ -402,7 +375,6 @@ func return_to_title() -> void:
 		save_camp()
 	_update_camp()
 	_request_audio(&"ui_back")
-	print("BH_PHASE TITLE")
 
 
 func open_mission_select() -> void:
@@ -526,23 +498,19 @@ func _fade_departure() -> void:
 
 
 func open_expedition() -> void:
-	_open_sortie(false)
+	_open_sortie()
 
 
-func open_practice() -> void:
-	_open_sortie(true)
-
-
-func _open_sortie(practice: bool, resume: Dictionary = {}) -> void:
+func _open_sortie(resume: Dictionary = {}) -> void:
 	if phase != Phase.TITLE or _settings_open():
 		return
 	if not _hunger_consented:
 		return
-	if (practice or _battle_meta.get("state") == "FAILED" or CampaignState.ended(camp_snapshot())):
+	if (_battle_meta.get("state") == "FAILED" or CampaignState.ended(camp_snapshot())):
 		return
-	if not practice and (_requires_continue or _progress_blocked):
+	if (_requires_continue or _progress_blocked):
 		return
-	if not practice and resume.is_empty():
+	if resume.is_empty():
 		var started: Dictionary = progress_session.begin(camp_snapshot(),selected_supply)
 		if started.error != OK:
 			_accept_transaction(started)
@@ -550,7 +518,6 @@ func _open_sortie(practice: bool, resume: Dictionary = {}) -> void:
 		selected_supply = progress_session.active_supply()
 	expedition = ExpeditionScene.instantiate() as Expedition
 	expedition.restoring_world = not resume.is_empty()
-	expedition.is_practice = practice
 	expedition.battle_survival = true
 	expedition.field_departure = camp_snapshot()
 	expedition.field_join_gate = progress_session.join_field
@@ -574,11 +541,9 @@ func _open_sortie(practice: bool, resume: Dictionary = {}) -> void:
 	expedition.starting_health = crew_health.duplicate()
 	expedition.crew_snapshot = crew.duplicate(true)
 	expedition.loadout_snapshot = WeaponInventory.snapshot(camp_snapshot())
-	if practice:
-		expedition.starting_health = [200.0, 200.0]
 	audio.stop_world()
 	audio.set_world_paused(false)
-	_active_sortie_id = "practice" if practice else "%s:%d" % [profile_id, settled_sorties + 1]
+	_active_sortie_id = "%s:%d" % [profile_id, settled_sorties + 1]
 	expedition.sortie_id = _active_sortie_id
 	_pending_settlement = {}
 	_finish_callback = _on_expedition_finished.bind(_active_sortie_id)
@@ -613,8 +578,7 @@ func _open_sortie(practice: bool, resume: Dictionary = {}) -> void:
 			_frozen_world = {}
 		else:
 			pause_menu.suspend_message = "恢复消费未确认；战场保持暂停。" + _suspend_problem(claimed)
-	if not practice:
-		_attach_damage_gates()
+	_attach_damage_gates()
 	_screen.hide()
 	_request_audio(&"ui_confirm")
 	if not resume.is_empty():
@@ -738,11 +702,6 @@ func _on_expedition_finished(report: Dictionary, sortie_id: String) -> void:
 	_screen.show()
 	_title.hide()
 	_result.show()
-	if expedition.is_practice:
-		_status.text = "交火练习不改变营地进度。"
-		$Interface/Screen/Result/Heading.text = "交火练习结束"
-		$Interface/Screen/Result/Scroll/Body.text = "队员生命 %d / %d\n击退 %d\n\n移动、命中、受击和击败均来自实际战斗。\n营地的天数、资源和队员生命保持不变。" % [ceili(report["health"][0]), ceili(report["health"][1]), report["kills"]]
-		return
 	var carried: Dictionary = {"loot":expedition.loot,"food":expedition.food_loot,"weapons":expedition.weapon_loot.duplicate(true)}
 	var prepared: Dictionary = progress_session.finish(report,carried)
 	if prepared.error == OK:
@@ -834,7 +793,7 @@ func open_pause_menu() -> void:
 
 
 func _configure_suspend_menu() -> void:
-	pause_menu.suspend_available = is_instance_valid(expedition) and not expedition.is_practice
+	pause_menu.suspend_available = is_instance_valid(expedition)
 	pause_menu.suspend_enabled = true
 	if pause_menu.suspend_available:
 		var preview: Dictionary = progress_session.preview_suspend(SortieSnapshot.capture(expedition))
@@ -919,7 +878,6 @@ func suspend_sortie() -> void:
 	_continue_button.text = "继续未完成的出击 →"
 	_update_camp()
 	if quit_after_save:
-		print("BH_SAFE_EXIT acknowledged")
 		audio.shutdown()
 		get_tree().quit()
 
@@ -970,12 +928,10 @@ func request_exit(target: String) -> void:
 	elif _progress_dirty:
 		title = "营地变更尚未保存"
 		message = "部分变更仅在当前内存中，退出可能丢失这些变更。\n请取消并重试保存；旧文件与已有记录保留。"
-	elif phase == Phase.EXPEDITION and not expedition.is_practice:
+	elif phase == Phase.EXPEDITION:
 		title = "这次行动尚未完成"
 		message = "本次出击尚未完整结算；退出可能使原旅程无法继续。\n已确认阵亡不会因退出撤销；未结算物资与日期不会被擅自推算。\n正常回营：留在行动，发动巴士并集合所有存活成员。\n强杀、闪退与断电无法由此菜单拦截。"
 		danger = "仍退出到首页（行动未结算）" if target == "home" else "仍关闭游戏（行动未结算）"
-	elif phase == Phase.EXPEDITION and expedition.is_practice:
-		message = "练习进度不会保存，也不会改变营地。"
 	elif phase == Phase.RESULT:
 		if not _pending_settlement.is_empty():
 			title = "完整结果已冻结"
@@ -989,7 +945,7 @@ func request_exit(target: String) -> void:
 	elif _requires_continue and _pending_save.is_empty() and not _progress_blocked:
 		title = "本次出击已暂存"
 		message = "下次使用同一隔离进度入口继续原战场；暂存已回读确认。\n这次尚未回营或结算，没有领取奖励、扣粮或推进日期。"
-	var offer_suspend: bool = phase == Phase.EXPEDITION and is_instance_valid(expedition) and not expedition.is_practice and expedition.phase != Expedition.Phase.FINISHED and not _progress_blocked
+	var offer_suspend: bool = phase == Phase.EXPEDITION and is_instance_valid(expedition) and expedition.phase != Expedition.Phase.FINISHED and not _progress_blocked
 	if offer_suspend:
 		_configure_suspend_menu()
 		offer_suspend = pause_menu.suspend_enabled
@@ -1370,7 +1326,7 @@ func continue_game() -> void:
 		selected_supply = SortieSnapshot.supply_for_world(offer.receipt.envelope.world)
 		_requires_continue = false
 		_progress_blocked = false
-		_open_sortie(false,offer)
+		_open_sortie(offer)
 		return
 	if _accept_transaction(progress_session.activate(),true):
 		_request_audio(&"ui_confirm")
@@ -1741,20 +1697,6 @@ func _setup_presentation() -> void:
 	_new_game_confirmation.canceled.connect(func() -> void:
 		if _battle_meta.get("state") == "FAILED":
 			_show_battle_result(camp_snapshot(),true))
-	for argument: String in OS.get_cmdline_user_args():
-		if argument == "--show-dev-menu":
-			_developer_menu = true
-		if argument.begins_with("--verify-anim=") or argument.begins_with("--verify-enemy=") or argument.begins_with("--verify-quality=") or argument.begins_with("--verify-roster="):
-			continue
-		if argument.begins_with("--verify-rescue-pool="):
-			continue
-		if argument.begins_with("--verify-record-hash=") or argument == "--verify-record-process":
-			continue
-		if argument.begins_with("--verify-weapons=") or argument.begins_with("--verify-training=") or argument.begins_with("--verify-traits=") or argument.begins_with("--verify-camp=") or argument.begins_with("--verify-field-join=") or argument.begins_with("--verify-growth=") or argument.begins_with("--verify-rescue=") or argument.begins_with("--verify-pilot=") or argument.begins_with("--verify-hunger=") or argument.begins_with("--verify-exit=") or argument.begins_with("--verify-recovery="):
-			continue
-		if argument.begins_with("--verify-") and not argument.begins_with("--verify-battle=") and not argument.begins_with("--verify-p0d02a=") and not argument.begins_with("--verify-m401=") and not argument.begins_with("--verify-m402=") and not argument.begins_with("--verify-m403=") and not argument.begins_with("--verify-m501=") and not argument.begins_with("--verify-m502=") and not argument.begins_with("--verify-m503=") and not argument.begins_with("--verify-m5ux01=") and not argument.begins_with("--verify-m5combat02=") and not argument.begins_with("--verify-m5combat03="):
-			_developer_menu = true
-			_camp_open = not _requires_continue and not _progress_blocked
 
 
 func _enter_camp() -> void:
@@ -1853,12 +1795,6 @@ func _refresh_presentation() -> void:
 		var button: Button = [start, _roster_button, _loadout_button][index]
 		CampStyle.place(button, Rect2(64 + index * 352,432,336,100))
 		button.add_theme_font_size_override("font_size", 22)
-	$Interface/Screen/Title/Practice.visible = false
-	$Interface/Screen/Title/Probe.visible = _developer_menu and _camp_open
-	CampStyle.place($Interface/Screen/Title/Practice, Rect2(840,604,220,32))
-	CampStyle.place($Interface/Screen/Title/Probe, Rect2(1072,604,144,32))
-	$Interface/Screen/Title/Practice.add_theme_font_size_override("font_size", 14)
-	$Interface/Screen/Title/Probe.add_theme_font_size_override("font_size", 14)
 
 	_refresh_playable_presentation()
 	if is_instance_valid(_blue_hour_title_art):
@@ -1886,7 +1822,7 @@ func _setup_camp_scene() -> void:
 		_camp_scene_problem = "营地场景未通过检查；原营地功能保留。"
 		return
 	camp_scene = candidate as CampSceneView
-	camp_scene.player_mode = not _developer_menu
+	camp_scene.player_mode = true
 	if camp_scene.player_mode:
 		camp_scene.theme = CampStyle.blue_hour_theme(_screen.theme)
 	_title.add_child(camp_scene)

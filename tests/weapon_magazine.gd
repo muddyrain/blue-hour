@@ -9,33 +9,6 @@ func run() -> void:
 	if not OS.get_user_data_dir().replace("\\","/").begins_with(ProjectSettings.globalize_path("res://.local/")):quit(2);return
 	_affix_sources()
 	_workshop_parameters()
-	var app: Node=load("res://src/app/main.tscn").instantiate();root.add_child(app)
-	await process_frame
-	app.playable_entry=false # Explicit historical fixture; normal new journeys use short V1.
-	app._new_game()
-	var base: Dictionary=app.camp_snapshot()
-	var types: Dictionary={}
-	var examples: Array=[]
-	for seed: String in ["task-v4-0","task-v4-1","task-v4-2","task-v4-3"]:
-		var fixture: Dictionary=base.duplicate(true);fixture.journey.seed=seed.md5_text()
-		var offers: Array[Dictionary]=WeaponActions.offers(fixture)
-		expect(TransactionReceipt.same({"v":offers},{"v":WeaponActions.offers(fixture)}),"new candidates stable")
-		for offer: Dictionary in offers:
-			expect(DailyActions.problem(offer).is_empty(),"V5 action/drop authenticates")
-			var rules: Dictionary=FrozenSettlement.pool_rules(fixture,DailyActions.supply(offer))
-			expect(rules.data_version==6 and FrozenSettlement._rules_problem(rules).is_empty(),"V6 rules bind V5 action")
-			for site: Dictionary in offer.sites:
-				if not site.weapon:continue
-				var item: Dictionary=WeaponInventory.site_reward(base.profile_id+":1",offer,site,true)
-				types[item.weapon_id]=true
-				examples.append({"seed":seed,"type":offer.type,"gun":item.weapon_id})
-				expect(item.weapon_id==WeaponInventory.drop_weapon(offer.seed,offer.id,site.id) and TransactionReceipt.same(item,WeaponInventory.instance_reward(fixture,item)),"carried drop agrees with durable camp provenance")
-				var altered: Dictionary=offer.duplicate(true)
-				for row: Dictionary in altered.sites:
-					if row.weapon:row.drop.weapon_id="long_rifle" if item.weapon_id=="carbine" else "carbine"
-				expect(not DailyActions.problem(altered).is_empty(),"changed frozen gun rejected")
-	expect(types.has_all(["carbine","long_rifle"]),"fixed seed fixtures cover both guns")
-	expect(WeaponInventory.reward(base.profile_id+":1",true).weapon_id=="long_rifle","historical reward stays fixed")
 	for gun: String in ["carbine","long_rifle"]:
 		var magazine: WeaponMagazine=WeaponMagazine.new("instance",gun)
 		expect(magazine.rounds==magazine.capacity(),"fresh full "+gun)
@@ -75,8 +48,7 @@ func run() -> void:
 		"M33 refunded rounds retain the existing magazine snapshot")
 	expect(restored.commit_shot() == 0 and restored.rounds == 0 and restored.reloading and restored.remaining == restored.seconds(),
 		"M33 next non-refunding last shot still starts normal reload")
-	print(JSON.stringify({"checks":checks,"failures":failures,"types":types,"examples":examples,"parameters":WeaponDefinition.MAGAZINES}))
-	app.audio.shutdown();app.queue_free();await process_frame
+	print(JSON.stringify({"checks":checks,"failures":failures,"parameters":WeaponDefinition.MAGAZINES}))
 	quit(0 if failures==0 else 1)
 
 

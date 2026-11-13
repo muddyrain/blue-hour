@@ -27,7 +27,6 @@ func run() -> void:
  var w: Expedition=Expedition.new()
  w.supply=MissionSupply.new();w.supply.generated={"version":8,"build":{"slots":["",""]}}
  w._effects=Node2D.new();root.add_child(w._effects)
- w.is_practice=false
  var a: FieldActor=actor(1,Vector2(400,400))
  w.survivors=[a]
  w.growth_inputs.configure([{"id":1}]);w.xp_inputs.configure({"transaction_id":"controlled:1"})

@@ -12,14 +12,17 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var sortie: Expedition = Expedition.new()
-	sortie.is_practice = true
 	sortie.set_physics_process(false)
 	root.add_child(sortie)
 	sortie.combat_feedback.connect(func(event: Dictionary) -> void:
 		if event.kind == "hit":
 			_hits.append(event.duplicate(true)))
-	sortie.practice_incoming(Vector2.RIGHT,24.0)
-	sortie.practice_incoming(Vector2.LEFT,24.0)
+	for actor: FieldActor in sortie.survivors:
+		actor.cooldown = 999.0
+	sortie._spawn_clock = INF
+	for direction: Vector2 in [Vector2.RIGHT, Vector2.LEFT]:
+		var enemy: FieldActor = sortie._make_actor(true, sortie.enemies.size(), sortie.survivors[0].position + direction * 24.0)
+		sortie.enemies.append(enemy)
 	_expect(sortie.enemies.all(func(enemy: FieldActor) -> bool: return sortie.navigation.is_clear(enemy.position)),"explicit near-start feet are legal on the actual map")
 	sortie.step(1.0/60.0)
 	_expect(_hits.size() == 2 and sortie.survivors[0].health == 192.0,"two real default enemy attacks reduce actual health by8")

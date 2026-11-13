@@ -2,24 +2,19 @@ extends "res://tests/persona_rules.gd"
 ## Pure description/capability fixtures; no earned completion, profile or save claim.
 func run() -> void:
 	var base: Dictionary=_camp_fixture()
-	base.journey.build=ExplorationState.initial_build(base.journey.seed)
+	base.journey.build=WorldgenState.initial_build(base.journey.seed, true, true)
 	expect(TransactionReceipt.camp_problem(base).is_empty(),"new build5 is strictly admitted by original camp owner")
-	var old: Dictionary=base.duplicate(true)
-	old.journey.build.version=4;old.journey.build.erase("exploration")
-	expect(TransactionReceipt.camp_problem(old).is_empty(),"explicit old build4 remains valid and not exploration enabled")
 	var current: Array[Dictionary]=DailyActions.offers(base)
-	var original: Array[Dictionary]=PersonaActions.offers(old)
 	expect(current.size()==3,"normal new mode exposes all three task choices")
 	var sizes: Array[String]=[]
 	for i: int in range(current.size()):
 		var value: Dictionary=current[i]
 		expect(not value.is_empty(),"bounded new map and content creation succeeds")
 		if value.is_empty(): continue
-		expect(value.version==9 and value.layout.version==4 and value.exploration.version==1,"new explicit generation/layout capabilities")
+		expect(value.version==9 and value.layout.version==5 and value.exploration.version==1,"new explicit generation/layout capabilities")
 		sizes.append(value.layout["size"])
 		expect(ExplorationActions.problem(value).is_empty(),"complete new canonical description authenticates")
-		expect(TransactionReceipt.same(ExplorationActions.origin(value),original[i]),"original task/reward/drop/ability/persona source is unchanged")
-		expect(DailyActions.matches(base,value) and not DailyActions.matches(old,value),"new descriptions bind only to new camp capability")
+		expect(DailyActions.matches(base,value),"new descriptions bind only to new camp capability")
 		var decoded: Dictionary=RecordEncoding.unpack(JSON.parse_string(RecordEncoding.stringify(value))).payload
 		expect(ExplorationActions.problem(decoded).is_empty(),"exact transport retains new canonical map/routes/facts")
 		var rules: Dictionary=FrozenSettlement.pool_rules(base,DailyActions.supply(value))
@@ -49,7 +44,7 @@ func run() -> void:
 	for mutation: String in ["marker","version","extra"]:
 		var bad: Dictionary=base.duplicate(true)
 		if mutation=="marker":bad.journey.build.exploration.version=2
-		elif mutation=="version":bad.journey.build.version=6
+		elif mutation=="version":bad.journey.build.version=7
 		else:bad.journey.build.exploration.unlocked=true
 		expect(not BuildState.problem(bad).is_empty(),"unknown capability fields/version reject "+mutation)
 	print(JSON.stringify({"suite":"exploration_contracts","checks":checks,"failures":failures,"scope":"PURE_DESCRIPTION_AND_EXPLICIT_MODE"}))

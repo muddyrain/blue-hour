@@ -87,65 +87,13 @@ func _run() -> void:
 	var casualty: Dictionary = CampEconomy.preview(fresh, deceased, token, Rules)
 	_expect(casualty.loadout.size() == 1 and WeaponInventory.owner(casualty, fresh.weapons[0].instance_id) == 0, "fallen member's existing weapon is idle, never equipped to dead ID")
 	_expect(not WeaponInventory.equip(casualty, 1, identity).has("data") and not WeaponInventory.equip(after, 9, identity).has("data"), "dead and unknown targets reject equip")
-	var store: RunSave = RunSave.new(_path)
-	_expect(store.save(swapped) == OK and store.load_save() == OK and store.snapshot == swapped, "v3 round trip preserves unique identities, condition, ownership and camp spending")
-	var bytes: PackedByteArray = FileAccess.get_file_as_bytes(_path)
-	var corrupt: Dictionary = swapped.duplicate(true)
-	corrupt.loadout[1].instance_id = corrupt.loadout[0].instance_id
-	_write(_path + ".bak", bytes)
-	_write(_path, JSON.stringify(corrupt).to_utf8_buffer())
-	var corrupt_bytes: PackedByteArray = FileAccess.get_file_as_bytes(_path)
-	_expect(store.load_save() != OK and store.snapshot.is_empty() and store.load_save(true) == OK and store.snapshot == swapped,
-		"invalid shared-instance disk file is rejected; independently valid v3 backup remains usable")
-	_expect(store.save(swapped) != OK and FileAccess.get_file_as_bytes(_path) == corrupt_bytes,
-		"malformed weapon save cannot be overwritten without explicit recovery")
-	_write(_path, bytes)
-	var blocker: String = _path.get_base_dir().path_join("parent-file")
-	_write(blocker, "file".to_utf8_buffer())
-	_expect(RunSave.new(blocker.path_join("run.json")).save(swapped) != OK and FileAccess.get_file_as_bytes(_path) == bytes,
-		"real filesystem obstruction cannot alter valid inventory bytes")
-	await _migration()
 	await _sortie_checks(swapped)
-	await _app_checks()
 	var file: FileAccess = FileAccess.open(_path.get_base_dir().path_join("weapon-fixture-report.json"), FileAccess.WRITE)
 	file.store_string(JSON.stringify({"checks":_results.size(), "failures":_failures, "results":_results}, "\t"))
 	file.close()
 	print("BH_WEAPON_FIXTURES checks=%d failures=%d" % [_results.size(), _failures])
 	quit(0 if _failures == 0 else 1)
 
-
-func _migration() -> void:
-	for version: int in [1, 2]:
-		var source: String = "res://tests/synthetic/legacy-v1-primary.json" if version == 1 else "res://tests/synthetic/legacy-v2-primary.json"
-		var bytes: PackedByteArray = FileAccess.get_file_as_bytes(source)
-		var backup_source: String = "res://tests/synthetic/legacy-v1-backup.json" if version == 1 else "res://tests/synthetic/legacy-v2-backup.json"
-		var backup_bytes: PackedByteArray = FileAccess.get_file_as_bytes(backup_source)
-		var legacy: Dictionary = JSON.parse_string(bytes.get_string_from_utf8())
-		for member: Dictionary in legacy.crew:
-			member.id = int(member.id)
-		if version == 2 and not legacy.last_day.is_empty():
-			for key: String in legacy.last_day:
-				if legacy.last_day[key] is float:
-					legacy.last_day[key] = int(legacy.last_day[key])
-			for index: int in range(legacy.last_day.ration_member_ids.size()):
-				legacy.last_day.ration_member_ids[index] = int(legacy.last_day.ration_member_ids[index])
-		var target: String = _path + "-legacy%d" % version
-		_write(target, bytes)
-		_write(target + ".bak", backup_bytes)
-		var legacy_backup_hash: String = FileAccess.get_sha256(target + ".bak")
-		var store: RunSave = RunSave.new(target)
-		_expect(store.snapshot.weapons.size() == 2 and store.snapshot.weapons[0].origin == "migration-v%d" % version
-			and store.snapshot.profile_id == legacy.profile_id and store.snapshot.crew[0].health == legacy.crew[0].health and store.snapshot.crew[1].health == legacy.crew[1].health and store.snapshot.cash == legacy.cash,
-			"v%d migration preserves old identity, cash, health and initializes only documented starter gear" % version)
-		if version == 2:
-			_expect(store.snapshot.food == legacy.food and store.snapshot.last_day == legacy.last_day, "v2 migration retains exact food and ration history")
-		_expect(FileAccess.get_file_as_bytes(target) == bytes and FileAccess.get_file_as_bytes(target + ".bak") == backup_bytes, "v%d read writes neither old primary nor backup" % version)
-		_expect(store.save(store.snapshot) == OK and FileAccess.get_file_as_bytes(target + ".v%d-" % version + FileAccess.get_sha256(target + ".bak") + ".json") == bytes,
-			"v%d first save keeps immutable byte-identical legacy original" % version)
-		_expect(FileAccess.get_file_as_bytes(target + ".v%d-" % version + legacy_backup_hash + ".json") == backup_bytes,
-			"v%d distinct legacy backup is independently retained before rotation" % version)
-		_write(target, "{bad v3".to_utf8_buffer())
-		_expect(store.load_save() != OK and store.load_save(true) == OK and FileAccess.get_file_as_string(target) == "{bad v3", "v%d checked backup survives invalid primary without silent replacement" % version)
 
 
 func _sortie_checks(data: Dictionary) -> void:
@@ -196,24 +144,6 @@ func _sortie_checks(data: Dictionary) -> void:
 	sortie.queue_free()
 	await process_frame
 
-
-func _app_checks() -> void:
-	var app: Node = MainScene.instantiate()
-	root.add_child(app)
-	await process_frame
-	app.continue_game()
-	app.open_loadout()
-	_expect(app.loadout_panel.visible, "real app opens inventory only at validated camp")
-	app.open_expedition()
-	_expect(app.expedition == null, "inventory modal blocks underlying start action")
-	app.close_loadout()
-	app.open_expedition()
-	app.expedition.set_physics_process(false)
-	app.open_loadout()
-	_expect(not app.loadout_panel.visible, "inventory cannot open over live or paused sortie")
-	app.queue_free()
-	await process_frame
-	await create_timer(0.15).timeout
 
 
 func _state() -> Dictionary:

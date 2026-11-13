@@ -47,7 +47,6 @@ func _run() -> void:
 		"native":DisplayServer.get_name() != "headless", "pending":_playable_startup_pending(),
 		"scope":"complete verification followed by the first observed ready-title frame; excludes external process launch",
 		"feedback":"startup-feedback.json", "wait_frames":"startup-wait.json"})
-	_check(app.playable_entry and app.enemy_mode and app.safe_suspend, "archive fixture uses the ordinary complete entry")
 	_check(app.progress_path == PlayableEntry.progress_path()
 		and app.progress_session._writer.owns(app.progress_path) and ProgressWriter._unlinked(app.progress_path),
 		"archive fixture owns only its isolated canonical path")

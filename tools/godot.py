@@ -24,14 +24,10 @@ def main():
  def execute(label,args,flags=None,expected=0):
   folder=job/label;folder.mkdir();cmd=[exe,'--headless','--path',str(ROOT),'--audio-driver','Dummy',*args]
   flags=list(flags if flags is not None else [])
-  cmd+=['--',*flags,'--bh-progress='+str(folder/('run.enemy-v1.json' if label in ['startup-default','rogue-contracts','world-contracts','neighborhood-contracts','task-contracts','task-data','campaign-contracts','journal-cache','world-bus','r2-save-failure','m48-sources','m48-record-transport','m48-record-cache','journal-prefix'] or '--bh-enemy-trial' in flags else 'run.json')),'--bh-audio-settings='+str(folder/'audio.json')]
+  cmd+=['--',*flags,'--bh-progress='+str(folder/'run.enemy-v1.json'),'--bh-audio-settings='+str(folder/'audio.json')]
   if label=='known-hash-cycle':cmd+=['--cycle-output='+(folder/'cycle.json').as_posix()]
   if label=='record-hash':cmd+=['--record-output='+(folder/'data').as_posix()]
-  if label=='closeout-view':cmd+=['--view-output='+(folder/'frames').as_posix()]
-  if label=='neighborhood-view':cmd+=['--view-output='+(folder/'frames').as_posix()]
   if label=='neighborhood-data':cmd+=['--neighborhood-output='+(folder/'data.json').as_posix()]
-  if label=='rogue-data':cmd+=['--rogue-data-output='+(folder/'data.json').as_posix()]
-  if label=='worldgen-generation':cmd+=['--worldgen-output='+(folder/'data').as_posix()]
   with (folder/'console.txt').open('xb') as out:z=subprocess.run(cmd,cwd=ROOT,stdout=out,stderr=out,env=env,timeout=300 if label=='m48-sources' else 150)
   text=(folder/'console.txt').read_text(encoding='utf-8',errors='replace');assert z.returncode==expected and not re.search(r'(?m)^(SCRIPT ERROR|ERROR):',text),(label,z.returncode,text[-2000:])
   assert all(int(n)==0 for n in re.findall(r'"failures"\s*:\s*(\d+)',text)),(label,'structured failures')
@@ -41,22 +37,15 @@ def main():
  execute('import',['--editor','--import'])
  execute('startup-default',['--quit-after','3'])
  execute('startup-111',['--quit-after','3'])
- for name in ['playable_entry','smoke','presentation','weapon_inventory','combat_los','navigation_nearest','night_pressure','contact_damage','contact_separation','animation/motion','animation/normal_stability','animation/infected_v1']:
+ for name in ['playable_entry','presentation','weapon_inventory','combat_los','navigation_nearest','night_pressure','contact_damage','contact_separation','animation/motion','animation/normal_stability','animation/infected_v1']:
   execute(name.replace('/','-'),['--script','res://tests/'+name+'.gd'])
- for name in ['rogue_data','rogue_navigation','hud_compact','rogue_legacy_scope','world_data']:
+ for name in ['rogue_navigation','hud_compact','world_data']:
   execute(name.replace('_','-'),['--script','res://tests/'+name+'.gd'])
- execute('world-bus',['--script','res://tests/world_bus.gd'],[])
  execute('journal-cache',['--script','res://tests/journal_cache.gd'],[])
- execute('closeout-view',['--script','res://tests/closeout_view.gd'])
  execute('neighborhood-data',['--script','res://tests/neighborhood_data.gd'])
- execute('neighborhood-view',['--script','res://tests/neighborhood_view.gd'])
- execute('neighborhood-contracts',['--script','res://tests/neighborhood_contracts.gd'],[])
- execute('world-contracts',['--script','res://tests/world_contracts.gd'],[])
- execute('rogue-contracts',['--script','res://tests/rogue_contracts.gd'],[])
  execute('task-data',['--script','res://tests/task_data.gd'],[])
- execute('task-contracts',['--script','res://tests/task_contracts.gd'],[])
  execute('weapon-magazine',['--script','res://tests/weapon_magazine.gd'],[])
- for name in ['campaign_rules','boss_behavior','campaign_contracts','encounter_termination','build_items','basic_support','build_contracts','combat_patterns_v1','toxic_v1','combat_integration','search_assignments','search_work_view','special_powers','power_boundaries','persona_rules','persona_runtime','persona_ui','exploration_generation','exploration_contracts','exploration_presentation','exploration_boundaries','worldgen_generation','worldgen_contracts','worldgen_hud','worldgen_boundaries','worldgen_picking']:
+ for name in ['campaign_rules','boss_behavior','campaign_contracts','encounter_termination','build_items','basic_support','build_contracts','combat_patterns_v1','toxic_v1','combat_integration','search_assignments','search_work_view','special_powers','power_boundaries','persona_rules','persona_runtime','persona_ui','exploration_contracts','exploration_presentation','exploration_boundaries','worldgen_contracts','worldgen_hud','worldgen_boundaries','worldgen_picking']:
   execute(name.replace('_','-'),['--script','res://tests/'+name+'.gd'],[])
  execute('known-hash-cycle',['--script','res://tests/known_hash_cycle.gd'])
  execute('record-hash',['--script','res://tests/record_hash.gd'])

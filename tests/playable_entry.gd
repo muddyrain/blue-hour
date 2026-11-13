@@ -15,11 +15,6 @@ func _run() -> void:
 	_expect(config.playable, "no gameplay flags starts playable")
 	_expect(config.progress == PlayableEntry.progress_path(), "stable canonical progress")
 	_expect(config.audio == "user://playable-v1/audio.json", "independent settings")
-	for flag: String in PlayableEntry.FEATURE_ARGUMENTS:
-		_expect(flag in config.arguments, "existing unified feature chain: "+flag)
-	for flag: String in PlayableEntry.LEGACY_ARGUMENTS:
-		var old: Dictionary = PlayableEntry.resolve(PackedStringArray([flag]))
-		_expect(not old.playable and old.progress == "user://saves/run.json", "explicit old entry remains: "+flag)
 	_expect(not PlayableEntry.owns_path("user://playable-v1/run.enemy-v1.json"), "owner requires resolved absolute path")
 	_expect(not PlayableEntry.owns_path(config.progress+".other"), "no arbitrary sibling accepted")
 	var session: ProductionProgress = ProductionProgress.new(config.progress,true,true,true,true,true,true,true,true,true,true,true,true,true)

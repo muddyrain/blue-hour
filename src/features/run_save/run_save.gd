@@ -10,7 +10,6 @@ const MAX_COUNTER: int = 1_000_000_000
 var path: String
 var diagnostic: String = ""
 var snapshot: Dictionary = {}
-var migrated_from: int = 0
 var _battle_format: bool = false
 var _survival_format: bool = false
 var _rescue_format: bool = false
@@ -46,13 +45,11 @@ static func new_profile_id() -> String:
 static func validate(data: Variant) -> String:
 	if not data is Dictionary:
 		return "根数据必须是对象"
-	if not data.has("schema_version") or not _integer(data.schema_version, 1, SCHEMA_VERSION):
+	if not data.has("schema_version") or not _integer(data.schema_version, SCHEMA_VERSION, SCHEMA_VERSION):
 		return "不支持的存档版本"
 	var required: Array[String] = ["schema_version", "profile_id", "day", "cash", "crew", "settled_sorties", "last_settlement_id"]
-	if data.schema_version >= 2:
-		required.append_array(["food", "last_day"])
-	if data.schema_version >= 3:
-		required.append_array(["weapons", "loadout", "camp_spending"])
+	required.append_array(["food", "last_day"])
+	required.append_array(["weapons", "loadout", "camp_spending"])
 	if data.size() != required.size():
 		return "存档字段不完整或包含未知字段"
 	for key: String in required:
@@ -71,41 +68,35 @@ static func validate(data: Variant) -> String:
 		return "队员人数无效"
 	var seen: Array[int] = []
 	for member: Variant in data.crew:
-		if not member is Dictionary or member.size() != (7 if data.schema_version >= 5 else (6 if data.schema_version == 4 else 2)) or not member.has("id") or not member.has("health"):
+		if not member is Dictionary or member.size() != 7 or not member.has("id") or not member.has("health"):
 			return "队员字段无效"
 		if not _integer(member.id, 1, 2) or int(member.id) in seen:
 			return "队员身份重复或未知"
 		if not _number(member.health) or member.health < 0.0 or member.health > 200.0:
 			return "队员生命无效"
 		seen.append(int(member.id))
-		if data.schema_version >= 4:
-			var member_problem: String = SurvivorRoster.validate(member, data)
-			if not member_problem.is_empty():
-				return member_problem
-	if data.schema_version >= 3:
-		var inventory_problem: String = WeaponInventory.validate(data)
-		if not inventory_problem.is_empty():
-			return inventory_problem
-	if data.schema_version >= 5:
-		for member: Dictionary in data.crew:
-			var growth_problem: String = SurvivorGrowth.validate_member(member,data)
-			if not growth_problem.is_empty():
-				return growth_problem
-		var duplicate_problem: String = SurvivorGrowth.validate_crew(data.crew)
-		if not duplicate_problem.is_empty():
-			return duplicate_problem
-	if data.schema_version >= 2:
-		if not _integer(data.food, 0, CampRules.FOOD_LIMIT):
-			return "食物库存必须是合法非负整数"
-		return _validate_day(data)
-	return ""
+		var member_problem: String = SurvivorRoster.validate(member, data)
+		if not member_problem.is_empty():
+			return member_problem
+	var inventory_problem: String = WeaponInventory.validate(data)
+	if not inventory_problem.is_empty():
+		return inventory_problem
+	for member: Dictionary in data.crew:
+		var growth_problem: String = SurvivorGrowth.validate_member(member,data)
+		if not growth_problem.is_empty():
+			return growth_problem
+	var duplicate_problem: String = SurvivorGrowth.validate_crew(data.crew)
+	if not duplicate_problem.is_empty():
+		return duplicate_problem
+	if not _integer(data.food, 0, CampRules.FOOD_LIMIT):
+		return "食物库存必须是合法非负整数"
+	return _validate_day(data)
 
 
 static func _validate_day(data: Dictionary, maximum_member_id: int = 2) -> String:
 	if not data.last_day is Dictionary:
 		return "每日结算记录无效"
 	var entry: Dictionary = data.last_day
-	# Empty history is honest for new games and v1 migration: never invent past rations.
 	if entry.is_empty():
 		return "缺少维修支出对应的归航记录" if int(data.get("camp_spending", 0)) != 0 else ""
 	var numbers: Array[String] = ["day", "food_before", "food_found", "food_stored", "food_overflow",
@@ -157,7 +148,6 @@ func load_save(backup: bool = false) -> Error:
 	var result: Dictionary = _read(source)
 	diagnostic = result.message
 	snapshot = result.data.duplicate(true)
-	migrated_from = int(result.get("migration", 0))
 	return result.error as Error
 
 
@@ -165,23 +155,10 @@ func has_files() -> bool:
 	return FileAccess.file_exists(path) or FileAccess.file_exists(path + ".bak")
 
 
-func read_v5_exact() -> Dictionary:
-	if _battle_format or _survival_format or _rescue_format or _growth_format or _field_format or _trait_format or _training_format or _pool_format or _roster_format or _quality_format or _enemy_format:
-		return {"error":ERR_INVALID_DATA,"message":"隔离生存格式不是v5","data":{}}
-	return read_transaction_exact()
-
-
 func read_transaction_exact() -> Dictionary:
 	var stamp: int = FreezeProfile.enter("camp.read_exact")
-	var result: Dictionary = _profiled_read_transaction_exact()
-	FreezeProfile.leave("camp.read_exact", stamp)
-	return result
-
-
-func _profiled_read_transaction_exact() -> Dictionary:
 	var result: Dictionary = _read(path)
-	if result.error == OK and int(result.get("migration", 0)) != 0:
-		return {"error":ERR_INVALID_DATA, "message":"事务适配器只接受现有v5；旧档须单独审核", "data":{}}
+	FreezeProfile.leave("camp.read_exact", stamp)
 	return result
 
 
@@ -211,8 +188,6 @@ func _save_owned(data: Dictionary, allow_invalid_replacement: bool = false, tran
 	diagnostic = _format_problem(data)
 	if not diagnostic.is_empty():
 		return ERR_INVALID_DATA
-	if not _battle_format and not _survival_format and not _rescue_format and not _growth_format and not _field_format and not _trait_format and not _training_format and not _pool_format and not _roster_format and not _quality_format and not _enemy_format and data.schema_version != SCHEMA_VERSION:
-		return _fail(ERR_INVALID_DATA, "写入只支持v5；旧版请先读取迁移")
 	var serialized: String = JSON.stringify(data, "\t", true, true) + "\n"
 	if serialized.to_utf8_buffer().size() > MAX_BYTES:
 		return _fail(ERR_INVALID_DATA, "库存存档超过工程大小保护上限；当前营地保留在内存")
@@ -233,16 +208,6 @@ func _save_owned(data: Dictionary, allow_invalid_replacement: bool = false, tran
 		DirAccess.remove_absolute(temporary)
 		return _fail(ERR_FILE_CORRUPT, "临时存档写入校验失败，旧档未改")
 	var current: Dictionary = _read(path)
-	# Only a verified save boundary may archive legacy bytes; reads never write.
-	if current.error == OK and int(current.get("migration", 0)) > 0:
-		error = _retain_legacy(path, int(current.migration))
-	if error == OK and FileAccess.file_exists(path + ".bak"):
-		var legacy_backup: Dictionary = _read(path + ".bak")
-		if legacy_backup.error == OK and int(legacy_backup.get("migration", 0)) > 0:
-			error = _retain_legacy(path + ".bak", int(legacy_backup.migration))
-	if error != OK:
-		DirAccess.remove_absolute(temporary)
-		return _fail(error, "无法保留旧版原件，旧档未改")
 	var rollback: String = ""
 	var old_backup: String = ""
 	var discard_backup: bool = false
@@ -278,7 +243,6 @@ func _save_owned(data: Dictionary, allow_invalid_replacement: bool = false, tran
 	if discard_backup:
 		DirAccess.remove_absolute(old_backup)
 	snapshot = checked.data.duplicate(true)
-	migrated_from = 0
 	diagnostic = "已保存营地进度"
 	return OK
 
@@ -306,21 +270,9 @@ func _read(source: String) -> Dictionary:
 	if not problem.is_empty():
 		return {"error": ERR_INVALID_DATA, "message": problem, "data": {}}
 	if _battle_format or _survival_format or _rescue_format or _growth_format or _field_format or _trait_format or _training_format or _pool_format or _roster_format or _quality_format or _enemy_format:
-		return {"error":OK,"message":"隔离生存格式校验通过，无旧档迁移","data":parser.data,"migration":0}
+		return {"error":OK,"message":"隔离生存格式校验通过","data":parser.data}
 	# Godot JSON numbers are floats; normalize only after strict range/integer checks.
 	var data: Dictionary = parser.data
-	var migration: int = int(data.schema_version) if int(data.schema_version) < SCHEMA_VERSION else 0
-	if data.schema_version == 1:
-		data.food = DefaultRules.v1_migration_food
-		data.last_day = {}
-	if migration > 0:
-		if migration < 3:
-			WeaponInventory.initialize(data, "migration-v%d" % migration)
-		if migration < 4:
-			SurvivorRoster.initialize(data.crew)
-		else:
-			SurvivorGrowth.initialize(data.crew)
-		data.schema_version = SCHEMA_VERSION
 	for key: String in ["schema_version", "day", "cash", "settled_sorties"]:
 		data[key] = int(data[key])
 	for member: Dictionary in data.crew:
@@ -342,16 +294,7 @@ func _read(source: String) -> Dictionary:
 		for member_id: Variant in data.last_day.ration_member_ids:
 			members.append(int(member_id))
 		data.last_day.ration_member_ids = members
-	var message: String = "存档校验通过"
-	if migration > 0:
-		message = "旧版v%d：队员档案使用迁移默认呼号；战绩从v4首次归航开始记录，不补写历史经验。" % migration
-		if migration == 4:
-			message = "v4档已读：呼号、战绩、钱粮和装备保留；成长状态待校准，行动明细从本版本实际出击开始记录。"
-		if migration < 3:
-			message += "原有默认两枪初始化为独立实例，非历史战利品。"
-		if migration == 1:
-			message += "食物初始化为%d（迁移默认值，非历史库存）。" % DefaultRules.v1_migration_food
-	return {"error": OK, "message": message, "data": data, "migration":migration}
+	return {"error": OK, "message": "存档校验通过", "data": data}
 
 
 func _format_problem(data: Variant) -> String:
@@ -410,17 +353,6 @@ func _format_problem(data: Variant) -> String:
 	if path.replace("\\","/").get_file().to_lower() != "run.battle-v1.json" and not path.replace("\\","/").get_file().to_lower().begins_with("run.battle-v1.json."):
 		return "BATTLE_NAMESPACE_REQUIRED"
 	return BattleState.problem(data) if data is Dictionary else "BATTLE_FORMAT"
-
-
-func _retain_legacy(source: String, version: int) -> Error:
-	var digest: String = FileAccess.get_sha256(source)
-	var archive: String = path + ".v%d-" % version + digest + ".json"
-	if FileAccess.file_exists(archive):
-		return OK if FileAccess.get_sha256(archive) == digest else ERR_FILE_CORRUPT
-	var error: Error = DirAccess.copy_absolute(source, archive)
-	if error != OK:
-		return error
-	return OK if FileAccess.get_sha256(archive) == digest else ERR_FILE_CORRUPT
 
 
 func _fail(error: Error, message: String) -> Error:

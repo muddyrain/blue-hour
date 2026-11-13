@@ -92,8 +92,6 @@ func inspect() -> Dictionary:
 	var has_camp: bool = FileAccess.file_exists(_path) or FileAccess.file_exists(_path+".bak")
 	var has_marker: bool = DirAccess.dir_exists_absolute(_path+".txn") or FileAccess.file_exists(_path+".txn")
 	if not has_camp and not has_marker:
-		if DirAccess.dir_exists_absolute(_path + ".migration") or FileAccess.file_exists(_path + ".migration"):
-			return _blocked("MIGRATION_REQUIRED_TARGET_MISSING")
 		return {"error":OK,"state":"EMPTY","camp":{},"reason":"NEW_JOURNEY_CONFIRMATION_REQUIRED"}
 	var parsed: JSON = JSON.new()
 	var binding_path: String = _path+".txn/binding.json"
@@ -109,9 +107,6 @@ func inspect() -> Dictionary:
 	var receipt: Dictionary = recovered.receipt
 	if not SurvivalState.is_extended(receipt.base) or not SurvivalState.is_survival(receipt.base) or not RescueState.is_family(receipt.base) or not GrowthState.is_family(receipt.base) or not FieldJoinState.is_family(receipt.base) or not TraitState.is_family(receipt.base) or not TrainingState.is_family(receipt.base) or not RescuePoolState.is_family(receipt.base) or not RosterState.is_family(receipt.base) or not WeaponState.is_family(receipt.base) or not EnemyState.is_state(receipt.base):
 		return _blocked("UNSUPPORTED_PROGRESS_FORMAT")
-	var migrated: String = SaveMigration.activation_problem(_path, TransactionReceipt.camp(receipt).get("origin", receipt.base.origin))
-	if not migrated.is_empty():
-		return _blocked(migrated)
 	if receipt.phase == "SUSPEND_READY":
 		if not suspend_enabled:
 			return _blocked("SUSPEND_EXPLICIT_ENTRY_REQUIRED")
@@ -186,9 +181,6 @@ func create(base: Dictionary) -> Dictionary:
 	if not _archived and (FileAccess.file_exists(_path+".bak") or DirAccess.dir_exists_absolute(_path+".bak")):
 		if DirAccess.rename_absolute(_path+".bak",_path+".bak.previous-"+RunSave.new_profile_id()) != OK:
 			return _blocked("OLD_BACKUP_ARCHIVE_FAILED")
-	if not _archived and (FileAccess.file_exists(_path+".migration") or DirAccess.dir_exists_absolute(_path+".migration")):
-		if DirAccess.rename_absolute(_path+".migration",_path+".migration.previous-"+RunSave.new_profile_id()) != OK:
-			return _blocked("OLD_MIGRATION_ARCHIVE_FAILED")
 	_archived = true
 	var save: RunSave = RunSave.new(_path,false,false,false,false,false,false,false,false,false,false,true)
 	var disk: Dictionary = save.read_transaction_exact()
@@ -236,24 +228,6 @@ func edit(before: Dictionary, request: Dictionary) -> Dictionary:
 	_pending_edit_head = state.hash
 	_pending_edit_request = request.duplicate(true)
 	return _retry_edit()
-
-
-func preview_migration(source: String, choice: String) -> Dictionary:
-	if not _problem.is_empty() or _writer == null or not _writer.owns(_path):
-		return _blocked("MIGRATION_ISOLATED_WRITER_REQUIRED")
-	return SaveMigration.preview(source, _path, choice, _writer)
-
-
-func migrate(source: String, intent: Dictionary) -> Dictionary:
-	if not _problem.is_empty() or _writer == null or not _writer.owns(_path):
-		return _blocked("MIGRATION_ISOLATED_WRITER_REQUIRED")
-	var migration: SaveMigration = SaveMigration.new(_path, _writer, _fault)
-	var result: Dictionary = migration.confirm(source, intent)
-	# A failed attempt may have retained an intent. A separate, confirmed new journey can archive it.
-	_expected = _disk_identity()
-	if result.error != OK:
-		return result
-	return inspect()
 
 
 func _retry_edit() -> Dictionary:
@@ -418,7 +392,7 @@ func _prepare_packet() -> Dictionary:
 
 func _disk_identity() -> String:
 	var values: Dictionary = {}
-	for suffix: String in ["",".bak",".txn/binding.json", ".migration/intent.json", ".migration/seal.json"]:
+	for suffix: String in ["",".bak",".txn/binding.json"]:
 		values[suffix] = FileAccess.get_sha256(_path+suffix) if FileAccess.file_exists(_path+suffix) else "MISSING"
 	return SurvivalContracts.fingerprint(values)
 

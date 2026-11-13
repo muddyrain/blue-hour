@@ -55,7 +55,7 @@ var audio_preferences: AudioPreferences
 var audio: B1AudioService
 var sound_settings: SoundSettingsPanel
 var _settings_diagnostic: String = ""
-var progress_path: String = "user://saves/run.json"
+var progress_path: String
 var run_save: RunSave
 var _frozen_world: Dictionary = {}
 var training_panel: TrainingPanel
@@ -1752,7 +1752,7 @@ func _setup_presentation() -> void:
 			continue
 		if argument.begins_with("--verify-weapons=") or argument.begins_with("--verify-training=") or argument.begins_with("--verify-traits=") or argument.begins_with("--verify-camp=") or argument.begins_with("--verify-field-join=") or argument.begins_with("--verify-growth=") or argument.begins_with("--verify-rescue=") or argument.begins_with("--verify-pilot=") or argument.begins_with("--verify-hunger=") or argument.begins_with("--verify-exit=") or argument.begins_with("--verify-recovery="):
 			continue
-		if argument.begins_with("--verify-") and not argument.begins_with("--verify-migration=") and not argument.begins_with("--verify-battle=") and not argument.begins_with("--verify-p0d02a=") and not argument.begins_with("--verify-m401=") and not argument.begins_with("--verify-m402=") and not argument.begins_with("--verify-m403=") and not argument.begins_with("--verify-m501=") and not argument.begins_with("--verify-m502=") and not argument.begins_with("--verify-m503=") and not argument.begins_with("--verify-m5ux01=") and not argument.begins_with("--verify-m5combat02=") and not argument.begins_with("--verify-m5combat03="):
+		if argument.begins_with("--verify-") and not argument.begins_with("--verify-battle=") and not argument.begins_with("--verify-p0d02a=") and not argument.begins_with("--verify-m401=") and not argument.begins_with("--verify-m402=") and not argument.begins_with("--verify-m403=") and not argument.begins_with("--verify-m501=") and not argument.begins_with("--verify-m502=") and not argument.begins_with("--verify-m503=") and not argument.begins_with("--verify-m5ux01=") and not argument.begins_with("--verify-m5combat02=") and not argument.begins_with("--verify-m5combat03="):
 			_developer_menu = true
 			_camp_open = not _requires_continue and not _progress_blocked
 

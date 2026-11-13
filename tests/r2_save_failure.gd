@@ -17,7 +17,7 @@ func run() -> void:
 	var app: Node=load("res://src/app/main.tscn").instantiate()
 	root.add_child(app)
 	await process_frame
-	app._new_game()
+	app._new_game("scavenge", {"version":CatalogProgress.VERSION, "unlock":""}, {"version":OpeningBuild.POLICY_VERSION, "eligible":[]})
 	app._select_mission(DailyActions.supply(DailyActions.offers(app.camp_snapshot())[0]))
 	var world: Expedition=app.expedition
 	expect(world!=null,"normal isolated entry starts before fault injection")

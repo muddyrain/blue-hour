@@ -15,38 +15,6 @@ window/size/window_height_override=720
 window/stretch/mode="canvas_items"
 
 [input]
-practice_far_target={
-"deadzone": 0.5,
-"events": [Object(InputEventKey,"keycode":85)]
-}
-practice_long_rifle={
-"deadzone": 0.5,
-"events": [Object(InputEventKey,"keycode":50)]
-}
-practice_cross={
-"deadzone": 0.5,
-"events": [Object(InputEventKey,"keycode":72)]
-}
-practice_north={
-"deadzone": 0.5,
-"events": [Object(InputEventKey,"keycode":73)]
-}
-practice_south={
-"deadzone": 0.5,
-"events": [Object(InputEventKey,"keycode":75)]
-}
-practice_west={
-"deadzone": 0.5,
-"events": [Object(InputEventKey,"keycode":74)]
-}
-practice_east={
-"deadzone": 0.5,
-"events": [Object(InputEventKey,"keycode":76)]
-}
-practice_carbine={
-"deadzone": 0.5,
-"events": [Object(InputEventKey,"keycode":49)]
-}
 camera_left={
 "deadzone": 0.5,
 "events": [Object(InputEventKey,"keycode":65)]
@@ -82,10 +50,6 @@ squad_command={
 return_to_title={
 "deadzone": 0.5,
 "events": [Object(InputEventKey,"keycode":4194305)]
-}
-place_probe={
-"deadzone": 0.5,
-"events": [Object(InputEventMouseButton,"button_index":1)]
 }
 
 [rendering]

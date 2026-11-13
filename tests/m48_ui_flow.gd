@@ -220,7 +220,6 @@ func _compact_specialty_hud() -> void:
 	app._screen.hide()
 	viewport.size = Vector2i(1024,576)
 	var world: InputWorld = InputWorld.new()
-	world.player_mode = true
 	world.layout = StreetLayout.new()
 	world.ui_theme = app._screen.theme
 	world.supply = MissionSupply.new()

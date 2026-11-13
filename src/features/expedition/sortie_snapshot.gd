@@ -71,7 +71,7 @@ static func supply_for_world(value: Dictionary) -> MissionSupply:
 
 
 static func capture(world: Expedition) -> Dictionary:
-	if not world.field_join_error.is_empty() or not world.is_paused or not world.battle_survival or world.is_practice or world.los_setup != null or world.threat_rehearsal or world._practice_manual_waves or world.phase == Expedition.Phase.FINISHED:
+	if not world.field_join_error.is_empty() or not world.is_paused or not world.battle_survival or world.phase == Expedition.Phase.FINISHED:
 		return {}
 	if world.bus_view != null and world.bus_view.stage in ["arriving","disembarking"]: world.bus_view.skip()
 	var rows: Array = []
@@ -80,23 +80,19 @@ static func capture(world: Expedition) -> Dictionary:
 		rows.append(_actor(actor))
 	for actor: FieldActor in world.enemies:
 		foes.append(_actor(actor))
-	var captured: Dictionary = {"version":ENEMY_VERSION if world.enemy_mode else VERSION,"build":ENEMY_BUILD if world.enemy_mode else QUALITY_BUILD if WeaponState.is_state(world.field_departure) else ROSTER_BUILD if RosterState.is_family(world.field_departure) else POOL_BUILD if world.pool_mode else TRAINING_BUILD if world.training_mode else TRAIT_BUILD if world.trait_mode else FIELD_BUILD if world.field_join_mode else (GROWTH_BUILD if world.growth_mode else BUILD),"compatibility":compatibility(world),"map":String(world.layout.id),
+	var captured: Dictionary = {"version":ENEMY_VERSION,"build":ENEMY_BUILD,"compatibility":compatibility(world),"map":String(world.layout.id),
 		"sim":_fields(world,SIM),"sites":{"cash":{"searched":world.searched,"progress":world.search_progress},"food":{"searched":world._food_site.searched,"progress":world._food_site.progress}},
 		"worker":world.search_actor.member_id if world.search_actor != null else 0,"active_site":String(world._active_site.kind) if world._active_site != null else "",
 		"survivors":rows,"enemies":foes,"weapons":world.weapon_loot.duplicate(true),
 		"threat":_fields(world.threat,{"stage":TYPE_INT,"interval":TYPE_FLOAT,"transitions":TYPE_INT}),
 		"growth":world.growth_inputs.snapshot(world.sortie_id,world.layout.id,world.elapsed),
-		"camera":_fields(world.camera,{"position":TYPE_VECTOR2,"zoom":TYPE_VECTOR2}),"viewport":_encode(world.get_viewport_rect().size),"hunger":world.hunger_trial,
-		"drill":{"enabled":world.battle_drill,"deployed":world.drill_panel._deployed.duplicate()}}
-	if world.rescue_mode:
-		captured.rescue_mission = String(world.supply.id)
-		captured.rescue = world.rescue_target.snapshot() if world.rescue_target != null else {}
-	if world.growth_mode:
-		captured.xp_inputs = world.xp_inputs.snapshot(world)
-	if world.trait_mode:
-		captured.trait_inputs = world.trait_inputs.snapshot(world)
-	if world.field_join_mode:
-		captured.field_joins = world.field_joins.duplicate(true)
+		"camera":_fields(world.camera,{"position":TYPE_VECTOR2,"zoom":TYPE_VECTOR2}),"viewport":_encode(world.get_viewport_rect().size),"hunger":true,
+		"drill":{"enabled":false,"deployed":world.drill_panel._deployed.duplicate()}}
+	captured.rescue_mission = String(world.supply.id)
+	captured.rescue = world.rescue_target.snapshot() if world.rescue_target != null else {}
+	captured.xp_inputs = world.xp_inputs.snapshot(world)
+	captured.trait_inputs = world.trait_inputs.snapshot(world)
+	captured.field_joins = world.field_joins.duplicate(true)
 	captured.build = String(captured.build) + "+" + FieldContacts.BUILD
 	if not world.supply.generated.is_empty():
 		captured.version = EXPLORATION_VERSION if world.exploration_mode() else PERSONA_VERSION if world.persona_mode() else POWER_VERSION if world.power_mode() else SEARCH_VERSION if world.parallel_search else COMBAT_VERSION if world.combat_mode() else BUILD_VERSION if (world.supply.generated.get("version")==7 or (world.supply.generated.get("version")==8 or world.supply.generated.get("version")==9)) else CAMPAIGN_VERSION if world.supply.generated.get("version")==6 else WEAPON_VERSION if world.supply.generated.get("version")==5 else (OUTDOOR_VERSION if TaskActions.outdoor_site(world.supply.generated,&"cash") else TASK_VERSION) if world.supply.generated.get("version")==4 else NEIGHBORHOOD_VERSION if world.supply.generated.get("version")==3 else WORLD_VERSION if world.supply.generated.get("version")==2 else ROGUE_VERSION
@@ -412,7 +408,7 @@ static func apply(world: Expedition, value: Dictionary) -> String:
 		return "WORLD_RECON_BINDING"
 	if value.has("billboard") != (world.billboard_site != null):
 		return "WORLD_BILLBOARD_BINDING"
-	if compatibility(world) != value.compatibility or _encode(world.get_viewport_rect().size) != value.viewport or world.hunger_trial != value.hunger or world.battle_drill != value.drill.enabled:
+	if compatibility(world) != value.compatibility or _encode(world.get_viewport_rect().size) != value.viewport or true != value.hunger or false != value.drill.enabled:
 		return "WORLD_BUILD_DATA_VIEWPORT_MISMATCH"
 	if world.bus_view != null: world.bus_view.skip()
 	_restore(world,value.sim,SIM)
@@ -448,12 +444,11 @@ static func apply(world: Expedition, value: Dictionary) -> String:
 		if old_actor.activity in [FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING]:
 			world.search_assignments.begin(old_actor.member_id)
 	for row: Dictionary in value.enemies:
-		var actor: FieldActor = world._make_actor(true,int(row.state.actor_id),_vec(row.state.position),{},String(row.behavior.kind) if world.enemy_mode else "")
+		var actor: FieldActor = world._make_actor(true,int(row.state.actor_id),_vec(row.state.position),{},String(row.behavior.kind))
 		_restore(actor,row.state,ACTOR)
 		_restore(actor.visual,row.visual,_visual_spec(true))
-		if world.enemy_mode:
-			actor.enemy_behavior.restore(row.behavior)
-			actor.sync_enemy_visual()
+		actor.enemy_behavior.restore(row.behavior)
+		actor.sync_enemy_visual()
 		actor.visual._apply_pose()
 		world.enemies.append(actor)
 	if (value.version==CAMPAIGN_VERSION or (value.version==BUILD_VERSION or combat_version(value.version))): world.encounter.restore(value.encounter)
@@ -469,12 +464,10 @@ static func apply(world: Expedition, value: Dictionary) -> String:
 	if power_version(value.version): world.powers=value.powers.duplicate(true)
 	world.refresh_power_factors()
 	_restore(world.threat,value.threat,{"stage":TYPE_INT,"interval":TYPE_FLOAT,"transitions":TYPE_INT})
-	if world.rescue_mode and world.rescue_target != null:
+	if world.rescue_target != null:
 		world.rescue_target.restore(value.rescue)
-	if world.growth_mode:
-		world.xp_inputs.restore(value.xp_inputs)
-	if world.trait_mode:
-		world.trait_inputs.restore(value.trait_inputs)
+	world.xp_inputs.restore(value.xp_inputs)
+	world.trait_inputs.restore(value.trait_inputs)
 	world.growth_inputs._counts.clear()
 	world.growth_inputs._recent.clear()
 	for row: Dictionary in value.growth.members:
@@ -494,9 +487,8 @@ static func compatibility(world: Expedition) -> String:
 	var weapons: Array = []
 	for definition: WeaponDefinition in WeaponInventory.Definitions:
 		weapons.append(_resource(definition))
-	var data: Dictionary = {"build":ENEMY_BUILD if world.enemy_mode else QUALITY_BUILD if WeaponState.is_state(world.field_departure) else ROSTER_BUILD if RosterState.is_family(world.field_departure) else POOL_BUILD if world.pool_mode else TRAINING_BUILD if world.training_mode else TRAIT_BUILD if world.trait_mode else FIELD_BUILD if world.field_join_mode else (GROWTH_BUILD if world.growth_mode else BUILD),"tuning":_resource(world.tuning),"threat":_resource(world.threat.rules),"supply":_resource(world.supply),"weapons":weapons}
-	if world.enemy_mode:
-		data.enemy_rules = EnemyRules.POLICY
+	var data: Dictionary = {"build":ENEMY_BUILD,"tuning":_resource(world.tuning),"threat":_resource(world.threat.rules),"supply":_resource(world.supply),"weapons":weapons}
+	data.enemy_rules = EnemyRules.POLICY
 	data.build = String(data.build) + "+" + FieldContacts.BUILD
 	if not world.supply.generated.is_empty():
 		data.build += "+"+(EXPLORATION_BUILD if world.exploration_mode() else PERSONA_BUILD if world.persona_mode() else POWER_BUILD if world.power_mode() else SEARCH_BUILD if world.parallel_search else COMBAT_BUILD if world.combat_mode() else BUILD_BUILD if (world.supply.generated.get("version")==7 or (world.supply.generated.get("version")==8 or world.supply.generated.get("version")==9)) else CAMPAIGN_BUILD if world.supply.generated.get("version")==6 else WEAPON_BUILD if world.supply.generated.get("version")==5 else (OUTDOOR_BUILD if TaskActions.outdoor_site(world.supply.generated,&"cash") else TASK_BUILD) if world.supply.generated.get("version")==4 else NEIGHBORHOOD_BUILD if world.supply.generated.get("version")==3 else WORLD_BUILD if world.supply.generated.get("version")==2 else ROGUE_BUILD)

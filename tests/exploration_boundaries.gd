@@ -97,7 +97,6 @@ func _world(task: Dictionary, tools: bool) -> ClockWorld:
 	world.layout = ExplorationLayout.resource(task.layout)
 	world.navigation = ExplorationLayout._routing(task.layout).nav
 	world.parallel_search = true
-	world.trait_mode = true
 	world.trait_inputs.configure(BINDING)
 	world.xp_inputs.configure(BINDING)
 	world.basic_support.configure(BINDING)

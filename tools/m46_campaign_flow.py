@@ -108,40 +108,6 @@ def install_driver(project, script):
     return target.name
 
 
-def compatibility(args, output):
-    if args.project == ROOT:
-        raise RuntimeError("Compatibility requires --project pointing to the archived M45 source")
-    baseline = args.project
-    script = "m46_compat_flow.gd"
-    baseline_script = install_driver(baseline, script)
-    profile = output / "profile"
-    old_field = output / "old-field"
-    phase_path = output / "phases.json"
-    phases = read_json(phase_path) if phase_path.exists() else []
-    sequence = ("m45-camp", "m46-camp", "m45-field", "m45-finish", "m46-finish")
-    if args.phase:
-        sequence = sequence[sequence.index(args.phase):]
-    try:
-        for phase in sequence:
-            args.project = baseline if phase.startswith("m45-") else ROOT
-            if phase == "m46-finish":
-                profile.rename(output / "archived-m45-finish")
-                shutil.copytree(old_field, profile)
-            phase_script = baseline_script if args.project == baseline else script
-            phases.append(run(args, output, phase, profile, phase_script, resume=phase != "m45-camp"))
-            save_json(phase_path, phases)
-            if phase == "m45-field":
-                shutil.copytree(profile, old_field)
-    finally:
-        args.project = baseline
-    before = read_json(output / "m45-field/offers.json")
-    after = read_json(output / "m46-camp/offers.json")
-    assert before == after, "M46's old camp menu changed a frozen M45 candidate or layout"
-    original_intel = read_json(output / "m45-finish/next-day.json")
-    candidate_intel = read_json(output / "m46-finish/next-day.json")
-    assert original_intel == candidate_intel, "M46's returned billboard changed M44 intel or its frozen candidates"
-    return {"phases": phases, "old_camp_offers": after, "next_day_offers": candidate_intel}
-
 
 def campaign(args, output):
     script = "m46_campaign_flow.gd"
@@ -182,7 +148,7 @@ def main():
     if sys.platform != "win32" or sys.flags.optimize:
         raise RuntimeError("Windows and enabled Python assertions required")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("timing", "campaign", "compatibility"))
+    parser.add_argument("mode", choices=("timing", "campaign"))
     parser.add_argument("--godot", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--project", type=Path, default=ROOT)
@@ -190,8 +156,7 @@ def main():
     parser.add_argument("--timeout", type=int, default=900)
     parser.add_argument("--headless", action="store_true", help="Campaign diagnostic without native evidence")
     campaign_phases = ("setup", "route-a", "b-prepare", "b-extended", "b-quick", "b-resume", "summarize")
-    compatibility_phases = ("m45-field", "m45-finish", "m46-finish")
-    parser.add_argument("--phase", choices=campaign_phases + compatibility_phases + ("cancel-wait",),
+    parser.add_argument("--phase", choices=campaign_phases + ("cancel-wait",),
                         help="Run a single retained campaign stage or summarize existing results")
     args = parser.parse_args()
     output = args.output.resolve()
@@ -199,21 +164,19 @@ def main():
     if not output.is_relative_to(ROOT / ".local"):
         raise RuntimeError("Use a new output directory under the project .local directory")
     if args.project != ROOT and (args.mode == "campaign" or not args.project.is_relative_to(ROOT / ".local")):
-        raise RuntimeError("Only timing and compatibility can use an archived baseline under .local")
+        raise RuntimeError("Only timing can use an archived baseline under .local")
     if args.mode == "timing" and args.headless:
         raise RuntimeError("Timing requires rendered Windows frames")
     if args.mode == "timing" and args.phase not in (None, "summarize", "cancel-wait"):
         raise RuntimeError("Choose fresh timing, summarize, or cancel-wait")
     if args.phase == "cancel-wait" and args.project != ROOT:
         raise RuntimeError("The cancel-wait proof requires the M46 waiting UI")
-    if args.phase and args.mode == "compatibility" and args.phase not in compatibility_phases:
-        raise RuntimeError("Choose a retained compatibility phase")
     if args.phase and args.mode == "campaign" and args.phase not in campaign_phases:
         raise RuntimeError("Choose a retained campaign phase")
     version = subprocess.check_output([args.godot, "--version"], text=True).strip()
     assert version == (args.project / ".godot-version").read_text().strip()
     output.mkdir(parents=True, exist_ok=args.phase is not None)
-    runner = {"timing": timing, "campaign": campaign, "compatibility": compatibility}[args.mode]
+    runner = {"timing": timing, "campaign": campaign}[args.mode]
     result = runner(args, output)
     result.update(engine=version, project=str(args.project), renderer="gl_compatibility", seed=args.seed,
                   open_streets=True, native=not args.headless, physical_input="NOT_VERIFIED")

@@ -3,14 +3,12 @@ extends RefCounted
 ## PROJECT_TEMP V1. Frozen geometry and read-only route certificates; no world state owner.
 
 const POLICY_ID: String = "BH_EXPLORATION_V1"
-const VERSION: int = 4
 const PREFIX: String = "explore_v1_"
 const SIZES: Dictionary = {
 	"small":{"bounds":[0, 0, 2560, 1920], "columns":4, "rows":3, "buildings":12, "optional_buildings":2, "vehicles":2, "fruit_trees":1},
 	"medium":{"bounds":[0, 0, 3584, 2688], "columns":5, "rows":4, "buildings":20, "optional_buildings":3, "vehicles":3, "fruit_trees":2},
 	"large":{"bounds":[0, 0, 4608, 3456], "columns":6, "rows":5, "buildings":30, "optional_buildings":4, "vehicles":4, "fruit_trees":3},
 }
-const KEYS: Array[String] = ["version", "seed", "size", "topology", "attempt", "fallback", "bounds", "entities", "roads", "barriers", "gates", "bus", "arrivals", "enemy_points", "rescue", "id", "objects"]
 const MAX_CACHE: int = 48
 static var _built: Dictionary = {}
 static var _certificates: Dictionary = {}
@@ -30,39 +28,12 @@ static func is_map_id(value: Variant) -> bool:
 	return value is String and value.length() == PREFIX.length() + 32 and value.begins_with(PREFIX) and value.substr(PREFIX.length()).is_valid_hex_number(false)
 
 
-static func generate(seed: String, size: String, topology: String) -> Dictionary:
-	if seed.is_empty() or seed.length() > 128 or not SIZES.has(size) or topology not in NeighborhoodLayout.TOPOLOGIES:
-		return {}
-	for attempt: int in range(3):
-		var value: Dictionary = _assemble(seed, size, topology, attempt, false)
-		if not value.is_empty():
-			return value
-	return _assemble(seed, size, topology, 0, true)
-
-
 static func validate(value: Variant, cached: bool = true) -> String:
-	if value is Dictionary and value.get("version")==5: return WorldgenLayout.validate(value,cached)
-	if not value is Dictionary or value.size() != KEYS.size() or not value.has_all(KEYS) or not SurvivalContracts.json_value(value):
-		return "EXPLORATION_LAYOUT_FIELDS"
-	if not SurvivalContracts.integer(value.version, VERSION, VERSION) or not value.seed is String or value.seed.is_empty() or value.seed.length() > 128 or not value["size"] is String or not SIZES.has(value["size"]) or not value.topology is String or value.topology not in NeighborhoodLayout.TOPOLOGIES or not SurvivalContracts.integer(value.attempt, 0, 2) or not value.fallback is bool or not is_map_id(value.id):
-		return "EXPLORATION_LAYOUT_IDENTITY"
-	var signature: String = RecordEncoding.fingerprint(value)
-	if cached and has_certificate(signature):
-		return ""
-	var expected: Dictionary = _assemble(value.seed, value["size"], value.topology, int(value.attempt), value.fallback)
-	if expected.is_empty() or RecordEncoding.fingerprint(expected) != signature:
-		return "EXPLORATION_LAYOUT_CANONICAL"
-	return ""
+	return WorldgenLayout.validate(value,cached)
 
 
 static func resource(data: Dictionary) -> StreetLayout:
 	return NeighborhoodLayout.resource(data) if validate(data).is_empty() else null
-
-
-static func _assemble(seed: String, size: String, topology: String, attempt: int, fallback: bool) -> Dictionary:
-	var data: Dictionary = NeighborhoodLayout._assemble(seed, size, topology, attempt, fallback, true)
-	data.objects = []
-	return complete(data)
 
 
 static func complete(data: Dictionary, trace: Array[String] = []) -> Dictionary:
@@ -110,7 +81,7 @@ static func complete(data: Dictionary, trace: Array[String] = []) -> Dictionary:
 	if certificate.is_empty() or not _all_routes(data, nav, trace):
 		trace.append("final_access")
 		return {}
-	if data.version==5 and not WorldgenLayout.content_reachable(data,certificate):
+	if not WorldgenLayout.content_reachable(data,certificate):
 		trace.append("building_categories")
 		return {}
 	if data.has("warehouse_district"):
@@ -131,7 +102,7 @@ static func complete(data: Dictionary, trace: Array[String] = []) -> Dictionary:
 	if data.enemy_points.size() < data.entities.size():
 		return {}
 	data.erase("id")
-	data.id = (WorldgenLayout.PREFIX if data.version==5 else PREFIX) + RecordEncoding.fingerprint(data).substr(0, 32)
+	data.id = WorldgenLayout.PREFIX + RecordEncoding.fingerprint(data).substr(0, 32)
 	var signature: String = RecordEncoding.fingerprint(data)
 	certificate.nav = nav
 	_store_certificate(origin_key, signature, data.duplicate(true), certificate)
@@ -181,7 +152,7 @@ static func _store_certificate(origin_key: String, signature: String, data: Dict
 static func _geometry_problem(data: Dictionary) -> String:
 	var bounds: Rect2 = WorldLayout.rect(data.bounds)
 	var expected: Array = OpenStreetsV1.BOUNDS if data.has("open_streets") else SIZES[data["size"]].bounds
-	if (data.version==4 and data.entities.size() != SIZES[data["size"]].buildings) or not TransactionReceipt.same({"v":data.bounds}, {"v":expected}):
+	if not TransactionReceipt.same({"v":data.bounds}, {"v":expected}):
 		return "EXPLORATION_DIMENSIONS"
 	var blocks: Array[Rect2] = []
 	for entity: Dictionary in data.entities:
@@ -232,11 +203,10 @@ static func _reserved(data: Dictionary) -> Array[Rect2]:
 		zones.append_array(IndustrialYard.reserved_rects(data))
 	if data.has("rescue_court"):
 		zones.append(WorldLayout.rect(data.rescue_court.bounds))
-	if data.version==5:
-		for parcel: Dictionary in data.parcels:
-			zones.append(Rect2(WorldLayout.point(parcel.entrance)-Vector2(44,44),Vector2(88,88)))
-			for court: Dictionary in parcel.courtyards:
-				zones.append(Rect2(WorldLayout.point(court.entrance)-Vector2(36,36),Vector2(72,72)))
+	for parcel: Dictionary in data.parcels:
+		zones.append(Rect2(WorldLayout.point(parcel.entrance)-Vector2(44,44),Vector2(88,88)))
+		for court: Dictionary in parcel.courtyards:
+			zones.append(Rect2(WorldLayout.point(court.entrance)-Vector2(36,36),Vector2(72,72)))
 	for entity: Dictionary in data.entities:
 		zones.append(Rect2(WorldLayout.point(entity.door) - Vector2(28, 28), Vector2(56, 56)))
 	zones.append(Rect2(WorldLayout.point(data.rescue) - Vector2(52, 52), Vector2(104, 104)))
@@ -320,10 +290,9 @@ static func _all_routes(data: Dictionary, nav: FieldNavigation, trace: Array[Str
 	var start: Vector2 = WorldLayout.point(data.bus.door)
 	var goals: Array = data.arrivals.duplicate(true)
 	goals.append(data.rescue)
-	if data.version==5:
-		for parcel: Dictionary in data.parcels:
-			goals.append(parcel.entrance)
-			for court: Dictionary in parcel.courtyards:goals.append(court.entrance)
+	for parcel: Dictionary in data.parcels:
+		goals.append(parcel.entrance)
+		for court: Dictionary in parcel.courtyards:goals.append(court.entrance)
 	goals.append_array(data.enemy_points)
 	for object: Dictionary in data.objects:
 		goals.append(object.work_point)

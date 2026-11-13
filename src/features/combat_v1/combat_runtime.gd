@@ -127,8 +127,8 @@ func _commit(world: Expedition,actor: FieldActor,plan: Array,state: Dictionary) 
 		if target==null: return false
 		if target.health<=actor.weapon_definition.damage*float(hit.hits):
 			fatal+=1
-			if world.growth_mode and not world.is_practice and (not world.growth_inputs.can_record(actor,target,world.elapsed) or not world.xp_inputs.can_record(world,actor,target)): return _blocked(world)
-	if world.growth_mode and world.xp_inputs.events.size()+fatal>GrowthRules.MAX_EVENTS: return _blocked(world)
+			if (not world.growth_inputs.can_record(actor,target,world.elapsed) or not world.xp_inputs.can_record(world,actor,target)): return _blocked(world)
+	if world.xp_inputs.events.size()+fatal>GrowthRules.MAX_EVENTS: return _blocked(world)
 	# Validate the complete batch before any HP, ammo, feedback or XP changes.
 	for hit: Dictionary in plan:
 		var target: FieldActor=_enemy(world,int(hit.id))
@@ -140,7 +140,7 @@ func _commit(world: Expedition,actor: FieldActor,plan: Array,state: Dictionary) 
 			world.kills+=1
 			actor.confirmed_kills+=1
 			var event: Dictionary=world.growth_inputs.accept_defeat(actor,target,world.elapsed)
-			if world.growth_mode and not world.xp_inputs.accept(world,actor,target,event): return _blocked(world)
+			if not world.xp_inputs.accept(world,actor,target,event): return _blocked(world)
 			if world.encounter!=null: world.encounter.record_defeat(target,event)
 			world.growth_input_recorded.emit(event)
 	return true
@@ -235,7 +235,6 @@ func advance_toxic(world: Expedition,delta: float) -> void:
 		world._update_enemy_behaviors(0.0)
 		world._hit_effect(victim.position,amount,true)
 		world.combat_feedback.emit({"kind":"toxic_hit","zone_id":hit.zone_id,"tick":hit.tick,"member_id":hit.member_id,"health":victim.health,"elapsed":world.elapsed})
-		print("BH_TOXIC_HIT zone=%s tick=%d member=%d health=%.2f"%[hit.zone_id,hit.tick,hit.member_id,victim.health])
 	refresh_toxic(world)
 
 func refresh_toxic(world: Expedition) -> void:

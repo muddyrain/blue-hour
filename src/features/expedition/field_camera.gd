@@ -12,7 +12,6 @@ var pan_speed: float = 480.0
 var min_zoom: float = 0.70
 var max_zoom: float = 1.25
 var zoom_step: float = 1.10
-var _last_pan: Vector2 = Vector2.ZERO
 var _tap_pan: Vector2 = Vector2.ZERO
 var menu_blocked: bool = false
 
@@ -35,9 +34,6 @@ func _process(delta: float) -> void:
 	_tap_pan = Vector2.ZERO
 	if direction != Vector2.ZERO:
 		pan_by(direction * pan_speed * delta / zoom.x)
-	if direction != _last_pan:
-		print("BH_CAMERA pan=%s position=%s zoom=%.2f" % [direction, position, zoom.x])
-		_last_pan = direction
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -70,7 +66,6 @@ func zoom_at(screen_point: Vector2, factor: float) -> void:
 	position = anchor - (screen_point - get_viewport_rect().size * 0.5) / zoom.x
 	_clamp_position()
 	force_update_scroll()
-	print("BH_CAMERA zoom=%.2f position=%s" % [zoom.x, position])
 
 
 func screen_to_world(point: Vector2) -> Vector2:

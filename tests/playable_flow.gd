@@ -1,6 +1,5 @@
 extends SceneTree
 ## Isolated real interface/business flow. No OS input and no synthetic camp/world edits.
-var _legacy_fixed: bool=false
 var capture_caption: Label
 var app: Node
 var viewport: SubViewport
@@ -13,7 +12,6 @@ var training_effects: Array[Dictionary] = []
 var stages: Array[Dictionary] = []
 var frames: int = 0
 var failures: int = 0
-var legacy_hashes: Dictionary = {}
 var focus_observations: Array[bool] = []
 var exercise_departure_review: bool = false
 var _playable_startup_contract: bool = false
@@ -68,7 +66,7 @@ func _tap(button: BaseButton) -> void:
 			await _frame()
 		_check(not app.mission_select.loading and not app.mission_select.daily_offers.is_empty(),
 			"bus finishes checking the actual task cards")
-	elif button in app.mission_select.choices:
+	elif app.mission_select.choices.any(func(choice: Button) -> bool: return choice == button):
 		await _tap(app.mission_select.depart_button)
 
 func _mark(label: String) -> void:
@@ -95,7 +93,6 @@ func _run() -> void:
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--flow-output="): output = arg.trim_prefix("--flow-output=")
 		if arg=="--flow-resume": resume = true
-		if arg=="--flow-fixed": _legacy_fixed = true
 	root.unfocusable = true
 	root.gui_embed_subwindows = true
 	if not output.is_absolute_path() or "/.local/" not in output or "/.local/" not in OS.get_user_data_dir().replace("\\","/") or FileAccess.file_exists(output.path_join("report.json")):
@@ -103,14 +100,6 @@ func _run() -> void:
 		return
 	DirAccess.make_dir_recursive_absolute(output)
 	_write("pid.json",{"pid":OS.get_process_id()})
-	for legacy_path: String in ["user://saves/run.json","user://saves/run.enemy-v1.json","user://settings/audio.json"]:
-		if not resume:
-			assert(not FileAccess.file_exists(legacy_path),"fresh synthetic profile required")
-			DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(legacy_path).get_base_dir())
-			var sentinel: FileAccess = FileAccess.open(legacy_path,FileAccess.WRITE)
-			sentinel.store_string("M6 synthetic protected old file; must never be read as playable or migrated")
-			sentinel.close()
-		legacy_hashes[legacy_path] = FileAccess.get_sha256(legacy_path)
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--flow-stream="):
 			movie = StreamPeerTCP.new()
@@ -157,21 +146,15 @@ func _run() -> void:
 		caption.add_theme_constant_override("shadow_offset_y",2)
 		overlay.add_child(caption)
 	await _hold(10)
-	_check((app.playable_entry or _legacy_fixed) and app.enemy_mode and app.camp_prototype and app.safe_suspend,"no gameplay parameters activates existing complete mode")
 	var expected_path: String=PlayableEntry.progress_path()
-	if _legacy_fixed:
-		for argument: String in OS.get_cmdline_user_args():
-			if argument.begins_with("--bh-progress="):expected_path=argument.trim_prefix("--bh-progress=")
 	_check(app.progress_path==expected_path,"canonical stable independent profile")
 	await _mark("title")
 	if resume:
 		await _resume()
 	else:
 		await _journey()
-	for path: String in legacy_hashes:
-		_check(FileAccess.get_sha256(path)==legacy_hashes[path],"old entry file remains byte-identical: "+path)
 	if DisplayServer.get_name() != "headless": _check(OS.has_feature("windows") or not focus_observations.has(true),"background renderer; Windows must use isolated desktop launcher")
-	_write("report.json",{"checks":rows,"failures":failures,"stages":stages,"events":events,"training_effects":training_effects,"camp":app.camp_snapshot(),"pid":OS.get_process_id(),"path":app.progress_path,"legacy_hashes":legacy_hashes,"root_visible":root.visible,"root_focused":root.has_focus(),"native_focus_observations":focus_observations.size(),"video_frames":frames,"input":flow_input_description(),"physical_input":"NOT_TESTED","display_FPS":"NOT_MEASURED"})
+	_write("report.json",{"checks":rows,"failures":failures,"stages":stages,"events":events,"training_effects":training_effects,"camp":app.camp_snapshot(),"pid":OS.get_process_id(),"path":app.progress_path,"root_visible":root.visible,"root_focused":root.has_focus(),"native_focus_observations":focus_observations.size(),"video_frames":frames,"input":flow_input_description(),"physical_input":"NOT_TESTED","display_FPS":"NOT_MEASURED"})
 	if movie != null: movie.disconnect_from_host()
 	app.audio.shutdown()
 	# Allow the native audio mixer to release stopped one-shot playback references.
@@ -216,7 +199,6 @@ func _resume() -> void:
 	if app._hunger_confirmation.visible: await _tap(app._hunger_confirmation.get_ok_button())
 	_check(TransactionReceipt.same(app.camp_snapshot(),expected.camp),"new PID restores exact date/resources/crew/growth/training/weapon instances")
 	_check(int(expected.pid)!=OS.get_process_id(),"different process actually resumed")
-	_check(expected.legacy_hashes==legacy_hashes,"legacy sentinels unchanged across process restart")
 	_check(app.camp_scene.is_visible_in_tree(),"continue returns to playable camp")
 	await _mark("continued")
 
@@ -229,7 +211,7 @@ func _journey() -> void:
 	var original: Dictionary = app.camp_snapshot()
 	await _tap(app.camp_scene.hotspots[&"training"])
 	await _tap(app.training_panel.member_buttons[1])
-	if not _legacy_fixed: _check("PROJECT_TEMP" not in app.training_panel.detail.text and "PROJECT_TEMP" not in app.training_panel.preview_text.text,"player training preview omits internal prototype marker")
+	_check("PROJECT_TEMP" not in app.training_panel.detail.text and "PROJECT_TEMP" not in app.training_panel.preview_text.text,"player training preview omits internal prototype marker")
 	await _tap(app.training_panel.train_button)
 	await _mark("training-confirm")
 	await _tap(app.training_panel.confirmation.get_ok_button())
@@ -272,7 +254,7 @@ func _journey() -> void:
 		await _advance(world,func() -> bool: return world.phase==Expedition.Phase.FINISHED)
 		_check(app.phase==app.Phase.RESULT and world.boarding_status().arrived==world.living_count(),"all actual living actors gathered before frozen preview")
 		_check(TransactionReceipt.same(before,app.camp_snapshot()),"preview never banks rewards or advances date")
-		if not _legacy_fixed: _check(("带回：货币%d" % app._pending_settlement.last_day.cash_gained) in app.get_node("Interface/Screen/Result/Scroll/Body").text,"player reward text reads authoritative frozen camp ledger")
+		_check(("带回：货币%d" % app._pending_settlement.last_day.cash_gained) in app.get_node("Interface/Screen/Result/Scroll/Body").text,"player reward text reads authoritative frozen camp ledger")
 		await _mark("result-%d" % round_number)
 		if round_number==2:
 			app.progress_session.fault_hook = func(point: String) -> Error: return ERR_CANT_CREATE if point=="before_commit_receipt" else OK

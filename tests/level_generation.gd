@@ -23,11 +23,6 @@ func run() -> void:
 	var old_marker: Dictionary=base.duplicate(true)
 	old_marker.journey.build.worldgen={"version":1,"policy_id":"BH_WORLDGEN_V1"}
 	expect(not ExplorationActions.matches(old_marker,normal[0]),"complete base marker participates in warm match identity")
-	var finale: Dictionary=base.duplicate(true)
-	finale.journey.campaign.preparations=4
-	var final_offers: Array[Dictionary]=DailyActions.offers(finale)
-	expect(TransactionReceipt.same({"v":final_offers},{"v":PersonaActions.offers(finale)}),"new level marker retains the exact original finale generation contract")
-	expect(final_offers.size()==1 and DailyActions.problem(final_offers[0]).is_empty() and DailyActions.supply(final_offers[0]).layout!=null,"original finale descriptor and actual layout resource load under the new camp marker")
 	var seeds: Dictionary = {}
 	for index: int in range(40):
 		var label: String = "m15-level-%d" % index
@@ -137,16 +132,8 @@ func _industrial_yard() -> void:
 		expect(not yard.is_empty() and gear.worldgen.revision == 2 and gear.type == "airdrop", "industrial equipment has a distinct frozen revision " + label)
 		if yard.is_empty():
 			continue
-		expect(prior[1].worldgen.revision == 1 and not prior[1].layout.has("loading_yard")
-			and ExplorationActions.problem(prior[1]).is_empty() and DailyActions.matches(old, prior[1])
-			and not DailyActions.matches(old, gear), "old camp retains and authenticates its original offer " + label)
-		expect(TransactionReceipt.same(prior[0], offered[0]) and TransactionReceipt.same(prior[2], offered[2]),
-			"yard opt-in preserves supply and clue offers " + label)
-		var old_site: Dictionary = prior[1].sites.filter(func(site: Dictionary) -> bool: return site.id == "cash")[0]
 		var work_site: Dictionary = gear.sites.filter(func(site: Dictionary) -> bool: return site.id == "cash")[0]
-		expect(work_site.weapon and work_site.amount == old_site.amount and work_site.seconds == old_site.seconds
-			and TransactionReceipt.same(work_site.drop, old_site.drop)
-			and TaskActions.site_point(gear, work_site) == WorldLayout.point(yard.work_point), "same drop and work at one shared physical site " + label)
+		expect(work_site.weapon and TaskActions.site_point(gear, work_site) == WorldLayout.point(yard.work_point), "weapon work uses the shared physical yard site " + label)
 		var routing: Dictionary = ExplorationLayout._routing(gear.layout)
 		expect(IndustrialYard.certified(gear.layout, routing.nav) and WorldgenLayout.validate(gear.layout, false).is_empty()
 			and ExplorationActions.problem(gear).is_empty() and DailyActions.matches(current, gear), "both real passages and bus return certify after props " + label)

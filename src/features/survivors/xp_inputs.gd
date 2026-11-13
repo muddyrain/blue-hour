@@ -20,11 +20,11 @@ func has_capacity() -> bool:
 
 
 func can_record(world: Expedition, shooter: FieldActor, enemy: FieldActor) -> bool:
-	return world.growth_mode and not world.is_paused and world.phase!=Expedition.Phase.FINISHED and world.survivors.has(shooter) and world.enemies.has(enemy) and shooter.health>0 and shooter.visible and shooter.activity not in [FieldActor.Activity.DOWN,FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING] and enemy.is_enemy and has_capacity() and not _seen.has(enemy.actor_id) and world.growth_inputs._counts.get(shooter.member_id)==shooter.confirmed_kills
+	return not world.is_paused and world.phase!=Expedition.Phase.FINISHED and world.survivors.has(shooter) and world.enemies.has(enemy) and shooter.health>0 and shooter.visible and shooter.activity not in [FieldActor.Activity.DOWN,FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING] and enemy.is_enemy and has_capacity() and not _seen.has(enemy.actor_id) and world.growth_inputs._counts.get(shooter.member_id)==shooter.confirmed_kills
 
 
 func accept(world: Expedition, shooter: FieldActor, enemy: FieldActor, accepted: Dictionary) -> bool:
-	if not world.growth_mode or world.is_paused or world.phase == Expedition.Phase.FINISHED or not world.survivors.has(shooter) or not world.enemies.has(enemy):
+	if world.is_paused or world.phase == Expedition.Phase.FINISHED or not world.survivors.has(shooter) or not world.enemies.has(enemy):
 		return false
 	if shooter.health <= 0 or not shooter.visible or shooter.activity in [FieldActor.Activity.DOWN,FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING] or not enemy.is_enemy or enemy.health != 0 or enemy.activity != FieldActor.Activity.DOWN:
 		return false
@@ -38,12 +38,11 @@ func accept(world: Expedition, shooter: FieldActor, enemy: FieldActor, accepted:
 	receipt.member_id = shooter.member_id
 	events.append(receipt)
 	_seen[enemy.actor_id] = true
-	diagnostic = diagnostic or world.battle_drill or world.is_practice or world.threat_rehearsal or world.los_setup != null
 	return true
 
 
 func snapshot(world: Expedition) -> Dictionary:
-	return {"ruleset_id":GrowthRules.RULESET,"binding":binding.duplicate(true),"diagnostic":diagnostic or world.battle_drill or world.is_practice or world.threat_rehearsal or world.los_setup != null,
+	return {"ruleset_id":GrowthRules.RULESET,"binding":binding.duplicate(true),"diagnostic":diagnostic,
 		"spawn_count":world._spawn_count,"events":events.duplicate(true)}
 
 

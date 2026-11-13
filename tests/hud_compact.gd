@@ -69,7 +69,6 @@ func scenario(size: Vector2i, count: int) -> void:
 	# time ratio, Chinese help and resource formatting follow the production path.
 	var adapter: ExpeditionHud = ExpeditionHud.new()
 	adapter.ui_theme = theme
-	adapter.player_mode = true
 	adapter.pause_requested.connect(func() -> void: pause_requests += 1)
 	adapter.extraction_requested.connect(func() -> void: gather_requests += 1)
 	viewport.add_child(adapter)

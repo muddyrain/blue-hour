@@ -20,7 +20,7 @@ func run() -> void:
 	var app: Node = load("res://src/app/main.tscn").instantiate()
 	root.add_child(app)
 	await process_frame
-	app._new_game()
+	app._new_game("scavenge", {"version":CatalogProgress.VERSION, "unlock":""}, {"version":OpeningBuild.POLICY_VERSION, "eligible":[]})
 	app._select_mission(DailyActions.supply(DailyActions.offers(app.camp_snapshot())[0]))
 	app.expedition.set_physics_process(false)
 	app.expedition.set_process(false)

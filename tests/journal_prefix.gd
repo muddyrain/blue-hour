@@ -29,7 +29,7 @@ func _run() -> void:
 	var app: Node = load("res://src/app/main.tscn").instantiate()
 	root.add_child(app)
 	await process_frame
-	app._new_game()
+	app._new_game("scavenge", {"version":CatalogProgress.VERSION, "unlock":""}, {"version":OpeningBuild.POLICY_VERSION, "eligible":[]})
 	var transaction: RunTransaction = app.progress_session._transaction
 	if transaction == null:
 		expect(false, "ordinary isolated fixture registers a transaction")

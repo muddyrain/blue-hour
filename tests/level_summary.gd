@@ -17,7 +17,7 @@ func expect(condition: bool, label: String) -> void:
 
 
 func run() -> void:
-	var layout: Dictionary = ExplorationLayout.generate("level-summary-final-nav", "medium", "commercial")
+	var layout: Dictionary = WorldgenLayout._assemble("m15-explicit-fallback", "medium", "commercial", 0, true, "supply")
 	expect(not layout.is_empty(), "real layout fixture completes all prop collisions")
 	if layout.is_empty():
 		quit(1)

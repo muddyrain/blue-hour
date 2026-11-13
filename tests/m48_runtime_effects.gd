@@ -67,8 +67,6 @@ func _world(slots: Array = ["", ""], enhanced: Array = []) -> ClockWorld:
 	var world: ClockWorld = ClockWorld.new()
 	world.supply = MissionSupply.new()
 	world.supply.generated = {"version":8, "type":"equipment", "build":{"version":BuildItems.M48_CATALOG_POOL, "slots":slots.duplicate(), "enhanced":enhanced.duplicate()}, "sites":[{"id":"cash", "point":[400.0,400.0], "building":"directed-building"}]}
-	world.is_practice = true
-	world._practice_manual_waves = true
 	world._spawn_clock = 10000.0
 	world._ai_clock = 10000.0
 	world.navigation.configure([], Rect2(0,0,6000,2000))

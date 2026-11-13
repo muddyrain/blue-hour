@@ -5,12 +5,11 @@ extends RefCounted
 static func enabled(camp: Dictionary) -> bool:
 	return camp.get("journey") is Dictionary and camp.journey.get("build") is Dictionary and camp.journey.build.get("version")==6
 
-static func initial_build(seed: String, level: bool = false, industrial: bool = false) -> Dictionary:
+static func initial_build(seed: String, _level: bool = false, _industrial: bool = false) -> Dictionary:
 	var value: Dictionary=ExplorationState.initial_build(seed)
 	value.version=6
-	value.worldgen={"version":2,"policy_id":"BH_LEVEL_V1"} if level else {"version":1,"policy_id":"BH_WORLDGEN_V1"}
-	if level and industrial:
-		value.worldgen.industrial_yard = 1
+	value.worldgen={"version":2,"policy_id":"BH_LEVEL_V1"}
+	value.worldgen.industrial_yard = 1
 	return value
 
 static func level_enabled(camp: Dictionary) -> bool:
@@ -24,7 +23,6 @@ static func problem(camp: Dictionary) -> String:
 	var value: Variant = camp.journey.build.get("worldgen")
 	if value is Dictionary:
 		for supported: Dictionary in [
-			{"version":1,"policy_id":"BH_WORLDGEN_V1"},
 			{"version":2,"policy_id":"BH_LEVEL_V1"},
 			{"version":2,"policy_id":"BH_LEVEL_V1","industrial_yard":1},
 		]:

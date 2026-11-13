@@ -162,64 +162,19 @@ func _camp_fixture() -> Dictionary:
 	return EnemyState.snapshot(camp, journey, [], [])
 
 
-func _dispatch_projection() -> void:
+
+func _dispatch_current() -> void:
 	var base: Dictionary = _camp_fixture()
-	expect(TransactionReceipt.camp_problem(base).is_empty() and PersonaState.enabled(base), "original pure initializers produce a legal build-four fixture")
-	var decoded: Dictionary = RecordEncoding.unpack(JSON.parse_string(RecordEncoding.stringify(base))).payload
-	expect(PersonaState.enabled(decoded) and PowerState.enabled(decoded) and BuildState.problem(decoded).is_empty(), "exactly decoded numeric versions retain persona, power and strict build dispatch")
-	expect(TransactionReceipt.same({"v":DailyActions.offers(decoded)}, {"v":DailyActions.offers(base)}), "decoded build-four context produces the same complete frozen offers")
-	var old: Dictionary = base.duplicate(true)
-	old.journey.build.version = 3
-	old.journey.build.erase("persona")
-	expect(TransactionReceipt.camp_problem(old).is_empty() and not PersonaState.enabled(old), "explicit old build-three projection retains its original mode")
-	var current: Array[Dictionary] = PersonaActions.offers(base)
-	var prior: Array[Dictionary] = PowerActions.offers(old)
-	expect(current.size() == 3 and current.size() == prior.size(), "persona extension preserves original offer count")
-	var identity: String = base.profile_id + ":1"
-	expect(RescuePoolState.choice(base, identity) == RescuePoolState.choice(old, identity)
-		and RescuePoolState.available(base) == RescuePoolState.available(old), "five persona recipes grant no roster eligibility or rescue reroll")
-	expect(TransactionReceipt.same({"v":DailyActions.offers(base)}, {"v":current})
-		and TransactionReceipt.same({"v":DailyActions.offers(old)}, {"v":prior}), "daily dispatch separates current persona and old power modes")
-	for index: int in range(current.size()):
-		var offer: Dictionary = current[index]
-		expect(PowerState._source_problem(base, offer).is_empty(), "new mode authenticates its complete persona-bearing source %d" % index)
-		expect(not PowerState._source_problem(old, offer).is_empty(), "old mode never widens source authentication to a persona descriptor %d" % index)
-		expect(not PowerState._source_problem(base, prior[index]).is_empty(), "new mode cannot omit persona provenance from a source %d" % index)
-		expect(PowerState._source_problem(old, prior[index]).is_empty(), "old mode retains its original complete power-source validation %d" % index)
-		var bad_root: Dictionary = base.duplicate(true)
-		bad_root.journey.build.persona.seed = SEED_F
-		expect(not PowerState._source_problem(bad_root, offer).is_empty(), "persona-bearing source cannot bind to a different root seed fact %d" % index)
-		bad_root = base.duplicate(true)
-		bad_root.journey.build.persona.members[0].definition_id = "crew_2"
-		expect(not PowerState._source_problem(bad_root, offer).is_empty(), "persona-bearing source cannot bind to a changed root member identity %d" % index)
-		expect(TransactionReceipt.same(PersonaActions.legacy(offer), prior[index]), "full old task/map/drop/combat/power projection is unchanged for offer %d" % index)
-		expect(DailyActions.problem(offer).is_empty() and DailyActions.matches(base, offer)
-			and not DailyActions.matches(old, offer), "dispatch binds persona offers exclusively to the originating mode %d" % index)
-		var supply: MissionSupply = DailyActions.supply(offer)
-		var previous_supply: MissionSupply = PowerActions.supply(prior[index])
-		var rules: Dictionary = FrozenSettlement.pool_rules(base, supply)
-		var previous_rules: Dictionary = FrozenSettlement.pool_rules(old, previous_supply)
-		var projected: Dictionary = rules.duplicate(true)
-		projected.mission.generated = PersonaActions.legacy(projected.mission.generated)
-		expect(DailyActions.mission_problem(rules.mission).is_empty() and FrozenSettlement._rules_problem(rules).is_empty()
-			and TransactionReceipt.same(projected, previous_rules), "mission and full rule projection preserve reward and rescue inputs %d" % index)
-		var bad_offer: Dictionary = offer.duplicate(true)
-		bad_offer.persona.policy = []
-		expect(not PersonaActions.problem(bad_offer).is_empty(), "nondictionary frozen catalogue is rejected before typed equality")
-		bad_offer = offer.duplicate(true)
-		bad_offer.persona.facts.members[0].positive_id = "unknown_v1"
-		expect(not DailyActions.problem(bad_offer).is_empty(), "frozen recipe cannot substitute an unknown trait")
-	for mutation: String in ["missing", "extra", "unknown_build", "unknown_catalogue_version", "seed", "foreign_journey_seed", "container"]:
-		var bad: Dictionary = base.duplicate(true)
-		match mutation:
-			"missing": bad.journey.build.erase("persona")
-			"extra": bad.journey.build.unlocked_slots = 3
-			"unknown_build": bad.journey.build.version = 5
-			"unknown_catalogue_version": bad.journey.build.persona.version = 2
-			"seed": bad.journey.build.persona.seed = SEED_F
-			"foreign_journey_seed": bad.journey.seed = SEED_F
-			"container": bad.journey.build.persona = []
-		expect(not BuildState.problem(bad).is_empty(), "build-four rejects malformed fact, seed or version " + mutation)
+	base.journey.build = WorldgenState.initial_build(base.journey.seed, true, true)
+	var offers: Array[Dictionary] = DailyActions.offers(base)
+	expect(offers.size() == 3, "current journey exposes three persona-bearing exploration offers")
+	for offer: Dictionary in offers:
+		expect(DailyActions.problem(offer).is_empty() and DailyActions.matches(base, offer), "current persona source authenticates")
+		var decoded: Dictionary = RecordEncoding.unpack(JSON.parse_string(RecordEncoding.stringify(offer))).payload
+		expect(TransactionReceipt.same(decoded, offer) and DailyActions.matches(base, decoded), "exact current source transport retains persona provenance")
+		var changed: Dictionary = offer.duplicate(true)
+		changed.persona.facts.members[0].positive_id = "unknown_v1"
+		expect(not DailyActions.problem(changed).is_empty(), "current frozen recipe rejects an unknown trait")
 
 
 func run() -> void:
@@ -229,6 +184,6 @@ func run() -> void:
 	_generation()
 	_numeric_factors()
 	_negative_cases()
-	_dispatch_projection()
+	_dispatch_current()
 	print(JSON.stringify({"suite":"persona_rules", "checks":checks, "failures":failures, "policy_source":"PROJECT_TEMP", "scope":"PURE_CATALOGUE_AND_SEEDED_IDENTITY"}))
 	quit(0 if failures == 0 else 1)

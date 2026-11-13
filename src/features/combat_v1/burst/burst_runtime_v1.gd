@@ -101,7 +101,6 @@ func feedback(world: Expedition, kind: String) -> void:
 	var event: Dictionary = {"kind":kind, "actor_id":state.actor_id, "elapsed":world.elapsed,
 		"remaining":state.remaining, "event":state.event.duplicate(true)}
 	world.combat_feedback.emit(event)
-	print("BH_BURST " + JSON.stringify(event))
 
 
 func _target(world: Expedition, actor: FieldActor) -> FieldActor:

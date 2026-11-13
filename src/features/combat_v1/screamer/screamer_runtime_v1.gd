@@ -127,7 +127,6 @@ func _feedback(world: Expedition, kind: String) -> void:
 	var event: Dictionary = {"kind":kind, "actor_id":state.actor_id, "elapsed":world.elapsed,
 		"remaining":state.remaining, "event":state.event.duplicate(true)}
 	world.combat_feedback.emit(event)
-	print("BH_SCREAMER " + JSON.stringify(event))
 
 
 static func summon_ids(world: Dictionary) -> Array[int]:

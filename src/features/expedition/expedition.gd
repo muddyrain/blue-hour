@@ -24,6 +24,9 @@ enum Phase {
 
 const BusTexture: Texture2D = preload("res://assets/candidates/bus_02.png")
 
+var _feedback: ExpeditionFeedback
+var _ui: ExpeditionUi
+
 var tuning: ExpeditionTuning = ExpeditionTuning.new()
 var navigation: FieldNavigation = FieldNavigation.new()
 var shot_obstacles: Array[ShotObstacle] = []
@@ -155,6 +158,8 @@ var _active_site: SearchSite:
 
 
 func _ready() -> void:
+	_feedback = ExpeditionFeedback.new(self)
+	_ui = ExpeditionUi.new(self)
 	task_event = TaskActions.empty_event(supply.generated)
 	parallel_search = combat_mode()
 	_setup_crew.assign(crew_snapshot.duplicate(true) if not crew_snapshot.is_empty() else SurvivorRoster.new_crew())
@@ -206,14 +211,7 @@ func _ready() -> void:
 		ground.food_source_visible = supply.supports(&"food")
 		ground.z_index = -10
 		add_child(ground)
-	camera = FieldCamera.new()
-	camera.pan_speed = tuning.camera_pan_speed
-	camera.min_zoom = tuning.camera_min_zoom
-	camera.max_zoom = tuning.camera_max_zoom
-	camera.zoom_step = tuning.camera_zoom_step
-	camera.bounds = layout.world_bounds
-	add_child(camera)
-	camera.pan_by(_street_camera_start() - camera.position)
+	_feedback._make_camera()
 	_sort = Node2D.new()
 	_sort.name = "ActorsAndProps"
 	_sort.y_sort_enabled = true
@@ -339,7 +337,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if phase == Phase.FINISHED and bus_view != null and bus_view.running():
 		bus_view.advance(delta)
-		_refresh_night_lighting()
+		_feedback._refresh_night_lighting()
 
 
 func _physics_process(delta: float) -> void:
@@ -347,21 +345,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _draw() -> void:
-	if combat.burst != null:
-		combat.burst.draw_warning(self)
-	for job: Dictionary in search_assignments.ordered():
-		var actor: FieldActor = search_member(int(job.member_id))
-		if actor != null and actor.activity == FieldActor.Activity.MOVING:
-			draw_dashed_line(actor.position, search_site(StringName(job.site_id)).door, Color("e3c879"), 1.5, 8.0)
-	if phase == Phase.BOARDING:
-		draw_circle(layout.bus_door, tuning.boarding_radius, Color(0.9, 0.75, 0.3, 0.2))
-		draw_arc(layout.bus_door, tuning.boarding_radius, 0.0, TAU, 48, Color("e3c879"), 2.0)
-	if goal != Vector2.ZERO and phase != Phase.FINISHED:
-		draw_arc(goal, 13.0, 0.0, TAU, 24, Color("b3e8d9"), 2.0, true)
-		draw_line(goal - Vector2(6, 0), goal + Vector2(6, 0), Color("b3e8d9"), 2.0)
-		for actor: FieldActor in survivors:
-			if actor.activity == FieldActor.Activity.MOVING and not has_search_job(actor.member_id):
-				draw_dashed_line(actor.position, goal, Color(0.8, 0.95, 0.91, 0.4), 1.0, 8.0)
+	_feedback._draw()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -729,14 +713,7 @@ func member_site(member_id: int) -> SearchSite:
 
 
 func site_label(site: SearchSite) -> String:
-	if site == recon_site:
-		return "侦察点"
-	if site == billboard_site:
-		return "广告牌"
-	if _is_event_site(site):
-		return EventSortieV1.TITLE
-	return "工具回收点" if _tools_at(String(site.id)) > 0 \
-		else SearchWorkView.short_site(site.prop.title,sites.find(site)+1)
+	return _ui.site_label(site)
 
 
 func _toolbox_site() -> SearchSite:
@@ -1255,10 +1232,10 @@ func _fire_ranged(actor: FieldActor, target: FieldActor, decision: AttackRules.D
 		growth_input_recorded.emit(receipt)
 	actor.visual.show_fire(actor.aim)
 	var muzzle: Vector2 = actor.position + actor.visual.muzzle_offset(actor.aim)
-	_shot_effect(muzzle, target.position, weapon.damage)
+	_feedback._shot_effect(muzzle, target.position, weapon.damage)
 	if not extra.is_empty():
 		_shot_trace(decision.hit_to, impact, Color("a5dfce"))
-		_draw_hit_effect(secondary.position, float(extra.applied_damage), false, "穿透 ")
+		_feedback._draw_hit_effect(secondary.position, float(extra.applied_damage), false, "穿透 ")
 	if refunded > 0:
 		_combat_popup(actor.position + Vector2(12, -136), "击倒补弹 +%d" % refunded, Color("a5dfce"))
 	var feedback: Dictionary = {"kind": "shot", "actor": actor.actor_id,
@@ -1434,7 +1411,7 @@ func _complete_search(actor: FieldActor, site: SearchSite) -> bool:
 		_release_searcher(actor.member_id)
 		site.prop.searched = true
 		site.prop.queue_redraw()
-		_show_notice("应急补给站 · 已携带%s，归航后入库。" % _event_reward_text(carried))
+		_show_notice("应急补给站 · 已携带%s，归航后入库。" % _ui._event_reward_text(carried))
 		search_completed.emit(int(carried.cash) + int(carried.food))
 		return true
 	if site.kind == &"cash":
@@ -1493,8 +1470,7 @@ func _finish(evacuated: bool, boarding: Vector2i = Vector2i.ZERO) -> void:
 		bus_view.final_boarding = boarding
 	_hud.hide_screen()
 	_readouts.hide()
-	camera.set_process(false)
-	camera.set_process_unhandled_input(false)
+	_feedback._stop_camera()
 	var remaining_health: Array[float] = []
 	var member_records: Array[Dictionary] = []
 	var member_results: Array[Dictionary] = []
@@ -1530,296 +1506,28 @@ func _finish(evacuated: bool, boarding: Vector2i = Vector2i.ZERO) -> void:
 	FreezeProfile.finish()
 
 
-func _shot_effect(from: Vector2, to: Vector2, damage: float) -> void:
-	_shot_trace(from, to + Vector2.UP * AttackRules.HIT_HEIGHT, Color("f1d5a1"))
-	_hit_effect(to, damage, false)
-
-
 func _shot_trace(from: Vector2, to: Vector2, colour: Color) -> void:
-	var line: Line2D = Line2D.new()
-	line.points = PackedVector2Array([from, to])
-	line.width = 1.5
-	line.default_color = colour
-	_effects.add_child(line)
-	var tween: Tween = line.create_tween()
-	tween.tween_property(line, "modulate:a", 0.0, 0.09)
-	tween.tween_callback(line.queue_free)
+	_feedback._shot_trace(from, to, colour)
 
 
 func _hit_effect(to: Vector2, damage: float, survivor_hit: bool) -> void:
-	_draw_hit_effect(to, damage, survivor_hit, "")
-
-
-func _draw_hit_effect(to: Vector2, damage: float, survivor_hit: bool, prefix: String) -> void:
-	var impact: Node2D = Node2D.new()
-	impact.position = to + Vector2(0, -30)
-	_effects.add_child(impact)
-	for index: int in range(4):
-		var spark: Line2D = Line2D.new()
-		var direction: Vector2 = Vector2.RIGHT.rotated(float(index) * TAU / 4.0 + 0.4)
-		spark.points = PackedVector2Array([direction * 4.0, direction * 9.0])
-		spark.width = 2.0
-		spark.default_color = Color("f1ac80") if survivor_hit else Color("f5dda0")
-		impact.add_child(spark)
-	var fade: Tween = impact.create_tween()
-	fade.tween_property(impact, "modulate:a", 0.0, 0.18)
-	fade.tween_callback(impact.queue_free)
-	var amount_text: String = str(int(damage)) if is_equal_approx(damage,roundf(damage)) else "%.2f" % damage
-	var text: String = prefix + ("−" if survivor_hit else "") + amount_text
-	_combat_popup(to + Vector2(-38 if survivor_hit else 8, -108), text,
-		Color("f8b491") if survivor_hit else Color("f1dfbd"))
+	_feedback._hit_effect(to, damage, survivor_hit)
 
 
 func _combat_popup(at: Vector2, text: String, colour: Color) -> void:
-	var label: Label = Label.new()
-	label.text = text
-	label.add_theme_color_override("font_color", colour)
-	label.add_theme_color_override("font_outline_color", Color("142d36"))
-	label.add_theme_constant_override("outline_size", 3)
-	label.position = at
-	_effects.add_child(label)
-	var popup: Tween = label.create_tween()
-	popup.tween_property(label, "position:y", label.position.y - 18.0, 0.5)
-	popup.tween_callback(label.queue_free)
+	_feedback._combat_popup(at, text, colour)
 
 
 func _make_ui() -> void:
-	_hud = ExpeditionHud.new()
-	_hud.ui_theme = ui_theme
-	_hud.pause_requested.connect(toggle_pause)
-	_hud.extraction_requested.connect(request_bus_action)
-	_hud.help_changed.connect(func(expanded: bool) -> void: help_changed.emit(expanded))
-	add_child(_hud)
-	_hud.view.objective_locate_requested.connect(locate_objective)
-	if not EventSortieV1.site_id(supply.generated).is_empty():
-		event_sortie_panel = EventSortiePanel.new()
-		event_sortie_panel.generated = supply.generated
-		event_sortie_panel.choice_confirmed.connect(confirm_event_choice)
-		_hud.view.add_child(event_sortie_panel)
-	if layout.world_data.get("version")==5:
-		_hud.view.place_help_above_lane()
-	if battle_survival:
-		drill_panel = BattleDrillPanel.new()
-		drill_panel.expedition = self
-		drill_panel.theme = ui_theme
-		_hud.view.add_child(drill_panel)
-		drill_panel.visible = false
-	if build_mode():
-		support_panel=BasicSupportPanel.new()
-		support_panel.position=Vector2(16,160)
-		support_panel.heal_requested.connect(request_heal)
-		support_panel.airstrike_requested.connect(toggle_support_aim)
-		_hud.view.add_child(support_panel)
-		support_aim=BasicSupportAim.new()
-		_effects.add_child(support_aim)
-	if power_mode():
-		power_panel=PowerSlotPanel.new()
-		power_panel.position=Vector2(16,300)
-		power_panel.activation_requested.connect(request_power)
-		_hud.view.add_child(power_panel)
-		if SpecialPowers.progression_version(powers.get("version")) and powers.loadout.slots.size() >= 2:
-			second_power_panel = PowerSlotPanel.new()
-			second_power_panel.slot_index = 1
-			second_power_panel.position = Vector2(16, 378)
-			second_power_panel.activation_requested.connect(request_power.bind(1))
-			_hud.view.add_child(second_power_panel)
-		if SpecialPowers.progression_version(powers.get("version")) and powers.loadout.slots.size() >= 3:
-			third_power_panel = PowerSlotPanel.new()
-			third_power_panel.slot_index = 2
-			third_power_panel.position = Vector2(16, 456)
-			third_power_panel.activation_requested.connect(request_power.bind(2))
-			_hud.view.add_child(third_power_panel)
-		power_view=PowerEffectView.new()
-		_effects.add_child(power_view)
-	if BuildItems.specialty_pool(int(supply.generated.get("build", {}).get("version", 0))):
-		var names: PackedStringArray = []
-		for id: String in supply.generated.build.slots:
-			if id in [BuildItems.AID_KIT, BuildItems.STRIDE_HARNESS, BuildItems.GUIDED_MAG]:
-				var item: Dictionary = SpecialtyPresentation.definition(id)
-				var enhanced: bool = id in supply.generated.build.get("enhanced", [])
-				names.append("%s\n%s" % [item.name, BuildItems.effect_text(id, enhanced, int(supply.generated.build.version))])
-		if not names.is_empty():
-			var kit: PanelContainer = PanelContainer.new()
-			kit.position = Vector2(16, 540 if third_power_panel != null else 460)
-			kit.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			kit.add_theme_stylebox_override("panel", CampStyle.box(Color(0.045, 0.10, 0.14, 0.90), Color("48646d"), 8))
-			var label: Label = CampStyle.label("\n".join(names), 13, CampStyle.TEAL)
-			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			if get_viewport_rect().size.y - kit.position.y < 80.0:
-				label.text = "专精道具 · %d 件" % names.size()
-				label.tooltip_text = "\n".join(names)
-				label.mouse_filter = Control.MOUSE_FILTER_STOP
-				label.focus_mode = Control.FOCUS_ALL
-				label.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-				var detail: PanelContainer = PanelContainer.new()
-				detail.name = "SpecialtyDetails"
-				detail.position = Vector2(16, kit.position.y - 150)
-				detail.add_theme_stylebox_override("panel", CampStyle.box(Color("10252f"), Color("48646d"), 8))
-				detail.add_child(CampStyle.label("\n".join(names), 13, CampStyle.TEAL))
-				detail.hide()
-				_hud.view.add_child(detail)
-				label.gui_input.connect(func(event: InputEvent) -> void:
-					if (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed) \
-							or (event is InputEventKey and event.pressed and event.keycode in [KEY_ENTER, KEY_SPACE]):
-						detail.visible = not detail.visible
-						label.grab_focus()
-						label.accept_event())
-			kit.add_child(label)
-			_hud.view.add_child(kit)
-	_update_ui()
+	_ui._make_ui()
 
 
 func _show_notice(message: String) -> void:
-	_notice_text = message
-	_notice_clock = 7.0
-
-
-func _refresh_night_lighting() -> void:
-	if _night_lighting == null:
-		return
-	var daylight: float = tuning.daylight_seconds
-	var dusk: float = daylight * threat.rules.late_fraction
-	var deep_night: float = daylight * threat.rules.deep_fraction
-	var night_grade: float = 0.78
-	var amount: float = night_grade * smoothstep(dusk, daylight, elapsed)
-	if elapsed >= daylight:
-		amount = lerpf(night_grade, 1.0, smoothstep(daylight, deep_night, elapsed))
-	_night_lighting.refresh(amount, _bus_sprite.get_global_transform_with_canvas().origin, camera.zoom.x)
+	_feedback._show_notice(message)
 
 
 func _update_ui() -> void:
-	_refresh_night_lighting()
-	_present_support()
-	_present_power()
-	if _hud == null:
-		return
-	if billboard_site != null:
-		var worker: FieldActor = search_member(search_assignments.member_for(String(billboard_site.id)))
-		var work_phase: String = search_assignments.phase_for(worker.member_id) if worker != null else ""
-		_billboard_view.present(billboard_site.progress, work_phase,
-			SearchWorkView.short_call_sign(worker.call_sign) if worker != null else "")
-	if event_sortie_panel != null and event_sortie_panel.visible:
-		var site: SearchSite = search_site(StringName(EventSortieV1.site_id(supply.generated)))
-		if phase == Phase.FINISHED or task_event.branch != "" or _near_event_worker(site) == null:
-			event_sortie_panel.hide()
-	if _readouts != null:
-		if phase == Phase.FINISHED:
-			_readouts.hide()
-		else:
-			_update_member_display()
-			_readouts.update_members(survivors, get_global_transform_with_canvas(), get_viewport_rect().size)
-	var timing: Dictionary = time_status()
-	var boarding: Dictionary = boarding_status(phase == Phase.BOARDING)
-	var engine_text: String = "发动引擎 →"
-	if phase == Phase.ENGINE:
-		engine_text = "发动引擎 %d" % timing["engine_seconds"]
-	elif phase == Phase.BOARDING:
-		engine_text = "等待幸存者"
-	elif elapsed < tuning.bus_ready_seconds:
-		engine_text = "巴士准备 %d 秒" % timing["bus_seconds"]
-	var members: Array[Dictionary] = []
-	var activities: Array[String] = ["警戒", "移动", "搜集中", "倒地", "回收中"]
-	for actor: FieldActor in survivors:
-		var assigned_site: SearchSite = member_site(actor.member_id)
-		var status: String = activities[actor.activity]
-		if assigned_site != null:
-			var work_phase: String = search_assignments.phase_for(actor.member_id)
-			if assigned_site == billboard_site:
-				status = "调查·广告牌" if work_phase == "working" else "前往·广告牌"
-			else:
-				status = SearchWorkView.actor_status(work_phase,site_label(assigned_site),TaskActions.outdoor_site(supply.generated,assigned_site.id))
-		members.append({"id":actor.member_id,"label":"%s · %s" % [actor.call_sign, "阵亡" if actor.permanent_death else status],
-			"call_sign":actor.call_sign,"status":_weapon_status(actor,status),"ammo":_ammo_text(actor),"detail":("%s · %s"%[status,site_label(assigned_site) if assigned_site.prop == null else assigned_site.prop.title] if assigned_site!=null else status),
-			"colour":SurvivorRoster.definition_by_id(String(actor.definition_id)).colour,
-			"hp":actor.health,"max_hp":actor.max_health})
-	for member: Dictionary in members:
-		member.level = SurvivorRoster.member(_setup_crew,int(member.id)).growth.level
-	if persona_mode():
-		for member: Dictionary in members:
-			member.persona=PersonaViewModel.field(self,search_member(int(member.id)),String(member.status))
-	var pending: PackedStringArray = []
-	for actor: FieldActor in survivors:
-		pending.append("%02d +%d" % [actor.member_id,0 if actor.health <= 0 else xp_inputs.pending(actor.member_id)])
-	var xp_text: String = "本次经验（归航后生效）："+" / ".join(pending)
-	if not weapon_loot.is_empty():xp_text+="\n携带："+WeaponInventory.loot_description(weapon_loot[0])
-	var objective: String = TaskActions.hud(self)
-	if pump_station_mode():
-		if not station_stopped():
-			var worker: int = search_assignments.member_for(String(PumpStationAction.CONSOLE))
-			objective = "前往控制柜 · 点击派工停机"
-			if worker > 0:
-				objective = "正在停机 · 再点控制柜可取消" if search_assignments.phase_for(worker) == "working" else "操作员正前往控制柜"
-		elif encounter.defeat.is_empty():
-			objective = "破阵者蓄力 · 横移避开冲锋道" if not encounter.pump.state.lane.is_empty() else "停机完成 · 击败破阵者"
-		else:
-			objective = "破阵者已倒地 · 集合回车"
-		if phase in [Phase.ENGINE, Phase.BOARDING] and encounter.defeat.is_empty():
-			objective = "提前撤离 · 未达成胜利，可回营再战"
-	elif encounter != null and not encounter.defeat.is_empty() and CampFacilities.enabled(field_departure):
-		objective = "破阵者已倒地 · 集合回车"
-	var toolbox: SearchSite = _toolbox_site()
-	_hud.refresh({
-		"toolbox":_carried_tools() if supply.generated.has("economy_source") else int(toolbox.searched) if toolbox != null else -1,
-		"exploration_objectives":_exploration_objective_rows() if exploration_mode() else [],
-		"objective":objective,
-		"mission_title":mission_title, "members":members,
-		"can_extract":phase == Phase.ACTIVE and elapsed >= tuning.bus_ready_seconds,
-		"boarding":boarding,
-		"engine_running":phase == Phase.ENGINE,
-		"can_gather":phase == Phase.BOARDING and boarding.required > 0,
-		"day": day, "seconds": timing["sortie_seconds"], "time_fraction": timing["sortie_fraction"],
-		"paused": is_paused, "cash": initial_cash, "loot": loot,
-		"food":initial_food,"food_loot":food_loot,"sites_searched":_searched_count(),
-		"sites_total":1 if pump_station_mode() else sites.filter(func(site: SearchSite) -> bool: return supply.supports(site.kind)).size(),
-		"has_food_source":supply.supports(&"food"),
-		"route_hint":"可定位侦察点。走近站点后可搜集，侦察完成可提前标记两处。" if recon_site != null else layout.route_hint,
-		"weapon_loot":weapon_loot.size(),
-		"searched": searched, "kills": kills, "engine": engine_text,
-		"notice": _notice_text, "notice_visible": _notice_clock > 0.0,
-		"threat":threat_status(),
-		"burst_warning":combat.burst.warning_text() if combat.burst != null and phase != Phase.FINISHED else "",
-	})
-	if drill_panel != null:
-		drill_panel.refresh()
-	if station_art != null:
-		station_art.set_stopped(station_stopped())
-	for site: SearchSite in sites:
-		if recon_knowledge != null:
-			var known: bool = site_discovered(site)
-			if site.prop.searchable != known or (site.prop is AirdropProp and site.prop.visible != known):
-				site.prop.searchable = known
-				site.prop.primary_target = known and supply.generated.objective.site_ids.has(String(site.id))
-				if site.prop is AirdropProp:
-					site.prop.visible = known
-				site.prop.queue_redraw()
-		var worker: FieldActor = search_member(search_assignments.member_for(String(site.id)))
-		if site.prop is ExplorationProp:
-			var faded: bool=survivors.any(func(actor: FieldActor) -> bool: return actor.visible and actor.health>0 and actor.position.y<site.prop.position.y and actor.position.distance_to(site.prop.position)<105.0)
-			(site.prop as ExplorationProp).present({"searched":site.searched,"progress":site.progress},worker.member_id if worker!=null else 0,worker.call_sign if worker!=null else "",faded)
-		site.prop.searched = site.searched
-		var work_phase: String = search_assignments.phase_for(worker.member_id) if worker != null else ""
-		var fraction: float = site.progress / _site_seconds(site)
-		if not site.prop.loot_category.is_empty():
-			site.prop.present_loot(worker.member_id if worker != null else 0, worker.call_sign if worker != null else "", work_phase, fraction)
-		else:
-			var text: String = SearchWorkView.building_text(worker.member_id, worker.call_sign, work_phase, TaskActions.outdoor_site(supply.generated,site.id)) if worker != null else ""
-			site.prop.update_work(worker.actor_id if worker != null else -1,
-				fraction, worker != null and work_state_matches(worker,site), worker.call_sign if worker != null else "", text)
-
-
-func _update_member_display() -> void:
-	var both_visible: bool = survivors.size() == 2 and survivors[0].visible and survivors[1].visible and living_count() == 2
-	var separation: float = survivors[0].position.distance_to(survivors[1].position) if survivors.size() == 2 else 0.0
-	var shift: float = clampf(1.0 - separation / 56.0, 0.0, 1.0) * 12.0 if both_visible else 0.0
-	for index: int in range(survivors.size()):
-		survivors[index].visual.position.x = shift * (-1.0 if index == 0 else 1.0)
-
-	for building: FieldProp in _buildings:
-		var hidden_friend: bool = false
-		for actor: FieldActor in survivors:
-			if actor.visible and building.obscures(actor.position):
-				hidden_friend = true
-		building.show_behind_roof(hidden_friend)
+	_ui._update_ui()
 
 
 func _make_building(block: Rect2, title: String, texture: Texture2D, market: bool, residence: bool) -> FieldProp:
@@ -1876,24 +1584,6 @@ func _street_supply_entrances() -> Array[Vector2]:
 				break
 	return doors if doors.size() == 2 and doors[0].is_finite() and doors[1].is_finite() else []
 
-
-func _street_camera_start() -> Vector2:
-	if ReconActionV1.enabled(supply.generated):
-		return layout.bus_door
-	var view_size: Vector2 = get_viewport_rect().size / camera.zoom
-	var yard: Dictionary = layout.world_data.get("loading_yard", layout.world_data.get("rescue_court", {}))
-	if not yard.is_empty():
-		var scene: Rect2 = WorldLayout.rect(yard.bounds).expand(layout.bus_door + Vector2(0, 42))
-		if scene.size.x <= view_size.x - 144 and scene.size.y <= view_size.y - 160:
-			return scene.get_center() - Vector2(0, 32)
-	if _supply_entrances.is_empty():
-		return layout.camera_start
-	var focus: Rect2 = Rect2(layout.bus_door, Vector2.ZERO).expand(_supply_entrances[0])
-	var both: Rect2 = focus.expand(_supply_entrances[1])
-	if both.size.x <= view_size.x - 192 and both.size.y <= view_size.y - 192:
-		focus = both
-	var roof_room: float = clampf((view_size.y - focus.size.y) * 0.5 - 96, 0, 72)
-	return focus.get_center() - Vector2(0, roof_room)
 
 func _searched_count() -> int:
 	return sites.filter(func(site: SearchSite) -> bool: return site.searched).size()
@@ -2119,20 +1809,8 @@ func _site_weapon(site: SearchSite) -> Dictionary:
 
 
 func _ammo_text(actor: FieldActor) -> String:
-	if CombatEquipment.melee(String(actor.weapon_definition.id)): return actor.weapon_definition.display_name + " · 近战"
-	if actor.magazine==null:return "%s · 旧规则"%actor.weapon_definition.display_name if actor.weapon_definition!=null else ""
-	# Keep the task destination readable; reload feedback uses the ammunition line.
-	if has_search_job(actor.member_id) and actor.magazine.reloading:
-		return "换弹暂停" if actor.activity in [FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING] else "换弹 %.1fs"%actor.magazine.remaining
-	return "%s %d/%d · ∞"%[actor.weapon_definition.display_name,actor.magazine.rounds,actor.magazine.capacity()]
+	return _ui._ammo_text(actor)
 
-
-func _weapon_status(actor: FieldActor, action: String) -> String:
-	if actor.activity==FieldActor.Activity.DOWN:return "阵亡" if actor.permanent_death else "倒地"
-	if has_search_job(actor.member_id): return action
-	if actor.magazine!=null and actor.magazine.reloading:
-		return "%s · 换弹暂停"%action if actor.activity in [FieldActor.Activity.SEARCHING,FieldActor.Activity.RECOVERING] else "%s · 换弹%.1fs"%[action,actor.magazine.remaining]
-	return action
 
 func combat_mode() -> bool:
 	return (supply.generated.get("version")==8 or supply.generated.get("version")==9)
@@ -2221,14 +1899,8 @@ func request_heal() -> bool:
 	return _accept_support(before,basic_support.request("heal",plan))
 
 func first_aid_status() -> String:
-	if not FirstAidV1.enabled(supply.generated):
-		return ""
-	if not basic_support.ready(FirstAidV1.KIND):
-		return "已用"
-	var medic: FieldActor = search_member(FirstAidV1.SOURCE_ID)
-	var present: bool = medic != null and FirstAidV1.available({"health":medic.health,
-		"visible":medic.visible, "activity":medic.activity})
-	return "可用" if present else "暂不可用"
+	return _ui.first_aid_status()
+
 
 func request_first_aid() -> bool:
 	if not FirstAidV1.enabled(supply.generated) or not support_available() \
@@ -2356,29 +2028,8 @@ func _support_input(event: InputEvent) -> bool:
 	return false
 
 func _present_support() -> void:
-	if not build_mode() or support_panel==null: return
-	if not support_available(): support_aiming=false
-	var state: Dictionary=basic_support.snapshot()
-	var members: Array[Dictionary]=[]
-	for actor: FieldActor in survivors: members.append({"member_id":actor.member_id,"health":actor.health,"max_health":actor.max_health,"present":actor.activity!=FieldActor.Activity.DOWN})
-	var plan: Dictionary=basic_support.plan_heal(members,BuildItems.frozen_factors(supply.generated.build).heal)
-	var heal_text: String="Q 治疗 · %.1fs"%state.cooldowns.heal if state.cooldowns.heal>0 else "Q 治疗 · 队员%d +%.0fHP"%[plan.member_id,plan.amount] if not plan.is_empty() else "Q 治疗 · 无受伤存活者"
-	var strike_text: String="E 空袭 · %.1fs"%state.cooldowns.airstrike if state.cooldowns.airstrike>0 else "左键确认 · 右键/Esc取消" if support_aiming else "E 空袭 · 就绪"
-	if not support_available(): heal_text="治疗 · 当前阶段不可用"; strike_text="空袭 · 当前阶段不可用"
-	var point: Vector2=get_global_mouse_position()
-	var aim_plan: Dictionary = support_plan_airstrike(point) if support_aiming else {}
-	var legal: bool = not aim_plan.is_empty()
-	if _barricade_view != null:
-		_barricade_view.present(barricade_open, support_aiming and not barricade_open)
-		if not barricade_open and legal and BarricadeState.hits(supply.generated, aim_plan, layout):
-			strike_text = "可炸开路障 · 左键确认"
-	support_panel.present(heal_text,strike_text,support_available() and state.cooldowns.heal==0 and not plan.is_empty(),support_available() and state.cooldowns.airstrike==0)
-	if support_aiming:
-		var caller: FieldActor=null
-		for actor: FieldActor in survivors:
-			if actor.health>0 and actor.visible and actor.activity not in [2,3,4] and (caller==null or actor.position.distance_to(point)<caller.position.distance_to(point) or (actor.position.distance_to(point)==caller.position.distance_to(point) and actor.member_id<caller.member_id)): caller=actor
-		if caller!=null: support_aim.present_caller(caller.position)
-	support_aim.present(point,BasicSupport.POLICY.airstrike_radius*BuildItems.frozen_factors(supply.generated.build).blast,legal,support_aiming)
+	_feedback._present_support()
+
 
 func support_plan_airstrike(point: Vector2) -> Dictionary:
 	var view: Dictionary={"version":10,"generated":supply.generated,"survivors":[],"enemies":[]}
@@ -2450,97 +2101,15 @@ func _accept_power(before: Dictionary, request: Dictionary) -> bool:
 	return true
 
 func _present_power() -> void:
-	if not power_mode() or power_panel==null: return
-	_present_power_slot(power_panel, 0)
-	if second_power_panel != null:
-		_present_power_slot(second_power_panel, 1)
-	if third_power_panel != null:
-		_present_power_slot(third_power_panel, 2)
-	var members: Array[Dictionary]=[]
-	var foes: Array[Dictionary]=[]
-	for actor: FieldActor in survivors: members.append({"position":actor.position,"moving":actor.activity==FieldActor.Activity.MOVING,"alive":actor.health>0 and actor.visible})
-	for actor: FieldActor in enemies: foes.append({"position":actor.position,"moving":actor.activity==FieldActor.Activity.MOVING,"alive":actor.health>0 and actor.visible})
-	power_view.present(members,foes,SpecialPowers.ability_remaining(powers,SpecialPowers.SPEED,elapsed)>0,power_frozen,elapsed)
+	_feedback._present_power()
+
 
 func _present_power_slot(panel: PowerSlotPanel, slot: int) -> void:
-	var id: String = SpecialPowers.equipped_at(powers, slot)
-	var loadout: Variant = powers.get("loadout")
-	var remaining: float = SpecialPowers.remaining(powers, elapsed, slot)
-	var used: bool = not basic_support.ready(id) if id == SpecialPowers.RADIO else not SpecialPowers.event_at(powers, slot).is_empty()
-	var status: String = "营地装配" if id.is_empty() else "持续 %.1f 秒" % remaining if remaining > 0.0 else "已用" if used else "就绪"
-	panel.present("特殊能力空槽" if id.is_empty() else SpecialPowers.definition(id).name,
-		status, remaining, (SpecialPowers.effect_duration(loadout, id) if loadout is Dictionary else SpecialPowers.duration(id, false)) if not id.is_empty() else 0.0,
-		support_available() and not id.is_empty() and not used, id,
-		SpecialPowers.radio_amount(loadout) if loadout is Dictionary else 24.0)
+	_feedback._present_power_slot(panel, slot)
 
 
 func _exploration_objective_rows() -> Array[Dictionary]:
-	var generated: Dictionary = supply.generated
-	var rescue_revealed: bool = rescue_target != null and rescue_target.revealed()
-	var rows: Array[Dictionary] = ExplorationSites.objective_rows(
-		{"type":generated.type,"objective":generated.objective,"optional_objectives":generated.exploration.optional_objectives},
-		WorldSites.facts(self),rescue_revealed and rescue_target.npc.health > 0.0,
-		rescue_target.candidate_name() if rescue_revealed else "")
-	var investigation: Dictionary = generated.get("investigation", {})
-	if pump_station_mode():
-		var stopped: bool = station_stopped()
-		rows[0].title = "停机完成 · 击败破阵者" if stopped else "控制柜 · 派工停机"
-		rows[0].complete = stopped and encounter != null and not encounter.defeat.is_empty()
-		if rows[0].complete:
-			rows[0].title = "破阵者已倒地 · 集合回车"
-		rows[0].done = int(rows[0].complete)
-		rows[0].hint = "右装卸道较近，左检修道有实墙。冲锋锁线后横移。"
-	elif event_sortie_panel != null:
-		var site: SearchSite = search_site(StringName(EventSortieV1.site_id(generated)))
-		var branch: String = task_event.branch
-		if branch.is_empty():
-			rows[0].hint = "左键前往站点，抵达后选取方案。"
-		else:
-			var title: String = EventSortieV1.QUIET_TITLE if branch == EventSortieV1.QUIET else "强开 · 警报" if task_event.started else EventSortieV1.FORCE_TITLE
-			rows[0].title = "%s %.1f/%.0f秒" % [title, site.progress, site.seconds]
-			if site.searched:
-				rows[0].title = "已携带 %s · %s" % [_event_reward_text(EventSortieV1.reward(generated, branch)), "强开警报" if task_event.started else "待归航"]
-			rows[0].hint = "无事件增援" if branch == EventSortieV1.QUIET else "警报已触发" if task_event.started else "选择已锁定 · 待开工"
-	elif not investigation.is_empty():
-		rows[0].title = "%s · %s" % ["已携带" if rows[0].complete else "调查", CampaignRules.CLUE_NAMES[investigation.clue_id]]
-		rows[0].hint = "搜索标记建筑取得线索，生还撤离并确认归航后登记。"
-	elif generated.has("rare_policy"):
-		if generated.type == "supply":
-			rows[0].title = "近处配货间 · %d 粮" % RareSortie.NEAR_FOOD
-			rows[0].hint = "取粮后可直接归航。"
-			rows[1].title = "后装卸区 · %d 粮" % RareSortie.DEEP_FOOD
-			rows[1].hint = "深入作业会压缩天黑前回车时间。"
-		else:
-			rows[0].title = "露天武器箱 · 武器 1 件"
-			rows[0].hint = "增援已触发，可集合归航。" if task_event.started else "首次开工引来增援。"
-			rows[1].title = "器材库 · %d 币" % RareSortie.EQUIPMENT_CASH
-			rows[1].hint = "可选，带回用于维修或建设。"
-	elif generated.get("mission_policy") == 1 and generated.type == "airdrop":
-		rows[0].title = "装备 · 露天回收"
-		if generated.has("gear_build_policy") and not generated.build.drops.is_empty():
-			rows[0].title += " · 道具 %d 件" % generated.build.drops.size()
-		rows[0].hint = "一次性增援已触发。" if task_event.started else "首次开工触发一次增援，工作中可受击。"
-	var toolbox: SearchSite = _toolbox_site()
-	if generated.has("economy_source"):
-		for source: Dictionary in EconomyActions.tool_sources(generated):
-			var tool_site: SearchSite = search_site(StringName(source.site_id))
-			rows.insert(1, {"id":"tools:" + String(source.site_id), "title":"工具 ×%d" % int(source.count),
-				"optional":source.site_id not in generated.objective.site_ids, "done":int(tool_site.searched),
-				"total":1,"complete":tool_site.searched,"site_ids":[source.site_id],
-				"hint":"完成此点即可携带，归航确认后入库。"})
-	elif toolbox != null:
-		rows.insert(1, {"id":"toolbox", "title":"工具箱 ×1", "optional":true, "done":int(toolbox.searched),
-			"total":1, "complete":toolbox.searched, "site_ids":[String(toolbox.id)],
-			"hint":"完成此点原搜集即可携带，归航确认后入库。"})
-	if recon_site != null:
-		_present_recon_objectives(rows)
-	if billboard_site != null:
-		rows.insert(1, {"id":BillboardActionV1.SITE_ID,
-			"title":"超市广告牌 · 已调查" if billboard_site.searched else "超市广告牌 · %.1f/4 秒" % billboard_site.progress,
-			"optional":true, "complete":billboard_site.searched, "done":int(billboard_site.searched), "total":1,
-			"site_ids":[BillboardActionV1.SITE_ID],
-			"hint":BillboardFieldView.DONE if billboard_site.searched else BillboardFieldView.HINT.replace("\n", " · ")})
-	return rows
+	return _ui._exploration_objective_rows()
 
 
 func _tools_at(site_id: String) -> int:
@@ -2584,8 +2153,7 @@ func _update_recon_knowledge() -> void:
 
 
 func refresh_recon_view() -> void:
-	if _recon_view != null:
-		_recon_view.queue_redraw()
+	_feedback.refresh_recon_view()
 
 
 func recon_region() -> Rect2:
@@ -2596,86 +2164,5 @@ func recon_region() -> Rect2:
 	return Rect2(start, size).intersection(layout.world_bounds)
 
 
-func _present_recon_objectives(rows: Array[Dictionary]) -> void:
-	var marker: Dictionary = supply.generated.recon
-	var primary: SearchSite = search_site(StringName(marker.primary_id))
-	if not site_discovered(primary):
-		rows[0].title = "装备区域 · 位置待发现"
-		rows[0].hint = "定位到大致区域。走近后发现主点，也可先派工侦察。"
-	var optional: SearchSite = search_site(StringName(marker.optional_id))
-	for index: int in range(rows.size() - 1, 0, -1):
-		var row: Dictionary = rows[index]
-		row.site_ids = row.site_ids.filter(func(id: String) -> bool: return site_discovered(search_site(StringName(id))))
-		if row.site_ids.is_empty() or (row.id == "toolbox" and optional == _toolbox_site()):
-			rows.remove_at(index)
-	rows.insert(1, {"id":"recon", "title":"侦察 · 已标记 2 处" if recon_site.searched else "侦察点 %.1f/6 秒" % recon_site.progress,
-		"optional":true, "complete":recon_site.searched, "done":int(recon_site.searched), "total":1, "site_ids":[ReconActionV1.SITE_ID],
-		"hint":"到点后派一人侦察。只提供目标信息，可随时取消。"})
-	if site_discovered(optional):
-		var title: String = "可搜建筑 · 工具箱" if optional == _toolbox_site() else "已发现 · 可搜建筑"
-		rows.insert(2, {"id":"recon_optional", "title":title, "optional":true, "complete":optional.searched,
-			"done":int(optional.searched), "total":1, "site_ids":[marker.optional_id], "hint":"按原条件搜集此建筑。"})
-
-
-func _event_reward_text(reward: Dictionary) -> String:
-	return "%d 粮" % reward.food if reward.food > 0 else "%d 币" % reward.cash
-
-
 func locate_objective(id: String) -> void:
-	if not exploration_mode(): return
-	if id == "primary" and recon_site != null and not site_discovered(search_site(&"cash")):
-		camera.position = recon_region().get_center()
-		camera._clamp_position()
-		camera.force_update_scroll()
-		if _locate_marker != null:
-			_locate_marker.hide()
-		return
-	var rows: Array[Dictionary] = _exploration_objective_rows()
-	var target: Vector2=Vector2.INF
-	var target_prop: FieldProp
-	for row: Dictionary in rows:
-		if row.id!=id: continue
-		var pending: Array[String]=[]
-		for site_id: String in row.site_ids:
-			var site: SearchSite=search_site(StringName(site_id))
-			if site!=null and not site.searched: pending.append(site_id)
-		if pending.is_empty(): pending.assign(row.site_ids)
-		if pending.is_empty():
-			target=layout.rescue_point
-		else:
-			var index: int=int(_objective_cursors.get(id,0))%pending.size()
-			var site: SearchSite = search_site(StringName(pending[index]))
-			target = site.door
-			target_prop = site.prop
-			_objective_cursors[id]=index+1
-		break
-	if not target.is_finite(): return
-	camera.position=target
-	camera._clamp_position()
-	camera.force_update_scroll()
-	if _locate_marker==null:
-		_locate_marker=Node2D.new()
-		_effects.add_child(_locate_marker)
-		_locate_ring = Line2D.new()
-		_locate_ring.width=3.0; _locate_ring.default_color=Color("f2c47c")
-		for i: int in range(33):_locate_ring.add_point(Vector2.from_angle(TAU*i/32.0)*34.0)
-		_locate_marker.add_child(_locate_ring)
-		_locate_label = Label.new()
-		_locate_label.text="目标位置"; _locate_label.position=Vector2(-30,-60); _locate_label.mouse_filter=Control.MOUSE_FILTER_IGNORE
-		_locate_label.add_theme_font_size_override("font_size",16)
-		_locate_label.add_theme_color_override("font_color",Color("ffe5a7"))
-		_locate_marker.add_child(_locate_label)
-	var has_badge: bool = target_prop != null and not target_prop.loot_category.is_empty()
-	var recon_pin: bool = recon_site != null and id in ["primary", "recon_optional", "recon"]
-	_locate_label.visible = not has_badge and not recon_pin and id != BillboardActionV1.SITE_ID
-	# Shrink the pulse around the clickable entrance to clear the building badge.
-	var ring_scale: float = 0.5 if has_badge and not target_prop is ExplorationProp else 1.0
-	_locate_ring.scale = Vector2.ONE * ring_scale
-	_locate_ring.width = 3.0 / ring_scale
-	if _locate_tween!=null: _locate_tween.kill()
-	_locate_marker.position=target
-	_locate_marker.show()
-	_locate_marker.modulate.a=1.0
-	_locate_tween=create_tween()
-	_locate_tween.tween_interval(0.6)
-	_locate_tween.tween_property(_locate_marker,"modulate:a",0.0,1.3)
+	_feedback.locate_objective(id)

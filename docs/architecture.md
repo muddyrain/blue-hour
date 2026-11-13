@@ -8,7 +8,9 @@
 - `src/app/playable_entry.gd`：固定存档目录 `user://playable-v1/`（`run.enemy-v1.json` 与 `audio.json`）。命令行只接受 `--bh-progress=` / `--bh-audio-settings=` 覆盖路径（测试用）。
 - 一局循环：营地（`camp`/`camp_scene`/`loadout`/`survivors`）→ `MissionSelect` 选当日行动 → `Expedition`（`src/features/expedition/expedition.gd`）运行街区：派工搜刮、战斗、救援、夜间压力 → 巴士集合撤离 → `FrozenSettlement` 计算结算 → `RunTransaction` 写入存档 → 回营。
 
-`main.gd`（约 2.5k 行）和 `expedition.gd`（约 2.8k 行）仍然过大，计划在下一轮按职责拆分。
+`main.gd`（约 2.5k 行）和 `expedition.gd`（约 2.2k 行）仍然过大，继续按职责拆分。
+
+`Expedition` 保留场内共享状态与规则，通过持有显式 `Expedition` 引用的 `RefCounted` helper 组合展示层：`ExpeditionFeedback` 负责特效、绘制、通知、光照、镜头与能力展示，`ExpeditionUi` 负责 HUD 构建、刷新与文本格式化。两个 helper 在 `_ready()` 开头初始化；对外调用和信号连接使用的根方法保留同签名转发。
 
 ## 模块（`src/features/`）
 

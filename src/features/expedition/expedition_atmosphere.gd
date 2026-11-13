@@ -38,11 +38,11 @@ func refresh(world: Expedition, amount: float) -> void:
 		# Reuse twelve pools near the visible street; the map can be much larger
 		# than the viewport. Two additional lights follow the bus headlights.
 		for prop: Node in world._sort.get_children():
-			if (prop is WorldFurniture and prop.kind == "lamp") or (prop is WorldgenFurniture and (prop.detail.get("kind", "") == "lamp" or prop.detail.get("slot", "") == WarehouseSlots.LAMP)):
-				_sources.append((prop as Node2D).position + Vector2(0, -35))
+			if (prop is WorldFurniture and prop.kind == "lamp") or (prop is WorldgenFurniture and (prop.detail.get("kind", "") == "lamp" or prop.detail.get("slot", "") == WarehouseSlots.LAMP)) or (prop is Node2D and prop.has_meta("iso_kind") and String(prop.get_meta("iso_kind")) == "lamp"):
+				_sources.append((prop as Node2D).position + Vector2(0, -40))
 		for prop: FieldProp in world._buildings:
 			_sources.append(prop.position + Vector2(0, -45))
-		for index: int in range(mini(12, _sources.size())):
+		for index: int in range(mini(16, _sources.size())):
 			_add_light(world, _sources[index], texture, 1.25)
 			_scenery_lights.append(_lights.back())
 		for offset: Vector2 in [Vector2(-95, -65), Vector2(-95, -25)]:

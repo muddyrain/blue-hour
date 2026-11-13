@@ -13,10 +13,16 @@ var supply_entrances: Array[Vector2] = []
 
 
 func _ready() -> void:
-	if layout.world_data.get("version")==5:
+	if layout.world_data.get("seaside_town") or layout.world_data.get("version")==5:
+		var tiles: IsoTiles = IsoTiles.new()
+		tiles.layout = layout
+		add_child(tiles)
+		if layout.world_data.get("seaside_town"):
+			return
 		var surface: WorldgenGround = WorldgenGround.new()
 		surface.layout = layout
 		surface.supply_entrances = supply_entrances
+		surface.skip_base = true
 		add_child(surface)
 		return
 

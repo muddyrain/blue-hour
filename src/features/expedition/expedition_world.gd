@@ -43,7 +43,7 @@ func setup() -> void:
 	expedition._food_site.door = expedition.layout.food_door
 	if expedition.supply.generated.has("barricade"):
 		expedition.navigation = BarricadeV1.navigation(expedition.supply.generated, false)
-	elif expedition.exploration_mode() and not expedition.pump_station_mode():
+	elif expedition.exploration_mode() and not expedition.pump_station_mode() and not SeasideTown.is_layout(expedition.layout):
 		expedition.navigation = ExplorationLayout._routing(expedition.layout.world_data).nav
 	else:
 		expedition.navigation.configure(expedition.layout.blockers(), expedition.layout.world_bounds)
@@ -106,6 +106,8 @@ func setup() -> void:
 	expedition._sort.add_child(bus)
 	if expedition.pump_station_mode():
 		expedition._world._make_pump_station()
+	elif SeasideTown.is_layout(expedition.layout):
+		SeasideTown.populate(expedition)
 	elif not expedition.layout.world_data.is_empty():
 		expedition._world._make_world_buildings()
 	else:

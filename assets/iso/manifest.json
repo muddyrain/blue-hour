@@ -1,0 +1,149 @@
+{
+  "scale": 0.5,
+  "sprites": {
+    "buildings/house_a.png": {
+      "w": 640,
+      "h": 524,
+      "foot": [
+        192.0,
+        412.0
+      ]
+    },
+    "buildings/house_b.png": {
+      "w": 640,
+      "h": 540,
+      "foot": [
+        176.0,
+        436.0
+      ]
+    },
+    "buildings/house_c.png": {
+      "w": 640,
+      "h": 528,
+      "foot": [
+        160.0,
+        432.0
+      ]
+    },
+    "buildings/convenience.png": {
+      "w": 864,
+      "h": 688,
+      "foot": [
+        256.0,
+        544.0
+      ]
+    },
+    "buildings/grocery.png": {
+      "w": 800,
+      "h": 636,
+      "foot": [
+        240.0,
+        500.0
+      ]
+    },
+    "buildings/warehouse.png": {
+      "w": 1024,
+      "h": 784,
+      "foot": [
+        320.0,
+        608.0
+      ]
+    },
+    "buildings/shrine.png": {
+      "w": 448,
+      "h": 484,
+      "foot": [
+        136.0,
+        392.0
+      ]
+    },
+    "props/bike_shelter.png": {
+      "w": 480,
+      "h": 360,
+      "foot": [
+        160.0,
+        264.0
+      ]
+    },
+    "props/tram_stop.png": {
+      "w": 472,
+      "h": 416,
+      "foot": [
+        180.0,
+        306.0
+      ]
+    },
+    "props/vending_red.png": {
+      "w": 140,
+      "h": 194,
+      "foot": [
+        50.0,
+        145.0
+      ]
+    },
+    "props/vending_blue.png": {
+      "w": 140,
+      "h": 194,
+      "foot": [
+        50.0,
+        145.0
+      ]
+    },
+    "props/lamp.png": {
+      "w": 96,
+      "h": 180,
+      "foot": [
+        48.0,
+        172
+      ]
+    },
+    "props/tree.png": {
+      "w": 192,
+      "h": 220,
+      "foot": [
+        96.0,
+        208
+      ]
+    },
+    "props/bike.png": {
+      "w": 88,
+      "h": 56,
+      "foot": [
+        44.0,
+        52
+      ]
+    },
+    "props/stone_bridge.png": {
+      "w": 760,
+      "h": 540,
+      "foot": [
+        188.0,
+        422.0
+      ]
+    },
+    "props/wood_bridge.png": {
+      "w": 576,
+      "h": 388,
+      "foot": [
+        192.0,
+        276.0
+      ]
+    },
+    "props/bus.png": {
+      "w": 532,
+      "h": 426,
+      "foot": [
+        208.0,
+        302.0
+      ]
+    },
+    "props/crate.png": {
+      "w": 140,
+      "h": 136,
+      "foot": [
+        48.0,
+        92.0
+      ]
+    }
+  }
+}

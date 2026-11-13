@@ -21,6 +21,7 @@ var facade_tint: Color = Color.WHITE
 var _alpha: Image
 var world_asset: bool = false
 var facade: Texture2D = ShopTexture
+var iso_art: String = ""
 var is_market: bool = false
 var is_residence: bool = false
 var front_width: float = 368.0
@@ -39,6 +40,29 @@ var _wall: Sprite2D
 
 
 func _ready() -> void:
+	if not iso_art.is_empty():
+		IsoAtlas.attach(self, iso_art)
+		_roof = Sprite2D.new()
+		_wall = Sprite2D.new()
+		_roof.visible = false
+		_wall.visible = false
+		add_child(_roof)
+		add_child(_wall)
+		_work = _label("", Vector2(-72, 10), 16, 144)
+		_bar = ProgressBar.new()
+		_bar.position = Vector2(-48, 32)
+		_bar.size = Vector2(96, 7)
+		_bar.show_percentage = false
+		_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var fill: StyleBoxFlat = StyleBoxFlat.new()
+		fill.bg_color = Color("86ccb7")
+		_bar.add_theme_stylebox_override("fill", fill)
+		var background: StyleBoxFlat = StyleBoxFlat.new()
+		background.bg_color = Color("25454d")
+		_bar.add_theme_stylebox_override("background", background)
+		add_child(_bar)
+		update_work(-1, 0.0, false)
+		return
 	var factor: float = front_width / reference_width
 	_roof = _part(Rect2(0,0,native_size.x,roof_cut) if world_asset else Rect2(0,0,512,320),(-render_anchor if world_asset else Vector2(-256,-416))*factor,factor)
 	_wall = _part(Rect2(0,roof_cut,native_size.x,native_size.y-roof_cut) if world_asset else Rect2(0,320,512,128),(Vector2(0,roof_cut)-render_anchor if calibrated else Vector2(-256,-96))*factor,factor)
@@ -101,6 +125,10 @@ func _part(region: Rect2, point: Vector2, factor: float) -> Sprite2D:
 
 
 func _draw() -> void:
+	if not iso_art.is_empty():
+		if primary_target and loot_category.is_empty():
+			IsoDraw.marker(self, Vector2(door_offset, 0), Color("a8ebd4") if searched else IsoDraw.AMBER)
+		return
 	var depth: float = maxf(body_depth, 64.0)
 	var height: float = 96.0 if is_market else (72.0 if is_residence else 88.0)
 	var roof: Color = IsoDraw.SHOP_ROOF if is_market else (IsoDraw.ROOF if is_residence else IsoDraw.WARE_ROOF)

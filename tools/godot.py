@@ -6,24 +6,24 @@ ROOT=Path(__file__).resolve().parents[1]
 LOCK=(ROOT/'.godot-version').read_text(encoding='utf-8').strip()
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('action',choices=['check','run']);p.add_argument('--godot');entry=p.add_mutually_exclusive_group();entry.add_argument('--enemy-trial',action='store_true');entry.add_argument('--legacy-entry',action='store_true');entry.add_argument('--open-streets',action='store_true');p.add_argument('--profile',type=Path);p.add_argument('--output',type=Path);a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('action',choices=['check','run']);p.add_argument('--godot');entry=p.add_mutually_exclusive_group();entry.add_argument('--enemy-trial',action='store_true');entry.add_argument('--open-streets',action='store_true');p.add_argument('--profile',type=Path);p.add_argument('--output',type=Path);a=p.parse_args()
  exe=a.godot or os.environ.get('GODOT_BIN') or shutil.which('godot') or shutil.which('godot4')
  if not exe:raise RuntimeError('Specify --godot or GODOT_BIN with the pinned engine')
  version=subprocess.check_output([exe,'--version'],text=True,timeout=15).strip();assert version==LOCK,(version,LOCK)
  if a.action=='run':
-  env=dict(os.environ);flags=['--bh-enemy-trial','--bh-safe-suspend','--bh-camp-prototype'] if a.enemy_trial else ['--bh-legacy-entry'] if a.legacy_entry else ['--bh-open-streets'] if a.open_streets else []
+  env=dict(os.environ);flags=['--bh-open-streets'] if a.open_streets else []
   profile=a.profile or (ROOT/'.local/developer-enemy' if a.enemy_trial else ROOT/'.local/m45-open-streets' if a.open_streets else None)
   if profile is not None:
    profile=profile.resolve();assert profile.is_relative_to(ROOT/'.local'),'Use a project-local isolated profile';profile.mkdir(parents=True,exist_ok=True)
    env.update(HOME=str(profile/'home'),APPDATA=str(profile/'user'),XDG_DATA_HOME=str(profile/'user'))
-   flags+=['--bh-progress='+str(profile/('run.json' if a.legacy_entry else 'run.enemy-v1.json')),'--bh-audio-settings='+str(profile/'audio.json')]
+   flags+=['--bh-progress='+str(profile/'run.enemy-v1.json'),'--bh-audio-settings='+str(profile/'audio.json')]
   return subprocess.call([exe,'--path',str(ROOT),'--rendering-method','gl_compatibility','--',*flags],cwd=ROOT,env=env)
  job=(a.output or ROOT/'.local/public-checks'/(datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'-'+uuid.uuid4().hex[:8])).resolve();assert job.is_relative_to(ROOT/'.local'),'Use a project-local isolated output';job.mkdir(parents=True,exist_ok=False)
  env=dict(os.environ,HOME=str(job/'home'),APPDATA=str(job/'user'),XDG_DATA_HOME=str(job/'user'))
  rows=[]
  def execute(label,args,flags=None,expected=0):
   folder=job/label;folder.mkdir();cmd=[exe,'--headless','--path',str(ROOT),'--audio-driver','Dummy',*args]
-  flags=list(flags if flags is not None else ([] if label=='startup-default' else ['--bh-legacy-entry']))
+  flags=list(flags if flags is not None else [])
   cmd+=['--',*flags,'--bh-progress='+str(folder/('run.enemy-v1.json' if label in ['startup-default','rogue-contracts','world-contracts','neighborhood-contracts','task-contracts','task-data','campaign-contracts','journal-cache','world-bus','r2-save-failure','m48-sources','m48-record-transport','m48-record-cache','journal-prefix'] or '--bh-enemy-trial' in flags else 'run.json')),'--bh-audio-settings='+str(folder/'audio.json')]
   if label=='known-hash-cycle':cmd+=['--cycle-output='+(folder/'cycle.json').as_posix()]
   if label=='record-hash':cmd+=['--record-output='+(folder/'data').as_posix()]
@@ -40,8 +40,7 @@ def main():
   rows.append({'case':label,'exit':z.returncode,'expected_exit':expected,'status':'EXPECTED_KNOWN_FAILURE' if expected else 'PASS'});print(label,rows[-1]['status'],flush=True)
  execute('import',['--editor','--import'])
  execute('startup-default',['--quit-after','3'])
- execute('startup-legacy',['--quit-after','3'],['--bh-legacy-entry'])
- execute('startup-111',['--quit-after','3'],['--bh-enemy-trial','--bh-safe-suspend','--bh-camp-prototype'])
+ execute('startup-111',['--quit-after','3'])
  for name in ['playable_entry','smoke','presentation','weapon_inventory','combat_los','navigation_nearest','night_pressure','contact_damage','contact_separation','animation/motion','animation/normal_stability','animation/infected_v1']:
   execute(name.replace('/','-'),['--script','res://tests/'+name+'.gd'])
  for name in ['rogue_data','rogue_navigation','hud_compact','rogue_legacy_scope','world_data']:

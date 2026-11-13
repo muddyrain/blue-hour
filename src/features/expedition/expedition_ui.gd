@@ -102,7 +102,7 @@ func _make_ui() -> void:
 						label.accept_event())
 			kit.add_child(label)
 			x._hud.view.add_child(kit)
-	_update_ui()
+	x._update_ui()
 
 
 func _update_ui() -> void:

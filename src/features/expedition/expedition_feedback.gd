@@ -28,8 +28,8 @@ func _draw() -> void:
 
 
 func _shot_effect(from: Vector2, to: Vector2, damage: float) -> void:
-	_shot_trace(from, to + Vector2.UP * AttackRules.HIT_HEIGHT, Color("f1d5a1"))
-	_hit_effect(to, damage, false)
+	x._shot_trace(from, to + Vector2.UP * AttackRules.HIT_HEIGHT, Color("f1d5a1"))
+	x._hit_effect(to, damage, false)
 
 
 func _shot_trace(from: Vector2, to: Vector2, colour: Color) -> void:

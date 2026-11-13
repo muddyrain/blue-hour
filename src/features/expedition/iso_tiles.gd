@@ -34,9 +34,10 @@ func fill_from_layout(source: StreetLayout) -> void:
 	_stamp_rects(grounds.get("canal", []), "canal")
 	for road: Rect2 in source.roads:
 		_road_edges.append(road)
-		# Plain asphalt first so a 64-wide single lane is not dashed like two lanes.
+		# Plain asphalt first so a 64-wide single lane stays unmarked.
 		_stamp_rect(road, "road")
-		# Wider roads keep one center dashed strip, not a dash in every 32-cell.
+		# A 96-wide dual lane (and any wider road) gets one center dashed
+		# strip, not a dash in the middle of every 32-cell.
 		if minf(road.size.x, road.size.y) > 64.0:
 			var name: String = "road_ew" if road.size.x >= road.size.y else "road_ns"
 			var strip: Rect2

@@ -624,8 +624,8 @@ def make_bike() -> Image.Image:
 
 
 def stone_bridge() -> Image.Image:
-    # Canal is 96 map units plus 32-unit banks; deck follows the 64-deep EW road.
-    w, d, h = 160, 72, 22
+    # Canal is 96 map units plus 32-unit banks; deck follows the 96-deep EW road.
+    w, d, h = 160, 104, 22
     drop = 34
     img, vx, _ = sprite_canvas(w, d, h + drop, pad=24)
     dr = ImageDraw.Draw(img)
@@ -773,20 +773,35 @@ def main():
 
 def export_bus_only():
     """Regenerate only props/bus.png and that manifest entry."""
+    _export_sprites({"props/bus.png": minibus}, "bus-only")
+
+
+def export_bridges_only():
+    """Regenerate only the canal bridges and those manifest entries."""
+    _export_sprites({
+        "props/stone_bridge.png": stone_bridge,
+        "props/wood_bridge.png": wood_bridge,
+    }, "bridges-only")
+
+
+def _export_sprites(items: dict, label: str):
     import json
     path = ROOT / "manifest.json"
     data = json.loads(path.read_text(encoding="utf-8"))
     global MANIFEST
     MANIFEST = data
     MANIFEST.setdefault("sprites", {})
-    save_sprite("props/bus.png", minibus())
+    for rel, fn in items.items():
+        save_sprite(rel, fn())
     path.write_text(json.dumps(MANIFEST, indent=2) + "\n", encoding="utf-8")
-    print("bus-only written", MANIFEST["sprites"]["props/bus.png"])
+    print(label, "written", {rel: MANIFEST["sprites"][rel] for rel in items})
 
 
 if __name__ == "__main__":
     import sys
     if "--bus-only" in sys.argv:
         export_bus_only()
+    elif "--bridges-only" in sys.argv:
+        export_bridges_only()
     else:
         main()

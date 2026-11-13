@@ -114,11 +114,11 @@
       ]
     },
     "props/stone_bridge.png": {
-      "w": 560,
-      "h": 440,
+      "w": 624,
+      "h": 472,
       "foot": [
         208.0,
-        312.0
+        344.0
       ]
     },
     "props/wood_bridge.png": {

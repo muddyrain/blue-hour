@@ -4,7 +4,7 @@ extends RefCounted
 
 const TITLE: String = "海边町·商店街路口"
 const TILE: float = 32.0
-const ROAD_WIDTH: float = 64.0
+const ROAD_WIDTH: float = 96.0
 const WALK_WIDTH: float = 32.0
 const CANAL_WIDTH: float = 96.0
 const BANK_WIDTH: float = 32.0
@@ -57,10 +57,10 @@ static func layout(generated: Dictionary) -> StreetLayout:
 	result.world_bounds = BOUNDS
 	result.world_data = data
 	var bus: Rect2 = WorldLayout.rect(data.bus.rect)
-	# The 108x32 van stays centered in the 64-wide lane, leaving about 16px of
-	# asphalt on each side. bus_block matches the visible body so the sprite
-	# foot and shot blocker stay aligned; navigation insets the body in
-	# StreetLayout.blockers() so those side strips remain walkable.
+	# The 108x32 van parks in the north EW lane of the 96-wide dual road,
+	# leaving the south lane open. bus_block matches the visible body so the
+	# sprite foot and shot blocker stay aligned; navigation insets the body
+	# in StreetLayout.blockers() so the other lane stays walkable.
 	result.bus_block = bus
 	result.bus_door = WorldLayout.point(data.bus.door)
 	for entity: Dictionary in data.entities:
@@ -119,7 +119,8 @@ static func _axis() -> Dictionary:
 		"canal_mid": (canal_x + east_bank) * 0.5,
 		"wood_y": wood_y,
 		"wood_end": wood_y + WOOD_WIDTH,
-		"bus_y": EW_CENTER - BUS_WIDTH * 0.5,
+		# North EW lane (48 px); south lane stays clear for passing.
+		"bus_y": EW_CENTER - ROAD_WIDTH * 0.25 - BUS_WIDTH * 0.5,
 	}
 
 
@@ -132,11 +133,13 @@ static func world_data(generated: Dictionary) -> Dictionary:
 	entities.append_array(houses)
 	var a: Dictionary = _axis()
 	var bus_y: float = float(a.bus_y)
-	# Keep the gathering point at the previous lane center (x=684) so the
-	# shorter van still sits mid-lane, just short of the north-south crossing.
-	var bus_x: float = 684.0 - BUS_LENGTH * 0.5
+	# Park just short of the north-south crossing: the nose lines up with the
+	# west curb of the 96-wide NS road. The van sits in the north lane; the
+	# door is 8px north of the body, on the curb, and the south lane stays empty.
+	var bus_x: float = float(a.ns_x) - BUS_LENGTH
 	var bus_door_x: float = bus_x + BUS_LENGTH * 0.5
 	var bus_door_y: float = bus_y - 8.0
+	var bus_foot_y: float = bus_y + BUS_WIDTH
 	var mid: float = float(a.canal_mid)
 	var wood_y: float = float(a.wood_y)
 	var wood_end: float = float(a.wood_end)
@@ -162,9 +165,9 @@ static func world_data(generated: Dictionary) -> Dictionary:
 			"rect": [bus_x, bus_y, BUS_LENGTH, BUS_WIDTH],
 			"door": [bus_door_x, bus_door_y],
 			"passenger_door": [bus_door_x, bus_door_y],
-			"entry": [80, EW_CENTER],
-			"exit": [1840, EW_CENTER],
-			"stop": [bus_door_x, bus_y + BUS_WIDTH],
+			"entry": [80, bus_foot_y],
+			"exit": [1840, bus_foot_y],
+			"stop": [bus_door_x, bus_foot_y],
 			"facing": "right",
 			"sweep": [0, ew_y, 1920, ROAD_WIDTH],
 		},
@@ -197,7 +200,7 @@ static func world_data(generated: Dictionary) -> Dictionary:
 			[1360, north_walk + 16.0],
 			[east_walk + 16.0, 80],
 		],
-		"rescue": [444, 1008],
+		"rescue": [444, 1024],
 		"objects": [],
 		"parcels": [],
 		"grounds": {
@@ -238,15 +241,16 @@ static func _shop_templates() -> Array[Dictionary]:
 	var edge: float = float(a.east_edge)
 	var north: float = float(a.north_walk)
 	var wood_end: float = float(a.wood_end)
-	# Vendings sit on the bank-side plaza, off the 32-wide sidewalk so the
-	# team can still pass the bus on the pavement.
+	# Vendings sit on the bank-side plaza, off the 32-wide sidewalk.
+	# Shops stay the same distance from the plaza as before the road widened,
+	# so the street does not stretch apart.
 	return [
-		_entity("convenience", "food_main", "便利店", "buildings/convenience.png", [1080, north - 176.0, 224, 176], [1192, north + 16.0]),
+		_entity("convenience", "food_main", "便利店", "buildings/convenience.png", [edge + 88.0, north - 176.0, 224, 176], [edge + 200.0, north + 16.0]),
 		_entity("vending_a", "food_quick", "售货机", "props/vending_red.png", [edge + 8.0, north - 32.0, 32, 32], [edge + 24.0, north + 16.0]),
 		_entity("vending_b", "food_quick", "售货机", "props/vending_blue.png", [edge + 48.0, north - 32.0, 32, 32], [edge + 64.0, north + 16.0]),
-		_entity("grocery", "cash_shop", "杂货铺", "buildings/grocery.png", [1320, north - 160.0, 208, 160], [1424, north + 16.0]),
-		_entity("bike_shelter", "optional", "自行车棚", "props/bike_shelter.png", [544, 880, 128, 80], [608, 984]),
-		_entity("shrine", "optional", "小神社", "buildings/shrine.png", [400, 896, 88, 88], [444, 1008]),
+		_entity("grocery", "cash_shop", "杂货铺", "buildings/grocery.png", [edge + 328.0, north - 160.0, 208, 160], [edge + 432.0, north + 16.0]),
+		_entity("bike_shelter", "optional", "自行车棚", "props/bike_shelter.png", [544, 896, 128, 80], [608, 1000]),
+		_entity("shrine", "optional", "小神社", "buildings/shrine.png", [400, 912, 88, 88], [444, 1024]),
 		_entity("warehouse", "weapon", "渔具仓库", "buildings/warehouse.png", [edge + 32.0, wood_end, 288, 192], [edge + 176.0, wood_end + 208.0]),
 	]
 
@@ -261,7 +265,7 @@ static func _house_templates() -> Array[Dictionary]:
 		_entity("house_c2", "house", "住宅", "buildings/house_c.png", [west - 136.0, north - 160.0, 128, 160], [west - 72.0, north + 16.0]),
 		_entity("house_c", "house", "住宅", "buildings/house_c.png", [400, yard, 128, 160], [464, yard + 184.0]),
 		_entity("house_b", "house", "住宅", "buildings/house_b.png", [544, yard, 144, 144], [616, yard + 168.0]),
-		_entity("house_a3", "house", "住宅", "buildings/house_a.png", [544, 1008, 128, 96], [608, 1128]),
+		_entity("house_a3", "house", "住宅", "buildings/house_a.png", [544, 1024, 128, 96], [608, 1144]),
 	]
 
 
@@ -320,6 +324,7 @@ static func _scenery() -> Array:
 	var mid: float = float(a.canal_mid)
 	var south_road: float = float(a.south_walk)
 	var wood_end: float = float(a.wood_end)
+	var edge: float = float(a.east_edge)
 	return [
 		{"art": "props/tram_stop.png", "point": [west_mid, north_mid], "kind": "tram"},
 		{"art": "props/stone_bridge.png", "point": [mid, south_road], "kind": "bridge"},
@@ -328,28 +333,28 @@ static func _scenery() -> Array:
 		{"art": "props/lamp.png", "point": [east_mid, north_mid], "kind": "lamp"},
 		{"art": "props/lamp.png", "point": [west_mid, south_mid], "kind": "lamp"},
 		{"art": "props/lamp.png", "point": [east_mid, south_mid], "kind": "lamp"},
-		{"art": "props/lamp.png", "point": [1016, north_mid], "kind": "lamp"},
-		{"art": "props/lamp.png", "point": [1192, north_mid], "kind": "lamp"},
-		{"art": "props/lamp.png", "point": [1320, north_mid], "kind": "lamp"},
-		{"art": "props/lamp.png", "point": [1424, north_mid], "kind": "lamp"},
-		{"art": "props/lamp.png", "point": [1192, south_mid], "kind": "lamp"},
-		{"art": "props/lamp.png", "point": [1424, south_mid], "kind": "lamp"},
+		{"art": "props/lamp.png", "point": [edge + 24.0, north_mid], "kind": "lamp"},
+		{"art": "props/lamp.png", "point": [edge + 200.0, north_mid], "kind": "lamp"},
+		{"art": "props/lamp.png", "point": [edge + 328.0, north_mid], "kind": "lamp"},
+		{"art": "props/lamp.png", "point": [edge + 432.0, north_mid], "kind": "lamp"},
+		{"art": "props/lamp.png", "point": [edge + 200.0, south_mid], "kind": "lamp"},
+		{"art": "props/lamp.png", "point": [edge + 432.0, south_mid], "kind": "lamp"},
 		{"art": "props/lamp.png", "point": [632, north_mid], "kind": "lamp"},
 		{"art": "props/lamp.png", "point": [632, south_mid], "kind": "lamp"},
-		{"art": "props/lamp.png", "point": [1080, wood_end + 184.0], "kind": "lamp"},
-		{"art": "props/lamp.png", "point": [1240, wood_end + 184.0], "kind": "lamp"},
-		{"art": "props/tree.png", "point": [672, 1000], "kind": "tree"},
+		{"art": "props/lamp.png", "point": [edge + 88.0, wood_end + 184.0], "kind": "lamp"},
+		{"art": "props/lamp.png", "point": [edge + 248.0, wood_end + 184.0], "kind": "lamp"},
+		{"art": "props/tree.png", "point": [672, 1016], "kind": "tree"},
 		{"art": "props/tree.png", "point": [east_mid, 464], "kind": "tree"},
 		{"art": "props/tree.png", "point": [east_mid, south_mid + 64.0], "kind": "tree"},
-		{"art": "props/tree.png", "point": [1488, 464], "kind": "tree"},
-		{"art": "props/tree.png", "point": [1488, 992], "kind": "tree"},
-		{"art": "props/tree.png", "point": [1224, 464], "kind": "tree"},
+		{"art": "props/tree.png", "point": [edge + 496.0, 464], "kind": "tree"},
+		{"art": "props/tree.png", "point": [edge + 496.0, 992], "kind": "tree"},
+		{"art": "props/tree.png", "point": [edge + 232.0, 464], "kind": "tree"},
 		{"art": "props/bike.png", "point": [west_mid - 8.0, north_mid], "kind": "bike"},
 		{"art": "props/bike.png", "point": [float(a.west_walk), north_mid + 8.0], "kind": "bike"},
-		{"art": "props/bike.png", "point": [568, 972], "kind": "bike"},
-		{"art": "props/crate.png", "point": [1064, wood_end + 184.0], "kind": "crate"},
-		{"art": "props/crate.png", "point": [1280, wood_end + 200.0], "kind": "crate"},
-		{"art": "props/crate.png", "point": [1048, wood_end + 168.0], "kind": "crate"},
+		{"art": "props/bike.png", "point": [568, 988], "kind": "bike"},
+		{"art": "props/crate.png", "point": [edge + 72.0, wood_end + 184.0], "kind": "crate"},
+		{"art": "props/crate.png", "point": [edge + 288.0, wood_end + 200.0], "kind": "crate"},
+		{"art": "props/crate.png", "point": [edge + 56.0, wood_end + 168.0], "kind": "crate"},
 	]
 
 

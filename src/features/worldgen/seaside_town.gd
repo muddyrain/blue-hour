@@ -12,8 +12,8 @@ const WOOD_GAP: float = 144.0
 const WOOD_WIDTH: float = 64.0
 const NS_CENTER: float = 768.0
 const EW_CENTER: float = 624.0
-const BUS_LENGTH: float = 168.0
-const BUS_WIDTH: float = 52.0
+const BUS_LENGTH: float = 108.0
+const BUS_WIDTH: float = 32.0
 const BOUNDS: Rect2 = Rect2(0, 0, 1920, 1536)
 # Town streets stay compact; grass padding around them leaves off-screen spawn room.
 const PAD: float = 320.0
@@ -57,9 +57,11 @@ static func layout(generated: Dictionary) -> StreetLayout:
 	result.world_bounds = BOUNDS
 	result.world_data = data
 	var bus: Rect2 = WorldLayout.rect(data.bus.rect)
-	# Keep the 168x52 sprite centered in the lane, but inset the parked-bus
-	# blocker so a 32-wide sidewalk still has two walkable rows after inflation.
-	result.bus_block = Rect2(bus.position + Vector2(0, 8), Vector2(bus.size.x, maxf(24.0, bus.size.y - 16.0)))
+	# The 108x32 van stays centered in the 64-wide lane, leaving about 16px of
+	# asphalt on each side. bus_block matches the visible body so the sprite
+	# foot and shot blocker stay aligned; navigation insets the body in
+	# StreetLayout.blockers() so those side strips remain walkable.
+	result.bus_block = bus
 	result.bus_door = WorldLayout.point(data.bus.door)
 	for entity: Dictionary in data.entities:
 		# Visual footprints stay flush to the curb; navigation bodies are inset
@@ -130,9 +132,11 @@ static func world_data(generated: Dictionary) -> Dictionary:
 	entities.append_array(houses)
 	var a: Dictionary = _axis()
 	var bus_y: float = float(a.bus_y)
+	# Keep the gathering point at the previous lane center (x=684) so the
+	# shorter van still sits mid-lane, just short of the north-south crossing.
+	var bus_x: float = 684.0 - BUS_LENGTH * 0.5
+	var bus_door_x: float = bus_x + BUS_LENGTH * 0.5
 	var bus_door_y: float = bus_y - 8.0
-	var bus_x: float = 600.0
-	var bus_door_x: float = 684.0
 	var mid: float = float(a.canal_mid)
 	var wood_y: float = float(a.wood_y)
 	var wood_end: float = float(a.wood_end)

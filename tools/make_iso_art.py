@@ -681,36 +681,37 @@ def wood_bridge() -> Image.Image:
 
 
 def minibus() -> Image.Image:
-    w, d, h = 168, 58, 50
-    img, vx, _ = sprite_canvas(w, d, h + 10, pad=20)
+    # Cream van / small bus that leaves asphalt on a 64-wide lane.
+    w, d, h = 108, 32, 38
+    img, vx, _ = sprite_canvas(w, d, h + 8, pad=16)
     # body
     draw_box(img, vx, w, d, h, (176, 180, 184), PAL["bus"], PAL["bus_dk"], (220, 222, 224))
     dr = ImageDraw.Draw(img)
     # windshield on +x cab end (right wall)
-    a, b = vx(w / 2, -4), vx(w / 2, -d + 4)
+    a, b = vx(w / 2, -3), vx(w / 2, -d + 3)
     glass = [
-        (a[0] + 1, a[1] - 18 * SCALE),
-        (b[0] + 1, b[1] - 18 * SCALE),
-        (b[0] + 1, b[1] - 42 * SCALE),
-        (a[0] + 1, a[1] - 42 * SCALE),
+        (a[0] + 1, a[1] - 12 * SCALE),
+        (b[0] + 1, b[1] - 12 * SCALE),
+        (b[0] + 1, b[1] - 32 * SCALE),
+        (a[0] + 1, a[1] - 32 * SCALE),
     ]
     dr.polygon(glass, fill=rgb(PAL["bus_win"], 230))
     dr.line(glass + [glass[0]], fill=rgb((80, 90, 100)), width=1)
     # side windows
-    draw_windows_left(img, vx, w, d, h, [(22, 16)], [0.18, 0.38, 0.58], (90, 90, 92))
+    draw_windows_left(img, vx, w, d, h, [(14, 14)], [0.16, 0.40, 0.64], (90, 90, 92))
     # headlights
-    for y in (-8, -d + 8):
+    for y in (-5, -d + 5):
         p = vx(w / 2 + 1, y)
-        dr.ellipse((p[0] - 3, p[1] - 16 * SCALE, p[0] + 5, p[1] - 10 * SCALE), fill=rgb((255, 210, 120)))
-    # wheels
-    for x, y in ((-46, 8), (36, 8), (-46, -d - 6), (36, -d - 6)):
+        dr.ellipse((p[0] - 2, p[1] - 12 * SCALE, p[0] + 4, p[1] - 7 * SCALE), fill=rgb((255, 210, 120)))
+    # wheels stay mostly under the body so the 32-wide van does not fill the lane
+    for x, y in ((-30, 3), (24, 3), (-30, -d - 2), (24, -d - 2)):
         p = vx(x, y)
-        dr.ellipse((p[0] - 7, p[1] - 7, p[0] + 7, p[1] + 5), fill=rgb((36, 38, 42)))
-        dr.ellipse((p[0] - 3, p[1] - 3, p[0] + 3, p[1] + 2), fill=rgb((70, 72, 76)))
+        dr.ellipse((p[0] - 5, p[1] - 5, p[0] + 5, p[1] + 4), fill=rgb((36, 38, 42)))
+        dr.ellipse((p[0] - 2, p[1] - 2, p[0] + 2, p[1] + 1), fill=rgb((70, 72, 76)))
     # amber roof lights
-    for x in (-12, 12):
+    for x in (-8, 8):
         p = vx(x, -d * 0.5)
-        dr.ellipse((p[0] - 3, p[1] - (h + 3) * SCALE, p[0] + 3, p[1] - (h - 1) * SCALE), fill=rgb((220, 150, 60)))
+        dr.ellipse((p[0] - 2, p[1] - (h + 2) * SCALE, p[0] + 2, p[1] - (h - 1) * SCALE), fill=rgb((220, 150, 60)))
     return img
 
 
@@ -770,5 +771,22 @@ def main():
     print("done")
 
 
+def export_bus_only():
+    """Regenerate only props/bus.png and that manifest entry."""
+    import json
+    path = ROOT / "manifest.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    global MANIFEST
+    MANIFEST = data
+    MANIFEST.setdefault("sprites", {})
+    save_sprite("props/bus.png", minibus())
+    path.write_text(json.dumps(MANIFEST, indent=2) + "\n", encoding="utf-8")
+    print("bus-only written", MANIFEST["sprites"]["props/bus.png"])
+
+
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--bus-only" in sys.argv:
+        export_bus_only()
+    else:
+        main()

@@ -29,6 +29,14 @@ var rescue_point: Vector2 = Vector2(1344,1120)
 func blockers() -> Array[Rect2]:
 	if not world_data.is_empty():
 		var blocks: Array[Rect2] = [bus_block]
+		if world_data.get("seaside_town"):
+			# Inset 12px north and south so the 16px asphalt strips beside the
+			# van stay walkable after 18px footprint inflation, along with the
+			# 32-wide sidewalks. Shots still use the full visual bus_block.
+			var inset: float = 12.0
+			if bus_block.size.y > inset * 2.0:
+				blocks[0] = Rect2(bus_block.position + Vector2(0, inset),
+					Vector2(bus_block.size.x, bus_block.size.y - inset * 2.0))
 		blocks.append_array(residences)
 		if (world_data.get("version")==3 or world_data.get("version")==5): blocks.append_array(fences)
 		if world_data.get("version")==5:

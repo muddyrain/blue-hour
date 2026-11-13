@@ -45,7 +45,9 @@ func refresh(world: Expedition, amount: float) -> void:
 		for index: int in range(mini(16, _sources.size())):
 			_add_light(world, _sources[index], texture, 1.25)
 			_scenery_lights.append(_lights.back())
-		for offset: Vector2 in [Vector2(-95, -65), Vector2(-95, -25)]:
+		# View-space offsets from the south-center foot to the cab headlights
+		# of the 108x32 cream van (map +54,-5 and +54,-27).
+		for offset: Vector2 in [Vector2(59, 25), Vector2(81, 14)]:
 			_add_light(world._bus_sprite, offset, texture, 1.7)
 	var center: Vector2 = world.camera.position
 	_sources.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.distance_squared_to(center) < b.distance_squared_to(center))

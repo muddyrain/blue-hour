@@ -28,6 +28,8 @@ var _pause_state: Label
 var _bus_status: Label
 var _bus_waiting: Label
 var _hint: Label
+var _hint_panel: PanelContainer
+var _actions_panel: PanelContainer
 var _pause_button: Button
 var _bus_button: Button
 var _help_button: Button
@@ -140,6 +142,9 @@ func refresh(state: Dictionary) -> void:
 	_hint.text = _text(state, "status_hint")
 	_hint.visible = not _hint.text.is_empty()
 	_hint.tooltip_text = _hint.text
+	if _hint_panel != null:
+		_hint_panel.visible = _hint.visible
+	place_status_hint.call_deferred()
 	var supplied: Variant = state.get("survivors", [])
 	var members: Array[Dictionary] = []
 	if supplied is Array:
@@ -407,22 +412,53 @@ func _build_actions() -> void:
 	_bus_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_bus_button.add_theme_font_size_override("font_size",14)
 	_bus_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_hint = _label(self, "StatusHint", 14)
-	_hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	_hint.offset_left=-260
-	_hint.offset_right=260
-	_hint.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-	_hint.clip_text=true
-	_hint.mouse_filter=Control.MOUSE_FILTER_PASS
-	_hint.add_theme_color_override("font_outline_color",Color("22201e"))
-	_hint.add_theme_constant_override("outline_size",3)
-	panel.resized.connect(_place_bus_hint.bind(panel))
-	_place_bus_hint(panel)
+	_actions_panel = panel
+	_hint_panel = _panel(self, "StatusHintPanel")
+	_hint_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hint_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_hint_panel.offset_left = -200
+	_hint_panel.offset_right = 200
+	_hint_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_hint = _label(_hint_panel, "StatusHint", 14)
+	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_hint.clip_text = false
+	_hint.mouse_filter = Control.MOUSE_FILTER_PASS
+	_hint.add_theme_color_override("font_outline_color", Color("22201e"))
+	_hint.add_theme_constant_override("outline_size", 3)
+	_hint_panel.hide()
+	panel.resized.connect(place_status_hint)
+	place_status_hint.call_deferred()
 
 
-func _place_bus_hint(panel: PanelContainer) -> void:
-	_hint.offset_bottom = panel.offset_bottom - panel.size.y - 4.0
-	_hint.offset_top = _hint.offset_bottom - 32.0
+func place_status_hint() -> void:
+	if _hint_panel == null or _actions_panel == null:
+		return
+	var cluster_top: float = _actions_panel.offset_top
+	if _actions_panel.size.y > 1.0:
+		cluster_top = _actions_panel.offset_bottom - _actions_panel.size.y
+	var strip: Control = get_node_or_null("CommandStrip") as Control
+	if strip != null and strip.visible:
+		var strip_top: float = strip.offset_top
+		if strip.size.y > 1.0:
+			strip_top = strip.offset_bottom - strip.size.y
+		cluster_top = minf(cluster_top, strip_top)
+	_hint_panel.offset_bottom = cluster_top - 20.0
+	var text_height: float = maxf(36.0, _hint.get_minimum_size().y + 12.0)
+	_hint_panel.offset_top = _hint_panel.offset_bottom - text_height
+	_hint_panel.visible = _hint.visible and not _hint.text.is_empty()
+
+
+func hud_exclusion_rects() -> Array[Rect2]:
+	var rects: Array[Rect2] = []
+	for path: String in [
+		"OverviewPanel", "LocationName", "HelpButton", "ActionsPanel", "CommandStrip",
+		"MembersPanel", "StatusHintPanel", "MissionPanel", "TimePanel", "ResourcesPanel",
+	]:
+		var node: Control = get_node_or_null(path) as Control
+		if node != null and node.is_visible_in_tree() and node.size.x > 1.0 and node.size.y > 1.0:
+			rects.append(node.get_global_rect().grow(6.0))
+	return rects
 
 
 func _build_help() -> void:

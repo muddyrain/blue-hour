@@ -126,7 +126,8 @@ func _update_ui() -> void:
 			x._readouts.hide()
 		else:
 			_update_member_display()
-			x._readouts.update_members(x.survivors, x.get_global_transform_with_canvas(), x.get_viewport_rect().size)
+			var blocked: Array[Rect2] = x._hud.view.hud_exclusion_rects() if x._hud != null and x._hud.view != null else []
+			x._readouts.update_members(x.survivors, x.get_global_transform_with_canvas(), x.get_viewport_rect().size, blocked)
 	if x.bus_view != null and not x.bus_view.has_meta("field_skin"):
 		x.bus_view.skip_button.theme = x._hud.view.theme
 		ExpeditionHudTheme.skin(x.bus_view)
@@ -394,6 +395,8 @@ func _arrange_field_hud() -> void:
 	for child: Control in strip.get_children():
 		child.custom_minimum_size = Vector2(64, 64)
 		child.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	strip.resized.connect(x._hud.view.place_status_hint)
+	x._hud.view.place_status_hint.call_deferred()
 	var map_panel: PanelContainer = PanelContainer.new()
 	map_panel.name = "OverviewPanel"
 	map_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE

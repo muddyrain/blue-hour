@@ -28,6 +28,7 @@ func _run() -> void:
 	_check_weapon(ActorVisual.CarbineView)
 	_check_weapon(ActorVisual.LongRifleView)
 	_check_readouts()
+	_check_dusk_tint()
 	await process_frame
 	print("BH_PRESENTATION checks=%d failures=%d" % [_checks, _failures])
 	quit(0 if _failures == 0 else 1)
@@ -83,8 +84,25 @@ func _check_readouts() -> void:
 	readouts.update_members(members, Transform2D.IDENTITY, Vector2(1280, 720))
 	_expect(not readouts.entries[0]["rect"].intersects(readouts.entries[1]["rect"]), "readouts remain separated after viewport-edge clamping")
 	for member: FieldActor in members:
+		member.position = Vector2(40, 640)
+	var minimap: Rect2 = Rect2(8, 492, 156, 194)
+	readouts.update_members(members, Transform2D.IDENTITY, Vector2(1280, 720), [minimap])
+	_expect(members[0].position == Vector2(40, 640) and members[1].position == Vector2(40, 640), "HUD avoidance never changes gameplay positions")
+	_expect(readouts.entries.all(func(entry: Dictionary) -> bool:
+		return float(entry.get("alpha", 1.0)) < 0.05 or not Rect2(entry.rect).intersects(minimap)
+	), "badges over the minimap are moved or faded, not left opaque on the panel")
+	for member: FieldActor in members:
 		member.queue_free()
 	readouts.queue_free()
+
+
+func _check_dusk_tint() -> void:
+	var night: Color = Color(0.24, 0.28, 0.48)
+	_expect(ExpeditionAtmosphere.tint_for(0.0).is_equal_approx(Color.WHITE), "day tint is white")
+	_expect(ExpeditionAtmosphere.tint_for(1.0).is_equal_approx(night), "night tint keeps the deep blue")
+	var mid: Color = ExpeditionAtmosphere.tint_for(0.65)
+	var linear: Color = Color.WHITE.lerp(night, 0.65)
+	_expect(mid.r - mid.b > linear.r - linear.b and mid.r > mid.b * 0.9, "mid-dusk is warmer than a linear grey-blue lerp")
 
 
 func _expect(condition: bool, label: String) -> void:

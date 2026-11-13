@@ -2,10 +2,24 @@ class_name ExpeditionAtmosphere
 extends RefCounted
 ## World-canvas lighting only. Reads the expedition clock; owns no simulation.
 
+const NIGHT_TINT: Color = Color(0.24, 0.28, 0.48)
+const DUSK_WARM: Color = Color(1.0, 0.82, 0.68)
+const BLUE_HOUR: Color = Color(0.46, 0.42, 0.62)
+
 var _modulate: CanvasModulate
 var _lights: Array[PointLight2D] = []
 var _sources: Array[Vector2] = []
 var _scenery_lights: Array[PointLight2D] = []
+
+
+static func tint_for(amount: float) -> Color:
+	var t: float = clampf(amount, 0.0, 1.0)
+	if t <= 0.45:
+		return Color.WHITE.lerp(DUSK_WARM, t / 0.45)
+	if t <= 0.80:
+		return DUSK_WARM.lerp(BLUE_HOUR, (t - 0.45) / 0.35)
+	return BLUE_HOUR.lerp(NIGHT_TINT, (t - 0.80) / 0.20)
+
 
 func refresh(world: Expedition, amount: float) -> void:
 	if _modulate == null:
@@ -37,7 +51,7 @@ func refresh(world: Expedition, amount: float) -> void:
 	_sources.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.distance_squared_to(center) < b.distance_squared_to(center))
 	for index: int in range(_scenery_lights.size()):
 		_scenery_lights[index].position = _sources[index]
-	_modulate.color = Color.WHITE.lerp(Color(0.24, 0.28, 0.48), amount)
+	_modulate.color = tint_for(amount)
 	for light: PointLight2D in _lights:
 		light.energy = 1.25 * smoothstep(0.35, 1.0, amount)
 		light.visible = amount > 0.01

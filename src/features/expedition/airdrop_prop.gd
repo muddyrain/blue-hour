@@ -8,7 +8,8 @@ func _ready() -> void:
 	update_work(-1,0,false)
 
 func _draw() -> void:
-	draw_crate(self,searched)
+	IsoDraw.crate(self)
+	IsoDraw.marker(self, Vector2.ZERO, Color("9aebd6") if searched else IsoDraw.AMBER)
 
 
 static func draw_crate(canvas: CanvasItem, recovered: bool) -> void:

@@ -23,7 +23,7 @@ func _draw() -> void:
 		for actor: Dictionary in _actors:
 			if actor.get("alive", false) != true or actor.get("moving", false) != true or not actor.get("position") is Vector2:
 				continue
-			var point: Vector2 = actor.position
+			var point: Vector2 = IsoSpace.to_view(actor.position)
 			var drift: float = fmod(_clock * 20.0, 10.0)
 			var tint: Color = Color("b6f4e2")
 			tint.a = 0.8
@@ -36,7 +36,7 @@ func _draw() -> void:
 		for enemy: Dictionary in _enemies:
 			if enemy.get("alive", false) != true or not enemy.get("position") is Vector2:
 				continue
-			var point: Vector2 = enemy.position
+			var point: Vector2 = IsoSpace.to_view(enemy.position)
 			var ice: Color = Color("c2f3ff")
 			draw_arc(point, 18.0, PI * 0.05, PI * 0.95, 16, ice, 1.5, true)
 			draw_arc(point, 18.0, PI * 1.1, PI * 1.9, 16, ice, 1.5, true)

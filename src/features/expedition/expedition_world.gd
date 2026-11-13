@@ -65,6 +65,10 @@ func setup() -> void:
 	expedition._sort.name = "ActorsAndProps"
 	expedition._sort.y_sort_enabled = true
 	expedition.add_child(expedition._sort)
+	var logic: Node2D = Node2D.new()
+	logic.name = "LogicalActors"
+	expedition.add_child(logic)
+	expedition.set_meta("iso_logic", logic)
 	expedition._effects = Node2D.new()
 	expedition.add_child(expedition._effects)
 	if expedition.supply.generated.has("barricade"):
@@ -94,10 +98,11 @@ func setup() -> void:
 		expedition._sort.add_child(expedition._billboard_view)
 	var bus: Sprite2D = Sprite2D.new()
 	expedition._bus_sprite = bus
-	bus.texture = Expedition.BusTexture
-	bus.offset = Vector2(0, -128)
-	bus.scale = Vector2.ONE * (240.0 / 448.0)
+	bus.texture = null
+	bus.centered = true
 	bus.position = expedition.layout.bus_foot()
+	var bus_art: IsoBusView = IsoBusView.new()
+	bus.add_child(bus_art)
 	expedition._sort.add_child(bus)
 	if expedition.pump_station_mode():
 		expedition._world._make_pump_station()
@@ -180,6 +185,7 @@ func setup() -> void:
 		expedition.add_child(expedition.bus_view)
 	expedition._night_lighting = NightLighting.new()
 	expedition.add_child(expedition._night_lighting)
+	_project_visuals()
 	print("BH_SORTIE start day=%d members=%d" % [expedition.day, expedition.survivors.size()])
 
 
@@ -213,7 +219,9 @@ func _make_actor(enemy: bool, index: int, point: Vector2, profile: Dictionary = 
 	if not enemy and not profile.is_empty():
 		TraitRules.apply(actor,profile,expedition.tuning.survivor_speed)
 	actor.position = point
-	expedition._sort.add_child(actor)
+	var logic_root: Node = expedition.get_meta("iso_logic") if expedition.has_meta("iso_logic") else expedition._sort
+	logic_root.add_child(actor)
+	IsoSpace.attach_actor(actor, expedition._sort)
 	return actor
 
 
@@ -398,3 +406,22 @@ func _street_supply_entrances() -> Array[Vector2]:
 				doors.append(TaskActions.site_point(generated, site))
 				break
 	return doors if doors.size() == 2 and doors[0].is_finite() and doors[1].is_finite() else []
+
+func _project_visuals() -> void:
+	for node: Node in expedition._sort.get_children():
+		_project_node(node)
+	if expedition._barricade_view != null:
+		_project_node(expedition._barricade_view)
+	if expedition._recon_view != null:
+		_project_node(expedition._recon_view)
+
+
+func _project_node(node: Node) -> void:
+	if node is PumpStationArt:
+		for child: Node in node.get_children():
+			if child is Node2D:
+				IsoSpace.place(child, child.position)
+		return
+	if node is Node2D and not node.has_meta("iso_map"):
+		IsoSpace.place(node, node.position)
+

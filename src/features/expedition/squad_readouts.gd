@@ -10,7 +10,7 @@ func update_members(members: Array[FieldActor], world_to_screen: Transform2D, vi
 	for actor: FieldActor in members:
 		if not actor.visible or actor.activity == FieldActor.Activity.DOWN:
 			continue
-		var head: Vector2 = world_to_screen * (actor.position + actor.visual.position + Vector2(0, -72))
+		var head: Vector2 = world_to_screen * (IsoSpace.to_view(actor.position) + actor.visual.position + Vector2(0, -72))
 		# Leave the north-facing long barrel and the face clear, with stable team-side placement.
 		var rect: Rect2 = Rect2(head + Vector2(-96 if actor.actor_id == 0 else 20, -25), Vector2(76, 27))
 		var definition: SurvivorDefinition = SurvivorRoster.definition(actor.member_id)

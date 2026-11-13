@@ -20,137 +20,18 @@ func _ready() -> void:
 
 
 func _draw() -> void:
-	var street_material: bool = int(layout.world_data.get("art_revision", 0)) == 3
-	var blue_hour: bool = _blue_hour()
-	var open_streets: bool = layout.world_data.has("open_streets")
-	var compact: bool = int(layout.world_data.get("open_streets", 0)) >= OpenStreetsV1.COMPACT_VERSION
-	var junction: Rect2 = OpenStreetsV1.turn_junction(layout.roads[0], layout.roads[1]) \
-		if compact and layout.world_data.topology != "commercial" else Rect2()
-	var warehouse: bool = layout.world_data.has("warehouse_district")
-	var seeded_warehouse: bool = layout.world_data.get("warehouse_district", {}).has("family")
-	var loading_yard: Dictionary = layout.world_data.get("loading_yard", {})
-	var rescue_court: Dictionary = layout.world_data.get("rescue_court", {})
-	var grass: Color = Color(0.59, 0.72, 0.76, 0.56) if blue_hour else Color(0.93, 0.94, 0.81, 0.58) if street_material else Color(0.77, 0.88, 0.76, 0.42)
-	draw_rect(layout.world_bounds, Color("344846") if blue_hour else Color("59634c") if street_material else Color("586b60"))
-	draw_texture_rect(StreetBlock.GrassTexture, layout.world_bounds, true, grass)
-	for parcel: Dictionary in layout.world_data.parcels:
-		var area: Rect2=WorldLayout.rect(parcel.rect)
-		draw_rect(area, Color("3c514b") if blue_hour else Color("62694f") if street_material else Color("56664e"))
-		draw_texture_rect(StreetBlock.GrassTexture, area, true, grass if blue_hour else Color(0.93, 0.94, 0.8, 0.60) if street_material else Color(0.7, 0.84, 0.66, 0.5))
-		if warehouse and not seeded_warehouse:
-			var service_area: Rect2 = area.grow(-WarehouseDistrict.PERIMETER)
-			draw_rect(service_area, Color("4d5657"))
-			draw_texture_rect(StreetBlock.ConcreteTexture, service_area, true, Color(0.66, 0.73, 0.77, 0.46))
-		if seeded_warehouse:
-			# Separate working concrete from unpaved setbacks. Load pads and paths
-			# are drawn below from their actual footprints.
-			var buildings: Array = parcel.buildings
-			for entity: Dictionary in layout.world_data.entities:
-				if entity.id not in buildings:
-					continue
-				var pad: Rect2 = WorldgenScale.visible_rect(entity).grow_individual(20.0, 12.0, 20.0, 72.0).intersection(area)
-				draw_rect(pad, Color("475557"))
-				draw_texture_rect(StreetBlock.ConcreteTexture, pad, true, Color(0.65, 0.72, 0.76, 0.44))
-		if parcel.id == loading_yard.get("parcel"):
-			_loading_yard_floor(loading_yard)
-		if parcel.id == rescue_court.get("parcel"):
-			_rescue_court_floor(rescue_court)
-		for court: Dictionary in parcel.courtyards:
-			_court(court)
-		# Authored orthogonal shared paths join frontages and courts; no nav debug lines.
-		for walk: Array in parcel.walks:
-			var paving: Rect2=WorldLayout.rect(walk).intersection(area)
-			if street_material:
-				_paving(paving)
-				if blue_hour and paving.size.y > paving.size.x and paving.has_area():
-					_walk_edges(paving)
-			else:
-				draw_rect(paving.grow(3).intersection(area),Color("676e62"))
-				draw_rect(paving,Color("909384"))
-				draw_texture_rect(StreetBlock.PavingTexture,paving,true,Color(0.83,0.89,0.81,0.65))
+	var doors: Array[Vector2] = supply_entrances.duplicate()
+	IsoDraw.ground(self, layout, doors, true)
+	if layout.world_data.has("loading_yard"):
+		IsoDraw.fill(self, WorldLayout.rect(layout.world_data.loading_yard.bounds), Color("4a5560"))
+		IsoDraw.stroke(self, WorldLayout.rect(layout.world_data.loading_yard.bounds), Color("6a7580"), 1.5)
+	if layout.world_data.has("rescue_court"):
+		IsoDraw.fill(self, WorldLayout.rect(layout.world_data.rescue_court.bounds), Color("8b9890"))
+		IsoDraw.stroke(self, WorldLayout.rect(layout.world_data.rescue_court.bounds), Color("7f8778"), 1.5)
+	for parcel: Dictionary in layout.world_data.get("parcels", []):
 		for detail: Dictionary in parcel.get("dressing", []):
 			if detail.has("surface"):
-				var surface: Texture2D = WarehouseDressingArt.texture(detail.slot)
-				if surface != null:
-					draw_texture_rect(surface, WorldLayout.rect(detail.surface), false)
-	# One continuous verge on each street, cut by all actual connections.
-	for road: Rect2 in layout.roads:
-		var width: float = minf(road.size.x, road.size.y)
-		var verge: int = 28
-		if compact and (width == OpenStreetsV1.ARTERIAL_WIDTH or road == junction):
-			verge = OpenStreetsV1.SIDEWALK_WIDTH
-		elif open_streets and width == OpenStreetsV1.WIDE_ARTERIAL_WIDTH:
-			verge = 96
-		var paving: Rect2 = road.grow(verge).intersection(layout.world_bounds)
-		if street_material:
-			_paving(paving)
-		else:
-			draw_rect(paving,Color("93998a"))
-			draw_texture_rect(StreetBlock.PavingTexture,paving,true,Color(0.88,0.91,0.86,0.52))
-	if compact:
-		_paving(OpenStreetsV1.boarding_paving(layout.world_data.bus))
-	if not loading_yard.is_empty():
-		_loading_yard_surface(loading_yard)
-	for entity: Dictionary in layout.world_data.entities:
-		var block: Rect2=WorldLayout.rect(entity.rect)
-		var door: Vector2=WorldLayout.point(entity.door)
-		var apron: Rect2=Rect2(block.position.x-8,block.end.y-3,block.size.x+16,64)
-		if street_material:
-			# Adjacent facades share the same material coordinates and foundation line.
-			_paving(apron)
-			draw_rect(Rect2(block.position.x-4,block.end.y-3,block.size.x+8,5),Color("4c5660") if blue_hour else Color("68665d"))
-			draw_rect(Rect2(door-Vector2(29,48),Vector2(58,5)),Color("90969b") if blue_hour else Color("bbb2a1"))
-			draw_rect(Rect2(door-Vector2(31,43),Vector2(62,4)),Color("596473") if blue_hour else Color("898376"))
-		else:
-			draw_rect(apron,Color("969b8c"))
-			draw_texture_rect(StreetBlock.PavingTexture,apron,true,Color(0.9,0.94,0.87,0.56))
-			draw_rect(Rect2(block.position.x-5,block.end.y-5,block.size.x+10,10),Color("434e48"))
-			draw_rect(Rect2(door-Vector2(29,48),Vector2(58,8)),Color("c1bdac"))
-			draw_rect(Rect2(door-Vector2(32,40),Vector2(64,7)),Color("7a8177"))
-	for road: Rect2 in layout.roads:
-		draw_rect(road, Color("263748") if blue_hour else Color("34434b"))
-		draw_texture_rect(StreetBlock.AsphaltTexture, road, true, Color(0.63, 0.74, 0.95, 0.43) if blue_hour else Color(0.73, 0.8, 0.82, 0.45))
-	if blue_hour and not open_streets:
-		_bus_curb_paint()
-	for road: Rect2 in layout.roads:
-		if road == junction:
-			_junction_curbs(junction)
-			continue
-		var horizontal: bool=road.size.x>road.size.y
-		var length: int=int(road.size.x if horizontal else road.size.y)
-		var tangent: Vector2 = Vector2.RIGHT if horizontal else Vector2.DOWN
-		for step: int in range(12,length-12,32):
-			for side: int in [-1,1]:
-				var p: Vector2=road.position+(Vector2(step,-3 if side<0 else road.size.y+1) if horizontal else Vector2(-3 if side<0 else road.size.x+1,step))
-				if _junction(p,road): continue
-				if blue_hour:
-					_curb(p, tangent, side, road, step % 160 == 12)
-				else:
-					draw_line(p, p + tangent * 26.0, Color("b6b6a4"), 3)
-					if step % 160 == 12:
-						draw_rect(Rect2(p+Vector2(1,5),Vector2(18,4)),Color("28363a"))
-		for step: int in range(32,length-32,88):
-			var p: Vector2=Vector2(road.position.x+step,road.get_center().y) if horizontal else Vector2(road.get_center().x,road.position.y+step)
-			var center_line: Color = Color("aa956d") if minf(road.size.x, road.size.y) >= WorldgenScale.MAIN_WIDTH else Color("727879")
-			if not _junction(p,road) and (open_streets or not blue_hour or not layout.bus_block.grow(40).has_point(p)):
-				draw_line(p, p + tangent * 32.0, center_line if blue_hour else Color("c3b27d"), 2)
-	# Crossings mark the actual perpendicular road connections, never a collision.
-	for a: Rect2 in layout.roads:
-		if a.size.x<=a.size.y: continue
-		for b: Rect2 in layout.roads:
-			if b.size.x>=b.size.y or not a.intersects(b): continue
-			if compact and a.intersection(b).intersects(junction): continue
-			var y: float = a.position.y - 25 if b.position.y < a.position.y else a.end.y + 8
-			for stripe: int in range(8,int(b.size.x)-8,17):
-				draw_rect(Rect2(b.position.x+stripe,y,9,18),Color("939e9e") if blue_hour else Color("b9bca9"))
-			if blue_hour:
-				_crossing_landings(b, y)
-	if blue_hour:
-		_supply_lights()
-	if not loading_yard.is_empty():
-		_loading_yard_lights(loading_yard)
-	if not rescue_court.is_empty():
-		_rescue_court_lights(rescue_court)
+				IsoDraw.fill(self, WorldLayout.rect(detail.get("rect", detail.get("surface", [0,0,1,1]))), Color("9aa392"))
 
 
 func _junction_curbs(junction: Rect2) -> void:

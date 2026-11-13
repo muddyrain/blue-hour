@@ -16,16 +16,17 @@ func _draw() -> void:
 	for job: Dictionary in x.search_assignments.ordered():
 		var actor: FieldActor = x.search_member(int(job.member_id))
 		if actor != null and actor.activity == FieldActor.Activity.MOVING:
-			x.draw_dashed_line(actor.position, x.search_site(StringName(job.site_id)).door, Color("e3c879"), 1.5, 8.0)
+			x.draw_dashed_line(IsoSpace.to_view(actor.position), IsoSpace.to_view(x.search_site(StringName(job.site_id)).door), Color("e3c879"), 1.5, 8.0)
 	if x.phase == Expedition.Phase.BOARDING:
-		x.draw_circle(x.layout.bus_door, x.tuning.boarding_radius, Color(0.9, 0.75, 0.3, 0.2))
-		x.draw_arc(x.layout.bus_door, x.tuning.boarding_radius, 0.0, TAU, 48, Color("e3c879"), 2.0)
+		x.draw_circle(IsoSpace.to_view(x.layout.bus_door), x.tuning.boarding_radius, Color(0.9, 0.75, 0.3, 0.2))
+		x.draw_arc(IsoSpace.to_view(x.layout.bus_door), x.tuning.boarding_radius, 0.0, TAU, 48, Color("e3c879"), 2.0)
 	if x.goal != Vector2.ZERO and x.phase != Expedition.Phase.FINISHED:
-		x.draw_arc(x.goal, 13.0, 0.0, TAU, 24, Color("b3e8d9"), 2.0, true)
-		x.draw_line(x.goal - Vector2(6, 0), x.goal + Vector2(6, 0), Color("b3e8d9"), 2.0)
+		var goal_view: Vector2 = IsoSpace.to_view(x.goal)
+		x.draw_arc(goal_view, 13.0, 0.0, TAU, 24, Color("b3e8d9"), 2.0, true)
+		x.draw_line(goal_view - Vector2(6, 0), goal_view + Vector2(6, 0), Color("b3e8d9"), 2.0)
 		for actor: FieldActor in x.survivors:
 			if actor.activity == FieldActor.Activity.MOVING and not x.has_search_job(actor.member_id):
-				x.draw_dashed_line(actor.position, x.goal, Color(0.8, 0.95, 0.91, 0.4), 1.0, 8.0)
+				x.draw_dashed_line(IsoSpace.to_view(actor.position), goal_view, Color(0.8, 0.95, 0.91, 0.4), 1.0, 8.0)
 
 
 func _shot_effect(from: Vector2, to: Vector2, damage: float) -> void:
@@ -35,7 +36,7 @@ func _shot_effect(from: Vector2, to: Vector2, damage: float) -> void:
 
 func _shot_trace(from: Vector2, to: Vector2, colour: Color) -> void:
 	var line: Line2D = Line2D.new()
-	line.points = PackedVector2Array([from, to])
+	line.points = PackedVector2Array([IsoSpace.to_view(from), IsoSpace.to_view(to)])
 	line.width = 1.5
 	line.default_color = colour
 	x._effects.add_child(line)
@@ -50,7 +51,7 @@ func _hit_effect(to: Vector2, damage: float, survivor_hit: bool) -> void:
 
 func _draw_hit_effect(to: Vector2, damage: float, survivor_hit: bool, prefix: String) -> void:
 	var impact: Node2D = Node2D.new()
-	impact.position = to + Vector2(0, -30)
+	impact.position = IsoSpace.to_view(to) + Vector2(0, -30)
 	x._effects.add_child(impact)
 	for index: int in range(4):
 		var spark: Line2D = Line2D.new()
@@ -74,7 +75,7 @@ func _combat_popup(at: Vector2, text: String, colour: Color) -> void:
 	label.add_theme_color_override("font_color", colour)
 	label.add_theme_color_override("font_outline_color", Color("142d36"))
 	label.add_theme_constant_override("outline_size", 3)
-	label.position = at
+	label.position = IsoSpace.to_view(at)
 	x._effects.add_child(label)
 	var popup: Tween = label.create_tween()
 	popup.tween_property(label, "position:y", label.position.y - 18.0, 0.5)
@@ -104,7 +105,7 @@ func _keep_squad_in_view() -> void:
 	var points: Array[Vector2] = []
 	for actor: FieldActor in x.survivors:
 		if actor.visible and actor.health > 0.0 and actor.activity != FieldActor.Activity.DOWN:
-			points.append(actor.position)
+			points.append(IsoSpace.to_view(actor.position))
 	x.camera.keep_points_visible(points)
 
 
@@ -128,7 +129,7 @@ func _street_camera_start() -> Vector2:
 				area = both
 			var roof_room: float = clampf((view_size.y - area.size.y) * 0.5 - 96, 0, 72)
 			focus = area.get_center() - Vector2(0, roof_room)
-	return x.camera.framed_position(focus)
+	return x.camera.framed_position(IsoSpace.to_view(focus))
 
 func _present_support() -> void:
 	if not x.build_mode() or x.support_panel==null: return
@@ -140,7 +141,8 @@ func _present_support() -> void:
 	var heal_text: String="Q 治疗 · %.1fs"%state.cooldowns.heal if state.cooldowns.heal>0 else "Q 治疗 · 队员%d +%.0fHP"%[plan.member_id,plan.amount] if not plan.is_empty() else "Q 治疗 · 无受伤存活者"
 	var strike_text: String="E 空袭 · %.1fs"%state.cooldowns.airstrike if state.cooldowns.airstrike>0 else "左键确认 · 右键/Esc取消" if x.support_aiming else "E 空袭 · 就绪"
 	if not x.support_available(): heal_text="治疗 · 当前阶段不可用"; strike_text="空袭 · 当前阶段不可用"
-	var point: Vector2=x.get_global_mouse_position()
+	var view_point: Vector2=x.get_global_mouse_position()
+	var point: Vector2=IsoSpace.to_map(view_point)
 	var aim_plan: Dictionary = x.support_plan_airstrike(point) if x.support_aiming else {}
 	var legal: bool = not aim_plan.is_empty()
 	if x._barricade_view != null:
@@ -152,8 +154,8 @@ func _present_support() -> void:
 		var caller: FieldActor=null
 		for actor: FieldActor in x.survivors:
 			if actor.health>0 and actor.visible and actor.activity not in [2,3,4] and (caller==null or actor.position.distance_to(point)<caller.position.distance_to(point) or (actor.position.distance_to(point)==caller.position.distance_to(point) and actor.member_id<caller.member_id)): caller=actor
-		if caller!=null: x.support_aim.present_caller(caller.position)
-	x.support_aim.present(point,BasicSupport.POLICY.airstrike_radius*BuildItems.frozen_factors(x.supply.generated.build).blast,legal,x.support_aiming)
+		if caller!=null: x.support_aim.present_caller(IsoSpace.to_view(caller.position))
+	x.support_aim.present(view_point,BasicSupport.POLICY.airstrike_radius*BuildItems.frozen_factors(x.supply.generated.build).blast,legal,x.support_aiming)
 
 func _present_power() -> void:
 	if not x.power_mode() or x.power_panel==null: return
@@ -258,7 +260,7 @@ func locate_objective(id: String) -> void:
 	x._locate_ring.scale = Vector2.ONE * ring_scale
 	x._locate_ring.width = 3.0 / ring_scale
 	if x._locate_tween!=null: x._locate_tween.kill()
-	x._locate_marker.position=target
+	x._locate_marker.position=IsoSpace.to_view(target)
 	x._locate_marker.show()
 	x._locate_marker.modulate.a=1.0
 	x._locate_tween=x.create_tween()
@@ -272,7 +274,7 @@ func _make_camera() -> void:
 	x.camera.min_zoom = x.tuning.camera_min_zoom
 	x.camera.max_zoom = x.tuning.camera_max_zoom
 	x.camera.zoom_step = x.tuning.camera_zoom_step
-	x.camera.bounds = x.layout.world_bounds
+	x.camera.bounds = IsoSpace.view_bounds(x.layout.world_bounds)
 	x.add_child(x.camera)
 	x.camera.pan_by(_street_camera_start() - x.camera.position)
 

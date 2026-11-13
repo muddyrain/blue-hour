@@ -24,21 +24,13 @@ func _draw() -> void:
 	if layout == null:
 		return
 	var station: Dictionary = layout.world_data.pump_station
-	var yard: Rect2 = WorldLayout.rect(station.yard)
-	var arena: Rect2 = WorldLayout.rect(station.arena)
-	var road: Rect2 = layout.roads[0]
-	draw_rect(layout.world_bounds, Color("253a3f"))
-	draw_texture_rect(StreetBlock.GrassTexture, layout.world_bounds, true, Color(0.43, 0.60, 0.66, 0.33))
-	_draw_channel(WorldLayout.rect(station.channel), yard.position.y)
-	_paving(yard.grow(-8), Color("3c4954"))
-	_paving(Rect2(Vector2(0, road.position.y - 52), Vector2(road.size.x, 52)), CONCRETE)
-	_paving(Rect2(Vector2(0, road.end.y), Vector2(road.size.x, 31)), Color("45515b"))
-	_draw_road(road)
-	_draw_arena(arena)
-	_draw_front_route(station)
-	_draw_side_route(station)
-	_draw_gate(WorldLayout.point(station.front_gate), float(station.front_gap), true)
-	_draw_gate(WorldLayout.point(station.side_gate), float(station.side_gap), false)
+	IsoDraw.ground(self, layout, [], true)
+	IsoDraw.fill(self, WorldLayout.rect(station.channel), Color("3a6a80"))
+	IsoDraw.fill(self, WorldLayout.rect(station.yard).grow(-8), Color("4a5560"))
+	IsoDraw.fill(self, WorldLayout.rect(station.arena), Color("5a656e"))
+	IsoDraw.stroke(self, WorldLayout.rect(station.yard), Color("8a9096"), 1.5)
+	IsoDraw.marker(self, WorldLayout.point(station.front_gate), IsoDraw.AMBER)
+	IsoDraw.marker(self, WorldLayout.point(station.side_gate), Color("8acbc0"))
 
 
 func _draw_channel(water: Rect2, quay_end: float) -> void:

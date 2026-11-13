@@ -2,6 +2,7 @@ class_name ExpeditionFeedback
 extends RefCounted
 ## Presentation hooks for future hitstop, camera shake, animation and audio.
 
+var _atmosphere: ExpeditionAtmosphere = ExpeditionAtmosphere.new()
 var x: Expedition
 
 
@@ -88,13 +89,9 @@ func _show_notice(message: String) -> void:
 func _refresh_night_lighting() -> void:
 	if x._night_lighting == null:
 		return
-	var daylight: float = x.tuning.daylight_seconds
-	var dusk: float = daylight * x.threat.rules.late_fraction
-	var deep_night: float = daylight * x.threat.rules.deep_fraction
-	var night_grade: float = 0.78
-	var amount: float = night_grade * smoothstep(dusk, daylight, x.elapsed)
-	if x.elapsed >= daylight:
-		amount = lerpf(night_grade, 1.0, smoothstep(daylight, deep_night, x.elapsed))
+	var daylight: float = maxf(1.0, x.tuning.daylight_seconds)
+	var amount: float = clampf(x.elapsed / daylight, 0.0, 1.0)
+	_atmosphere.refresh(x, amount)
 	x._night_lighting.refresh(amount, x._bus_sprite.get_global_transform_with_canvas().origin, x.camera.zoom.x)
 
 

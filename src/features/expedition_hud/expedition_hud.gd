@@ -11,8 +11,8 @@ signal bus_start_requested
 # Matches the verified P03-2 ActorVisual identities; no dependency on that class.
 const IDENTITY_COLORS: Array[Color] = [Color("80ddd8"), Color("f2c37f")]
 const TONES: Dictionary[String, Color] = {
-	"normal": Color("dbe8eb"), "info": Color("80ddd8"),
-	"warning": Color("f2c37f"), "danger": Color("ffaca7"),
+	"normal": Color("e8dcc4"), "info": Color("8fbf7a"),
+	"warning": Color("d9a24a"), "danger": Color("c8553d"),
 }
 
 var _paused: bool = false
@@ -49,6 +49,7 @@ var _persona_id: int = 0
 var _members_panel: PanelContainer
 var _has_exploration_rows: bool=false
 var _exploration_objectives: ExplorationObjectives
+var _readouts: ExpeditionHudReadouts = ExpeditionHudReadouts.new()
 var _member_scroll: ScrollContainer
 
 
@@ -56,6 +57,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build_top()
+	_readouts.build(self)
 	_build_actions()
 	_build_help()
 	# Let native traversal include objective, threat, member and skill controls.
@@ -63,9 +65,15 @@ func _ready() -> void:
 	visibility_changed.connect(_on_visibility_changed)
 	get_viewport().size_changed.connect(_fit_persona_members)
 	refresh({})
+	ExpeditionHudTheme.skin(self)
+	_mission.add_theme_color_override("font_color", ExpeditionHudTheme.AMBER)
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	if is_visible_in_tree() and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_B:
+		_request_bus()
+		get_viewport().set_input_as_handled()
+		return
 	# Native no-focus Tab entry only searches direct Viewport Control children.
 	# This HUD lives under its owner's CanvasLayer; seed existing UI navigation
 	# locally, then let Control handle the focus ring. Never intercept Space.
@@ -92,6 +100,10 @@ func refresh(state: Dictionary) -> void:
 	for row: Dictionary in state.get("exploration_objectives",[]): rows.append(row)
 	_has_exploration_rows=not rows.is_empty()
 	_exploration_objectives.present(rows)
+	for index: int in range(mini(rows.size(), _exploration_objectives.labels.size())):
+		_exploration_objectives.labels[index].add_theme_color_override("font_color",
+			ExpeditionHudTheme.SAGE if rows[index].get("complete", false) else
+			ExpeditionHudTheme.SECONDARY if rows[index].get("optional", false) else ExpeditionHudTheme.AMBER)
 	_exploration_objectives.visible=not rows.is_empty() and _objective_expanded
 	_objective.text=_text(state,"objective")
 	_objective.visible=_objective_expanded and not _objective.text.is_empty()
@@ -102,6 +114,7 @@ func refresh(state: Dictionary) -> void:
 	if not delta.is_empty():
 		_currency.text += "    本次 %s" % delta
 	if state.get("resource_text") is String: _currency.text = state.resource_text
+	_readouts.refresh(self, rows, state)
 	_currency.tooltip_text = "货币 " + _text(state,"currency_text","—") + "\n本次 " + delta
 	_paused = state.get("paused", false) == true
 	_pause_state.text = "已暂停" if _paused else "出击中"
@@ -198,7 +211,7 @@ func place_help_above_lane() -> void:
 
 func _build_top() -> void:
 	var panel: PanelContainer = _panel(self, "MissionPanel")
-	panel.position = Vector2(16,16)
+	panel.position = Vector2.ZERO
 	panel.custom_minimum_size.x = 264
 	panel.size.x = 264
 	var mission_box: VBoxContainer = _column(panel)
@@ -349,9 +362,10 @@ func _build_member(parent: Control, index: int) -> void:
 	bar.step = 0.0
 	_passive(bar)
 	var fill: StyleBoxFlat = StyleBoxFlat.new()
-	fill.bg_color = IDENTITY_COLORS[index % 2]
+	fill.bg_color = ExpeditionHudTheme.SAGE
 	bar.add_theme_stylebox_override("fill", fill)
 	box.add_child(bar)
+	ExpeditionHudTheme.skin(bar)
 	var status: Label = _label(box,"Activity",14)
 	status.autowrap_mode = TextServer.AUTOWRAP_OFF
 	status.clip_text=true
@@ -368,8 +382,11 @@ func _build_actions() -> void:
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	panel.offset_left = -168
 	panel.offset_right = 168
-	panel.offset_top = -68
-	panel.offset_bottom = -16
+	panel.offset_top = -116
+	panel.offset_bottom = -80
+	var surface: StyleBoxFlat = panel.get_theme_stylebox("panel") as StyleBoxFlat
+	surface.content_margin_top = 2
+	surface.content_margin_bottom = 2
 	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	var column: VBoxContainer = _column(panel)
 	column.add_theme_constant_override("separation",3)
@@ -397,7 +414,7 @@ func _build_actions() -> void:
 	_hint.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	_hint.clip_text=true
 	_hint.mouse_filter=Control.MOUSE_FILTER_PASS
-	_hint.add_theme_color_override("font_outline_color",Color("10232b"))
+	_hint.add_theme_color_override("font_outline_color",Color("22201e"))
 	_hint.add_theme_constant_override("outline_size",3)
 	panel.resized.connect(_place_bus_hint.bind(panel))
 	_place_bus_hint(panel)
@@ -447,9 +464,8 @@ func _refresh_member(index: int, state: Dictionary) -> void:
 	_members[index].status.tooltip_text=_text(state,"detail",_text(state,"status"))
 	_members[index].ammo.tooltip_text=_text(state,"ammo")
 	_members[index].detail=full_name + "\n" + _text(state,"detail",_text(state,"status")) + "\n" + _text(state,"ammo")
-	var colour: Color = state.get("colour", IDENTITY_COLORS[index % 2])
-	title.add_theme_color_override("font_color", colour)
-	(bar.get_theme_stylebox("fill") as StyleBoxFlat).bg_color = colour
+	title.add_theme_color_override("font_color", ExpeditionHudTheme.CREAM)
+	(bar.get_theme_stylebox("fill") as StyleBoxFlat).bg_color = ExpeditionHudTheme.SAGE
 	var hp: Variant = state.get("hp")
 	var maximum: Variant = state.get("max_hp")
 	if not _finite_number(hp) or not _finite_number(maximum) or float(maximum) <= 0.0:
@@ -525,7 +541,7 @@ func _panel(parent: Control, node_name: String) -> PanelContainer:
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	# Wheel events must not escape an opaque panel into the camera behind it.
 	panel.mouse_force_pass_scroll_events = false
-	var style: StyleBoxFlat = get_theme_stylebox("panel","PanelContainer").duplicate() as StyleBoxFlat
+	var style: StyleBoxFlat = ExpeditionHudTheme.box()
 	style.content_margin_left=8
 	style.content_margin_right=8
 	style.content_margin_top=6
@@ -546,6 +562,7 @@ func _label(parent: Control, node_name: String, font_size: int) -> Label:
 	var label: Label = Label.new()
 	label.name = node_name
 	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", ExpeditionHudTheme.CREAM)
 	_passive(label)
 	parent.add_child(label)
 	return label
@@ -568,6 +585,7 @@ func _button(parent: Control, node_name: String, title: String, action: Callable
 		button.add_theme_stylebox_override(state,style)
 	button.pressed.connect(action)
 	parent.add_child(button)
+	ExpeditionHudTheme.skin(button)
 	return button
 
 
@@ -617,7 +635,27 @@ func _compact_persona_card(card: PersonaCard, first_aid: String) -> void:
 	card.custom_minimum_size.x=148
 	card.portrait_button.custom_minimum_size=Vector2(40,40)
 	card.info_button.custom_minimum_size=Vector2(22,24)
-	card.primary_label.add_theme_font_size_override("font_size",13)
+	if not card.has_meta("field_skin"):
+		ExpeditionHudTheme.skin(card)
+		var surface: StyleBoxFlat = (card.get_node("CardSurface") as PanelContainer).get_theme_stylebox("panel") as StyleBoxFlat
+		surface.content_margin_top = 1
+		surface.content_margin_bottom = 1
+		card.set_meta("field_skin", true)
+	card.primary_label.add_theme_color_override("font_color", ExpeditionHudTheme.CREAM)
+	(card.health_bar.get_theme_stylebox("fill") as StyleBoxFlat).bg_color = ExpeditionHudTheme.SAGE
+	# Keep the original hidden health label for details/tests; expose its HP in the identity row.
+	var identity: Node = card.primary_label.get_parent()
+	var hp: Label = identity.get_node_or_null("FieldHp") as Label
+	if hp == null:
+		hp = Label.new()
+		hp.name = "FieldHp"
+		hp.clip_text = true
+		hp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hp.add_theme_font_size_override("font_size", 11)
+		identity.add_child(hp)
+	hp.text = card.name_label.text.get_slice("  ", 1) + "\n" + card.health_label.text.split(" · ")[0]
+	hp.add_theme_color_override("font_color", ExpeditionHudTheme.SECONDARY)
+	card.primary_label.add_theme_font_size_override("font_size",12)
 	card.name_label.visible = not first_aid.is_empty()
 	card.health_label.hide()
 	card.ammo_label.hide()

@@ -78,7 +78,7 @@ func _make_ui() -> void:
 			var kit: PanelContainer = PanelContainer.new()
 			kit.position = Vector2(16, 540 if x.third_power_panel != null else 460)
 			kit.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			kit.add_theme_stylebox_override("panel", CampStyle.box(Color(0.045, 0.10, 0.14, 0.90), Color("48646d"), 8))
+			kit.add_theme_stylebox_override("panel", ExpeditionHudTheme.box())
 			var label: Label = CampStyle.label("\n".join(names), 13, CampStyle.TEAL)
 			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			if x.get_viewport_rect().size.y - kit.position.y < 80.0:
@@ -90,7 +90,7 @@ func _make_ui() -> void:
 				var detail: PanelContainer = PanelContainer.new()
 				detail.name = "SpecialtyDetails"
 				detail.position = Vector2(16, kit.position.y - 150)
-				detail.add_theme_stylebox_override("panel", CampStyle.box(Color("10252f"), Color("48646d"), 8))
+				detail.add_theme_stylebox_override("panel", ExpeditionHudTheme.box())
 				detail.add_child(CampStyle.label("\n".join(names), 13, CampStyle.TEAL))
 				detail.hide()
 				x._hud.view.add_child(detail)
@@ -102,6 +102,7 @@ func _make_ui() -> void:
 						label.accept_event())
 			kit.add_child(label)
 			x._hud.view.add_child(kit)
+	_arrange_field_hud()
 	x._update_ui()
 
 
@@ -126,6 +127,16 @@ func _update_ui() -> void:
 		else:
 			_update_member_display()
 			x._readouts.update_members(x.survivors, x.get_global_transform_with_canvas(), x.get_viewport_rect().size)
+	if x.bus_view != null and not x.bus_view.has_meta("field_skin"):
+		x.bus_view.skip_button.theme = x._hud.view.theme
+		ExpeditionHudTheme.skin(x.bus_view)
+		x.bus_view.set_meta("field_skin", true)
+	var map_panel: Node = x._hud.view.get_node_or_null("OverviewPanel")
+	if map_panel != null:
+		(map_panel.get_node("Overview") as Control).queue_redraw()
+	if x.support_panel != null:
+		x.support_panel.heal_button.text = x.support_panel.heal_button.text.replace("Q  ", "Q 治疗\n")
+		x.support_panel.airstrike_button.text = x.support_panel.airstrike_button.text.replace("E  ", "E 空袭\n")
 	var timing: Dictionary = x.time_status()
 	var boarding: Dictionary = x.boarding_status(x.phase == Expedition.Phase.BOARDING)
 	var engine_text: String = "发动引擎 →"
@@ -197,6 +208,14 @@ func _update_ui() -> void:
 		"threat":x.threat_status(),
 		"burst_warning":x.combat.burst.warning_text() if x.combat.burst != null and x.phase != Expedition.Phase.FINISHED else "",
 	})
+	if map_panel != null:
+		var bus_shortcut: Button = map_panel.get_node("MapOverlay/BusShortcut") as Button
+		bus_shortcut.disabled = x._hud.view._bus_button.disabled
+		bus_shortcut.focus_mode = Control.FOCUS_NONE if bus_shortcut.disabled else Control.FOCUS_ALL
+	var bus_command: Button = x._hud.view.get_node_or_null("CommandStrip/CommandBus") as Button
+	if bus_command != null:
+		bus_command.disabled = x._hud.view._bus_button.disabled
+		bus_command.focus_mode = Control.FOCUS_NONE if bus_command.disabled else Control.FOCUS_ALL
 	if x.drill_panel != null:
 		x.drill_panel.refresh()
 	if x.station_art != null:
@@ -337,3 +356,87 @@ func _exploration_objective_rows() -> Array[Dictionary]:
 
 func _event_reward_text(reward: Dictionary) -> String:
 	return "%d 粮" % reward.food if reward.food > 0 else "%d 币" % reward.cash
+
+
+func _arrange_field_hud() -> void:
+	var strip: HBoxContainer = HBoxContainer.new()
+	strip.name = "CommandStrip"
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	strip.alignment = BoxContainer.ALIGNMENT_CENTER
+	strip.add_theme_constant_override("separation", 8)
+	x._hud.view.add_child(strip)
+	strip.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	strip.offset_left = -200
+	strip.offset_right = 200
+	strip.offset_top = -76
+	strip.offset_bottom = -8
+	if x.support_panel != null:
+		x.support_panel.heal_button.reparent(strip)
+		x.support_panel.airstrike_button.reparent(strip)
+		x.support_panel.hide()
+	for panel: PowerSlotPanel in [x.power_panel, x.second_power_panel, x.third_power_panel]:
+		if panel == null: continue
+		panel.reparent(strip)
+		panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	if strip.get_child_count() == 3:
+		var bus_command: Button = C1HudButton.new()
+		bus_command.name = "CommandBus"
+		bus_command.text = "B 巴士"
+		bus_command.icon = preload("res://assets/candidates/bus_01.png")
+		bus_command.expand_icon = true
+		bus_command.add_theme_constant_override("icon_max_width", 28)
+		bus_command.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		bus_command.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+		bus_command.add_theme_font_size_override("font_size", 12)
+		bus_command.pressed.connect(x._hud.view._request_bus)
+		strip.add_child(bus_command)
+	for child: Control in strip.get_children():
+		child.custom_minimum_size = Vector2(64, 64)
+		child.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var map_panel: PanelContainer = PanelContainer.new()
+	map_panel.name = "OverviewPanel"
+	map_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	x._hud.view.add_child(map_panel)
+	map_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	map_panel.offset_left = 8
+	map_panel.offset_right = 164
+	map_panel.offset_top = -228
+	map_panel.offset_bottom = -56
+	var overview: ExpeditionHudOverview = ExpeditionHudOverview.new()
+	overview.name = "Overview"
+	overview.world = x
+	map_panel.add_child(overview)
+	var location: Label = Label.new()
+	location.name = "LocationName"
+	location.text = x.mission_title
+	location.tooltip_text = x.mission_title
+	location.add_theme_font_size_override("font_size", 12)
+	location.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	location.clip_text = true
+	location.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	x._hud.view.add_child(location)
+	location.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	location.offset_left = 8
+	location.offset_right = 164
+	location.offset_top = -54
+	location.offset_bottom = -34
+	var bus_shortcut: Button = C1HudButton.new()
+	bus_shortcut.name = "BusShortcut"
+	bus_shortcut.text = "B"
+	bus_shortcut.tooltip_text = "巴士 · B\n发动 / 集合至巴士"
+	var overlay: Control = Control.new()
+	overlay.name = "MapOverlay"
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	map_panel.add_child(overlay)
+	overlay.add_child(bus_shortcut)
+	bus_shortcut.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	bus_shortcut.offset_left = -34
+	bus_shortcut.offset_right = -4
+	bus_shortcut.offset_top = 4
+	bus_shortcut.offset_bottom = 34
+	# Overlay the corner without participating in the minimap container layout.
+	bus_shortcut.set_as_top_level(false)
+	bus_shortcut.pressed.connect(x._hud.view._request_bus)
+	ExpeditionHudTheme.skin(x._hud.view)
+	x._hud.view._mission.add_theme_color_override("font_color", ExpeditionHudTheme.AMBER)

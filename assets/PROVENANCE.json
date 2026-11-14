@@ -929,14 +929,14 @@
     },
     {
       "path": "assets/iso/props/bike.png",
-      "sha256": "5b4cb541817584121ca3665892c61cf1b80bb15d7c97a670b19e5c638ad64e00",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
+      "sha256": "663fe5635eaba0b14165c3dd78a89c4074a99d6a87238b9f29e0b34966c55915",
+      "origin": "Original project isometric art, hand-authored with Pillow in tools/make_iso_art.py (2:1 everyday city bicycles with filled rubber tires, rims, spokes, shaded colored frames, saddles, handlebars and optional baskets; the existing timber bike shelter reuses the same bicycle geometry). Not AI-generated and not a third-party pack.",
       "license": "No additional license granted"
     },
     {
       "path": "assets/iso/props/bike_shelter.png",
-      "sha256": "315db59834f1060ad9e1e7d054815cd70a91ba18718124594793c48601080849",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
+      "sha256": "f7d31d5e09ed1462a2ff596be586dd1547f907d8546dfaf2e0a515ed133bdef2",
+      "origin": "Original project isometric art, hand-authored with Pillow in tools/make_iso_art.py (2:1 everyday city bicycles with filled rubber tires, rims, spokes, shaded colored frames, saddles, handlebars and optional baskets; the existing timber bike shelter reuses the same bicycle geometry). Not AI-generated and not a third-party pack.",
       "license": "No additional license granted"
     },
     {
@@ -1225,6 +1225,18 @@
       "path": "assets/iso/props/sign.png",
       "sha256": "5905df28520563ce87a6685b8ce753841619a829bdc5ad1bec40cb3c95936ad0",
       "origin": "Original project isometric art, hand-authored in tools/make_iso_art.py (2:1 street dressing: a small healthy parked compact, a yard trash bin, and a blank pole-mounted board with abstract color bars). Not AI-generated and not a third-party pack.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/props/bike_b.png",
+      "sha256": "00f89f1202f43b5a97e96563e2b966dee99bd601bc7b9f06603d49ec4d1ae592",
+      "origin": "Original project isometric art, hand-authored with Pillow in tools/make_iso_art.py (2:1 everyday city bicycles with filled rubber tires, rims, spokes, shaded colored frames, saddles, handlebars and optional baskets; the existing timber bike shelter reuses the same bicycle geometry). Not AI-generated and not a third-party pack.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/props/bike_c.png",
+      "sha256": "68ae0c54e4c941485da03ad0ff6f90ed1d1858bdf15f636d33b71241d33aebec",
+      "origin": "Original project isometric art, hand-authored with Pillow in tools/make_iso_art.py (2:1 everyday city bicycles with filled rubber tires, rims, spokes, shaded colored frames, saddles, handlebars and optional baskets; the existing timber bike shelter reuses the same bicycle geometry). Not AI-generated and not a third-party pack.",
       "license": "No additional license granted"
     }
   ]

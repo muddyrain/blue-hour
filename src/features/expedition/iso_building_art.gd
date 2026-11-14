@@ -161,7 +161,7 @@ static func prop_for(kind: String, variant: int = 0) -> String:
 	if "bike_shelter" in key or key == "shelter":
 		return "props/bike_shelter.png"
 	if key == "bike":
-		return "props/bike.png"
+		return ["props/bike.png", "props/bike_b.png", "props/bike_c.png"][posmod(variant, 3)]
 	if "tram" in key:
 		return "props/tram_stop.png"
 	if "trash" in key or key == "bin":

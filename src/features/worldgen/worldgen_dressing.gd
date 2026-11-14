@@ -81,16 +81,18 @@ static func enrich(data: Dictionary) -> void:
 		occupied.append(WorldLayout.rect(wall).grow(16))
 	for parcel: Dictionary in data.parcels:
 		for detail: Dictionary in parcel.get("dressing", []):
-			if detail.has("point"):
+			if detail.has("surface"):
+				occupied.append(WorldLayout.rect(detail.surface))
+			elif detail.has("point"):
 				var point: Vector2 = WorldLayout.point(detail.point)
-				occupied.append(Rect2(point - Vector2(16, 16), Vector2(32, 32)))
+				occupied.append(_prop_mark(String(detail.get("kind", "")), point))
 			for rect: Array in detail.get("collisions", [detail.collision] if detail.has("collision") else []):
 				occupied.append(WorldLayout.rect(rect).grow(8))
 	var reserved: Array[Rect2] = ExplorationLayout._reserved(data)
 	var random: RandomNumberGenerator = RogueLayout.rng("town-props-more:" + String(data.get("seed", "0")))
 	for parcel: Dictionary in data.parcels:
-		_edge_furniture(data, parcel, occupied, reserved, random)
 		_street_sets(data, parcel, occupied, reserved, random)
+		_edge_furniture(data, parcel, occupied, reserved, random)
 		_fill_open(data, parcel, occupied, reserved, random)
 
 
@@ -98,16 +100,16 @@ static func _scatter(data: Dictionary, occupied: Array[Rect2], reserved: Array[R
 	# Visual-only street furniture. No collision, so navigation certificates stay intact.
 	var random: RandomNumberGenerator = RogueLayout.rng("town-props:" + String(data.get("seed", "0")))
 	for parcel: Dictionary in data.parcels:
+		# Give coherent street sets room before scattering the smaller props.
+		_street_sets(data, parcel, occupied, reserved, random)
 		for court: Dictionary in parcel.courtyards:
 			if court.kind in ["garden", "court"]:
 				_fill_garden(data, parcel, court, occupied, reserved, random)
 			elif court.kind == "parking":
-				_fill_parking(data, parcel, court, occupied, reserved, random)
 				_fill_yard_edge(data, parcel, court, occupied, reserved, random)
 			elif court.kind == "loading":
 				_fill_yard_edge(data, parcel, court, occupied, reserved, random)
 		_edge_furniture(data, parcel, occupied, reserved, random)
-		_street_sets(data, parcel, occupied, reserved, random)
 		_fill_open(data, parcel, occupied, reserved, random)
 
 
@@ -118,17 +120,17 @@ static func _fill_garden(data: Dictionary, parcel: Dictionary, court: Dictionary
 		return
 	_border_garden(data, parcel, court, occupied, reserved, random)
 	var kinds: Array[String] = ["tree", "tree_b", "bush", "hedge", "planter", "yard_wall", "bike", "vending", "trash"]
-	var budget: int = clampi(int(area.get_area() / 7000.0), 6, 28)
+	var budget: int = clampi(int(area.get_area() / 4500.0), 10, 40)
 	var added: int = 0
 	var attempts: int = 0
-	while added < budget and attempts < budget * 6:
+	while added < budget and attempts < budget * 10:
 		attempts += 1
 		var kind: String = kinds[random.randi_range(0, kinds.size() - 1)]
 		var point: Vector2 = Vector2(
 			random.randf_range(area.position.x + 16.0, area.end.x - 16.0),
 			random.randf_range(area.position.y + 16.0, area.end.y - 16.0)
 		)
-		var mark: Rect2 = Rect2(point - Vector2(16, 16), Vector2(32, 32))
+		var mark: Rect2 = _prop_mark(kind, point)
 		if not _free(data, parcel, mark, occupied, reserved):
 			continue
 		parcel.dressing.append({"kind": kind, "point": [point.x, point.y], "variant": random.randi_range(0, 3)})
@@ -148,25 +150,31 @@ static func _edge_furniture(data: Dictionary, parcel: Dictionary, occupied: Arra
 		var x: float = bounds.position.x + 48.0
 		while x < bounds.end.x - 48.0:
 			anchors.append(Vector2(x, y))
-			x += 80.0 + random.randf_range(-12.0, 12.0)
+			x += 52.0 + random.randf_range(-6.0, 6.0)
 	if edges.size() > 0 and edges[0]:
 		var y: float = bounds.position.y + 20.0
 		var x: float = bounds.position.x + 48.0
 		while x < bounds.end.x - 48.0:
 			anchors.append(Vector2(x, y))
-			x += 88.0
+			x += 56.0
 	var kinds: Array[String] = ["lamp", "pole", "planter", "bike", "bush", "vending", "tree", "crate", "trash", "sign"]
 	var added: int = 0
 	for point: Vector2 in anchors:
-		if added >= 16:
+		if added >= 32:
 			break
 		var kind: String = kinds[random.randi_range(0, kinds.size() - 1)]
-		var mark: Rect2 = Rect2(point - Vector2(12, 12), Vector2(24, 24))
-		if not _free(data, parcel, mark, occupied, reserved):
-			continue
-		parcel.dressing.append({"kind": kind, "point": [point.x, point.y], "variant": random.randi_range(0, 3)})
-		occupied.append(mark)
-		added += 1
+		# A frontage lip can itself be a walk. Try the next inner band without
+		# weakening any door, pavement, yard or bus reservation.
+		var inward: float = 1.0 if point.y < bounds.get_center().y else -1.0
+		for offset: float in [0.0, 48.0, 96.0]:
+			var candidate: Vector2 = point + Vector2(0, inward * offset)
+			var mark: Rect2 = _prop_mark(kind, candidate, 12.0)
+			if not _free(data, parcel, mark, occupied, reserved):
+				continue
+			parcel.dressing.append({"kind": kind, "point": [candidate.x, candidate.y], "variant": random.randi_range(0, 3)})
+			occupied.append(mark)
+			added += 1
+			break
 
 
 static func _fill_yard_edge(data: Dictionary, parcel: Dictionary, court: Dictionary,
@@ -204,17 +212,17 @@ static func _fill_open(data: Dictionary, parcel: Dictionary, occupied: Array[Rec
 	if area.size.x < 80.0 or area.size.y < 80.0:
 		return
 	var kinds: Array[String] = ["tree", "tree_b", "bush", "hedge", "planter", "yard_wall", "bike", "pole", "vending", "crate", "trash", "sign"]
-	var budget: int = clampi(int(area.get_area() / 14000.0), 4, 20)
+	var budget: int = clampi(int(area.get_area() / 6500.0), 10, 44)
 	var added: int = 0
 	var attempts: int = 0
-	while added < budget and attempts < budget * 8:
+	while added < budget and attempts < budget * 12:
 		attempts += 1
 		var kind: String = kinds[random.randi_range(0, kinds.size() - 1)]
 		var point: Vector2 = Vector2(
 			random.randf_range(area.position.x + 16.0, area.end.x - 16.0),
 			random.randf_range(area.position.y + 16.0, area.end.y - 16.0)
 		)
-		var mark: Rect2 = Rect2(point - Vector2(16, 16), Vector2(32, 32))
+		var mark: Rect2 = _prop_mark(kind, point)
 		if not _free(data, parcel, mark, occupied, reserved):
 			continue
 		parcel.dressing.append({"kind": kind, "point": [point.x, point.y], "variant": random.randi_range(0, 3)})
@@ -228,35 +236,40 @@ static func _street_sets(data: Dictionary, parcel: Dictionary, occupied: Array[R
 	# Intentional clusters: a parking stall with a car, a vending pair, a bike shelter.
 	for court: Dictionary in parcel.get("courtyards", []):
 		var kind: String = String(court.get("kind", ""))
+		if kind in ["garden", "court", "parking"] and random.randf() < 0.65:
+			var area: Rect2 = WorldLayout.rect(court.rect)
+			for point: Vector2 in [area.get_center() + Vector2(0, 33),
+					Vector2(area.position.x + 72, area.end.y - 24),
+					Vector2(area.end.x - 72, area.end.y - 24)]:
+				if area.encloses(_prop_mark("bike_shelter", point)) and _place_prop(
+						data, parcel, occupied, reserved, random, "bike_shelter", point, 28.0):
+					break
 		if kind == "parking":
 			_fill_parking(data, parcel, court, occupied, reserved, random)
-		elif kind in ["garden", "court"] and random.randf() < 0.35:
-			_place_prop(data, parcel, occupied, reserved, random, "bike_shelter",
-				WorldLayout.rect(court.rect).get_center(), 28.0)
 	var bounds: Rect2 = WorldLayout.rect(parcel.rect)
 	var edges: Array = parcel.get("road_edges", [false, false, false, false])
 	if edges.size() > 1 and edges[1]:
 		var lip: float = bounds.end.y - 36.0
 		var along: float = bounds.position.x + 96.0
 		var pads: int = 0
-		while along < bounds.end.x - 80.0 and pads < 3:
-			if random.randf() < 0.55:
+		while along < bounds.end.x - 80.0 and pads < 4:
+			if random.randf() < 0.8:
 				var pad: Rect2 = Rect2(along - 40.0, lip - 72.0, 80.0, 64.0)
-				if _free(data, parcel, pad, occupied, reserved, true):
+				if _free(data, parcel, pad, occupied, reserved):
 					parcel.dressing.append({"kind": "parking", "point": [pad.get_center().x, pad.get_center().y],
 						"surface": [pad.position.x, pad.position.y, pad.size.x, pad.size.y]})
 					_place_prop(data, parcel, occupied, reserved, random, "parked_car",
-						pad.get_center() + Vector2(0, 8.0), 24.0, random.randf() < 0.5, true)
+						pad.get_center() + Vector2(0, 8.0), 24.0, random.randf() < 0.5)
 					occupied.append(pad)
 					pads += 1
 					_place_prop(data, parcel, occupied, reserved, random, "sign",
 						Vector2(along + 56.0, lip - 8.0), 16.0)
-					if random.randf() < 0.5:
+					if random.randf() < 0.75:
 						_place_prop(data, parcel, occupied, reserved, random, "vending",
 							Vector2(along + 72.0, lip - 6.0), 14.0)
 						_place_prop(data, parcel, occupied, reserved, random, "trash",
 							Vector2(along + 88.0, lip - 6.0), 12.0)
-			along += 180.0
+			along += 152.0
 
 
 static func _fill_parking(data: Dictionary, parcel: Dictionary, court: Dictionary,
@@ -264,26 +277,28 @@ static func _fill_parking(data: Dictionary, parcel: Dictionary, court: Dictionar
 	var area: Rect2 = WorldLayout.rect(court.rect).grow(-12.0)
 	if area.size.x < 72.0 or area.size.y < 56.0:
 		return
-	var count: int = clampi(int(area.size.x / 90.0), 1, 3)
+	var count: int = clampi(int(area.size.x / 88.0), 1, 4)
 	var added: int = 0
 	var x: float = area.position.x + 8.0
 	while added < count and x + 64.0 <= area.end.x:
-		var pad: Rect2 = Rect2(x, area.position.y + 4.0, 64.0, minf(72.0, area.size.y - 8.0))
-		if _free(data, parcel, pad, occupied, reserved, true):
+		# Shallow courts start just below an apron: the old 4-unit margin
+		# always failed the 6-unit walk clearance. Keep an 8-unit inset.
+		var pad: Rect2 = Rect2(x, area.position.y + 8.0, 64.0, minf(72.0, area.size.y - 16.0))
+		if _free(data, parcel, pad, occupied, reserved):
 			parcel.dressing.append({"kind": "parking", "point": [pad.get_center().x, pad.get_center().y],
 				"surface": [pad.position.x, pad.position.y, pad.size.x, pad.size.y]})
-			if random.randf() < 0.75:
+			if random.randf() < 0.85:
 				_place_prop(data, parcel, occupied, reserved, random, "parked_car",
-					pad.get_center() + Vector2(0, 6.0), 22.0, random.randf() < 0.5, true)
-			elif random.randf() < 0.45:
-				_place_prop(data, parcel, occupied, reserved, random, "bike_shelter",
-					pad.get_center(), 28.0, false, true)
+					pad.get_center() + Vector2(0, 6.0), 22.0, random.randf() < 0.5)
+			else:
+				_place_prop(data, parcel, occupied, reserved, random, "bike",
+					pad.get_center(), 28.0)
 			occupied.append(pad)
+			added += 1
 		x += 88.0
-		added += 1
 	if added == 0:
 		_place_prop(data, parcel, occupied, reserved, random, "parked_car",
-			area.get_center(), 22.0, random.randf() < 0.5, true)
+			area.get_center(), 22.0, random.randf() < 0.5)
 	_place_prop(data, parcel, occupied, reserved, random, "pole",
 		Vector2(area.position.x + 16.0, area.position.y + 12.0), 14.0)
 	_place_prop(data, parcel, occupied, reserved, random, "sign",
@@ -292,18 +307,30 @@ static func _fill_parking(data: Dictionary, parcel: Dictionary, court: Dictionar
 
 static func _place_prop(data: Dictionary, parcel: Dictionary, occupied: Array[Rect2],
 		reserved: Array[Rect2], random: RandomNumberGenerator, kind: String, point: Vector2,
-		radius: float, flip: bool = false, ignore_walks: bool = false) -> void:
-	var mark: Rect2 = Rect2(point - Vector2(radius, radius), Vector2(radius * 2.0, radius * 2.0))
-	if not _free(data, parcel, mark, occupied, reserved, ignore_walks):
-		return
+		radius: float, flip: bool = false) -> bool:
+	var mark: Rect2 = _prop_mark(kind, point, radius)
+	if not _free(data, parcel, mark, occupied, reserved):
+		return false
 	var row: Dictionary = {"kind": kind, "point": [point.x, point.y], "variant": random.randi_range(0, 3)}
 	if flip:
 		row.flip = true
 	parcel.dressing.append(row)
 	occupied.append(mark)
+	return true
 
 
-static func _free(data: Dictionary, parcel: Dictionary, mark: Rect2, occupied: Array[Rect2], reserved: Array[Rect2], ignore_walks: bool = false) -> bool:
+static func _prop_mark(kind: String, point: Vector2, radius: float = 16.0) -> Rect2:
+	# These sprites extend beyond the old 32-unit placeholder footprint.
+	if kind == "bike_shelter":
+		return Rect2(point - Vector2(70, 86), Vector2(140, 106))
+	if kind == "bike":
+		return Rect2(point - Vector2(30, 8), Vector2(60, 20))
+	return Rect2(point - Vector2.ONE * radius, Vector2.ONE * radius * 2.0)
+
+
+static func _free(data: Dictionary, parcel: Dictionary, mark: Rect2, occupied: Array[Rect2], reserved: Array[Rect2]) -> bool:
+	if not WorldLayout.rect(parcel.rect).encloses(mark):
+		return false
 	if data.has("bus"):
 		if data.has("open_streets") and OpenStreetsV1.intersects_sweep(data.bus, mark, 20):
 			return false
@@ -313,16 +340,19 @@ static func _free(data: Dictionary, parcel: Dictionary, mark: Rect2, occupied: A
 			return false
 		if data.bus.has("door") and mark.grow(20).has_point(WorldLayout.point(data.bus.door)):
 			return false
-	for other: Rect2 in occupied + reserved:
+	# Avoid copying every occupied/reserved rectangle for every rejected candidate.
+	for other: Rect2 in occupied:
+		if mark.grow(6).intersects(other):
+			return false
+	for other: Rect2 in reserved:
 		if mark.grow(6).intersects(other):
 			return false
 	for road: Array in data.get("roads", []):
 		if mark.grow(8).intersects(WorldLayout.rect(road)):
 			return false
-	if not ignore_walks:
-		for walk: Array in parcel.get("walks", []):
-			if mark.grow(6).intersects(WorldLayout.rect(walk)):
-				return false
+	for walk: Array in parcel.get("walks", []):
+		if mark.grow(6).intersects(WorldLayout.rect(walk)):
+			return false
 	return true
 
 
@@ -336,15 +366,15 @@ static func _border_garden(data: Dictionary, parcel: Dictionary, court: Dictiona
 	while x < area.end.x - 20.0:
 		points.append(Vector2(x, area.end.y - 14.0))
 		points.append(Vector2(x, area.position.y + 16.0))
-		x += 72.0
+		x += 56.0
 	var y: float = area.position.y + 28.0
 	while y < area.end.y - 28.0:
 		points.append(Vector2(area.position.x + 16.0, y))
 		points.append(Vector2(area.end.x - 16.0, y))
-		y += 80.0
+		y += 60.0
 	var added: int = 0
 	for index: int in range(points.size()):
-		if added >= 14:
+		if added >= 20:
 			break
 		var point: Vector2 = points[index]
 		if point.distance_to(entry) < 48.0:

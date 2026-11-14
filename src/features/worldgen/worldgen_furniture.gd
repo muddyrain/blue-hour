@@ -3,7 +3,18 @@ extends Node2D
 ## Static frozen scenery, no input, timers, search sites or gameplay state.
 var detail: Dictionary
 
+
+func _ready() -> void:
+	var kind: String = str(detail.get("kind", detail.get("slot", "")))
+	var art: String = IsoBuildingArt.prop_for(kind, int(detail.get("variant", 0)))
+	if not art.is_empty():
+		IsoAtlas.attach(self, art)
+		set_meta("iso_kind", kind)
+
+
 func _draw() -> void:
+	if has_meta("iso_art"):
+		return
 	var kind: String = str(detail.get("kind", detail.get("slot", "")))
 	var width: float = float(detail.get("width", 36.0))
 	if kind == "wall" or kind == "courtyard_edge":

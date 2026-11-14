@@ -41,7 +41,15 @@ var _wall: Sprite2D
 
 func _ready() -> void:
 	if not iso_art.is_empty():
-		IsoAtlas.attach(self, iso_art)
+		var extra: float = 1.0
+		var meta: Dictionary = IsoAtlas.info(iso_art)
+		var map_size: Variant = meta.get("map", [])
+		if map_size is Array and map_size.size() >= 2 and front_width > 1.0 and body_depth > 1.0:
+			var authored: float = float(map_size[0]) + float(map_size[1])
+			if authored > 1.0:
+				# Keep 2:1 angles; never blow a sprite up enough to cover the street.
+				extra = clampf((front_width + body_depth) / authored, 0.62, 1.22)
+		IsoAtlas.attach(self, iso_art, extra)
 		_roof = Sprite2D.new()
 		_wall = Sprite2D.new()
 		_roof.visible = false

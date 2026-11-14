@@ -262,10 +262,10 @@ static func _house_templates() -> Array[Dictionary]:
 	var yard: float = float(a.south_walk) + WALK_WIDTH
 	return [
 		_entity("house_a", "house", "住宅", "buildings/house_a.png", [west - 312.0, north - 128.0, 160, 128], [west - 232.0, north + 16.0]),
-		_entity("house_c2", "house", "住宅", "buildings/house_c.png", [west - 136.0, north - 160.0, 128, 160], [west - 72.0, north + 16.0]),
+		_entity("house_c2", "house", "住宅", "buildings/house_g.png", [west - 136.0, north - 160.0, 128, 160], [west - 72.0, north + 16.0]),
 		_entity("house_c", "house", "住宅", "buildings/house_c.png", [400, yard, 128, 160], [464, yard + 184.0]),
-		_entity("house_b", "house", "住宅", "buildings/house_b.png", [544, yard, 144, 144], [616, yard + 168.0]),
-		_entity("house_a3", "house", "住宅", "buildings/house_a.png", [544, 1024, 128, 96], [608, 1144]),
+		_entity("house_b", "house", "住宅", "buildings/house_f.png", [544, yard, 144, 144], [616, yard + 168.0]),
+		_entity("house_a3", "house", "住宅", "buildings/house_d.png", [544, 1024, 128, 96], [608, 1144]),
 	]
 
 
@@ -355,7 +355,27 @@ static func _scenery() -> Array:
 		{"art": "props/crate.png", "point": [edge + 72.0, wood_end + 184.0], "kind": "crate"},
 		{"art": "props/crate.png", "point": [edge + 288.0, wood_end + 200.0], "kind": "crate"},
 		{"art": "props/crate.png", "point": [edge + 56.0, wood_end + 168.0], "kind": "crate"},
-	]
+	] + _canal_rails()
+
+
+static func _canal_rails() -> Array:
+	var a: Dictionary = _axis()
+	var west: float = float(a.west_bank) + BANK_WIDTH * 0.5
+	var east: float = float(a.east_bank) + BANK_WIDTH * 0.5
+	var ew_y: float = float(a.ew_y)
+	var south: float = float(a.south_walk)
+	var wood_y: float = float(a.wood_y)
+	var wood_end: float = float(a.wood_end)
+	var rows: Array = []
+	var y: float = 24.0
+	while y < BOUNDS.size.y - 24.0:
+		var on_road: bool = y >= ew_y - 8.0 and y <= south + 8.0
+		var on_wood: bool = y >= wood_y - 8.0 and y <= wood_end + 8.0
+		if not on_road and not on_wood:
+			rows.append({"art": "props/canal_rail_ns.png", "point": [west, y], "kind": "rail"})
+			rows.append({"art": "props/canal_rail_ns.png", "point": [east, y], "kind": "rail"})
+		y += 48.0
+	return rows
 
 
 static func _bind_sites(shops: Array[Dictionary], houses: Array[Dictionary], generated: Dictionary) -> void:

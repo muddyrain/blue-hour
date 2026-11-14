@@ -52,6 +52,28 @@ static func attach(host: Node2D, rel: String, extra_scale: float = 1.0) -> Sprit
 	return sprite
 
 
+static func flip_attached(host: Node2D, rel: String, extra_scale: float = 1.0) -> void:
+	# Mirror around the authored south-center foot so a flipped door stays on the facade.
+	var sprite: Sprite2D = host.get_node_or_null("IsoSprite") as Sprite2D
+	if sprite == null or sprite.texture == null:
+		return
+	var factor: float = art_scale() * extra_scale
+	var meta: Dictionary = info(rel)
+	var tex_w: float = float(sprite.texture.get_width())
+	var foot: Array = meta.get("foot", [tex_w * 0.5, sprite.texture.get_height()])
+	sprite.flip_h = true
+	sprite.position.x = -(tex_w - float(foot[0])) * factor
+	var lights: Sprite2D = host.get_node_or_null("IsoLights") as Sprite2D
+	if lights == null or lights.texture == null:
+		return
+	var light_rel: String = rel.replace(".png", "_lights.png")
+	var lmeta: Dictionary = info(light_rel)
+	var ltex_w: float = float(lights.texture.get_width())
+	var lfoot: Array = lmeta.get("foot", [ltex_w * 0.5, lights.texture.get_height()])
+	lights.flip_h = true
+	lights.position.x = -(ltex_w - float(lfoot[0])) * factor
+
+
 static func stamp_cell(canvas: CanvasItem, rel: String, cell: Vector2i, tile: float = 64.0) -> void:
 	var tex: Texture2D = texture(rel)
 	if tex == null:

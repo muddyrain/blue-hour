@@ -158,6 +158,16 @@ static func prop_for(kind: String, variant: int = 0) -> String:
 		return "props/crate.png"
 	if "vending" in key:
 		return ["props/vending_red.png", "props/vending_blue.png", "props/vending_green.png"][posmod(variant, 3)]
+	if "bike_shelter" in key or key == "shelter":
+		return "props/bike_shelter.png"
 	if key == "bike":
-		return "props/bike.png"
+		return ["props/bike.png", "props/bike_b.png", "props/bike_c.png"][posmod(variant, 3)]
+	if "tram" in key:
+		return "props/tram_stop.png"
+	if "trash" in key or key == "bin":
+		return "props/trash.png"
+	if "sign" in key or "billboard" in key:
+		return "props/sign.png"
+	if key == "parked_car" or key == "car":
+		return ["props/parked_car.png", "props/parked_car_b.png"][posmod(variant, 2)]
 	return ""

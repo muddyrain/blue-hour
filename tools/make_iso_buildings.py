@@ -1241,18 +1241,10 @@ def shrine():
 
 
 def bike_shelter():
-    w, d, h = 128, 80, 36
-    img, vx, _ = sprite_canvas(w, d, h + 10, pad=18, extra_south=10)
-    ground_shadow(img, vx, w, d)
-    dr = ImageDraw.Draw(img)
-    for x, y in ((-w / 2 + 8, 0), (w / 2 - 8, 0), (-w / 2 + 8, -d), (w / 2 - 8, -d)):
-        dr.line([vx(x, y), vx(x, y, h)], fill=rgb((90, 90, 86)), width=3)
-    draw_hip_roof(img, vx, w, d, h, 8, (148, 128, 104), over=6, courses=4)
-    for ox in (-36, 0, 36):
-        p = vx(ox, -12, 0)
-        dr.ellipse((p[0] - 7, p[1] - 7, p[0] + 3, p[1] + 3), outline=rgb((50, 50, 52)), width=2)
-        dr.ellipse((p[0] + 8, p[1] - 5, p[0] + 18, p[1] + 5), outline=rgb((50, 50, 52)), width=2)
-        dr.line((p[0] - 2, p[1] - 2, p[0] + 10, p[1] - 14), fill=rgb((50, 50, 52)), width=2)
+    import make_iso_art as street_art
+    img = street_art.bike_shelter()
+    global LAST_FOOT, LAST_MAP
+    LAST_FOOT, LAST_MAP = street_art.LAST_FOOT, (128, 80)
     return img
 
 
@@ -1333,13 +1325,10 @@ def tree():
 
 
 def make_bike():
-    img, vx, _ = sprite_canvas(28, 12, 16, pad=10, extra_south=6)
-    dr = ImageDraw.Draw(img)
-    p = vx(0, 0, 0)
-    dr.ellipse((p[0] - 10, p[1] - 8, p[0] + 2, p[1] + 4), outline=rgb((50, 50, 52)), width=2)
-    dr.ellipse((p[0] + 8, p[1] - 6, p[0] + 20, p[1] + 6), outline=rgb((50, 50, 52)), width=2)
-    dr.line((p[0] - 4, p[1] - 2, p[0] + 12, p[1] - 16), fill=rgb((50, 50, 52)), width=2)
-    dr.line((p[0] + 12, p[1] - 16, p[0] + 12, p[1] - 22), fill=rgb((50, 50, 52)), width=2)
+    import make_iso_art as street_art
+    img = street_art.make_bike()
+    global LAST_FOOT, LAST_MAP
+    LAST_FOOT, LAST_MAP = street_art.LAST_FOOT, (60, 16)
     return img
 
 

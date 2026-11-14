@@ -2,9 +2,9 @@ class_name ParcelScenery
 extends RefCounted
 ## Fit the same site envelopes against each theme's existing building and scenery profiles.
 
-const SETBACK: Vector2 = Vector2(24.0, 24.0)
-const DOOR_APRON: float = 88.0
-const EDGE_GAP: float = 20.0
+const SETBACK: Vector2 = Vector2(16.0, 16.0)
+const DOOR_APRON: float = 72.0
+const EDGE_GAP: float = 16.0
 
 
 static func fit(data: Dictionary) -> void:
@@ -40,9 +40,9 @@ static func _fit_plot(data: Dictionary, plot: Dictionary, buildings: Array,
 		if barrier.intersects(bounds):
 			exclusions.append(barrier)
 	for building: Dictionary in buildings:
-		exclusions.append(WorldgenScale.visible_rect(building).grow(16.0))
+		exclusions.append(WorldgenScale.visible_rect(building).grow(10.0))
 	for walk: Array in plot.walks:
-		exclusions.append(WorldLayout.rect(walk).grow(12.0))
+		exclusions.append(WorldLayout.rect(walk).grow(8.0))
 		clear_walks.append(WorldLayout.rect(walk))
 	for court: Dictionary in plot.courtyards:
 		exclusions.append(WorldLayout.rect(court.rect).grow(12.0))
@@ -52,7 +52,7 @@ static func _fit_plot(data: Dictionary, plot: Dictionary, buildings: Array,
 	var candidates: Array[Rect2] = _lots(interior, exclusions, minimum)
 	var eligible: bool = not candidates.is_empty()
 	var annexes: int = 0
-	var budget: int = clampi(int(bounds.get_area() / 520000.0), 1, 4)
+	var budget: int = clampi(int(bounds.get_area() / 260000.0), 1, 6)
 	var types: Array[String] = []
 	if industrial:
 		types.assign(["garage", "warehouse", "convenience_store"])
@@ -112,7 +112,7 @@ static func _fit_plot(data: Dictionary, plot: Dictionary, buildings: Array,
 	# A frontage with enough space for a wider loading or parking strip gets one.
 	# Narrow land can still support a repair or planting pad at its accessible edge.
 	for index: int in range(budget):
-		var apron_size: Vector2 = Vector2(720.0, 304.0) if industrial else Vector2(448.0, 224.0)
+		var apron_size: Vector2 = Vector2(480.0, 200.0) if industrial else Vector2(288.0, 144.0)
 		var pads: Array[Rect2] = _lots(interior, exclusions, apron_size)
 		if pads.is_empty():
 			apron_size = minimum
@@ -120,7 +120,7 @@ static func _fit_plot(data: Dictionary, plot: Dictionary, buildings: Array,
 		if pads.is_empty():
 			break
 		var apron: Rect2 = _near_frontage(pads, plot, bounds, apron_size)
-		var use: String = "loading" if industrial and apron.size.x >= 720.0 else \
+		var use: String = "loading" if industrial and apron.size.x >= 480.0 else \
 			"staging" if industrial else "garden" if data.topology == "residential" else "parking"
 		if use == "staging":
 			WarehouseScenery._surface(plot, "staging_%d" % index, WarehouseSlots.MAT, apron.grow(-10.0))

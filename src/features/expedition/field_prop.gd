@@ -37,6 +37,8 @@ var _work: Label
 var _bar: ProgressBar
 var _roof: Sprite2D
 var _wall: Sprite2D
+var _lights: Sprite2D
+var window_glow: float = 0.0
 
 
 func _ready() -> void:
@@ -50,6 +52,7 @@ func _ready() -> void:
 				# Keep 2:1 angles; never blow a sprite up enough to cover the street.
 				extra = clampf((front_width + body_depth) / authored, 0.62, 1.22)
 		IsoAtlas.attach(self, iso_art, extra)
+		_attach_window_lights(extra)
 		_roof = Sprite2D.new()
 		_wall = Sprite2D.new()
 		_roof.visible = false
@@ -130,6 +133,46 @@ func _part(region: Rect2, point: Vector2, factor: float) -> Sprite2D:
 	sprite.scale = Vector2.ONE * factor
 	add_child(sprite)
 	return sprite
+
+
+func _attach_window_lights(extra_scale: float) -> void:
+	var rel: String = iso_art.replace(".png", "_lights.png")
+	if IsoAtlas.info(rel).is_empty() or IsoAtlas.texture(rel) == null:
+		return
+	var sprite: Sprite2D = Sprite2D.new()
+	sprite.name = "IsoLights"
+	sprite.texture = IsoAtlas.texture(rel)
+	sprite.centered = false
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	var factor: float = IsoAtlas.art_scale() * extra_scale
+	sprite.scale = Vector2.ONE * factor
+	var meta: Dictionary = IsoAtlas.info(rel)
+	var foot: Array = meta.get("foot", [sprite.texture.get_width() * 0.5, sprite.texture.get_height()])
+	sprite.position = -Vector2(float(foot[0]), float(foot[1])) * factor
+	sprite.modulate = Color(1, 1, 1, 0)
+	sprite.visible = false
+	add_child(sprite)
+	_lights = sprite
+
+
+func set_window_glow(amount: float, world_tint: Color) -> void:
+	if _lights == null:
+		return
+	window_glow = smoothstep(0.22, 0.72, clampf(amount, 0.0, 1.0))
+	_lights.visible = window_glow > 0.01
+	# CanvasModulate tints the world blue at night; invert it so shop windows stay warm.
+	var warm: Color = Color(1.12, 0.96, 0.62, window_glow)
+	_lights.modulate = Color(
+		clampf(warm.r / maxf(world_tint.r, 0.14), 0.7, 5.0),
+		clampf(warm.g / maxf(world_tint.g, 0.14), 0.7, 5.0),
+		clampf(warm.b / maxf(world_tint.b, 0.14), 0.5, 5.0),
+		window_glow
+	)
+
+
+func apply_occlusion_fade(fade: float) -> void:
+	if _lights != null:
+		_lights.modulate.a = window_glow * fade
 
 
 func _draw() -> void:

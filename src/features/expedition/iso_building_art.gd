@@ -140,10 +140,20 @@ static func prop_for(kind: String, variant: int = 0) -> String:
 	var key: String = kind.to_lower()
 	if key == "lamp" or key.ends_with("lamp"):
 		return "props/lamp.png"
+	if "tree_b" in key or (("tree" in key) and posmod(variant, 2) == 1):
+		return "props/tree_b.png"
 	if "tree" in key:
 		return "props/tree.png"
 	if "planter" in key:
 		return "props/planter.png"
+	if "hedge" in key:
+		return "props/hedge.png"
+	if "bush" in key:
+		return "props/bush.png"
+	if key == "yard_wall" or key == "wall" or "yard_wall" in key:
+		return "props/yard_wall.png"
+	if "pole" in key:
+		return "props/pole.png"
 	if "crate" in key or key == "box":
 		return "props/crate.png"
 	if "vending" in key:

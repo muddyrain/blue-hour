@@ -53,10 +53,13 @@ func refresh(world: Expedition, amount: float) -> void:
 	_sources.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.distance_squared_to(center) < b.distance_squared_to(center))
 	for index: int in range(_scenery_lights.size()):
 		_scenery_lights[index].position = _sources[index]
-	_modulate.color = tint_for(amount)
+	var tint: Color = tint_for(amount)
+	_modulate.color = tint
 	for light: PointLight2D in _lights:
 		light.energy = 1.25 * smoothstep(0.35, 1.0, amount)
 		light.visible = amount > 0.01
+	for prop: FieldProp in world._buildings:
+		prop.set_window_glow(amount, tint)
 
 func _add_light(parent: Node2D, offset: Vector2, texture: Texture2D, spread: float) -> void:
 	var light: PointLight2D = PointLight2D.new()

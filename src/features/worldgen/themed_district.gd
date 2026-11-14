@@ -144,6 +144,16 @@ static func populate(plot: Dictionary, entities: Array, roads: Array, bus: Dicti
 			WorldgenGeometry._add_building("row_house", 1, home_x, home_foot, plot, entities, roads, bus)
 		if linear:
 			WorldgenGeometry._add_building("row_house", 0, x, home_foot, plot, entities, roads, bus)
+		# Pack remaining residential frontage so enclosed courts are not two shops on a lawn.
+		if home_foot < foot - 80.0:
+			var homes: Array[String] = ["detached_home", "row_house", "detached_home"]
+			_fill_front(plot, entities, roads, bus, west, east, home_foot, homes, 4)
+	var fillers: Array[String] = []
+	if commercial:
+		fillers.assign(["convenience_store", "eatery", "garage"])
+	else:
+		fillers.assign(["detached_home", "row_house"])
+	_fill_front(plot, entities, roads, bus, west, east, foot if linear else side_foot, fillers, 4)
 	var approaches: Dictionary = {}
 	for name: String in paths:
 		var point: Vector2 = start
@@ -159,3 +169,24 @@ static func populate(plot: Dictionary, entities: Array, roads: Array, bus: Dicti
 	plot.kind = "shopfront" if commercial else "garden"
 	return {"family":style, "roles":{"main":plot.id}, "approaches":approaches,
 		"food":[main.id, spare.id], "local_segments":plan.local_segments, "barriers":fences}
+
+
+static func _fill_front(plot: Dictionary, entities: Array, roads: Array, bus: Dictionary,
+		west: float, east: float, foot: float, types: Array[String], limit: int) -> void:
+	var added: int = 0
+	var cursor: float = west + 16.0
+	var index: int = 0
+	while cursor + 200.0 < east and added < limit and index < 28:
+		var typ: String = types[index % types.size()]
+		var width: float = float(WorldgenScale.WIDTH[typ])
+		if cursor + width > east - 8.0:
+			index += 1
+			if width > east - cursor - 8.0:
+				break
+			continue
+		if WorldgenGeometry._add_building(typ, index + 2, cursor, foot, plot, entities, roads, bus):
+			cursor += width + 28.0
+			added += 1
+		else:
+			cursor += 48.0
+		index += 1

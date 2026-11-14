@@ -19,6 +19,8 @@ FONT_DIR = Path("/usr/share/fonts/opentype/noto")
 LAST_FOOT = (0.0, 0.0)
 LAST_MAP = (0.0, 0.0)
 MANIFEST: dict = {"scale": 0.5, "sprites": {}}
+WINDOW_QUADS: list = []
+FASCIA_QUADS: list = []
 
 
 def to_view(x: float, y: float) -> tuple[float, float]:
@@ -90,6 +92,8 @@ def sprite_canvas(w, d, h, pad=20, extra_south=16):
     global LAST_FOOT, LAST_MAP
     LAST_FOOT = foot
     LAST_MAP = (w, d)
+    WINDOW_QUADS.clear()
+    FASCIA_QUADS.clear()
     return img, vx, foot
 
 
@@ -248,6 +252,7 @@ def draw_window(img, pts, frame, glass, lit=False, mullions=True, sill=True):
     edge(img, pts, shade(frame, -0.35), 1)
     if sill:
         ImageDraw.Draw(img).line([lerp_pt(a, b, -0.02), lerp_pt(a, b, 1.02)], fill=rgb(shade(frame, -0.15)), width=max(2, SCALE))
+    WINDOW_QUADS.append({"pts": list(pts), "kind": "window"})
 
 
 def window_on_south(vx, w, d, x, z, ww, wh):
@@ -283,6 +288,7 @@ def draw_door(img, vx, face, w, d, offset, z, width, height, color, style="panel
         fill_masked(img, g, rgb(glass or (140, 180, 190), 220))
         ImageDraw.Draw(img).line([lerp_pt(g[0], g[1], 0.5), lerp_pt(g[3], g[2], 0.5)], fill=rgb(shade(color, -0.2)), width=1)
         fill_masked(img, [lerp_pt(g[3], g[2], 0.1), lerp_pt(g[3], g[2], 0.45), lerp_pt(g[0], g[1], 0.35)], rgb((255, 255, 255), 50))
+        WINDOW_QUADS.append({"pts": list(g), "kind": "door"})
     else:
         for t in (0.22, 0.52, 0.78):
             ImageDraw.Draw(img).line(
@@ -447,6 +453,9 @@ def fascia_band(img, vx, w, d, z0, z1, south_color, east_color, wrap=True):
         e = wall_quad(vx, w / 2, 0, w / 2, -d, z0, z1)
         fill_masked(img, e, east_color)
         edge(img, e, shade(east_color[:3], -0.3), 1)
+    FASCIA_QUADS.append({"pts": list(s), "kind": "fascia"})
+    if e is not None:
+        FASCIA_QUADS.append({"pts": list(e), "kind": "fascia"})
     return s, e
 
 
@@ -982,58 +991,139 @@ def make_bike():
     return img
 
 
+
 def stone_bridge():
-    w, d = 160, 96
-    deck_z = 20
-    img, vx, _ = sprite_canvas(w, d, 64, pad=18, extra_south=10)
-    ground_shadow(img, vx, w, d)
-    draw_wall(img, vx, -w / 2, 0, w / 2, 0, 0, deck_z, (150, 146, 138), 0.04, 81)
-    draw_wall(img, vx, w / 2, 0, w / 2, -d, 0, deck_z, (128, 124, 116), 0.04, 82)
-    deck = [vx(-w / 2, 0, deck_z), vx(w / 2, 0, deck_z), vx(w / 2, -d, deck_z), vx(-w / 2, -d, deck_z)]
-    noisy_fill(img, deck, (168, 164, 156), 0.05, 80)
-    edge(img, deck, (110, 106, 98), 1)
-    arch = []
+    """Arched masonry span: canal is 96 wide plus 32-unit banks; deck follows the 96-deep EW road."""
+    w, d = 168, 104
+    drop = 38
+    deck_z = 18
+    rail_h = 16
+    img, vx, _ = sprite_canvas(w, d, deck_z + rail_h + 10, pad=22, extra_south=drop + 16)
+    # Foot stays at bank/road level so placement on the south curb does not change.
+    stone = (168, 160, 148)
+    stone_dk = (118, 112, 102)
+    stone_lt = (196, 190, 178)
+    cap = (186, 180, 168)
+    # Far (north) skirt hanging into the canal, then the deck, then the south arch wall.
+    north_wall = [vx(-w / 2, -d, deck_z), vx(w / 2, -d, deck_z), vx(w / 2, -d, -drop), vx(-w / 2, -d, -drop)]
+    draw_tiled_quad(img, north_wall, shade(stone, -0.18), shade(stone, -0.05), stone_dk, courses=10, divisions=14)
+    # East end of the far skirt
+    east_far = [vx(w / 2, 0, deck_z), vx(w / 2, -d, deck_z), vx(w / 2, -d, -drop), vx(w / 2, 0, -drop)]
+    draw_tiled_quad(img, east_far, shade(stone, -0.22), shade(stone, -0.1), shade(stone_dk, -0.1), courses=10, divisions=8)
+    arch_span = 52  # half-width of the water opening (~canal 96)
+
+    def arch_pt(u, y, inner=0.0):
+        # u in [-1, 1] along the span; rise is a semicircle standing on the water line.
+        rise = (1.0 - u * u) * (deck_z + drop - 4) - drop
+        return vx(u * arch_span, y, rise + inner)
+
+    # Inner soffit just behind the south opening; a full barrel fill would bleed across the east pier.
+    soffit = []
     for i in range(17):
-        t = i / 16
-        arch.append(vx(lerp(-w * 0.32, w * 0.32, t), 0, 1 + math.sin(t * math.pi) * 16))
-    arch += [vx(w * 0.32, 0, 0), vx(-w * 0.32, 0, 0)]
-    fill_masked(img, arch, (40, 86, 96))
-    # voussoir ticks around the arch
-    for i in range(1, 16):
-        t = i / 16
-        inner = vx(lerp(-w * 0.32, w * 0.32, t), 0, 1 + math.sin(t * math.pi) * 16)
-        outer = vx(lerp(-w * 0.32, w * 0.32, t), 0, 1 + math.sin(t * math.pi) * 19)
-        ImageDraw.Draw(img).line([inner, outer], fill=rgb((110, 108, 100), 180), width=1)
-    # stone joints on the deck
-    a, b, c, dpt = deck
+        u = i / 16 * 2 - 1
+        soffit.append(arch_pt(u, 0, 0))
+    for i in range(16, -1, -1):
+        u = i / 16 * 2 - 1
+        soffit.append(arch_pt(u, -22, 3))
+    fill_masked(img, soffit, (86, 80, 74))
+    edge(img, soffit, (70, 66, 60), 1)
+    # Re-cover the east pier in case any soffit silhouette overlaps it.
+    east_far = [vx(w / 2, 0, deck_z), vx(w / 2, -d, deck_z), vx(w / 2, -d, -drop), vx(w / 2, 0, -drop)]
+    draw_tiled_quad(img, east_far, shade(stone, -0.22), shade(stone, -0.1), shade(stone_dk, -0.1), courses=10, divisions=8)
+    # Deck surface covers the top of the vault.
+    deck = [vx(-w / 2, 0, deck_z), vx(w / 2, 0, deck_z), vx(w / 2, -d, deck_z), vx(-w / 2, -d, deck_z)]
+    draw_tiled_quad(img, deck, cap, stone_lt, stone_dk, courses=6, divisions=16)
+    # South face: left pier, right pier, and an arched crown. The opening is left transparent.
+    def south_arch_hole():
+        hole = []
+        for i in range(21):
+            u = i / 20 * 2 - 1
+            hole.append(arch_pt(u, 0, 0))
+        hole.append(vx(arch_span, 0, -drop))
+        hole.append(vx(-arch_span, 0, -drop))
+        return hole
+
+    hole = south_arch_hole()
+    # Left pier (west bank)
+    left_face = [vx(-w / 2, 0, deck_z), vx(-arch_span, 0, deck_z), vx(-arch_span, 0, -drop), vx(-w / 2, 0, -drop)]
+    draw_tiled_quad(img, left_face, stone, stone_lt, stone_dk, courses=11, divisions=5)
+    # Right pier
+    right_face = [vx(arch_span, 0, deck_z), vx(w / 2, 0, deck_z), vx(w / 2, 0, -drop), vx(arch_span, 0, -drop)]
+    draw_tiled_quad(img, right_face, stone, stone_lt, stone_dk, courses=11, divisions=5)
+    # Crown / spandrel above the arch (irregular polygon, not a quad)
+    crown = [vx(-w / 2, 0, deck_z), vx(w / 2, 0, deck_z)]
+    for i in range(20, -1, -1):
+        u = i / 20 * 2 - 1
+        crown.append(arch_pt(u, 0, 0))
+    noisy_fill(img, crown, stone, 0.05, 88)
+    edge(img, crown, stone_dk, 1)
+    # Mortar ticks in the spandrel
     for i in range(1, 8):
-        ImageDraw.Draw(img).line([lerp_pt(a, b, i / 8), lerp_pt(dpt, c, i / 8)], fill=rgb((130, 126, 118), 90), width=1)
-    for y, col in ((0, (176, 172, 164)), (-d, (160, 156, 148))):
-        draw_wall(img, vx, -w / 2, y, w / 2, y, deck_z, deck_z + 14, col, 0.03, 83)
-    draw_wall(img, vx, w / 2, 0, w / 2, -d, deck_z, deck_z + 14, (148, 144, 136), 0.03, 84)
-    for x in (-w / 2, -w / 4, 0, w / 4, w / 2):
-        for y in (0, -d):
-            p = vx(x, y, deck_z + 14)
-            ImageDraw.Draw(img).rectangle((p[0] - 2 * SCALE, p[1] - 4 * SCALE, p[0] + 2 * SCALE, p[1] + 2), fill=rgb((150, 146, 138)))
+        t = i / 8
+        ImageDraw.Draw(img).line(
+            [lerp_pt(vx(-w / 2, 0, deck_z), vx(w / 2, 0, deck_z), t), arch_pt(t * 2 - 1, 0, 0)],
+            fill=rgb((120, 114, 104), 120), width=1,
+        )
+    # Voussoirs around the visible arch
+    for i in range(21):
+        u = i / 20 * 2 - 1
+        inner = arch_pt(u, 0, 0)
+        outer = arch_pt(u, 0, 5)
+        ImageDraw.Draw(img).line([inner, outer], fill=rgb((96, 90, 82), 200), width=1)
+    edge(img, hole[:21], (92, 86, 78), 2)
+    # Coping along the south lip of the deck
+    lip = [vx(-w / 2, 2, deck_z + 2), vx(w / 2, 2, deck_z + 2), vx(w / 2, 0, deck_z), vx(-w / 2, 0, deck_z)]
+    fill_masked(img, lip, cap)
+    edge(img, lip, stone_dk, 1)
+    # Parapets with stone posts and a slightly raised rail, close to the locked concept.
+    for y, col in ((0, stone_lt), (-d, shade(stone, -0.08))):
+        draw_tiled_quad(
+            img,
+            [vx(-w / 2, y, deck_z), vx(w / 2, y, deck_z), vx(w / 2, y, deck_z + rail_h), vx(-w / 2, y, deck_z + rail_h)],
+            col, shade(col, 0.12), stone_dk, courses=3, divisions=14,
+        )
+        for i in range(7):
+            x = lerp(-w / 2, w / 2, i / 6)
+            p0 = vx(x - 3, y + (2 if y == 0 else -2), deck_z)
+            p1 = vx(x + 3, y + (2 if y == 0 else -2), deck_z)
+            p2 = vx(x + 3, y + (2 if y == 0 else -2), deck_z + rail_h + 4)
+            p3 = vx(x - 3, y + (2 if y == 0 else -2), deck_z + rail_h + 4)
+            fill_masked(img, [p0, p1, p2, p3], shade(stone, -0.05 if y == 0 else -0.15))
+            cap_pt = vx(x, y, deck_z + rail_h + 5)
+            ImageDraw.Draw(img).ellipse((cap_pt[0] - 3 * SCALE, cap_pt[1] - 2 * SCALE, cap_pt[0] + 3 * SCALE, cap_pt[1] + 2 * SCALE), fill=rgb(cap))
+    # East parapet end cap so the body reads as thick, not a paper railing.
+    end_cap = [vx(w / 2, 0, deck_z), vx(w / 2, -d, deck_z), vx(w / 2, -d, deck_z + rail_h), vx(w / 2, 0, deck_z + rail_h)]
+    draw_tiled_quad(img, end_cap, shade(stone, -0.2), shade(stone, -0.08), stone_dk, courses=3, divisions=6)
     return img
 
 
 def wood_bridge():
-    w, d = 140, 72
-    img, vx, _ = sprite_canvas(w, d, 40, pad=16, extra_south=10)
-    ground_shadow(img, vx, w, d)
-    deck = [vx(-w / 2, 0, 6), vx(w / 2, 0, 6), vx(w / 2, -d, 6), vx(-w / 2, -d, 6)]
-    fill_masked(img, deck, (166, 126, 82))
-    a, b, c, dpt = deck
-    for i in range(1, 12):
-        t = i / 12
-        ImageDraw.Draw(img).line([lerp_pt(a, b, t), lerp_pt(dpt, c, t)], fill=rgb((130, 96, 60), 180), width=1)
-    edge(img, deck, (110, 80, 50), 1)
-    for x in (-w / 2 + 6, -w / 6, w / 6, w / 2 - 6):
+    w, d = 148, 72
+    drop = 18
+    deck_z = 8
+    img, vx, _ = sprite_canvas(w, d, 36, pad=16, extra_south=drop + 10)
+    wood = (166, 126, 82)
+    wood_dk = (110, 80, 50)
+    wood_lt = (196, 154, 102)
+    # Posts hanging toward the water
+    for x in (-w / 2 + 8, -w / 6, w / 6, w / 2 - 8):
         for y in (0, -d):
-            ImageDraw.Draw(img).line([vx(x, y, 0), vx(x, y, 22)], fill=rgb((96, 70, 46)), width=3)
+            ImageDraw.Draw(img).line([vx(x, y, -drop), vx(x, y, 24)], fill=rgb(wood_dk), width=4)
+        beam = [vx(x - 3, 0, -2), vx(x + 3, 0, -2), vx(x + 3, -d, -2), vx(x - 3, -d, -2)]
+        fill_masked(img, beam, wood_dk)
+    deck = [vx(-w / 2, 0, deck_z), vx(w / 2, 0, deck_z), vx(w / 2, -d, deck_z), vx(-w / 2, -d, deck_z)]
+    fill_masked(img, deck, wood)
+    a, b, c, dpt = deck
+    for i in range(1, 14):
+        t = i / 14
+        ImageDraw.Draw(img).line([lerp_pt(a, b, t), lerp_pt(dpt, c, t)], fill=rgb(wood_dk, 200), width=2)
+    edge(img, deck, wood_dk, 1)
+    # Side rails with posts and a top cap
     for y in (0, -d):
-        ImageDraw.Draw(img).line([vx(-w / 2 + 4, y, 20), vx(w / 2 - 4, y, 20)], fill=rgb((96, 70, 46)), width=3)
+        for x in (-w / 2 + 6, -w / 6, w / 6, w / 2 - 6):
+            ImageDraw.Draw(img).line([vx(x, y, deck_z), vx(x, y, 26)], fill=rgb(wood_dk), width=3)
+        ImageDraw.Draw(img).line([vx(-w / 2 + 4, y, 24), vx(w / 2 - 4, y, 24)], fill=rgb(wood_lt if y == 0 else wood_dk), width=3)
+        ImageDraw.Draw(img).line([vx(-w / 2 + 8, y, 16), vx(w / 2 - 8, y, 16)], fill=rgb(wood_dk), width=2)
     return img
 
 
@@ -1071,6 +1161,125 @@ def planter_prop():
     return img
 
 
+def hedge():
+    w, d, h = 40, 14, 22
+    img, vx, _ = sprite_canvas(w, d, h + 8, pad=12, extra_south=6)
+    ground_shadow(img, vx, w, d)
+    base = (46, 92, 54)
+    draw_wall(img, vx, -w / 2, 0, w / 2, 0, 0, h, shade(base, 0.08), 0.06, 101)
+    draw_wall(img, vx, w / 2, 0, w / 2, -d, 0, h, shade(base, -0.18), 0.06, 102)
+    top = [vx(-w / 2, 0, h), vx(w / 2, 0, h), vx(w / 2, -d, h), vx(-w / 2, -d, h)]
+    fill_masked(img, top, (62, 116, 68))
+    dr = ImageDraw.Draw(img)
+    for i in range(7):
+        t = (i + 0.5) / 7
+        p = lerp_pt(vx(-w / 2, 0, h), vx(w / 2, 0, h), t)
+        r = (5 + (i % 3)) * SCALE
+        dr.ellipse((p[0] - r, p[1] - r * 0.7, p[0] + r, p[1] + r * 0.35), fill=rgb((50 + i * 4, 104 + (i % 3) * 8, 58)))
+    return img
+
+
+def yard_wall():
+    w, d, h = 48, 10, 20
+    img, vx, _ = sprite_canvas(w, d, h + 6, pad=10, extra_south=6)
+    ground_shadow(img, vx, w, d)
+    stone = (176, 168, 154)
+    draw_tiled_quad(img, wall_quad(vx, -w / 2, 0, w / 2, 0, 0, h), stone, shade(stone, 0.12), shade(stone, -0.25), courses=3, divisions=6)
+    draw_tiled_quad(img, wall_quad(vx, w / 2, 0, w / 2, -d, 0, h), shade(stone, -0.18), shade(stone, -0.05), shade(stone, -0.3), courses=3, divisions=2)
+    cap = [vx(-w / 2, 0, h), vx(w / 2, 0, h), vx(w / 2, -d, h), vx(-w / 2, -d, h)]
+    fill_masked(img, cap, (196, 190, 178))
+    edge(img, cap, (130, 124, 112), 1)
+    return img
+
+
+def utility_pole():
+    img, vx, _ = sprite_canvas(10, 10, 96, pad=20, extra_south=8)
+    ground_shadow(img, vx, 10, 10)
+    dr = ImageDraw.Draw(img)
+    base = vx(0, 0, 0)
+    fill_masked(img, [vx(-5, 3, 0), vx(5, 3, 0), vx(3, 2, 6), vx(-3, 2, 6)], (120, 110, 98))
+    dr.line([base, vx(0, 0, 88)], fill=rgb((92, 78, 60)), width=max(4, int(2 * SCALE)))
+    # Cross-arms and insulators
+    for z in (72, 82):
+        a, b = vx(-16, 0, z), vx(16, 0, z)
+        dr.line([a, b], fill=rgb((80, 70, 56)), width=max(2, SCALE))
+        for u in (-0.7, -0.35, 0.35, 0.7):
+            p = lerp_pt(a, b, 0.5 + u * 0.5)
+            dr.ellipse((p[0] - 2 * SCALE, p[1] - 3 * SCALE, p[0] + 2 * SCALE, p[1] + 1), fill=rgb((210, 214, 220)))
+    global LAST_FOOT
+    LAST_FOOT = vx(0, 0, 0)
+    return img
+
+
+def tree_b():
+    img, vx, foot = sprite_canvas(22, 22, 86, pad=28, extra_south=8)
+    dr = ImageDraw.Draw(img)
+    base = vx(0, 0, 0)
+    dr.rectangle((base[0] - 3 * SCALE, base[1] - 30 * SCALE, base[0] + 3 * SCALE, base[1]), fill=rgb((88, 64, 44)))
+    for (dx, dy), r, col in (((0, -54), 24, (70, 128, 78)), ((-12, -44), 16, (52, 108, 64)), ((12, -42), 15, (86, 142, 88)), ((-2, -66), 14, (48, 100, 60)), ((8, -60), 13, (96, 150, 96)), ((-8, -58), 12, (60, 116, 70))):
+        cx, cy = base[0] + dx * SCALE * 0.6, base[1] + dy * SCALE * 0.85
+        dr.ellipse((cx - r * SCALE / 2, cy - r * SCALE / 2, cx + r * SCALE / 2, cy + r * SCALE / 2), fill=rgb(col))
+    return img
+
+
+def bush():
+    w, d, h = 22, 18, 16
+    img, vx, _ = sprite_canvas(w, d, h + 8, pad=12, extra_south=6)
+    ground_shadow(img, vx, w, d)
+    dr = ImageDraw.Draw(img)
+    base = vx(0, 0, 0)
+    for (dx, dy), r, col in (((0, -8), 14, (58, 110, 64)), ((-8, -4), 10, (46, 96, 56)), ((8, -3), 10, (70, 124, 74)), ((0, -14), 8, (80, 136, 84))):
+        cx, cy = base[0] + dx * SCALE * 0.7, base[1] + dy * SCALE
+        dr.ellipse((cx - r * SCALE / 2, cy - r * SCALE / 2, cx + r * SCALE / 2, cy + r * SCALE / 2), fill=rgb(col))
+    return img
+
+
+def emit_shop_lights(size):
+    """Warm window and fascia glow only; same canvas and foot as the shop sprite."""
+    img = Image.new("RGBA", size, (0, 0, 0, 0))
+    halo = Image.new("RGBA", size, (0, 0, 0, 0))
+    glass = (255, 214, 140)
+    for rec in WINDOW_QUADS:
+        pts = rec["pts"]
+        if rec["kind"] == "door":
+            fill_masked(img, pts, rgb((255, 200, 120), 210))
+        else:
+            fill_masked(img, pts, rgb(glass, 230))
+            # mullion-free inner glow
+            if len(pts) >= 4:
+                a, b, c, d = pts[0], pts[1], pts[2], pts[3]
+                inner = [
+                    lerp_pt(lerp_pt(a, b, 0.12), lerp_pt(d, c, 0.12), 0.12),
+                    lerp_pt(lerp_pt(a, b, 0.88), lerp_pt(d, c, 0.88), 0.12),
+                    lerp_pt(lerp_pt(a, b, 0.88), lerp_pt(d, c, 0.88), 0.88),
+                    lerp_pt(lerp_pt(a, b, 0.12), lerp_pt(d, c, 0.12), 0.88),
+                ]
+                fill_masked(img, inner, rgb((255, 232, 170), 255))
+        # expanded halo
+        if len(pts) >= 4:
+            a, b, c, d = pts[0], pts[1], pts[2], pts[3]
+            expanded = [
+                (a[0] - 8, a[1] + 6),
+                (b[0] + 8, b[1] + 6),
+                (c[0] + 10, c[1] - 8),
+                (d[0] - 10, d[1] - 8),
+            ]
+            fill_masked(halo, expanded, rgb((255, 170, 70), 90))
+    # Soft underside glow along the shop fascia / sign band
+    for rec in FASCIA_QUADS:
+        pts = rec["pts"]
+        if len(pts) >= 4:
+            a, b, c, d = pts[0], pts[1], pts[2], pts[3]
+            # a thin strip just under the fascia, hanging toward the street
+            under = [lerp_pt(a, d, -0.15), lerp_pt(b, c, -0.15), lerp_pt(b, c, 0.35), lerp_pt(a, d, 0.35)]
+            fill_masked(halo, under, rgb((255, 180, 90), 70))
+    halo = halo.filter(ImageFilter.GaussianBlur(5))
+    out = Image.new("RGBA", size, (0, 0, 0, 0))
+    out.alpha_composite(halo)
+    out.alpha_composite(img)
+    return out
+
+
 def save_sprite(rel: str, img: Image.Image, map_size=None):
     path = ROOT / rel
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1085,8 +1294,8 @@ def save_sprite(rel: str, img: Image.Image, map_size=None):
 
 
 def contact_sheet(paths, out: Path, cols=6, cell=340):
-    rows = math.ceil(len(paths) / cols)
-    sheet = Image.new("RGBA", (cols * cell, rows * cell), (28, 30, 34, 255))
+    rows = math.ceil(len(paths) / cols) if paths else 1
+    sheet = Image.new("RGBA", (max(cols * cell, 1), max(rows * cell, 1)), (28, 30, 34, 255))
     dr = ImageDraw.Draw(sheet)
     for y in range(0, sheet.height, 16):
         for x in range(0, sheet.width, 16):
@@ -1103,6 +1312,19 @@ def contact_sheet(paths, out: Path, cols=6, cell=340):
     out.parent.mkdir(parents=True, exist_ok=True)
     sheet.save(out)
     print("sheet", out, sheet.size)
+
+
+SHOP_LIGHTS = {
+    "buildings/convenience.png",
+    "buildings/convenience_b.png",
+    "buildings/convenience_wide.png",
+    "buildings/grocery.png",
+    "buildings/grocery_b.png",
+    "buildings/eatery.png",
+    "buildings/eatery_b.png",
+    "buildings/supermarket.png",
+    "buildings/supermarket_b.png",
+}
 
 
 def main():
@@ -1153,6 +1375,7 @@ def main():
         ("props/vending_green.png", lambda: vending("green")),
         ("props/lamp.png", lamp),
         ("props/tree.png", tree),
+        ("props/tree_b.png", tree_b),
         ("props/bike.png", make_bike),
         ("props/stone_bridge.png", stone_bridge),
         ("props/wood_bridge.png", wood_bridge),
@@ -1160,17 +1383,38 @@ def main():
         ("props/canal_rail_ew.png", lambda: canal_rail("ew")),
         ("props/crate.png", crate),
         ("props/planter.png", planter_prop),
+        ("props/hedge.png", hedge),
+        ("props/yard_wall.png", yard_wall),
+        ("props/pole.png", utility_pole),
+        ("props/bush.png", bush),
     ]
     wanted = set(sys.argv[1:])
     written = []
     for rel, fn in jobs:
-        if wanted and rel not in wanted and Path(rel).name not in wanted:
-            continue
-        save_sprite(rel, fn())
+        if wanted and rel not in wanted and Path(rel).name not in wanted and not any(rel.endswith(w) or w in rel for w in wanted):
+            # Allow "lights" or a shop name to also rebuild lights via the shop job
+            if not (wanted & {Path(rel).stem + "_lights.png", rel.replace(".png", "_lights.png")}):
+                # If user asked only for new props / bridges / lights, skip unrelated
+                if wanted and not any(token in rel for token in wanted):
+                    continue
+        img = fn()
+        save_sprite(rel, img)
         written.append(ROOT / rel)
+        if rel in SHOP_LIGHTS:
+            lights_rel = rel.replace(".png", "_lights.png")
+            lights = emit_shop_lights(img.size)
+            # Same foot and map as the parent shop so the overlay can share the sprite transform.
+            foot = MANIFEST["sprites"][rel]["foot"]
+            mmap = MANIFEST["sprites"][rel]["map"]
+            path = ROOT / lights_rel
+            lights.save(path)
+            MANIFEST["sprites"][lights_rel] = {"w": lights.width, "h": lights.height, "foot": foot, "map": mmap}
+            written.append(path)
+            print("lights", lights_rel, lights.size)
     (ROOT / "manifest.json").write_text(json.dumps(MANIFEST, indent=2) + "\n")
     print("manifest", ROOT / "manifest.json", "sprites", len(MANIFEST["sprites"]))
-    contact_sheet(written, Path("/tmp/iso-prev/sheet.png"), cols=6, cell=340)
+    if written:
+        contact_sheet(written, Path("/tmp/iso-prev/sheet.png"), cols=6, cell=340)
 
 
 if __name__ == "__main__":

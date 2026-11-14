@@ -158,7 +158,9 @@ static func assemble(seed: String, size: String, topology: String, attempt: int,
 				if open_streets > 0:
 					rows = 2 if topology == "commercial" and parcel.kind == "shopfront" else 1
 				if compact:
-					rows = 2 if themed else 3 if float(parcel.rect[3]) >= 900.0 else 2
+					var depth: float = float(parcel.rect[3])
+					# Themed parcels were stopping at two rows, which left large rear lawns.
+					rows = 3 if themed or depth >= 700.0 else 2
 				_populate(parcel, topology, random, entities, roads, bus, rows, compact)
 		# Food and equipment are actual parcels, not rewards granted to every building.
 		_ensure_categories(entities,parcels,roads,bus,yard_parcel)
@@ -364,7 +366,7 @@ static func _populate(parcel: Dictionary, topology: String, random: RandomNumber
 				x+=float(WorldgenScale.WIDTH[type])+gap
 			# At least 24 world units separate visible roofs and rear feet. The
 			# physical gap also leaves the rear door +48 and its 48-wide walk clear.
-			var spacing: float=ceil(maxf(208.0,maxf(row_height+24.0,row_depth+112.0))/16.0)*16.0
+			var spacing: float=ceil(maxf(176.0,maxf(row_height+24.0,row_depth+112.0))/16.0)*16.0
 			if paired:
 				spacing=ceil((row_height+192.0)/16.0)*16.0
 			if row_height<=240.0:spacing+=16.0*random.randi_range(0,1)

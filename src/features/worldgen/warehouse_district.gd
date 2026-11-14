@@ -196,12 +196,18 @@ static func _infill(parcel: Dictionary, entities: Array, reserved: Array[Rect2],
 			occupied.append(used)
 			free.append_array(_subtract([area], used))
 			break
+	var already: int = 0
+	for entity: Dictionary in entities:
+		if entity.get("parcel", "") == parcel.id:
+			already += 1
 	if limit < 0:
 		_fill_across_cuts(parcel, entities, interior, occupied)
+	elif already < 4:
+		_fill_across_cuts(parcel, entities, interior, occupied, 2)
 
 
 static func _fill_across_cuts(parcel: Dictionary, entities: Array, interior: Rect2,
-		occupied: Array[Rect2]) -> void:
+		occupied: Array[Rect2], cap: int = -1) -> void:
 	# A small room can straddle the artificial cuts used to pack the larger modules.
 	# In anchor space, each occupied rectangle excludes the positions whose lot would overlap it.
 	var span: Vector2 = interior.size - MIN_LOT
@@ -211,7 +217,7 @@ static func _fill_across_cuts(parcel: Dictionary, entities: Array, interior: Rec
 	for area: Rect2 in occupied:
 		anchors = _subtract(anchors, _excluded_anchors(area), Vector2.ZERO)
 	var serial: int = 0
-	while not anchors.is_empty():
+	while not anchors.is_empty() and (cap < 0 or serial < cap):
 		var lot: Rect2 = Rect2(anchors[0].position, MIN_LOT)
 		var foot: float = lot.end.y - FRONT
 		_module(parcel, entities, OFFICE, lot.position.x + SIDE, foot,

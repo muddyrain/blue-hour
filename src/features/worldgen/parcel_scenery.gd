@@ -35,6 +35,10 @@ static func _fit_plot(data: Dictionary, plot: Dictionary, buildings: Array,
 	for zone: Rect2 in reserved + occupied:
 		if zone.intersects(bounds):
 			exclusions.append(zone)
+	for wall: Array in data.get("barriers", []):
+		var barrier: Rect2 = WorldLayout.rect(wall).grow(16.0)
+		if barrier.intersects(bounds):
+			exclusions.append(barrier)
 	for building: Dictionary in buildings:
 		exclusions.append(WorldgenScale.visible_rect(building).grow(16.0))
 	for walk: Array in plot.walks:
@@ -48,24 +52,42 @@ static func _fit_plot(data: Dictionary, plot: Dictionary, buildings: Array,
 	var candidates: Array[Rect2] = _lots(interior, exclusions, minimum)
 	var eligible: bool = not candidates.is_empty()
 	var annexes: int = 0
-	var budget: int = clampi(int(bounds.get_area() / 1000000.0), 1, 3)
+	var budget: int = clampi(int(bounds.get_area() / 520000.0), 1, 4)
+	var types: Array[String] = []
+	if industrial:
+		types.assign(["garage", "warehouse", "convenience_store"])
+	elif data.topology == "residential":
+		types.assign(["detached_home", "row_house", "garage", "convenience_store"])
+	else:
+		types.assign(["convenience_store", "eatery", "garage", "row_house"])
 	while not candidates.is_empty() and annexes < budget:
 		var lot: Rect2 = _near_frontage(candidates, plot, bounds, minimum)
-		var foot: Vector2 = lot.position + Vector2(SETBACK.x, minimum.y - DOOR_APRON)
+		var typ: String = types[annexes % types.size()]
+		var profile_now: Vector2 = Vector2(float(WorldgenScale.WIDTH[typ]), WorldgenScale.visible_height(typ)) if not industrial 			else profile
+		var min_now: Vector2 = profile_now + Vector2(SETBACK.x * 2.0, SETBACK.y + DOOR_APRON)
+		if lot.size.x < min_now.x or lot.size.y < min_now.y:
+			# This envelope was sized for a garage; skip rather than force a too-tall house.
+			exclusions.append(lot)
+			candidates = _lots(interior, exclusions, minimum)
+			continue
+		var foot: Vector2 = lot.position + Vector2(SETBACK.x, min_now.y - DOOR_APRON)
 		var id: String = "%s_site_annex_%d" % [plot.id, annexes]
 		var entity: Dictionary
 		if industrial:
 			var form: Dictionary = WarehouseSlots.BUILDINGS[slot]
 			var block: Rect2 = Rect2(foot - Vector2(0, form.depth), Vector2(profile.x, form.depth))
-			entity = {"id":id,"archetype":"garage","rect":WarehouseDistrict._rect(block),
-				"door":WarehouseDistrict._point(foot + Vector2(form.door,48.0)), "variant":0,
+			var arch: String = typ if typ in ["warehouse", "convenience_store", "garage"] else "garage"
+			entity = {"id":id,"archetype":arch,"rect":WarehouseDistrict._rect(block),
+				"door":WarehouseDistrict._point(foot + Vector2(form.door,48.0)), "variant":annexes % 3,
 				"parcel":plot.id,"art":slot,"service_only":true}
 			data.entities.append(entity)
 			plot.buildings.append(id)
 		else:
-			if not WorldgenGeometry._add_building("garage", random.randi_range(0, 2), foot.x, foot.y,
+			if not WorldgenGeometry._add_building(typ, random.randi_range(0, 2), foot.x, foot.y,
 					plot, data.entities, data.roads, data.bus):
-				break
+				exclusions.append(lot)
+				candidates = _lots(interior, exclusions, minimum)
+				continue
 			entity = data.entities[-1]
 			entity.service_only = true
 		buildings.append(entity)

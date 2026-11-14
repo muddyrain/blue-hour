@@ -811,56 +811,408 @@ def supermarket_b():
     return make_shop(480, 120, 92, (90, 100, 96), WALL_GREY, WALL_GREY_R, {"south": (70, 92, 80), "east": (56, 76, 66), "text": (245, 247, 240)}, "海岸市场", 30)
 
 
-def warehouse(variant="a"):
-    specs = {
-        "a": (288, 192, 108, (90, 102, 112), (176, 186, 192), (140, 150, 158)),
-        "b": (288, 192, 100, (86, 92, 90), (168, 170, 164), (132, 136, 130)),
-        "wide": (512, 128, 110, (90, 102, 112), (176, 186, 192), (140, 150, 158)),
-        "wide_b": (512, 128, 104, (100, 96, 88), (186, 178, 166), (150, 142, 130)),
-    }
-    w, d, wall_h, roof, wl, wr = specs[variant]
-    found = 8
-    img, vx, _ = sprite_canvas(w, d, wall_h + 28, pad=22, extra_south=14)
-    ground_shadow(img, vx, w, d)
-    draw_foundation(img, vx, w, d, found, (130, 132, 134))
-    draw_wall(img, vx, -w / 2, 0, w / 2, 0, found, wall_h, mix(wl, wr, 0.3), 0.03, 41)
-    draw_wall(img, vx, -w / 2, 0, -w / 2, -d, found, wall_h, wl, 0.03, 42)
-    draw_wall(img, vx, w / 2, 0, w / 2, -d, found, wall_h, wr, 0.03, 43)
-    spts = wall_quad(vx, -w / 2, 0, w / 2, 0, found, wall_h)
-    mask = _inside_mask(img.size, spts)
+
+def draw_corrugation(img, pts, color, count=18, alpha=40):
+    mask = _inside_mask(img.size, pts)
     layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
     ldr = ImageDraw.Draw(layer)
-    a, b, c, dpt = spts
-    for i in range(2, 24):
-        t = i / 24
-        ldr.line([lerp_pt(a, b, t), lerp_pt(dpt, c, t)], fill=rgb((255, 255, 255), 28), width=1)
+    a, b, c, dpt = pts
+    for i in range(1, count):
+        t = i / count
+        col = rgb(shade(color, 0.22 if i % 2 == 0 else -0.14), alpha)
+        ldr.line([lerp_pt(a, b, t), lerp_pt(dpt, c, t)], fill=col, width=1)
     layer.putalpha(ImageChops.multiply(layer.split()[3], mask))
     img.alpha_composite(layer)
-    draw_door(img, vx, "south", w, d, 0 if "wide" not in variant else -40, found, 70 if "wide" not in variant else 90, 58, (70, 80, 88), style="panel")
-    if "wide" in variant:
-        draw_door(img, vx, "south", w, d, 80, found, 70, 58, (70, 80, 88), style="panel")
-    for u in ((-0.25, -0.5, -0.75) if d > 140 else (-0.3, -0.65)):
-        draw_window(img, window_on_east(vx, w, d, d * u, wall_h - 28, 20, 12), (70, 80, 88), GLASS, mullions=False, sill=False)
-    draw_hip_roof(img, vx, w, d, wall_h, 16, roof, over=6, courses=6)
-    ac_unit(img, vx, w * 0.2, -d * 0.4, wall_h + 10, w=20, d=14, h=8)
+
+
+def draw_pilasters(img, vx, w, z0, z1, color, count):
+    # Vertical wall divisions on the south face; keep them flush so the footprint is unchanged.
+    span = w * 0.92
+    for i in range(count + 1):
+        x = -span / 2 + span * (i / count)
+        pts = wall_quad(vx, x - 3.2, 0, x + 3.2, 0, z0, z1)
+        fill_masked(img, pts, shade(color, -0.18 if i in (0, count) else -0.08))
+        edge(img, pts, shade(color, -0.32), 1)
+
+
+def draw_wainscot_band(img, vx, w, d, z0, z1, south, west, east):
+    draw_wall(img, vx, -w / 2, 0, w / 2, 0, z0, z1, south, 0.02, 61)
+    draw_wall(img, vx, -w / 2, 0, -w / 2, -d, z0, z1, west, 0.02, 62)
+    draw_wall(img, vx, w / 2, 0, w / 2, -d, z0, z1, east, 0.02, 63)
+    cap = wall_quad(vx, -w / 2, 0, w / 2, 0, z1 - 1.5, z1)
+    fill_masked(img, cap, shade(south, 0.12))
+    edge(img, cap, shade(south, -0.25), 1)
+
+
+def draw_shutter_door(img, vx, offset, z, width, height, color, frame=None, slits=False, hazard=True, bumpers=True):
+    frame = frame or shade(color, -0.28)
+    fw, fh = width + 10, height + 6
+    frame_pts = wall_quad(vx, offset - fw / 2, 0, offset + fw / 2, 0, z, z + fh)
+    fill_masked(img, frame_pts, frame)
+    edge(img, frame_pts, shade(frame, -0.35), 1)
+    inner = wall_quad(vx, offset - width / 2, 0, offset + width / 2, 0, z + 2, z + height)
+    fill_masked(img, inner, color)
+    a, b, c, dpt = inner
+    slats = max(8, int(height / 6))
+    dr = ImageDraw.Draw(img)
+    for i in range(1, slats):
+        t = i / slats
+        dr.line([lerp_pt(a, dpt, t), lerp_pt(b, c, t)], fill=rgb(shade(color, -0.22), 210), width=1)
+        if i % 2 == 0:
+            dr.line(
+                [lerp_pt(a, dpt, min(1, t + 0.012)), lerp_pt(b, c, min(1, t + 0.012))],
+                fill=rgb(shade(color, 0.14), 90),
+                width=1,
+            )
+    # Roller housing at the head of the shutter.
+    box = wall_quad(vx, offset - fw / 2, 0, offset + fw / 2, 0, z + height - 2, z + fh + 5)
+    fill_masked(img, box, shade(frame, 0.1))
+    edge(img, box, shade(frame, -0.28), 1)
+    bx = box
+    dr.line([lerp_pt(bx[0], bx[3], 0.45), lerp_pt(bx[1], bx[2], 0.45)], fill=rgb(shade(frame, -0.2), 180), width=1)
+    if slits:
+        for u in (0.25, 0.5, 0.75):
+            sl = [
+                lerp_pt(lerp_pt(a, b, u - 0.08), lerp_pt(dpt, c, u - 0.08), 0.7),
+                lerp_pt(lerp_pt(a, b, u + 0.08), lerp_pt(dpt, c, u + 0.08), 0.7),
+                lerp_pt(lerp_pt(a, b, u + 0.08), lerp_pt(dpt, c, u + 0.08), 0.84),
+                lerp_pt(lerp_pt(a, b, u - 0.08), lerp_pt(dpt, c, u - 0.08), 0.84),
+            ]
+            fill_masked(img, sl, rgb(GLASS_DK, 210))
+            edge(img, sl, shade(frame, -0.1), 1)
+    if hazard:
+        hz0, hz1 = 0.03, 0.12
+        band = [lerp_pt(a, dpt, hz0), lerp_pt(b, c, hz0), lerp_pt(b, c, hz1), lerp_pt(a, dpt, hz1)]
+        fill_masked(img, band, (42, 42, 40))
+        for t in (0.08, 0.28, 0.48, 0.68, 0.88):
+            p0 = lerp_pt(lerp_pt(a, b, max(0, t - 0.08)), lerp_pt(dpt, c, max(0, t - 0.08)), hz0)
+            p1 = lerp_pt(lerp_pt(a, b, min(1, t + 0.05)), lerp_pt(dpt, c, min(1, t + 0.05)), hz1)
+            dr.line([p0, p1], fill=rgb((228, 188, 56), 230), width=2)
+    # Concrete apron, kept short so it stays inside the existing canvas pad.
+    p0, p1 = vx(offset - width / 2 - 6, 7, 0), vx(offset + width / 2 + 6, 7, 0)
+    p2, p3 = vx(offset + width / 2 + 3, 0, 0), vx(offset - width / 2 - 3, 0, 0)
+    fill_masked(img, [p0, p1, p2, p3], (168, 158, 144))
+    edge(img, [p0, p1, p2, p3], (120, 110, 98), 1)
+    if bumpers:
+        for side in (-1, 1):
+            bx = offset + side * (width / 2 + 5)
+            bumper = [
+                vx(bx - 3.5, 2, z + 4),
+                vx(bx + 3.5, 2, z + 4),
+                vx(bx + 3.5, 2, z + 16),
+                vx(bx - 3.5, 2, z + 16),
+            ]
+            fill_masked(img, bumper, (68, 70, 66))
+            dr.line(
+                [lerp_pt(bumper[0], bumper[3], 0.5), lerp_pt(bumper[1], bumper[2], 0.5)],
+                fill=rgb((200, 168, 48)),
+                width=1,
+            )
+    return frame_pts
+
+
+def draw_loading_awning(img, vx, offset, width, z, depth=9, thick=4, color=(88, 96, 104)):
+    sw = vx(offset - width / 2 - 4, 0, z)
+    se = vx(offset + width / 2 + 4, 0, z)
+    fw = vx(offset - width / 2 - 4, depth, z - 3)
+    fe = vx(offset + width / 2 + 4, depth, z - 3)
+    fill_masked(img, [sw, se, fe, fw], shade(color, -0.18))
+    swu = vx(offset - width / 2 - 6, 0, z + thick)
+    seu = vx(offset + width / 2 + 6, 0, z + thick)
+    fwu = vx(offset - width / 2 - 4, depth, z + 1)
+    feu = vx(offset + width / 2 + 4, depth, z + 1)
+    fill_masked(img, [swu, seu, feu, fwu], shade(color, 0.14))
+    fill_masked(img, [se, fe, feu, seu], shade(color, -0.3))
+    front = [fw, fe, feu, fwu]
+    fill_masked(img, front, shade(color, -0.04))
+    edge(img, front, shade(color, -0.38), 1)
+    ImageDraw.Draw(img).line([fwu, feu], fill=rgb(shade(color, 0.2), 200), width=1)
+
+
+def draw_downspout(img, vx, x, y, z0, z1, color=(96, 100, 104)):
+    pts = wall_quad(vx, x - 1.6, y, x + 1.6, y, z0, z1)
+    fill_masked(img, pts, color)
+    edge(img, pts, shade(color, -0.3), 1)
+    elbow = [
+        vx(x - 1.6, y, z1),
+        vx(x + 1.6, y, z1),
+        vx(x + 1.6, y + 5, z1 + 2),
+        vx(x - 1.6, y + 5, z1 + 2),
+    ]
+    fill_masked(img, elbow, shade(color, 0.06))
+    shoe = [
+        vx(x - 2.5, y, z0),
+        vx(x + 2.5, y, z0),
+        vx(x + 2.5, y + 4, z0 + 1),
+        vx(x - 2.5, y + 4, z0 + 1),
+    ]
+    fill_masked(img, shoe, shade(color, -0.12))
+
+
+def draw_wall_vent(img, vx, face, w, d, offset, z, size=14, color=(90, 96, 100)):
+    if face == "south":
+        pts = wall_quad(vx, offset - size / 2, 0, offset + size / 2, 0, z, z + size * 0.72)
+    else:
+        pts = wall_quad(vx, w / 2, offset + size / 2, w / 2, offset - size / 2, z, z + size * 0.72)
+    fill_masked(img, pts, shade(color, -0.08))
+    a, b, c, dpt = pts
+    for t in (0.28, 0.5, 0.72):
+        ImageDraw.Draw(img).line([lerp_pt(a, dpt, t), lerp_pt(b, c, t)], fill=rgb(shade(color, -0.38)), width=1)
+    edge(img, pts, shade(color, -0.4), 1)
+
+
+def draw_hanging_board(img, vx, x, z, text, bg, fg, bw=30, bh=12):
+    pts = wall_quad(vx, x - bw / 2, 4, x + bw / 2, 4, z, z + bh)
+    fill_masked(img, pts, bg)
+    edge(img, pts, shade(bg, -0.35), 1)
+    text_on_quad(img, pts, text, fg, font(13), shadow=True)
+    p0, p1 = vx(x, 0, z + bh), vx(x, 4, z + bh)
+    ImageDraw.Draw(img).line([p0, p1], fill=rgb((70, 72, 74)), width=max(1, SCALE))
+
+
+def warehouse(variant="a"):
+    specs = {
+        "a": dict(
+            size=(288, 192, 108),
+            roof=(78, 92, 108),
+            wl=(186, 200, 210),
+            wr=(146, 160, 174),
+            wain_s=(126, 140, 152),
+            wain_w=(138, 150, 160),
+            wain_e=(108, 120, 132),
+            found=(128, 126, 122),
+            fascia={"south": (42, 88, 128), "east": (32, 70, 106), "text": (248, 248, 244),
+                    "stripes": [((230, 168, 64), (196, 140, 48), 3)]},
+            sign="海灯倉庫",
+            door=(58, 72, 86),
+            frame=(46, 54, 62),
+            awning=(70, 96, 122),
+            doors=[(8, 82, 62, True, True)],
+            personnel=(-78, 22, 44),
+            clerestory=[(-104, 20, 12), (104, 20, 12)],
+            office=[],
+            east_wins=[(-0.22, 26, 18), (-0.48, 26, 18), (-0.74, 26, 18)],
+            awnings=[(8, 90)],
+            vents_s=[(118, 30)],
+            vents_e=[(-0.36, 34)],
+            pipes=(0.9, -0.9),
+            ac=[(0.22, -0.38, 22, 16, 8), (-0.2, -0.58, 18, 14, 7)],
+            antenna=(-0.06, -0.3, 20),
+            hanging=None,
+            bays=4,
+        ),
+        "b": dict(
+            size=(288, 192, 100),
+            roof=(102, 90, 74),
+            wl=(196, 188, 166),
+            wr=(158, 150, 130),
+            wain_s=(132, 118, 96),
+            wain_w=(146, 132, 110),
+            wain_e=(116, 104, 86),
+            found=(136, 126, 112),
+            fascia={"south": (140, 62, 46), "east": (116, 50, 38), "text": (250, 236, 220)},
+            sign="北岸物流",
+            door=(78, 62, 50),
+            frame=(70, 52, 42),
+            awning=(132, 86, 62),
+            doors=[(-48, 78, 58, False, True)],
+            personnel=(86, 22, 42),
+            clerestory=[],
+            office=[(52, 28, 26), (86, 28, 26)],
+            east_wins=[(-0.28, 24, 20), (-0.62, 24, 20)],
+            awnings=[(-48, 86)],
+            vents_s=[(0, 36)],
+            vents_e=[(-0.48, 28)],
+            pipes=(0.88, -0.88),
+            ac=[(-0.18, -0.42, 20, 15, 8)],
+            antenna=(0.16, -0.55, 24),
+            hanging=(110, 58, "受付", (236, 220, 180), (70, 48, 36)),
+            bays=3,
+        ),
+        "wide": dict(
+            size=(512, 128, 110),
+            roof=(72, 98, 104),
+            wl=(176, 196, 202),
+            wr=(138, 156, 164),
+            wain_s=(114, 132, 140),
+            wain_w=(128, 144, 150),
+            wain_e=(98, 114, 122),
+            found=(126, 128, 128),
+            fascia={"south": (32, 96, 94), "east": (24, 78, 76), "text": (246, 250, 248),
+                    "stripes": [((236, 204, 86), (200, 168, 64), 3)]},
+            sign="臨海倉儲",
+            door=(54, 70, 80),
+            frame=(40, 52, 58),
+            awning=(46, 92, 90),
+            doors=[(-96, 86, 62, True, True), (40, 78, 60, True, True)],
+            personnel=(150, 22, 44),
+            clerestory=[(-200, 22, 12), (-20, 22, 12), (200, 22, 12)],
+            office=[],
+            east_wins=[(-0.3, 22, 16), (-0.62, 22, 16)],
+            awnings=[(-96, 96), (40, 86)],
+            vents_s=[(-200, 28), (200, 28)],
+            vents_e=[(-0.45, 32)],
+            pipes=(0.92, -0.92),
+            ac=[(-0.28, -0.4, 22, 16, 8), (0.08, -0.55, 18, 14, 7), (0.32, -0.32, 16, 12, 6)],
+            antenna=(0.0, -0.22, 18),
+            hanging=None,
+            bays=6,
+        ),
+        "wide_b": dict(
+            size=(512, 128, 104),
+            roof=(122, 98, 78),
+            wl=(214, 200, 178),
+            wr=(176, 160, 138),
+            wain_s=(148, 124, 96),
+            wain_w=(160, 138, 110),
+            wain_e=(128, 108, 84),
+            found=(140, 128, 110),
+            fascia={"south": (118, 70, 46), "east": (98, 56, 38), "text": (250, 240, 224)},
+            sign="漁具置場",
+            door=(82, 70, 58),
+            frame=(76, 58, 44),
+            awning=(140, 96, 64),
+            doors=[(-40, 92, 60, False, True)],
+            personnel=(-150, 24, 44),
+            clerestory=[],
+            office=[(80, 32, 28), (128, 32, 28), (176, 32, 28)],
+            east_wins=[(-0.25, 24, 18), (-0.58, 24, 18)],
+            awnings=[(-40, 100)],
+            vents_s=[(-200, 32)],
+            vents_e=[(-0.4, 30)],
+            pipes=(0.9, -0.9),
+            ac=[(0.24, -0.45, 20, 15, 8), (-0.22, -0.3, 16, 12, 6)],
+            antenna=None,
+            hanging=(200, 56, "入口", (240, 226, 196), (90, 56, 36)),
+            bays=5,
+        ),
+    }
+    cfg = specs[variant]
+    w, d, wall_h = cfg["size"]
+    found = 8
+    fascia_h = 16
+    img, vx, _ = sprite_canvas(w, d, wall_h + 28, pad=22, extra_south=14)
+    ground_shadow(img, vx, w, d)
+    draw_foundation(img, vx, w, d, found, cfg["found"])
+    south = draw_wall(img, vx, -w / 2, 0, w / 2, 0, found, wall_h, mix(cfg["wl"], cfg["wr"], 0.3), 0.03, 41)
+    west = draw_wall(img, vx, -w / 2, 0, -w / 2, -d, found, wall_h, cfg["wl"], 0.03, 42)
+    east = draw_wall(img, vx, w / 2, 0, w / 2, -d, found, wall_h, cfg["wr"], 0.03, 43)
+    draw_corrugation(img, south, mix(cfg["wl"], cfg["wr"], 0.3), 22 if w < 400 else 32, 46)
+    draw_corrugation(img, east, cfg["wr"], 12 if d < 150 else 16, 34)
+    draw_wainscot_band(img, vx, w, d, found, found + 20, cfg["wain_s"], cfg["wain_w"], cfg["wain_e"])
+    draw_pilasters(img, vx, w, found, wall_h - fascia_h, mix(cfg["wl"], cfg["wr"], 0.2), cfg["bays"])
+    frame_c = cfg["frame"]
+    for off, ww, hh, slits, hazard in cfg["doors"]:
+        draw_shutter_door(img, vx, off, found, ww, hh, cfg["door"], frame=frame_c, slits=slits, hazard=hazard)
+    if cfg["personnel"]:
+        po, pw, ph = cfg["personnel"]
+        draw_door(img, vx, "south", w, d, po, found, pw, ph, shade(cfg["door"], 0.08), style="auto", glass=GLASS_DK)
+    for off, ww, hh in cfg["clerestory"]:
+        draw_window(img, window_on_south(vx, w, d, off, wall_h - fascia_h - hh - 16, ww, hh), frame_c, GLASS, mullions=False, sill=True)
+    for off, ww, hh in cfg["office"]:
+        draw_window(img, window_on_south(vx, w, d, off, found + 22, ww, hh), frame_c, GLASS, mullions=True, sill=True)
+    for u, ww, hh in cfg["east_wins"]:
+        draw_window(img, window_on_east(vx, w, d, d * u, found + 26, ww, hh), frame_c, GLASS, mullions=True, sill=True)
+    for off, ww in cfg["awnings"]:
+        draw_loading_awning(img, vx, off, ww, found + 62, depth=8, thick=4, color=cfg["awning"])
+    for off, zz in cfg["vents_s"]:
+        draw_wall_vent(img, vx, "south", w, d, off, found + zz, size=14, color=shade(cfg["wr"], -0.05))
+    for u, zz in cfg["vents_e"]:
+        draw_wall_vent(img, vx, "east", w, d, d * u, found + zz, size=12, color=shade(cfg["wr"], -0.08))
+    draw_hip_roof(img, vx, w, d, wall_h, 16, cfg["roof"], over=6, courses=6)
+    z0, z1 = wall_h - fascia_h, wall_h - 4
+    s, _e = fascia_band(img, vx, w, d, z0, z1, cfg["fascia"]["south"], cfg["fascia"]["east"])
+    stripe_z = z0
+    for col_s, col_e, thick in cfg["fascia"].get("stripes", []):
+        fascia_band(img, vx, w, d, stripe_z, stripe_z + thick, col_s, col_e)
+        stripe_z += thick
+    if cfg["sign"]:
+        cap = 24 if w >= 400 else 18
+        fsz = max(16, int(min(cap, (z1 - z0) * 0.8)) * SCALE)
+        text_on_quad(img, s, cfg["sign"], cfg["fascia"].get("text", (248, 248, 244)), font(fsz))
+    for frac in cfg["pipes"]:
+        draw_downspout(img, vx, (w / 2) * frac, 0, found, z1, shade(cfg["fascia"]["east"], 0.15))
+    if cfg["hanging"]:
+        hx, hz, text, bg, fg = cfg["hanging"]
+        draw_hanging_board(img, vx, hx, found + hz, text, bg, fg, bw=36, bh=14)
+    for ax, ay, aw, ad, ah in cfg["ac"]:
+        ac_unit(img, vx, w * ax, d * ay, wall_h + 10, w=aw, d=ad, h=ah)
+    if cfg["antenna"]:
+        ax, ay, ah = cfg["antenna"]
+        antenna(img, vx, w * ax, d * ay, wall_h + 10, h=ah)
     return img
 
 
 def garage(variant="a"):
     w, d, wall_h = 264, 96, 72
-    roof = (110, 104, 96) if variant == "a" else (90, 96, 100)
-    wl, wr = ((210, 206, 198), (176, 170, 162)) if variant == "a" else ((200, 208, 206), (166, 174, 172))
+    if variant == "a":
+        roof, wl, wr = (118, 100, 82), (226, 216, 198), (192, 180, 162)
+        wain_s, wain_w, wain_e = (150, 128, 104), (162, 140, 116), (128, 108, 88)
+        found_c = (140, 132, 118)
+        fascia = {"south": (96, 62, 44), "east": (80, 50, 36), "text": (250, 238, 220)}
+        sign, door, frame, awning = "車庫", (78, 80, 82), (70, 58, 48), (120, 86, 62)
+        doors = [(-62, 68, 48, False, False), (62, 68, 48, False, False)]
+        personnel = None
+        south_win = [(0, 22, 16)]
+        hanging = None
+        bays = 2
+    else:
+        roof, wl, wr = (86, 104, 100), (196, 210, 204), (160, 176, 172)
+        wain_s, wain_w, wain_e = (110, 128, 124), (124, 140, 136), (92, 110, 108)
+        found_c = (132, 136, 132)
+        fascia = {"south": (40, 96, 92), "east": (30, 78, 74), "text": (240, 250, 246),
+                  "stripes": [((230, 196, 86), (196, 164, 64), 2)]}
+        sign, door, frame, awning = "修理工場", (52, 78, 74), (40, 60, 58), (48, 96, 90)
+        doors = [(-48, 78, 50, True, True)]
+        personnel = (70, 22, 40)
+        south_win = []
+        hanging = (110, 42, "營業", (236, 228, 200), (40, 70, 66))
+        bays = 3
     found = 6
+    fascia_h = 16
     img, vx, _ = sprite_canvas(w, d, wall_h + 24, pad=20, extra_south=12)
     ground_shadow(img, vx, w, d)
-    draw_foundation(img, vx, w, d, found, (140, 138, 132))
-    draw_wall(img, vx, -w / 2, 0, w / 2, 0, found, wall_h, mix(wl, wr, 0.3), 0.03, 51)
+    draw_foundation(img, vx, w, d, found, found_c)
+    south = draw_wall(img, vx, -w / 2, 0, w / 2, 0, found, wall_h, mix(wl, wr, 0.3), 0.03, 51)
     draw_wall(img, vx, -w / 2, 0, -w / 2, -d, found, wall_h, wl, 0.03, 52)
-    draw_wall(img, vx, w / 2, 0, w / 2, -d, found, wall_h, wr, 0.03, 53)
-    for off in (-60, 60):
-        draw_door(img, vx, "south", w, d, off, found, 70, 50, (80, 86, 90) if variant == "a" else (70, 90, 88), style="panel")
-    draw_window(img, window_on_east(vx, w, d, -d * 0.5, found + 20, 18, 16), FRAME, GLASS, sill=False)
+    east = draw_wall(img, vx, w / 2, 0, w / 2, -d, found, wall_h, wr, 0.03, 53)
+    draw_corrugation(img, south, mix(wl, wr, 0.25), 16, 36)
+    draw_corrugation(img, east, wr, 8, 28)
+    draw_wainscot_band(img, vx, w, d, found, found + 14, wain_s, wain_w, wain_e)
+    draw_pilasters(img, vx, w, found, wall_h - fascia_h, mix(wl, wr, 0.15), bays)
+    for off, ww, hh, slits, hazard in doors:
+        draw_shutter_door(img, vx, off, found, ww, hh, door, frame=frame, slits=slits, hazard=hazard, bumpers=hazard)
+        draw_loading_awning(img, vx, off, ww + 6, found + hh - 2, depth=7, thick=3, color=awning)
+    if personnel:
+        po, pw, ph = personnel
+        draw_door(img, vx, "south", w, d, po, found, pw, ph, shade(door, 0.1), style="auto", glass=GLASS)
+    for off, ww, hh in south_win:
+        draw_window(img, window_on_south(vx, w, d, off, found + 20, ww, hh), frame, GLASS, mullions=True, sill=True)
+    draw_window(img, window_on_east(vx, w, d, -d * 0.5, found + 18, 20, 18), frame, GLASS, mullions=True, sill=True)
+    draw_wall_vent(img, vx, "east", w, d, -d * 0.22, found + 36, size=10, color=shade(wr, -0.05))
     draw_hip_roof(img, vx, w, d, wall_h, 16, roof, over=7)
+    z0, z1 = wall_h - fascia_h, wall_h - 4
+    s, _e = fascia_band(img, vx, w, d, z0, z1, fascia["south"], fascia["east"])
+    stripe_z = z0
+    for col_s, col_e, thick in fascia.get("stripes", []):
+        fascia_band(img, vx, w, d, stripe_z, stripe_z + thick, col_s, col_e)
+        stripe_z += thick
+    if len(sign) <= 2:
+        # A compact plaque keeps short labels from smearing across a long thin fascia.
+        plaque = wall_quad(vx, -24, 0, 24, 0, z0 - 2, z1)
+        fill_masked(img, plaque, fascia["south"])
+        edge(img, plaque, shade(fascia["south"], -0.35), 1)
+        text_on_quad(img, plaque, sign, fascia["text"], font(20))
+    else:
+        fsz = max(18, int((z1 - z0) * 0.9) * SCALE)
+        text_on_quad(img, s, sign, fascia["text"], font(fsz))
+    draw_downspout(img, vx, w / 2 - 8, 0, found, z1, shade(fascia["east"], 0.18))
+    draw_downspout(img, vx, -w / 2 + 8, 0, found, z1, shade(fascia["east"], 0.18))
+    if hanging:
+        hx, hz, text, bg, fg = hanging
+        draw_hanging_board(img, vx, hx, found + hz, text, bg, fg, bw=34, bh=14)
+    if variant == "b":
+        ac_unit(img, vx, w * 0.18, -d * 0.4, wall_h + 8, w=16, d=12, h=6)
     return img
 
 

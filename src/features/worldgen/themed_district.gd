@@ -147,13 +147,13 @@ static func populate(plot: Dictionary, entities: Array, roads: Array, bus: Dicti
 		# Pack remaining residential frontage so enclosed courts are not two shops on a lawn.
 		if home_foot < foot - 80.0:
 			var homes: Array[String] = ["detached_home", "row_house", "detached_home"]
-			_fill_front(plot, entities, roads, bus, west, east, home_foot, homes, 4)
+			_fill_front(plot, entities, roads, bus, west, east, home_foot, homes, 6)
 	var fillers: Array[String] = []
 	if commercial:
 		fillers.assign(["convenience_store", "eatery", "garage"])
 	else:
 		fillers.assign(["detached_home", "row_house"])
-	_fill_front(plot, entities, roads, bus, west, east, foot if linear else side_foot, fillers, 4)
+	_fill_front(plot, entities, roads, bus, west, east, foot if linear else side_foot, fillers, 6)
 	var approaches: Dictionary = {}
 	for name: String in paths:
 		var point: Vector2 = start

@@ -1114,6 +1114,18 @@
       "license": "No additional license granted"
     },
     {
+      "path": "assets/iso/tiles/concrete.png",
+      "sha256": "4af54eae56e69d4d9644b9b6e72a2d2cf57a331108e18ddfeac609998907c4e4",
+      "origin": "Original project isometric art, hand-authored in tools/make_iso_art.py (2:1 diamond ground covers: soft lawn grain, fine gravel walks and low-contrast concrete aprons in the existing Japanese street palette, without a heavy cell grid). Not AI-generated and not a third-party pack.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/tiles/concrete_1.png",
+      "sha256": "19b41266a0c8680dbb475f746142ae4d0a1c7c492dfb9f98d59ad5467df27be7",
+      "origin": "Original project isometric art, hand-authored in tools/make_iso_art.py (2:1 diamond ground covers: soft lawn grain, fine gravel walks and low-contrast concrete aprons in the existing Japanese street palette, without a heavy cell grid). Not AI-generated and not a third-party pack.",
+      "license": "No additional license granted"
+    },
+    {
       "path": "assets/iso/tiles/crosswalk_ew.png",
       "sha256": "b5bc215ff6b19b56f936a6420a88486a753132cb0a8dafbab3273131ee9e73a4",
       "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
@@ -1127,8 +1139,44 @@
     },
     {
       "path": "assets/iso/tiles/grass.png",
-      "sha256": "6c35861837f5696b3fb1272d907ede8c6811d77b5c6d23b99d4e1cbf27c46055",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
+      "sha256": "c611083a1ffde99ef1adbf279fd8ba570b7a703d1e88887bef0bbb5cc4300c88",
+      "origin": "Original project isometric art, hand-authored in tools/make_iso_art.py (2:1 diamond ground covers: soft lawn grain, fine gravel walks and low-contrast concrete aprons in the existing Japanese street palette, without a heavy cell grid). Not AI-generated and not a third-party pack.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/tiles/grass_1.png",
+      "sha256": "2d6de6da96d70371cc0dfb15655fd2cd977f632fda207f89464ed649a6e9abcb",
+      "origin": "Original project isometric art, hand-authored in tools/make_iso_art.py (2:1 diamond ground covers: soft lawn grain, fine gravel walks and low-contrast concrete aprons in the existing Japanese street palette, without a heavy cell grid). Not AI-generated and not a third-party pack.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/tiles/grass_2.png",
+      "sha256": "b2a52d915406cd3981e300af5d682b21687fc121382fa847a24e7d29c304860b",
+      "origin": "Original project isometric art, hand-authored in tools/make_iso_art.py (2:1 diamond ground covers: soft lawn grain, fine gravel walks and low-contrast concrete aprons in the existing Japanese street palette, without a heavy cell grid). Not AI-generated and not a third-party pack.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/tiles/grass_3.png",
+      "sha256": "59288bbe7165bede1bf7add95583789145dc2cc8c08588c787acdd512eecc921",
+      "origin": "Original project isometric art, hand-authored in tools/make_iso_art.py (2:1 diamond ground covers: soft lawn grain, fine gravel walks and low-contrast concrete aprons in the existing Japanese street palette, without a heavy cell grid). Not AI-generated and not a third-party pack.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/tiles/gravel.png",
+      "sha256": "6c5d82dca1115a5b22fbc7ef19c6551fe90700255cbe8e6487e0c69d66534b7a",
+      "origin": "Original project isometric art, hand-authored in tools/make_iso_art.py (2:1 diamond ground covers: soft lawn grain, fine gravel walks and low-contrast concrete aprons in the existing Japanese street palette, without a heavy cell grid). Not AI-generated and not a third-party pack.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/tiles/gravel_1.png",
+      "sha256": "c20705d244774bb233d036ccaece6a133d418cd3718f980cc22a06fb287c4ec7",
+      "origin": "Original project isometric art, hand-authored in tools/make_iso_art.py (2:1 diamond ground covers: soft lawn grain, fine gravel walks and low-contrast concrete aprons in the existing Japanese street palette, without a heavy cell grid). Not AI-generated and not a third-party pack.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/tiles/gravel_2.png",
+      "sha256": "b362b8afba07f903e0037d962d66c3e297211ed6471719419dabe8a7597a9d7b",
+      "origin": "Original project isometric art, hand-authored in tools/make_iso_art.py (2:1 diamond ground covers: soft lawn grain, fine gravel walks and low-contrast concrete aprons in the existing Japanese street palette, without a heavy cell grid). Not AI-generated and not a third-party pack.",
       "license": "No additional license granted"
     },
     {

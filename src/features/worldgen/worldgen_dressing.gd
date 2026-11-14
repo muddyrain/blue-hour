@@ -111,11 +111,12 @@ static func _fill_garden(data: Dictionary, parcel: Dictionary, court: Dictionary
 	var area: Rect2 = WorldLayout.rect(court.rect).grow(-16.0)
 	if area.size.x < 48.0 or area.size.y < 48.0:
 		return
+	_border_garden(data, parcel, court, occupied, reserved, random)
 	var kinds: Array[String] = ["tree", "tree_b", "bush", "hedge", "planter", "yard_wall", "bike", "vending"]
-	var budget: int = clampi(int(area.get_area() / 14000.0), 4, 16)
+	var budget: int = clampi(int(area.get_area() / 7000.0), 6, 28)
 	var added: int = 0
 	var attempts: int = 0
-	while added < budget and attempts < budget * 5:
+	while added < budget and attempts < budget * 6:
 		attempts += 1
 		var kind: String = kinds[random.randi_range(0, kinds.size() - 1)]
 		var point: Vector2 = Vector2(
@@ -142,17 +143,17 @@ static func _edge_furniture(data: Dictionary, parcel: Dictionary, occupied: Arra
 		var x: float = bounds.position.x + 48.0
 		while x < bounds.end.x - 48.0:
 			anchors.append(Vector2(x, y))
-			x += 140.0 + random.randf_range(-16.0, 16.0)
+			x += 80.0 + random.randf_range(-12.0, 12.0)
 	if edges.size() > 0 and edges[0]:
 		var y: float = bounds.position.y + 20.0
-		var x: float = bounds.position.x + 64.0
+		var x: float = bounds.position.x + 48.0
 		while x < bounds.end.x - 48.0:
 			anchors.append(Vector2(x, y))
-			x += 150.0
-	var kinds: Array[String] = ["lamp", "pole", "planter", "bike", "bush", "vending"]
+			x += 88.0
+	var kinds: Array[String] = ["lamp", "pole", "planter", "bike", "bush", "vending", "tree", "crate"]
 	var added: int = 0
 	for point: Vector2 in anchors:
-		if added >= 8:
+		if added >= 16:
 			break
 		var kind: String = kinds[random.randi_range(0, kinds.size() - 1)]
 		var mark: Rect2 = Rect2(point - Vector2(12, 12), Vector2(24, 24))
@@ -175,10 +176,13 @@ static func _fill_yard_edge(data: Dictionary, parcel: Dictionary, court: Diction
 		Vector2(area.position.x + 24.0, area.end.y - 16.0),
 		Vector2(area.end.x - 24.0, area.end.y - 16.0),
 		Vector2(area.get_center().x, area.position.y + 18.0),
+		Vector2(area.position.x + area.size.x * 0.33, area.end.y - 16.0),
+		Vector2(area.position.x + area.size.x * 0.66, area.position.y + 18.0),
+		Vector2(area.end.x - 24.0, area.get_center().y),
 	]
 	var added: int = 0
 	for point: Vector2 in points:
-		if added >= 4:
+		if added >= 8:
 			break
 		var kind: String = kinds[random.randi_range(0, kinds.size() - 1)]
 		var mark: Rect2 = Rect2(point - Vector2(12, 12), Vector2(24, 24))
@@ -195,10 +199,10 @@ static func _fill_open(data: Dictionary, parcel: Dictionary, occupied: Array[Rec
 	if area.size.x < 80.0 or area.size.y < 80.0:
 		return
 	var kinds: Array[String] = ["tree", "tree_b", "bush", "hedge", "planter", "yard_wall", "bike", "pole", "vending", "crate"]
-	var budget: int = clampi(int(area.get_area() / 32000.0), 2, 8)
+	var budget: int = clampi(int(area.get_area() / 14000.0), 4, 20)
 	var added: int = 0
 	var attempts: int = 0
-	while added < budget and attempts < budget * 6:
+	while added < budget and attempts < budget * 8:
 		attempts += 1
 		var kind: String = kinds[random.randi_range(0, kinds.size() - 1)]
 		var point: Vector2 = Vector2(
@@ -224,12 +228,44 @@ static func _free(data: Dictionary, parcel: Dictionary, mark: Rect2, occupied: A
 		if data.bus.has("door") and mark.grow(20).has_point(WorldLayout.point(data.bus.door)):
 			return false
 	for other: Rect2 in occupied + reserved:
-		if mark.grow(10).intersects(other):
+		if mark.grow(6).intersects(other):
 			return false
 	for road: Array in data.get("roads", []):
-		if mark.grow(12).intersects(WorldLayout.rect(road)):
+		if mark.grow(8).intersects(WorldLayout.rect(road)):
 			return false
 	for walk: Array in parcel.get("walks", []):
-		if mark.grow(8).intersects(WorldLayout.rect(walk)):
+		if mark.grow(6).intersects(WorldLayout.rect(walk)):
 			return false
 	return true
+
+
+static func _border_garden(data: Dictionary, parcel: Dictionary, court: Dictionary,
+		occupied: Array[Rect2], reserved: Array[Rect2], random: RandomNumberGenerator) -> void:
+	# Decorative yard walls and hedges along the rim, leaving the entrance clear.
+	var area: Rect2 = WorldLayout.rect(court.rect)
+	var entry: Vector2 = WorldLayout.point(court.entrance) if court.has("entrance") else area.get_center()
+	var points: Array[Vector2] = []
+	var x: float = area.position.x + 20.0
+	while x < area.end.x - 20.0:
+		points.append(Vector2(x, area.end.y - 14.0))
+		points.append(Vector2(x, area.position.y + 16.0))
+		x += 72.0
+	var y: float = area.position.y + 28.0
+	while y < area.end.y - 28.0:
+		points.append(Vector2(area.position.x + 16.0, y))
+		points.append(Vector2(area.end.x - 16.0, y))
+		y += 80.0
+	var added: int = 0
+	for index: int in range(points.size()):
+		if added >= 14:
+			break
+		var point: Vector2 = points[index]
+		if point.distance_to(entry) < 48.0:
+			continue
+		var mark: Rect2 = Rect2(point - Vector2(14, 14), Vector2(28, 28))
+		if not _free(data, parcel, mark, occupied, reserved):
+			continue
+		var kind: String = "yard_wall" if index % 3 != 2 else "hedge" if index % 2 == 0 else "bush"
+		parcel.dressing.append({"kind": kind, "point": [point.x, point.y], "variant": random.randi_range(0, 3)})
+		occupied.append(mark)
+		added += 1

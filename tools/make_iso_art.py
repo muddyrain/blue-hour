@@ -78,6 +78,14 @@ PAL = {
     "ware_roof": (84, 96, 108),
     "stone": (150, 148, 140),
     "stone_dk": (112, 110, 102),
+    "gravel": (154, 144, 128),
+    "gravel_lt": (184, 174, 156),
+    "gravel_dk": (118, 110, 96),
+    "pebble": (170, 162, 146),
+    "concrete": (166, 168, 170),
+    "concrete_lt": (198, 200, 202),
+    "concrete_dk": (128, 132, 136),
+    "grout": (142, 144, 148),
     "wood": (150, 110, 72),
     "wood_dk": (112, 80, 52),
     "bus": (240, 234, 220),
@@ -245,6 +253,60 @@ def tile_bank() -> Image.Image:
     d = ImageDraw.Draw(img)
     pts = diamond_pts()
     d.line(pts + [pts[0]], fill=rgb(PAL["stone_dk"], 140), width=1)
+    return img
+
+
+def _diamond_mask():
+    pts = diamond_pts()
+    mask = Image.new("L", (TW, TH), 0)
+    ImageDraw.Draw(mask).polygon([(int(p[0]), int(p[1])) for p in pts], fill=255)
+    return mask, pts
+
+
+def tile_gravel() -> Image.Image:
+    """Warm residential grit, distinct from lawn and from the beige sidewalk."""
+    img = Image.new("RGBA", (TW, TH), (0, 0, 0, 0))
+    shade_diamond(img, PAL["gravel"], PAL["gravel_lt"], PAL["gravel_dk"], noise=0.06)
+    mask, pts = _diamond_mask()
+    d = ImageDraw.Draw(img)
+    rng = __import__("random").Random(91)
+    pebbles = [
+        PAL["gravel_lt"],
+        PAL["pebble"],
+        PAL["gravel_dk"],
+        (164, 152, 132),
+        (138, 132, 118),
+        (190, 182, 166),
+    ]
+    for _ in range(130):
+        x = rng.randint(8, TW - 9)
+        y = rng.randint(8, TH - 9)
+        if mask.getpixel((x, y)) < 200:
+            continue
+        rx = rng.randint(1, 2)
+        ry = rng.randint(1, 2)
+        color = pebbles[rng.randrange(len(pebbles))]
+        d.ellipse((x - rx, y - ry, x + rx, y + ry), fill=rgb(color, rng.randint(170, 230)))
+    d.line(pts + [pts[0]], fill=rgb(PAL["gravel_dk"], 110), width=1)
+    return img
+
+
+def tile_concrete() -> Image.Image:
+    """Cool shop and warehouse apron tiles, cooler and tighter than the sidewalk."""
+    img = Image.new("RGBA", (TW, TH), (0, 0, 0, 0))
+    shade_diamond(img, PAL["concrete"], PAL["concrete_lt"], PAL["concrete_dk"], noise=0.03)
+    d = ImageDraw.Draw(img)
+    pts = diamond_pts()
+    joint = rgb(PAL["grout"], 120)
+    # Three-by-three pavers along both diamond axes, so the apron reads as tile, not asphalt.
+    for t in (1.0 / 3.0, 2.0 / 3.0):
+        a0 = (lerp(pts[0][0], pts[1][0], t), lerp(pts[0][1], pts[1][1], t))
+        a1 = (lerp(pts[3][0], pts[2][0], t), lerp(pts[3][1], pts[2][1], t))
+        b0 = (lerp(pts[0][0], pts[3][0], t), lerp(pts[0][1], pts[3][1], t))
+        b1 = (lerp(pts[1][0], pts[2][0], t), lerp(pts[1][1], pts[2][1], t))
+        d.line([a0, a1], fill=joint, width=1)
+        d.line([b0, b1], fill=joint, width=1)
+    d.line(pts + [pts[0]], fill=rgb(PAL["concrete_dk"], 130), width=1)
     return img
 
 
@@ -780,6 +842,19 @@ def export_bus_only():
     _export_sprites({"props/bus.png": minibus}, "bus-only")
 
 
+def export_path_tiles(root: Path | None = None) -> None:
+    """Write only the door-path tiles, leaving existing grass/road art untouched."""
+    global ROOT
+    previous = ROOT
+    if root is not None:
+        ROOT = root
+    try:
+        save_tile("gravel", tile_gravel())
+        save_tile("concrete", tile_concrete())
+    finally:
+        ROOT = previous
+
+
 def export_bridges_only():
     """Regenerate only the canal bridges and those manifest entries."""
     _export_sprites({
@@ -807,5 +882,7 @@ if __name__ == "__main__":
         export_bus_only()
     elif "--bridges-only" in sys.argv:
         export_bridges_only()
+    elif "--path-tiles" in sys.argv:
+        export_path_tiles()
     else:
         main()

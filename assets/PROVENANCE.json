@@ -1114,6 +1114,12 @@
       "license": "No additional license granted"
     },
     {
+      "path": "assets/iso/tiles/concrete.png",
+      "sha256": "6b2b021d8a9c94380e512662fbba5bbe12ae76b3818b2e301c1556acc0b91f57",
+      "origin": "Original project isometric art, hand-authored in tools/make_iso_art.py (2:1 diamond ground tiles: warm gravel walks and cool concrete paver aprons in the existing Japanese street palette). Not AI-generated and not a third-party pack.",
+      "license": "No additional license granted"
+    },
+    {
       "path": "assets/iso/tiles/crosswalk_ew.png",
       "sha256": "b5bc215ff6b19b56f936a6420a88486a753132cb0a8dafbab3273131ee9e73a4",
       "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
@@ -1129,6 +1135,12 @@
       "path": "assets/iso/tiles/grass.png",
       "sha256": "6c35861837f5696b3fb1272d907ede8c6811d77b5c6d23b99d4e1cbf27c46055",
       "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/tiles/gravel.png",
+      "sha256": "273c5ee9a2f7ebe769409ede6f87c7db2ce903b0b33f4c4617331578b0965b37",
+      "origin": "Original project isometric art, hand-authored in tools/make_iso_art.py (2:1 diamond ground tiles: warm gravel walks and cool concrete paver aprons in the existing Japanese street palette). Not AI-generated and not a third-party pack.",
       "license": "No additional license granted"
     },
     {

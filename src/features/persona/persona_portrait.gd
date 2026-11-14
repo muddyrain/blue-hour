@@ -1,7 +1,8 @@
 class_name PersonaPortrait
 extends Control
-## Head-and-shoulder presentation of the existing authored identity texture.
-## Crop and badge are visual only; this view never infers a member or a recipe.
+## Face close-up presentation of the authored identity texture.
+## Portraits are already cropped to a readable front face; this view shows the
+## full texture. Badge overlay is visual only; this view never infers a member or a recipe.
 
 const BADGES: Dictionary = {
 	"稳控": preload("res://assets/persona/trait_aim.svg"),
@@ -34,10 +35,9 @@ func _draw() -> void:
 	var frame: Rect2 = Rect2(Vector2.ZERO, size)
 	draw_rect(frame, Color("17333f"))
 	if _texture != null and size.x > 0.0 and size.y > 0.0:
-		var source_size: Vector2 = _texture.get_size()
-		var source: Rect2 = Rect2(source_size * Vector2(0.21, 0.05), source_size * Vector2(0.58, 0.60))
 		var tint: Color = Color.WHITE if _alive else Color(0.55, 0.60, 0.63, 1.0)
-		draw_texture_rect_region(_texture, frame.grow(-1.0), source, tint)
+		# Iso face portraits already fill the texture; do not tighten-crop again.
+		draw_texture_rect(_texture, frame.grow(-1.0), false, tint)
 	else:
 		draw_circle(size * Vector2(0.5, 0.36), minf(size.x, size.y) * 0.14, Color("9aafb3"))
 		draw_arc(size * Vector2(0.5, 0.86), minf(size.x, size.y) * 0.29, PI, TAU, 16, Color("9aafb3"), 2.0, true)

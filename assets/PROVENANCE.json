@@ -716,6 +716,36 @@
       "sha256": "f0b0140f705329f2781ff1285495c178e66bc61b8229f501042389d34c41e614",
       "origin": "M20 project-authored AI-assisted camp art, text-free approved handoff",
       "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/chars/gu_portrait.png",
+      "sha256": "f62ea49012df7b8c3c9f5a34c43c8a705da736246148371af4aaa321bd84c51c",
+      "origin": "Derived face close-up portrait of 顾予安 from official AI-assisted Q-version sprite assets/m5_anim_01/gu_full.png (front idle crop, upscaled); tools/make_iso_portraits.py; no new generation",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/chars/xia_portrait.png",
+      "sha256": "9aa3be34b5d8eba642440ce86abf00bf4471d6167c609a124f0447bf55f0eb28",
+      "origin": "Derived face close-up portrait of 夏之遥 from official AI-assisted Q-version sprite assets/m5_anim_01/xia_full.png (front idle crop, upscaled); tools/make_iso_portraits.py; no new generation",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/chars/lin_portrait.png",
+      "sha256": "71787e21ecf64ae13e4ca2b157718310c19871d79ff526251c6dd4223698fc61",
+      "origin": "Derived face close-up portrait of 林知秋 from official AI-assisted Q-version sprite assets/m5_anim_01/lin_full.png (front idle crop, upscaled); tools/make_iso_portraits.py; no new generation",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/chars/shen_portrait.png",
+      "sha256": "53208d2d5329b8ab7489aae24bd0036ec750dc90e16e672420a843102aa88d81",
+      "origin": "Derived face close-up portrait of 沈听澜 from official AI-assisted Q-version sprite assets/m5_anim_01/shen_full.png (front idle crop, upscaled); tools/make_iso_portraits.py; no new generation",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/chars/lu_portrait.png",
+      "sha256": "64287ffad44fd0edfd8c7faf5dece245e70b035279cac86059775827bbd30ec0",
+      "origin": "Derived face close-up portrait of 陆景川 from official AI-assisted Q-version sprite assets/m5_anim_01/lu_full.png (front idle crop, upscaled); tools/make_iso_portraits.py; no new generation",
+      "license": "No additional license granted"
     }
   ]
 }

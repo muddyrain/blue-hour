@@ -22,6 +22,8 @@ static func _assemble(seed: String,size: String,topology: String,attempt: int,fa
 	var dressed: bool = open_streets == OpenStreetsV1.DRESSING_VERSION
 	if dressed and not WarehouseScenery.attach(data):
 		return {}
+	# Extra service buildings go in before decorative props, so leftover lawns still dress.
+	WorldgenDensity.fill(data)
 	WorldgenDressing.freeze(data)
 	if dressed and not WarehouseScenery.dress(data):
 		return {}

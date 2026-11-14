@@ -70,15 +70,40 @@ static func _courtyard_edge(data: Dictionary, parcel: Dictionary, occupied: Arra
 	return false
 
 
+static func enrich(data: Dictionary) -> void:
+	# Second pass after annexes. Never clears existing dressing or adds collision.
+	if data.is_empty() or data.get("seaside_town", false) or not data.has("parcels"):
+		return
+	var occupied: Array[Rect2] = []
+	for entity: Dictionary in data.entities:
+		occupied.append(WorldLayout.rect(entity.rect).grow(18))
+	for wall: Array in data.get("barriers", []):
+		occupied.append(WorldLayout.rect(wall).grow(16))
+	for parcel: Dictionary in data.parcels:
+		for detail: Dictionary in parcel.get("dressing", []):
+			if detail.has("point"):
+				var point: Vector2 = WorldLayout.point(detail.point)
+				occupied.append(Rect2(point - Vector2(16, 16), Vector2(32, 32)))
+			for rect: Array in detail.get("collisions", [detail.collision] if detail.has("collision") else []):
+				occupied.append(WorldLayout.rect(rect).grow(8))
+	var reserved: Array[Rect2] = ExplorationLayout._reserved(data)
+	var random: RandomNumberGenerator = RogueLayout.rng("town-props-more:" + String(data.get("seed", "0")))
+	for parcel: Dictionary in data.parcels:
+		_edge_furniture(data, parcel, occupied, reserved, random)
+		_fill_open(data, parcel, occupied, reserved, random)
+
+
 static func _scatter(data: Dictionary, occupied: Array[Rect2], reserved: Array[Rect2]) -> void:
 	# Visual-only street furniture. No collision, so navigation certificates stay intact.
 	var random: RandomNumberGenerator = RogueLayout.rng("town-props:" + String(data.get("seed", "0")))
 	for parcel: Dictionary in data.parcels:
 		for court: Dictionary in parcel.courtyards:
-			if court.kind not in ["garden", "court"]:
-				continue
-			_fill_garden(data, parcel, court, occupied, reserved, random)
+			if court.kind in ["garden", "court"]:
+				_fill_garden(data, parcel, court, occupied, reserved, random)
+			elif court.kind in ["parking", "loading"]:
+				_fill_yard_edge(data, parcel, court, occupied, reserved, random)
 		_edge_furniture(data, parcel, occupied, reserved, random)
+		_fill_open(data, parcel, occupied, reserved, random)
 
 
 static func _fill_garden(data: Dictionary, parcel: Dictionary, court: Dictionary,
@@ -86,11 +111,11 @@ static func _fill_garden(data: Dictionary, parcel: Dictionary, court: Dictionary
 	var area: Rect2 = WorldLayout.rect(court.rect).grow(-16.0)
 	if area.size.x < 48.0 or area.size.y < 48.0:
 		return
-	var kinds: Array[String] = ["tree", "tree_b", "bush", "hedge", "planter", "yard_wall", "bike"]
-	var budget: int = clampi(int(area.get_area() / 22000.0), 4, 16)
+	var kinds: Array[String] = ["tree", "tree_b", "bush", "hedge", "planter", "yard_wall", "bike", "vending"]
+	var budget: int = clampi(int(area.get_area() / 14000.0), 4, 16)
 	var added: int = 0
 	var attempts: int = 0
-	while added < budget and attempts < budget * 8:
+	while added < budget and attempts < budget * 5:
 		attempts += 1
 		var kind: String = kinds[random.randi_range(0, kinds.size() - 1)]
 		var point: Vector2 = Vector2(
@@ -117,20 +142,70 @@ static func _edge_furniture(data: Dictionary, parcel: Dictionary, occupied: Arra
 		var x: float = bounds.position.x + 48.0
 		while x < bounds.end.x - 48.0:
 			anchors.append(Vector2(x, y))
-			x += 180.0 + random.randf_range(-20.0, 20.0)
+			x += 140.0 + random.randf_range(-16.0, 16.0)
 	if edges.size() > 0 and edges[0]:
 		var y: float = bounds.position.y + 20.0
 		var x: float = bounds.position.x + 64.0
 		while x < bounds.end.x - 48.0:
 			anchors.append(Vector2(x, y))
-			x += 200.0
-	var kinds: Array[String] = ["lamp", "pole", "planter", "bike", "bush"]
+			x += 150.0
+	var kinds: Array[String] = ["lamp", "pole", "planter", "bike", "bush", "vending"]
 	var added: int = 0
 	for point: Vector2 in anchors:
 		if added >= 8:
 			break
 		var kind: String = kinds[random.randi_range(0, kinds.size() - 1)]
 		var mark: Rect2 = Rect2(point - Vector2(12, 12), Vector2(24, 24))
+		if not _free(data, parcel, mark, occupied, reserved):
+			continue
+		parcel.dressing.append({"kind": kind, "point": [point.x, point.y], "variant": random.randi_range(0, 3)})
+		occupied.append(mark)
+		added += 1
+
+
+static func _fill_yard_edge(data: Dictionary, parcel: Dictionary, court: Dictionary,
+		occupied: Array[Rect2], reserved: Array[Rect2], random: RandomNumberGenerator) -> void:
+	var area: Rect2 = WorldLayout.rect(court.rect)
+	if area.size.x < 80.0 or area.size.y < 64.0:
+		return
+	var kinds: Array[String] = ["pole", "lamp", "crate", "planter", "bush"]
+	var points: Array[Vector2] = [
+		Vector2(area.position.x + 24.0, area.position.y + 20.0),
+		Vector2(area.end.x - 24.0, area.position.y + 20.0),
+		Vector2(area.position.x + 24.0, area.end.y - 16.0),
+		Vector2(area.end.x - 24.0, area.end.y - 16.0),
+		Vector2(area.get_center().x, area.position.y + 18.0),
+	]
+	var added: int = 0
+	for point: Vector2 in points:
+		if added >= 4:
+			break
+		var kind: String = kinds[random.randi_range(0, kinds.size() - 1)]
+		var mark: Rect2 = Rect2(point - Vector2(12, 12), Vector2(24, 24))
+		if not _free(data, parcel, mark, occupied, reserved):
+			continue
+		parcel.dressing.append({"kind": kind, "point": [point.x, point.y], "variant": random.randi_range(0, 3)})
+		occupied.append(mark)
+		added += 1
+
+
+static func _fill_open(data: Dictionary, parcel: Dictionary, occupied: Array[Rect2],
+		reserved: Array[Rect2], random: RandomNumberGenerator) -> void:
+	var area: Rect2 = WorldLayout.rect(parcel.rect).grow(-28.0)
+	if area.size.x < 80.0 or area.size.y < 80.0:
+		return
+	var kinds: Array[String] = ["tree", "tree_b", "bush", "hedge", "planter", "yard_wall", "bike", "pole", "vending", "crate"]
+	var budget: int = clampi(int(area.get_area() / 32000.0), 2, 8)
+	var added: int = 0
+	var attempts: int = 0
+	while added < budget and attempts < budget * 6:
+		attempts += 1
+		var kind: String = kinds[random.randi_range(0, kinds.size() - 1)]
+		var point: Vector2 = Vector2(
+			random.randf_range(area.position.x + 16.0, area.end.x - 16.0),
+			random.randf_range(area.position.y + 16.0, area.end.y - 16.0)
+		)
+		var mark: Rect2 = Rect2(point - Vector2(16, 16), Vector2(32, 32))
 		if not _free(data, parcel, mark, occupied, reserved):
 			continue
 		parcel.dressing.append({"kind": kind, "point": [point.x, point.y], "variant": random.randi_range(0, 3)})

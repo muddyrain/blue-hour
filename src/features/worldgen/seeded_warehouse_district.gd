@@ -133,7 +133,7 @@ static func populate(parcels: Array, roads: Array, bus: Dictionary, seed: String
 		reserved.append(Rect2(WorldLayout.point(plot.entrance) - Vector2.ONE * 40.0, Vector2.ONE * 80.0))
 		if plot not in plots.values():
 			WarehouseDistrict._service_court(plot)
-		var limit: int = clampi(int(area.get_area() / 270000.0), 1, 13)
+		var limit: int = clampi(int(area.get_area() / 230000.0), 1, 10)
 		WarehouseDistrict._infill(plot, entities, reserved, random, limit)
 		plot.frontage.scope = "street" if plot.road_edges[1] else "internal"
 	var roles: Dictionary = {}

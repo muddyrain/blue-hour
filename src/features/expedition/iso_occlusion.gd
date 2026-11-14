@@ -6,7 +6,7 @@ extends RefCounted
 const FADE_ALPHA: float = 0.48
 const FADE_SPEED: float = 6.0
 const MIN_OVERLAP: float = 70.0
-const SKIP_KINDS: Array[String] = ["lamp", "bike", "crate", "bridge", "tram", "rail"]
+const SKIP_KINDS: Array[String] = ["lamp", "bike", "crate", "bridge", "tram", "rail", "pole", "hedge", "bush", "wall", "yard_wall", "planter"]
 
 
 static func update(expedition: Expedition, delta: float) -> void:
@@ -84,3 +84,5 @@ static func _fade_art(host: Node2D, target: float, step: float) -> void:
 		return
 	var next: float = target if step <= 0.0 else move_toward(current, target, step)
 	sprite.modulate.a = next
+	if host is FieldProp:
+		(host as FieldProp).apply_occlusion_fade(next)

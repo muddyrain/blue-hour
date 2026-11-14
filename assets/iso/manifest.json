@@ -170,26 +170,26 @@
       ]
     },
     "props/stone_bridge.png": {
-      "w": 584,
-      "h": 476,
+      "w": 632,
+      "h": 556,
       "foot": [
-        196.0,
-        340.0
+        212.0,
+        320.0
       ],
       "map": [
-        160,
-        96
+        168,
+        104
       ]
     },
     "props/wood_bridge.png": {
-      "w": 488,
-      "h": 376,
+      "w": 504,
+      "h": 412,
       "foot": [
-        172.0,
-        254.0
+        180.0,
+        250.0
       ],
       "map": [
-        140,
+        148,
         72
       ]
     },
@@ -535,6 +535,174 @@
       "map": [
         24,
         16
+      ]
+    },
+    "buildings/convenience_lights.png": {
+      "w": 896,
+      "h": 772,
+      "foot": [
+        272.0,
+        580.0
+      ],
+      "map": [
+        224,
+        176
+      ]
+    },
+    "buildings/convenience_b_lights.png": {
+      "w": 896,
+      "h": 772,
+      "foot": [
+        272.0,
+        580.0
+      ],
+      "map": [
+        224,
+        176
+      ]
+    },
+    "buildings/convenience_wide_lights.png": {
+      "w": 816,
+      "h": 720,
+      "foot": [
+        328.0,
+        500.0
+      ],
+      "map": [
+        280,
+        80
+      ]
+    },
+    "buildings/grocery_lights.png": {
+      "w": 832,
+      "h": 736,
+      "foot": [
+        256.0,
+        552.0
+      ],
+      "map": [
+        208,
+        160
+      ]
+    },
+    "buildings/grocery_b_lights.png": {
+      "w": 832,
+      "h": 736,
+      "foot": [
+        256.0,
+        552.0
+      ],
+      "map": [
+        208,
+        160
+      ]
+    },
+    "buildings/eatery_lights.png": {
+      "w": 800,
+      "h": 712,
+      "foot": [
+        312.0,
+        500.0
+      ],
+      "map": [
+        264,
+        88
+      ]
+    },
+    "buildings/eatery_b_lights.png": {
+      "w": 800,
+      "h": 712,
+      "foot": [
+        312.0,
+        500.0
+      ],
+      "map": [
+        264,
+        88
+      ]
+    },
+    "buildings/supermarket_lights.png": {
+      "w": 1296,
+      "h": 984,
+      "foot": [
+        528.0,
+        664.0
+      ],
+      "map": [
+        480,
+        120
+      ]
+    },
+    "buildings/supermarket_b_lights.png": {
+      "w": 1296,
+      "h": 984,
+      "foot": [
+        528.0,
+        664.0
+      ],
+      "map": [
+        480,
+        120
+      ]
+    },
+    "props/tree_b.png": {
+      "w": 200,
+      "h": 346,
+      "foot": [
+        78.0,
+        261.0
+      ],
+      "map": [
+        22,
+        22
+      ]
+    },
+    "props/hedge.png": {
+      "w": 156,
+      "h": 174,
+      "foot": [
+        64.0,
+        118.0
+      ],
+      "map": [
+        40,
+        14
+      ]
+    },
+    "props/yard_wall.png": {
+      "w": 156,
+      "h": 162,
+      "foot": [
+        68.0,
+        106.0
+      ],
+      "map": [
+        48,
+        10
+      ]
+    },
+    "props/pole.png": {
+      "w": 120,
+      "h": 316,
+      "foot": [
+        50.0,
+        247.0
+      ],
+      "map": [
+        10,
+        10
+      ]
+    },
+    "props/bush.png": {
+      "w": 128,
+      "h": 154,
+      "foot": [
+        46.0,
+        101.0
+      ],
+      "map": [
+        22,
+        18
       ]
     }
   }

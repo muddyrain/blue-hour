@@ -241,6 +241,7 @@ static func _shop_templates() -> Array[Dictionary]:
 	var edge: float = float(a.east_edge)
 	var north: float = float(a.north_walk)
 	var wood_end: float = float(a.wood_end)
+	var yard: float = float(a.south_walk) + WALK_WIDTH
 	# Vendings sit on the bank-side plaza, off the 32-wide sidewalk.
 	# Shops stay the same distance from the plaza as before the road widened,
 	# so the street does not stretch apart.
@@ -252,6 +253,7 @@ static func _shop_templates() -> Array[Dictionary]:
 		_entity("bike_shelter", "optional", "自行车棚", "props/bike_shelter.png", [544, 896, 128, 80], [608, 1000]),
 		_entity("shrine", "optional", "小神社", "buildings/shrine.png", [400, 912, 88, 88], [444, 1024]),
 		_entity("warehouse", "weapon", "渔具仓库", "buildings/warehouse.png", [edge + 32.0, wood_end, 288, 192], [edge + 176.0, wood_end + 208.0]),
+		_entity("eatery", "optional", "食堂", "buildings/eatery.png", [1408, yard, 264, 88], [1540, yard + 112.0]),
 	]
 
 
@@ -260,12 +262,21 @@ static func _house_templates() -> Array[Dictionary]:
 	var west: float = float(a.west_walk)
 	var north: float = float(a.north_walk)
 	var yard: float = float(a.south_walk) + WALK_WIDTH
+	var wood_end: float = float(a.wood_end)
 	return [
 		_entity("house_a", "house", "住宅", "buildings/house_a.png", [west - 312.0, north - 128.0, 160, 128], [west - 232.0, north + 16.0]),
 		_entity("house_c2", "house", "住宅", "buildings/house_g.png", [west - 136.0, north - 160.0, 128, 160], [west - 72.0, north + 16.0]),
+		# Fill the west frontage so the north sidewalk is not a lone pair of houses on a lawn.
+		_entity("house_wide_w", "house", "住宅", "buildings/house_wide_b.png", [west - 576.0, north - 96.0, 256, 96], [west - 448.0, north + 16.0]),
+		_entity("house_n", "house", "住宅", "buildings/house_wide_c.png", [west - 576.0, 320, 256, 96], [west - 448.0, 432]),
 		_entity("house_c", "house", "住宅", "buildings/house_c.png", [400, yard, 128, 160], [464, yard + 184.0]),
 		_entity("house_b", "house", "住宅", "buildings/house_f.png", [544, yard, 144, 144], [616, yard + 168.0]),
 		_entity("house_a3", "house", "住宅", "buildings/house_d.png", [544, 1024, 128, 96], [608, 1144]),
+		_entity("house_sw", "house", "住宅", "buildings/house_e.png", [200, yard, 160, 128], [280, yard + 152.0]),
+		_entity("house_sw2", "house", "住宅", "buildings/house_b.png", [208, 880, 144, 144], [280, 1040]),
+		# East of the canal, south of the shop street, packed lots instead of open lawn.
+		_entity("house_se", "house", "住宅", "buildings/house_wide_a.png", [1128, yard, 256, 96], [1256, yard + 120.0]),
+		_entity("house_wh", "house", "住宅", "buildings/garage_b.png", [1360, wood_end, 264, 96], [1492, wood_end + 120.0]),
 	]
 
 
@@ -284,18 +295,18 @@ static func _entity(id: String, role: String, title: String, art: String, rect: 
 
 static func _overflow_entity(site: Dictionary, index: int) -> Dictionary:
 	var pads: Array = [
-		[1456, 416, 64, 64],
-		[1456, 704, 64, 64],
-		[1456, 992, 64, 64],
-		[1008, 704, 64, 64],
-		[1168, 704, 64, 64],
-		[1360, 704, 64, 64],
-		[1008, 1072, 64, 64],
-		[1360, 1072, 64, 64],
-		[400, 1056, 64, 64],
-		[560, 1056, 64, 64],
-		[400, 976, 64, 64],
-		[672, 1056, 64, 64],
+		[80, 320, 64, 64],
+		[80, 880, 64, 64],
+		[1760, 320, 64, 64],
+		[1760, 720, 64, 64],
+		[1760, 1040, 64, 64],
+		[1008, 200, 64, 64],
+		[1200, 200, 64, 64],
+		[1544, 200, 64, 64],
+		[672, 200, 64, 64],
+		[1008, 1200, 64, 64],
+		[1360, 1200, 64, 64],
+		[400, 1248, 64, 64],
 	]
 	var rect: Array = pads[index % pads.size()].duplicate()
 	if index >= pads.size():
@@ -325,6 +336,9 @@ static func _scenery() -> Array:
 	var south_road: float = float(a.south_walk)
 	var wood_end: float = float(a.wood_end)
 	var edge: float = float(a.east_edge)
+	var west: float = float(a.west_walk)
+	var north: float = float(a.north_walk)
+	var yard: float = south_road + WALK_WIDTH
 	return [
 		{"art": "props/tram_stop.png", "point": [west_mid, north_mid], "kind": "tram"},
 		{"art": "props/stone_bridge.png", "point": [mid, south_road], "kind": "bridge"},
@@ -343,18 +357,59 @@ static func _scenery() -> Array:
 		{"art": "props/lamp.png", "point": [632, south_mid], "kind": "lamp"},
 		{"art": "props/lamp.png", "point": [edge + 88.0, wood_end + 184.0], "kind": "lamp"},
 		{"art": "props/lamp.png", "point": [edge + 248.0, wood_end + 184.0], "kind": "lamp"},
+		{"art": "props/lamp.png", "point": [240, north_mid], "kind": "lamp"},
+		{"art": "props/lamp.png", "point": [280, south_mid], "kind": "lamp"},
+		{"art": "props/lamp.png", "point": [1256, south_mid], "kind": "lamp"},
+		{"art": "props/lamp.png", "point": [1540, south_mid], "kind": "lamp"},
 		{"art": "props/tree.png", "point": [672, 1016], "kind": "tree"},
 		{"art": "props/tree.png", "point": [east_mid, 464], "kind": "tree"},
 		{"art": "props/tree.png", "point": [east_mid, south_mid + 64.0], "kind": "tree"},
 		{"art": "props/tree.png", "point": [edge + 496.0, 464], "kind": "tree"},
 		{"art": "props/tree.png", "point": [edge + 496.0, 992], "kind": "tree"},
 		{"art": "props/tree.png", "point": [edge + 232.0, 464], "kind": "tree"},
+		{"art": "props/tree_b.png", "point": [160, 400], "kind": "tree"},
+		{"art": "props/tree.png", "point": [168, 840], "kind": "tree"},
+		{"art": "props/tree_b.png", "point": [360, 1000], "kind": "tree"},
+		{"art": "props/tree.png", "point": [1520, 848], "kind": "tree"},
+		{"art": "props/tree_b.png", "point": [1680, 1000], "kind": "tree"},
+		{"art": "props/tree.png", "point": [180, 500], "kind": "tree"},
+		{"art": "props/tree_b.png", "point": [1280, 400], "kind": "tree"},
 		{"art": "props/bike.png", "point": [west_mid - 8.0, north_mid], "kind": "bike"},
 		{"art": "props/bike.png", "point": [float(a.west_walk), north_mid + 8.0], "kind": "bike"},
 		{"art": "props/bike.png", "point": [568, 988], "kind": "bike"},
+		{"art": "props/bike.png", "point": [edge + 80.0, north_mid + 6.0], "kind": "bike"},
+		{"art": "props/bike.png", "point": [1180, south_mid + 6.0], "kind": "bike"},
 		{"art": "props/crate.png", "point": [edge + 72.0, wood_end + 184.0], "kind": "crate"},
 		{"art": "props/crate.png", "point": [edge + 288.0, wood_end + 200.0], "kind": "crate"},
 		{"art": "props/crate.png", "point": [edge + 56.0, wood_end + 168.0], "kind": "crate"},
+		# Lot-side planters and hedges sit off the 32-wide sidewalk.
+		{"art": "props/planter.png", "point": [300, north - 8.0], "kind": "planter"},
+		{"art": "props/planter.png", "point": [500, north - 8.0], "kind": "planter"},
+		{"art": "props/planter.png", "point": [240, yard + 8.0], "kind": "planter"},
+		{"art": "props/planter.png", "point": [480, yard + 8.0], "kind": "planter"},
+		{"art": "props/planter.png", "point": [1200, yard + 8.0], "kind": "planter"},
+		{"art": "props/planter.png", "point": [1500, yard + 8.0], "kind": "planter"},
+		{"art": "props/planter.png", "point": [edge + 160.0, north - 8.0], "kind": "planter"},
+		{"art": "props/hedge.png", "point": [280, 400], "kind": "hedge"},
+		{"art": "props/hedge.png", "point": [200, 832], "kind": "hedge"},
+		{"art": "props/hedge.png", "point": [360, 880], "kind": "hedge"},
+		{"art": "props/hedge.png", "point": [1264, 848], "kind": "hedge"},
+		{"art": "props/hedge.png", "point": [160, 704], "kind": "hedge"},
+		{"art": "props/yard_wall.png", "point": [300, 320], "kind": "yard_wall"},
+		{"art": "props/yard_wall.png", "point": [240, 400], "kind": "yard_wall"},
+		{"art": "props/yard_wall.png", "point": [200, 1000], "kind": "yard_wall"},
+		{"art": "props/yard_wall.png", "point": [1256, 800], "kind": "yard_wall"},
+		{"art": "props/bush.png", "point": [340, 500], "kind": "bush"},
+		{"art": "props/bush.png", "point": [620, 1000], "kind": "bush"},
+		{"art": "props/bush.png", "point": [1488, 800], "kind": "bush"},
+		{"art": "props/bush.png", "point": [1700, 500], "kind": "bush"},
+		{"art": "props/bush.png", "point": [80, 500], "kind": "bush"},
+		{"art": "props/pole.png", "point": [west - 12.0, 400], "kind": "pole"},
+		{"art": "props/pole.png", "point": [west - 12.0, 800], "kind": "pole"},
+		{"art": "props/pole.png", "point": [edge + 12.0, 400], "kind": "pole"},
+		{"art": "props/pole.png", "point": [edge + 12.0, 800], "kind": "pole"},
+		{"art": "props/pole.png", "point": [edge + 520.0, north_mid], "kind": "pole"},
+		{"art": "props/vending_green.png", "point": [edge + 88.0, south_mid - 4.0], "kind": "vending"},
 	] + _canal_rails()
 
 

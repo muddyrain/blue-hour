@@ -40,6 +40,7 @@ static func freeze(data: Dictionary) -> void:
 				parcel.dressing.append({"kind":kind,"point":[point.x,point.y],"width":width,"collision":[block.position.x,block.position.y,block.size.x,block.size.y]})
 				occupied.append(block.grow(20));count+=1
 				break
+	_scatter(data, occupied, reserved)
 
 static func _courtyard_edge(data: Dictionary, parcel: Dictionary, occupied: Array[Rect2], reserved: Array[Rect2]) -> bool:
 	for court: Dictionary in parcel.courtyards:
@@ -67,3 +68,93 @@ static func _courtyard_edge(data: Dictionary, parcel: Dictionary, occupied: Arra
 			occupied.append(WorldLayout.rect(value).grow(22))
 		return true
 	return false
+
+
+static func _scatter(data: Dictionary, occupied: Array[Rect2], reserved: Array[Rect2]) -> void:
+	# Visual-only street furniture. No collision, so navigation certificates stay intact.
+	var random: RandomNumberGenerator = RogueLayout.rng("town-props:" + String(data.get("seed", "0")))
+	for parcel: Dictionary in data.parcels:
+		for court: Dictionary in parcel.courtyards:
+			if court.kind not in ["garden", "court"]:
+				continue
+			_fill_garden(data, parcel, court, occupied, reserved, random)
+		_edge_furniture(data, parcel, occupied, reserved, random)
+
+
+static func _fill_garden(data: Dictionary, parcel: Dictionary, court: Dictionary,
+		occupied: Array[Rect2], reserved: Array[Rect2], random: RandomNumberGenerator) -> void:
+	var area: Rect2 = WorldLayout.rect(court.rect).grow(-16.0)
+	if area.size.x < 48.0 or area.size.y < 48.0:
+		return
+	var kinds: Array[String] = ["tree", "tree_b", "bush", "hedge", "planter", "yard_wall", "bike"]
+	var budget: int = clampi(int(area.get_area() / 22000.0), 4, 16)
+	var added: int = 0
+	var attempts: int = 0
+	while added < budget and attempts < budget * 8:
+		attempts += 1
+		var kind: String = kinds[random.randi_range(0, kinds.size() - 1)]
+		var point: Vector2 = Vector2(
+			random.randf_range(area.position.x + 16.0, area.end.x - 16.0),
+			random.randf_range(area.position.y + 16.0, area.end.y - 16.0)
+		)
+		var mark: Rect2 = Rect2(point - Vector2(16, 16), Vector2(32, 32))
+		if not _free(data, parcel, mark, occupied, reserved):
+			continue
+		parcel.dressing.append({"kind": kind, "point": [point.x, point.y], "variant": random.randi_range(0, 3)})
+		# Reserve a tight visual footprint so props do not stack, but do not block walking.
+		occupied.append(mark)
+		added += 1
+
+
+static func _edge_furniture(data: Dictionary, parcel: Dictionary, occupied: Array[Rect2],
+		reserved: Array[Rect2], random: RandomNumberGenerator) -> void:
+	var bounds: Rect2 = WorldLayout.rect(parcel.rect)
+	var edges: Array = parcel.get("road_edges", [false, false, false, false])
+	# Place along the inner lip of a road frontage, inside the parcel, off the roadway.
+	var anchors: Array[Vector2] = []
+	if edges.size() > 1 and edges[1]:
+		var y: float = bounds.end.y - 20.0
+		var x: float = bounds.position.x + 48.0
+		while x < bounds.end.x - 48.0:
+			anchors.append(Vector2(x, y))
+			x += 180.0 + random.randf_range(-20.0, 20.0)
+	if edges.size() > 0 and edges[0]:
+		var y: float = bounds.position.y + 20.0
+		var x: float = bounds.position.x + 64.0
+		while x < bounds.end.x - 48.0:
+			anchors.append(Vector2(x, y))
+			x += 200.0
+	var kinds: Array[String] = ["lamp", "pole", "planter", "bike", "bush"]
+	var added: int = 0
+	for point: Vector2 in anchors:
+		if added >= 8:
+			break
+		var kind: String = kinds[random.randi_range(0, kinds.size() - 1)]
+		var mark: Rect2 = Rect2(point - Vector2(12, 12), Vector2(24, 24))
+		if not _free(data, parcel, mark, occupied, reserved):
+			continue
+		parcel.dressing.append({"kind": kind, "point": [point.x, point.y], "variant": random.randi_range(0, 3)})
+		occupied.append(mark)
+		added += 1
+
+
+static func _free(data: Dictionary, parcel: Dictionary, mark: Rect2, occupied: Array[Rect2], reserved: Array[Rect2]) -> bool:
+	if data.has("bus"):
+		if data.has("open_streets") and OpenStreetsV1.intersects_sweep(data.bus, mark, 20):
+			return false
+		if data.bus.has("sweep") and WorldLayout.rect(data.bus.sweep).grow(16).intersects(mark):
+			return false
+		if data.bus.has("rect") and WorldLayout.rect(data.bus.rect).grow(20).intersects(mark):
+			return false
+		if data.bus.has("door") and mark.grow(20).has_point(WorldLayout.point(data.bus.door)):
+			return false
+	for other: Rect2 in occupied + reserved:
+		if mark.grow(10).intersects(other):
+			return false
+	for road: Array in data.get("roads", []):
+		if mark.grow(12).intersects(WorldLayout.rect(road)):
+			return false
+	for walk: Array in parcel.get("walks", []):
+		if mark.grow(8).intersects(WorldLayout.rect(walk)):
+			return false
+	return true

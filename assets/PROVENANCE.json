@@ -423,32 +423,32 @@
     },
     {
       "path": "assets/infected_v1/normal/e.png",
-      "sha256": "c7491404fc4a44955d17ac674dcd503d71c2d4f26975105a21d9200f368794ca",
-      "origin": "Original procedural isometric art; tools/make_iso_chars.py, five source views and disclosed mirroring",
+      "sha256": "ee3510d818328f8772b14469544c74021ea4903c646cbd91a3a8b6958e9af5dc",
+      "origin": "AI-assisted original project art; M5-ART-INFECTED-01, built-in image_gen, five source views and disclosed mirroring",
       "license": "No additional license granted"
     },
     {
       "path": "assets/infected_v1/normal/se.png",
-      "sha256": "85ea6bc68e461b8f8b602d4f624c3d229650055e85ea8ad8d253e854a6e616a3",
-      "origin": "Original procedural isometric art; tools/make_iso_chars.py, five source views and disclosed mirroring",
+      "sha256": "ef74efeb66e2bbc8b7c720f95290a6f5eda0dfd20fa64e162c441a7c51ee3e91",
+      "origin": "AI-assisted original project art; M5-ART-INFECTED-01, built-in image_gen, five source views and disclosed mirroring",
       "license": "No additional license granted"
     },
     {
       "path": "assets/infected_v1/normal/s.png",
-      "sha256": "d7108fc3a771450cc7ddd7b4e13334179b1a0a907dae1b0686ad7434d72a6250",
-      "origin": "Original procedural isometric art; tools/make_iso_chars.py, five source views and disclosed mirroring",
+      "sha256": "07b805006d93bdf1a447fbd3d6da83ae667f23e0dd63c92a1beb94bd41d087e0",
+      "origin": "AI-assisted original project art; M5-ART-INFECTED-01, built-in image_gen, five source views and disclosed mirroring",
       "license": "No additional license granted"
     },
     {
       "path": "assets/infected_v1/normal/ne.png",
-      "sha256": "0cbee14c9dc1a8bb93e1bccc147b1e5a88b931753be65f3c81fb3cddbbc729de",
-      "origin": "Original procedural isometric art; tools/make_iso_chars.py, five source views and disclosed mirroring",
+      "sha256": "bb875ca48871ee0452dce258927c2d850bf8654152352d0bff87e827a8a6892b",
+      "origin": "AI-assisted original project art; M5-ART-INFECTED-01, built-in image_gen, five source views and disclosed mirroring",
       "license": "No additional license granted"
     },
     {
       "path": "assets/infected_v1/normal/n.png",
-      "sha256": "ac26f25f4b916c7313017f2106283c484172ebccddc959a1077638fa2b8a1e25",
-      "origin": "Original procedural isometric art; tools/make_iso_chars.py, five source views and disclosed mirroring",
+      "sha256": "b942f9f8d08414e2b5d0ddc6964bb6db86fcda902e63e06daf7c739c2a522db5",
+      "origin": "AI-assisted original project art; M5-ART-INFECTED-01, built-in image_gen, five source views and disclosed mirroring",
       "license": "No additional license granted"
     },
     {
@@ -715,6 +715,36 @@
       "path": "assets/ui/m20/camp-blue-hour.png",
       "sha256": "f0b0140f705329f2781ff1285495c178e66bc61b8229f501042389d34c41e614",
       "origin": "M20 project-authored AI-assisted camp art, text-free approved handoff",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/chars/gu_portrait.png",
+      "sha256": "f62ea49012df7b8c3c9f5a34c43c8a705da736246148371af4aaa321bd84c51c",
+      "origin": "Derived face close-up portrait of 顾予安 from official AI-assisted Q-version sprite assets/m5_anim_01/gu_full.png (front idle crop, upscaled); tools/make_iso_portraits.py; no new generation",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/chars/xia_portrait.png",
+      "sha256": "9aa3be34b5d8eba642440ce86abf00bf4471d6167c609a124f0447bf55f0eb28",
+      "origin": "Derived face close-up portrait of 夏之遥 from official AI-assisted Q-version sprite assets/m5_anim_01/xia_full.png (front idle crop, upscaled); tools/make_iso_portraits.py; no new generation",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/chars/lin_portrait.png",
+      "sha256": "71787e21ecf64ae13e4ca2b157718310c19871d79ff526251c6dd4223698fc61",
+      "origin": "Derived face close-up portrait of 林知秋 from official AI-assisted Q-version sprite assets/m5_anim_01/lin_full.png (front idle crop, upscaled); tools/make_iso_portraits.py; no new generation",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/chars/shen_portrait.png",
+      "sha256": "53208d2d5329b8ab7489aae24bd0036ec750dc90e16e672420a843102aa88d81",
+      "origin": "Derived face close-up portrait of 沈听澜 from official AI-assisted Q-version sprite assets/m5_anim_01/shen_full.png (front idle crop, upscaled); tools/make_iso_portraits.py; no new generation",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/chars/lu_portrait.png",
+      "sha256": "64287ffad44fd0edfd8c7faf5dece245e70b035279cac86059775827bbd30ec0",
+      "origin": "Derived face close-up portrait of 陆景川 from official AI-assisted Q-version sprite assets/m5_anim_01/lu_full.png (front idle crop, upscaled); tools/make_iso_portraits.py; no new generation",
       "license": "No additional license granted"
     }
   ]

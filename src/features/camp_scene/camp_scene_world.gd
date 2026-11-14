@@ -23,8 +23,12 @@ func _ready() -> void:
 	for id: int in [1, 2, 3, 4, 5]:
 		var sprite: Sprite2D = Sprite2D.new()
 		sprite.name = "Resident%d" % id
-		sprite.centered = false
-		sprite.offset = Vector2(-128, -224)
+		sprite.centered = true
+		sprite.texture = MotionAtlas.RIGHT[id - 1]
+		sprite.hframes = 5
+		sprite.vframes = 7
+		sprite.frame = 1
+		sprite.offset = Vector2(0, -96)
 		sprite.scale = Vector2.ONE * 0.44
 		sprite.position = CampSceneLayout.member_position(id)
 		sprite.set_meta("member_id", id)
@@ -90,7 +94,7 @@ func refresh(members: Array) -> void:
 		if member.health <= 0 or not residents.has(int(member.id)):
 			continue
 		var definition: SurvivorDefinition = SurvivorRoster.definition_for(member)
-		residents[int(member.id)].texture = definition.portrait
+		# HUD / roster use face close-ups; camp yard keeps the official standing sprite.
 		residents[int(member.id)].set_meta("definition_id", definition.id)
 		residents[int(member.id)].show()
 		visible_member_ids.append(int(member.id))

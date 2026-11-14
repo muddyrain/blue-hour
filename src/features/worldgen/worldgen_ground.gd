@@ -3,6 +3,7 @@ extends Node2D
 ## Flat materials read the frozen roads/parcels; no independent collision geometry.
 var layout: StreetLayout
 var supply_entrances: Array[Vector2] = []
+var skip_base: bool = false
 var _light_pool: GradientTexture2D
 
 
@@ -21,7 +22,8 @@ func _ready() -> void:
 
 func _draw() -> void:
 	var doors: Array[Vector2] = supply_entrances.duplicate()
-	IsoDraw.ground(self, layout, doors, true)
+	if not skip_base:
+		IsoDraw.ground(self, layout, doors, true)
 	if layout.world_data.has("loading_yard"):
 		IsoDraw.fill(self, WorldLayout.rect(layout.world_data.loading_yard.bounds), Color("4a5560"))
 		IsoDraw.stroke(self, WorldLayout.rect(layout.world_data.loading_yard.bounds), Color("6a7580"), 1.5)

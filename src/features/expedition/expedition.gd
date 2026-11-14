@@ -467,6 +467,8 @@ func _show_notice(message: String) -> void:
 	_feedback._show_notice(message)
 
 func _update_ui() -> void:
+	if _sort != null:
+		IsoOcclusion.update(self, combat_delta if combat_delta > 0.0 else 1.0 / 30.0)
 	_ui._update_ui()
 
 

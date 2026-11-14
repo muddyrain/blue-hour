@@ -1,12 +1,13 @@
 class_name IsoBusView
 extends Node2D
-## Procedural cream minibus placeholder. The parent sprite holds the logical-to-view position.
+## Cream minibus sprite. The parent sprite holds the logical-to-view position.
 
 
 func _ready() -> void:
 	z_as_relative = true
 	position = Vector2.ZERO
+	IsoAtlas.attach(self, "props/bus.png")
 
 
 func _draw() -> void:
-	IsoDraw.bus(self)
+	pass

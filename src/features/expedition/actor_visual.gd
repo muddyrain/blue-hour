@@ -10,7 +10,9 @@ const CarbineView: WeaponPresentation = preload("res://assets/p032/carbine_view.
 const LongRifleView: WeaponPresentation = preload("res://assets/p032/long_rifle_view.tres")
 const WALK_FRAMES: Array[int] = [1, 2, 3, 2]
 const HAND_PIXELS: Array[Vector2] = [Vector2(156, 140), Vector2(181, 110), Vector2(131, 143)]
-const BODY_SCALE: float = 0.36
+const BODY_SCALE: float = 0.22
+const SCALE_REF: float = 0.36
+const RING_RADIUS: float = 17.0 * BODY_SCALE / SCALE_REF
 const COLOURS: Array[Color] = [Color("80ddd8"), Color("f2c37f"), Color("e88266")]
 const NORMAL_DIRECTION_MARGIN: float = PI / 36.0
 const NORMAL_CONTACT_RESPONSE: float = 96.0
@@ -92,10 +94,10 @@ func _ready() -> void:
 
 func _draw() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.38))
-	draw_circle(Vector2.ZERO, 17.0, Color(0.03, 0.06, 0.08, 0.35))
+	draw_circle(Vector2.ZERO, RING_RADIUS, Color(0.03, 0.06, 0.08, 0.35))
 	draw_set_transform(Vector2.ZERO)
 	if not is_enemy and not _is_defeated:
-		draw_arc(Vector2.ZERO, 17.0, 0.0, TAU, 28, COLOURS[variant % COLOURS.size()], 2.0, true)
+		draw_arc(Vector2.ZERO, RING_RADIUS, 0.0, TAU, 28, COLOURS[variant % COLOURS.size()], 2.0, true)
 	if _screamer_enemy() and not _is_defeated:
 		ScreamerVisualV1.draw_cue(self, _screamer_phase, _screamer_progress)
 
@@ -227,7 +229,7 @@ func aimed_shot_offset(direction: Vector2) -> Vector2:
 	var facing: Vector2 = direction.normalized() if direction != Vector2.ZERO else _facing
 	var row: int = _row(facing)
 	var hand: Vector2 = _hand_pixels[row] - Vector2(128, 224)
-	var size: Vector2 = weapon_view.direction_scales[row] * weapon_view.display_scale
+	var size: Vector2 = weapon_view.direction_scales[row] * field_scale(weapon_view.display_scale)
 	if row == 0 and facing.x < 0.0:
 		hand.x = -hand.x
 		size.y *= -1.0
@@ -248,6 +250,10 @@ func presentation_state() -> Dictionary:
 		"muzzle": muzzle_offset(), "grip": grip, "hand": hand, "weapon": String(weapon_view.id),
 		"weapon_layer": _weapon.z_index, "display_offset": position, "defeat_clock": _defeat_clock,
 		"local_layers": [_upper.get_index(), _arms.get_index(), _weapon.get_index(), _head.get_index()]}
+
+
+static func field_scale(authored: float) -> float:
+	return authored * BODY_SCALE / SCALE_REF
 
 
 func _sprite(texture: Texture2D, columns: int, rows: int) -> Sprite2D:
@@ -319,13 +325,13 @@ func _apply_pose() -> void:
 	if is_enemy:
 		_body.scale *= Vector2(1.25, 1.18) if enemy_kind == EnemyRules.HEAVY else Vector2(0.90, 1.03) if enemy_kind == EnemyRules.RUSH else Vector2.ONE
 		if _normal_enemy() and NormalInfectedV1.enabled():
-			_body.scale = Vector2.ONE * NormalInfectedV1.DISPLAY_SCALE
+			_body.scale = Vector2.ONE * field_scale(NormalInfectedV1.DISPLAY_SCALE)
 		elif _toxic_enemy():
-			_body.scale = Vector2.ONE * ToxicCarrierVisualV1.DISPLAY_SCALE
+			_body.scale = Vector2.ONE * field_scale(ToxicCarrierVisualV1.DISPLAY_SCALE)
 		elif _screamer_enemy():
-			_body.scale = Vector2.ONE * ScreamerVisualV1.DISPLAY_SCALE
+			_body.scale = Vector2.ONE * field_scale(ScreamerVisualV1.DISPLAY_SCALE)
 		elif _night_hound():
-			_body.scale = Vector2.ONE * NightHoundVisualV1.DISPLAY_SCALE
+			_body.scale = Vector2.ONE * field_scale(NightHoundVisualV1.DISPLAY_SCALE)
 		# Presentation spacing only. Logical feet, navigation, LOS and melee range stay put.
 		_body.position = Vector2.ZERO if _night_hound() else _body.position + _contact_offset()
 	_body.self_modulate = tint
@@ -388,7 +394,7 @@ func _update_hold(tint: Color, moving: bool, action: int) -> void:
 	_weapon.offset = -weapon_view.grip_pixel
 	_weapon.position = hand * BODY_SCALE
 	_weapon.rotation = _facing.angle()
-	_weapon.scale = weapon_view.direction_scales[direction_row] * weapon_view.display_scale
+	_weapon.scale = weapon_view.direction_scales[direction_row] * field_scale(weapon_view.display_scale)
 	if direction_row == 0 and _facing.x < 0.0:
 		_weapon.scale.y *= -1.0
 	_weapon.z_index = 0
@@ -397,10 +403,11 @@ func _update_hold(tint: Color, moving: bool, action: int) -> void:
 	_hold.move_child(_head, _hold.get_child_count() - 1)
 	_hold.move_child(_muzzle, _hold.get_child_count() - 1)
 	_arms.facing = _facing
+	_arms.display_scale = BODY_SCALE / SCALE_REF
 	_arms.trigger = _weapon.position
 	_arms.support = _weapon.transform * ((weapon_view.muzzle_pixel - weapon_view.grip_pixel) * 0.32)
 	_arms.modulate = tint
 	_arms.queue_redraw()
 	_muzzle.position = _weapon.transform * (weapon_view.muzzle_pixel - weapon_view.grip_pixel)
 	_muzzle.rotation = _weapon.rotation
-	_muzzle.scale = Vector2.ONE * (0.65 + _fire_clock * 3.0)
+	_muzzle.scale = Vector2.ONE * field_scale(0.65 + _fire_clock * 3.0)

@@ -309,6 +309,9 @@ static func supply(value: Dictionary) -> MissionSupply:
 	var result: MissionSupply=PersonaActions.supply(source)
 	result.generated=value.duplicate(true)
 	result.layout=ExplorationLayout.resource(value.layout)
+	if SeasideTown.should_apply(value):
+		result.layout = SeasideTown.layout(value)
+		result.display_name = SeasideTown.TITLE
 	result.cash_reward=int(value.cash)
 	result.food_reward=int(value.food)
 	result.has_weapon_sample = value.weapons == 1

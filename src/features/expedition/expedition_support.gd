@@ -225,6 +225,29 @@ func request_power(slot: int = 0) -> bool:
 	return expedition._accept_power(expedition.support_world(),request)
 
 
+func request_special() -> bool:
+	# R fires the first ready expedition loadout power. Members have no separate active skill.
+	if not expedition.power_mode():
+		expedition._show_notice("当前没有可释放的特技")
+		return false
+	var slots: int = 1
+	var loadout: Variant = expedition.powers.get("loadout")
+	if loadout is Dictionary:
+		slots = maxi(1, (loadout.slots as Array).size())
+	elif expedition.third_power_panel != null:
+		slots = 3
+	elif expedition.second_power_panel != null:
+		slots = 2
+	for slot: int in range(slots):
+		if SpecialPowers.equipped_at(expedition.powers, slot).is_empty():
+			continue
+		if expedition.request_power(slot):
+			return true
+	expedition._show_notice("当前没有可释放的特技")
+	expedition._update_ui()
+	return false
+
+
 func _request_aid_broadcast() -> bool:
 	if not expedition.support_commit.is_valid() or not expedition.basic_support.ready(SpecialPowers.RADIO):
 		return false

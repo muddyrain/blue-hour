@@ -36,8 +36,8 @@ func _journey() -> void:
 			viewport.push_input(click,true)
 			world.step(1.0/30.0);await _frame()
 		_check(world.goal==goal_before and world.camera.zoom==zoom_before,"details mouse/wheel do not reach map")
-		for key: Key in [KEY_Q,KEY_E,KEY_3]:await _key(key)
-		_check(world.powers.accepted.is_empty() and not world.support_aiming,"detail focus blocks Q E 3")
+		for key: Key in [KEY_Q,KEY_W,KEY_E,KEY_R,KEY_3]:await _key(key)
+		_check(world.powers.accepted.is_empty() and not world.support_aiming and not world.rally_aiming and not world.focus_aiming,"detail focus blocks Q W E R 3")
 		var elapsed_before: float=world.elapsed
 		await _key(KEY_SPACE)
 		_check(world.is_paused,"Space explicitly pauses from detail")

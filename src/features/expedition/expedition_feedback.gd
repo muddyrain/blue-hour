@@ -27,9 +27,33 @@ func _draw() -> void:
 		for actor: FieldActor in x.survivors:
 			if actor.activity == FieldActor.Activity.MOVING and not x.has_search_job(actor.member_id):
 				x.draw_dashed_line(IsoSpace.to_view(actor.position), goal_view, Color(0.8, 0.95, 0.91, 0.4), 1.0, 8.0)
+	_draw_command_marks()
+
+
+func _draw_command_marks() -> void:
+	var amber := Color("d9a24a")
+	if x.rally_aiming:
+		var cursor: Vector2 = IsoSpace.to_view(IsoSpace.to_map(x.get_global_mouse_position()))
+		var legal: bool = x.layout.world_bounds.has_point(IsoSpace.to_map(x.get_global_mouse_position()))
+		var colour: Color = amber if legal else Color("c8553d")
+		x.draw_arc(cursor, 16.0, 0.0, TAU, 28, colour, 2.0, true)
+		x.draw_line(cursor - Vector2(7, 0), cursor + Vector2(7, 0), colour, 2.0)
+		x.draw_line(cursor - Vector2(0, 7), cursor + Vector2(0, 7), colour, 2.0)
+		x.draw_string(ThemeDB.fallback_font, cursor + Vector2(-120, -22), "左键确认集合 · 右键 / Esc 取消" if legal else "请选择集合地点", HORIZONTAL_ALIGNMENT_CENTER, 240, 15, colour)
+	if x.focus_aiming or (x.focus_target != null and is_instance_valid(x.focus_target) and x.focus_target.health > 0.0):
+		var hover: FieldActor = x.focus_target if not x.focus_aiming else x._orders._enemy_near(IsoSpace.to_map(x.get_global_mouse_position()))
+		if hover != null and is_instance_valid(hover) and hover.health > 0.0:
+			var mark: Vector2 = IsoSpace.to_view(hover.position)
+			var locked: bool = hover == x.focus_target
+			var colour: Color = amber if locked else Color("e8dcc4")
+			x.draw_arc(mark, 22.0, 0.0, TAU, 32, colour, 2.2, true)
+		if x.focus_aiming:
+			var cursor: Vector2 = x.get_global_mouse_position()
+			x.draw_string(ThemeDB.fallback_font, IsoSpace.to_view(IsoSpace.to_map(cursor)) + Vector2(-120, -28), "左键确认集火 · 右键 / Esc 取消", HORIZONTAL_ALIGNMENT_CENTER, 240, 15, amber)
 
 
 func _shot_effect(from: Vector2, to: Vector2, damage: float) -> void:
+
 	x._shot_trace(from, to + Vector2.UP * AttackRules.HIT_HEIGHT, Color("f1d5a1"))
 	x._hit_effect(to, damage, false)
 
@@ -132,30 +156,122 @@ func _street_camera_start() -> Vector2:
 	return x.camera.framed_position(IsoSpace.to_view(focus))
 
 func _present_support() -> void:
-	if not x.build_mode() or x.support_panel==null: return
-	if not x.support_available(): x.support_aiming=false
-	var state: Dictionary=x.basic_support.snapshot()
-	var members: Array[Dictionary]=[]
-	for actor: FieldActor in x.survivors: members.append({"member_id":actor.member_id,"health":actor.health,"max_health":actor.max_health,"present":actor.activity!=FieldActor.Activity.DOWN})
-	var plan: Dictionary=x.basic_support.plan_heal(members,BuildItems.frozen_factors(x.supply.generated.build).heal)
-	var heal_text: String="Q 治疗 · %.1fs"%state.cooldowns.heal if state.cooldowns.heal>0 else "Q 治疗 · 队员%d +%.0fHP"%[plan.member_id,plan.amount] if not plan.is_empty() else "Q 治疗 · 无受伤存活者"
-	var strike_text: String="E 空袭 · %.1fs"%state.cooldowns.airstrike if state.cooldowns.airstrike>0 else "左键确认 · 右键/Esc取消" if x.support_aiming else "E 空袭 · 就绪"
-	if not x.support_available(): heal_text="治疗 · 当前阶段不可用"; strike_text="空袭 · 当前阶段不可用"
-	var view_point: Vector2=x.get_global_mouse_position()
-	var point: Vector2=IsoSpace.to_map(view_point)
-	var aim_plan: Dictionary = x.support_plan_airstrike(point) if x.support_aiming else {}
-	var legal: bool = not aim_plan.is_empty()
-	if x._barricade_view != null:
-		x._barricade_view.present(x.barricade_open, x.support_aiming and not x.barricade_open)
-		if not x.barricade_open and legal and BarricadeState.hits(x.supply.generated, aim_plan, x.layout):
-			strike_text = "可炸开路障 · 左键确认"
-	x.support_panel.present(heal_text,strike_text,x.support_available() and state.cooldowns.heal==0 and not plan.is_empty(),x.support_available() and state.cooldowns.airstrike==0)
-	if x.support_aiming:
-		var caller: FieldActor=null
-		for actor: FieldActor in x.survivors:
-			if actor.health>0 and actor.visible and actor.activity not in [2,3,4] and (caller==null or actor.position.distance_to(point)<caller.position.distance_to(point) or (actor.position.distance_to(point)==caller.position.distance_to(point) and actor.member_id<caller.member_id)): caller=actor
-		if caller!=null: x.support_aim.present_caller(IsoSpace.to_view(caller.position))
-	x.support_aim.present(view_point,BasicSupport.POLICY.airstrike_radius*BuildItems.frozen_factors(x.supply.generated.build).blast,legal,x.support_aiming)
+	if x.support_panel == null:
+		return
+	if not x.support_available():
+		x.support_aiming = false
+	var heal_state := _heal_command_state()
+	var special_state := _special_command_state()
+	x.support_panel.present_commands(_rally_command_state(), _focus_command_state(), heal_state, special_state)
+	if x.support_aim != null:
+		var view_point: Vector2 = x.get_global_mouse_position()
+		var point: Vector2 = IsoSpace.to_map(view_point)
+		var aim_plan: Dictionary = x.support_plan_airstrike(point) if x.support_aiming else {}
+		var legal: bool = not aim_plan.is_empty()
+		if x._barricade_view != null:
+			x._barricade_view.present(x.barricade_open, x.support_aiming and not x.barricade_open)
+		if x.support_aiming:
+			var caller: FieldActor = null
+			for actor: FieldActor in x.survivors:
+				if actor.health>0 and actor.visible and actor.activity not in [2,3,4] and (caller==null or actor.position.distance_to(point)<caller.position.distance_to(point) or (actor.position.distance_to(point)==caller.position.distance_to(point) and actor.member_id<caller.member_id)): caller=actor
+			if caller!=null: x.support_aim.present_caller(IsoSpace.to_view(caller.position))
+		var radius: float = BasicSupport.POLICY.airstrike_radius
+		if x.build_mode():
+			radius *= BuildItems.frozen_factors(x.supply.generated.build).blast
+		x.support_aim.present(view_point, radius, legal, x.support_aiming)
+	if x.rally_aiming or x.focus_aiming or (x.focus_target != null and is_instance_valid(x.focus_target)):
+		x.queue_redraw()
+
+
+func _rally_command_state() -> Dictionary:
+	var movers: int = 0
+	var searchers: int = 0
+	for actor: FieldActor in x.survivors:
+		if actor.health <= 0.0:
+			continue
+		if x.has_search_job(actor.member_id):
+			searchers += 1
+		elif actor.visible and actor.activity != FieldActor.Activity.DOWN:
+			movers += 1
+	var enabled: bool = x.phase != Expedition.Phase.FINISHED and (movers > 0 or searchers > 0)
+	var status: String = "瞄准" if x.rally_aiming else "就绪" if enabled else "—"
+	var tooltip: String = "集合可指挥的队员到指定地点。\n搜集中的队员完成后归队。\nQ 进入瞄准，左键确认，右键 / Esc 取消。"
+	if not enabled:
+		tooltip += "\n当前没有可集合的队员。"
+	return {"status":status,"enabled":enabled,"aiming":x.rally_aiming,"tooltip":tooltip}
+
+
+func _focus_command_state() -> Dictionary:
+	var living: bool = x.survivors.any(func(actor: FieldActor) -> bool: return actor.health > 0.0)
+	var foes: bool = x.enemies.any(func(enemy: FieldActor) -> bool: return enemy.health > 0.0)
+	var enabled: bool = x.phase != Expedition.Phase.FINISHED and living and foes
+	var status: String = "瞄准" if x.focus_aiming else "就绪" if enabled else "—"
+	var tooltip: String = "选择一名敌人，让可指挥的队员优先集中攻击。\n超出射程的队员会靠上前。\nW 进入瞄准，左键确认，右键 / Esc 取消。"
+	if x.focus_target != null and is_instance_valid(x.focus_target) and x.focus_target.health > 0.0 and x.focus_target.enemy_behavior != null:
+		status = "锁定" if not x.focus_aiming else "瞄准"
+		tooltip += "\n当前目标：%s" % EnemyRules.name_for(x.focus_target.enemy_behavior.kind)
+	if not enabled:
+		tooltip += "\n当前没有可集火的目标。"
+	return {"status":status,"enabled":enabled,"aiming":x.focus_aiming,"tooltip":tooltip}
+
+
+func _heal_command_state() -> Dictionary:
+	if not x.build_mode():
+		return {"status":"当前阶段不可用","enabled":false,"tooltip":"治疗 · 当前阶段不可用"}
+	var state: Dictionary = x.basic_support.snapshot() if not x.basic_support.snapshot().is_empty() else {"cooldowns":{"heal":0.0}}
+	var remaining: float = float(state.get("cooldowns", {}).get("heal", 0.0))
+	var members: Array[Dictionary] = []
+	for actor: FieldActor in x.survivors:
+		members.append({"member_id":actor.member_id,"health":actor.health,"max_health":actor.max_health,"present":actor.activity!=FieldActor.Activity.DOWN})
+	var plan: Dictionary = x.basic_support.plan_heal(members, BuildItems.frozen_factors(x.supply.generated.build).heal) if x.support_available() else {}
+	var status: String = "%.1fs" % remaining if remaining > 0.0 else "队员%d +%.0fHP" % [plan.member_id, plan.amount] if not plan.is_empty() else "无受伤存活者"
+	if not x.support_available():
+		status = "当前阶段不可用"
+	var enabled: bool = x.support_available() and remaining == 0.0 and not plan.is_empty()
+	var tooltip: String = "治疗当前生命比例最低的存活队员。\n快捷键 E。\n" + status
+	return {"status":status,"enabled":enabled,"remaining":remaining,"duration":BuildItems.heal_cooldown(x.supply.generated.build) if x.build_mode() else 30.0,"tooltip":tooltip}
+
+
+func _special_command_state() -> Dictionary:
+	if not x.power_mode() or x.powers.is_empty():
+		return {"status":"空槽","enabled":false,"tooltip":"特技会释放已装配的特殊能力。\n当前没有可释放的特技。\n先完成装备行动并归航确认，再到营地装配。"}
+	var slots: int = 1
+	var loadout: Variant = x.powers.get("loadout")
+	if loadout is Dictionary:
+		slots = maxi(1, (loadout.slots as Array).size())
+	elif x.third_power_panel != null:
+		slots = 3
+	elif x.second_power_panel != null:
+		slots = 2
+	var lines: PackedStringArray = []
+	var ready_slot: int = -1
+	var remaining: float = 0.0
+	var duration: float = 0.0
+	var status: String = "空槽"
+	for slot: int in range(slots):
+		var id: String = SpecialPowers.equipped_at(x.powers, slot)
+		if id.is_empty():
+			lines.append("槽 %d：空槽" % (slot + 1))
+			continue
+		var time_left: float = SpecialPowers.remaining(x.powers, x.elapsed, slot)
+		var used: bool = not x.basic_support.ready(id) if id == SpecialPowers.RADIO else not SpecialPowers.event_at(x.powers, slot).is_empty()
+		var slot_status: String = "持续 %.1f 秒" % time_left if time_left > 0.0 else "已用" if used else "就绪"
+		lines.append("%s · %s" % [SpecialPowers.definition(id).name, slot_status])
+		if ready_slot < 0 and not used and time_left == 0.0:
+			ready_slot = slot
+			status = SpecialPowers.definition(id).name + " · 就绪"
+		elif ready_slot < 0 and time_left > 0.0:
+			status = "持续 %.1f 秒" % time_left
+			remaining = time_left
+			duration = SpecialPowers.effect_duration(loadout, id) if loadout is Dictionary else SpecialPowers.duration(id, false)
+		elif ready_slot < 0 and used:
+			status = "已用"
+	var enabled: bool = x.support_available() and ready_slot >= 0
+	var tooltip: String = "释放当前已装配且就绪的特殊能力。\n快捷键 R。队员特性为被动，不会另造主动技。\n" + "\n".join(lines)
+	if not enabled and status == "空槽":
+		tooltip += "\n当前没有可释放的特技。"
+	return {"status":status,"enabled":enabled,"remaining":remaining,"duration":duration,"tooltip":tooltip}
+
 
 func _present_power() -> void:
 	if not x.power_mode() or x.power_panel==null: return

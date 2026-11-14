@@ -223,7 +223,7 @@ func toggle_pause() -> void:
 		expedition._accept_power(expedition.pending_power.before,expedition.pending_power.request)
 		return
 	if expedition.combat_mode(): expedition.combat.cancel_unavailable(expedition)
-	expedition.support_aiming=false
+	clear_command_aims()
 	if not expedition.pending_support.is_empty():
 		expedition._accept_support(expedition.pending_support.before,expedition.pending_support.request)
 		return
@@ -242,25 +242,154 @@ func toggle_pause() -> void:
 
 func toggle_support_aim() -> void:
 	if expedition.support_available() and expedition.basic_support.snapshot().cooldowns.airstrike==0.0:
-		expedition.support_aiming=not expedition.support_aiming
+		var was: bool = expedition.support_aiming
+		clear_command_aims()
+		expedition.support_aiming = not was
+
+
+func toggle_rally_aim() -> void:
+	if expedition.phase == Expedition.Phase.FINISHED:
+		return
+	var was: bool = expedition.rally_aiming
+	clear_command_aims()
+	if was:
+		return
+	if _commandable().is_empty() and not _has_living_searchers():
+		expedition._show_notice("没有可集合的队员")
+		expedition._update_ui()
+		return
+	expedition.rally_aiming = true
+	expedition._show_notice("选择集合地点 · 左键确认，右键 / Esc 取消")
+	expedition._update_ui()
+
+
+func request_rally(point: Vector2) -> bool:
+	if expedition.phase == Expedition.Phase.FINISHED:
+		return false
+	if not expedition.layout.world_bounds.has_point(point):
+		expedition._show_notice("请选择集合地点")
+		return false
+	var movers: Array[FieldActor] = _commandable()
+	expedition.rally_aiming = false
+	expedition.command_move(point)
+	if movers.is_empty():
+		expedition._show_notice("已记下集合点 · 搜集中的队员完成后归队。" if _has_living_searchers() else "没有可集合的队员")
+	else:
+		expedition._show_notice("已下令集合" if not _has_living_searchers() else "已下令集合 · 搜集中的队员完成后归队。")
+	expedition._update_ui()
+	return true
+
+
+func toggle_focus_aim() -> void:
+	if expedition.phase == Expedition.Phase.FINISHED:
+		return
+	var was: bool = expedition.focus_aiming
+	var keep: FieldActor = expedition.focus_target
+	clear_command_aims()
+	expedition.focus_target = keep
+	if was:
+		expedition._update_ui()
+		return
+	if not expedition.survivors.any(func(actor: FieldActor) -> bool: return actor.health > 0.0) \
+			or not expedition.enemies.any(func(enemy: FieldActor) -> bool: return enemy.health > 0.0):
+		expedition._show_notice("没有可集火的目标")
+		expedition._update_ui()
+		return
+	expedition.focus_aiming = true
+	expedition._show_notice("选择集火目标 · 左键确认，右键 / Esc 取消")
+	expedition._update_ui()
+
+
+func request_focus_fire(point: Vector2) -> bool:
+	if expedition.phase == Expedition.Phase.FINISHED:
+		return false
+	var target: FieldActor = _enemy_near(point)
+	if target == null:
+		expedition._show_notice("请选择集火目标")
+		return false
+	expedition.focus_aiming = false
+	expedition.focus_target = target
+	var label: String = EnemyRules.name_for(target.enemy_behavior.kind) if target.enemy_behavior != null else "目标"
+	for actor: FieldActor in _commandable():
+		var decision: AttackRules.Decision = expedition.evaluate_attack(actor, target)
+		if not decision.targetable:
+			var path: PackedVector2Array = expedition.navigation.path_between(actor.position, target.position)
+			if not path.is_empty():
+				actor.command_path(path)
+	expedition._show_notice("集火 · %s" % label)
+	expedition._update_ui()
+	expedition.queue_redraw()
+	return true
+
+
+func clear_command_aims() -> void:
+	expedition.support_aiming = false
+	expedition.rally_aiming = false
+	expedition.focus_aiming = false
+
+
+func _commandable() -> Array[FieldActor]:
+	var members: Array[FieldActor] = []
+	for actor: FieldActor in expedition.survivors:
+		if actor.health <= 0.0 or not actor.visible or actor.activity == FieldActor.Activity.DOWN or expedition.has_search_job(actor.member_id):
+			continue
+		members.append(actor)
+	return members
+
+
+func _has_living_searchers() -> bool:
+	for actor: FieldActor in expedition.survivors:
+		if actor.health > 0.0 and expedition.has_search_job(actor.member_id):
+			return true
+	return false
+
+
+func _enemy_near(point: Vector2) -> FieldActor:
+	var click: Vector2 = IsoSpace.to_view(point)
+	var closest: float = 40.0 * 40.0
+	var result: FieldActor
+	for enemy: FieldActor in expedition.enemies:
+		if enemy.health <= 0.0 or not is_instance_valid(enemy):
+			continue
+		var distance: float = IsoSpace.to_view(enemy.position).distance_squared_to(click)
+		if distance <= closest:
+			closest = distance
+			result = enemy
+	return result
 
 
 func _support_input(event: InputEvent) -> bool:
-	if not expedition.build_mode(): return false
-	if expedition._hud.view.persona_details.visible and event is InputEventKey and event.keycode in [KEY_Q,KEY_E,KEY_3,KEY_4,KEY_5]: return true
+	var details_open: bool = expedition._hud != null and expedition._hud.view != null and expedition._hud.view.persona_details.visible
+	if details_open and event is InputEventKey and event.keycode in [KEY_Q, KEY_W, KEY_E, KEY_R, KEY_3, KEY_4, KEY_5]:
+		return true
 	if event is InputEventKey and event.pressed and not event.echo and expedition.power_mode() \
 			and (event.keycode == KEY_3 or (event.keycode == KEY_4 and expedition.second_power_panel != null) or (event.keycode == KEY_5 and expedition.third_power_panel != null)):
 		if expedition.get_viewport().gui_get_focus_owner()==null: expedition.request_power(0 if event.keycode == KEY_3 else 1 if event.keycode == KEY_4 else 2)
 		return true
 	if event is InputEventKey and event.pressed and not event.echo and expedition.get_viewport().gui_get_focus_owner()==null:
-		if expedition.support_aiming and event.keycode in [KEY_ESCAPE,KEY_E]: expedition.support_aiming=false; return true
-		if event.keycode==KEY_Q: expedition.request_heal(); return true
-		if event.keycode==KEY_E: expedition.toggle_support_aim(); return true
-	if expedition.support_aiming and event is InputEventMouseButton and event.pressed:
-		if event.button_index==MOUSE_BUTTON_RIGHT: expedition.support_aiming=false; return true
+		if event.keycode==KEY_ESCAPE and (expedition.rally_aiming or expedition.focus_aiming or expedition.support_aiming):
+			clear_command_aims()
+			expedition._update_ui()
+			return true
+		if event.keycode==KEY_Q: expedition.toggle_rally_aim(); return true
+		if event.keycode==KEY_W: expedition.toggle_focus_aim(); return true
+		if event.keycode==KEY_E: expedition.request_heal(); return true
+		if event.keycode==KEY_R: expedition.request_special(); return true
+	if (expedition.rally_aiming or expedition.focus_aiming or expedition.support_aiming) and event is InputEventMouseButton and event.pressed:
+		if event.button_index==MOUSE_BUTTON_RIGHT:
+			clear_command_aims()
+			expedition._update_ui()
+			return true
 		if event.button_index==MOUSE_BUTTON_LEFT:
 			FreezeProfile.mark("left_received")
-			expedition.request_airstrike(IsoSpace.to_map(expedition.get_global_transform_with_canvas().affine_inverse()*event.position))
+			var point: Vector2 = IsoSpace.to_map(expedition.get_global_transform_with_canvas().affine_inverse()*event.position)
+			if expedition.rally_aiming:
+				expedition.request_rally(point)
+				return true
+			if expedition.focus_aiming:
+				expedition.request_focus_fire(point)
+				return true
+			expedition.request_airstrike(point)
 			return true
 	return false
 

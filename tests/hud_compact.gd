@@ -74,11 +74,12 @@ func scenario(size: Vector2i, count: int) -> void:
 	viewport.add_child(adapter)
 	var hud: C1ExpeditionHud = adapter.view
 	var support: BasicSupportPanel = BasicSupportPanel.new()
-	support.position = Vector2(16, 164)
 	hud.add_child(support)
-	var power: PowerSlotPanel = PowerSlotPanel.new()
-	power.position = Vector2(16, 316)
-	hud.add_child(power)
+	support.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	support.offset_left = -220
+	support.offset_right = 220
+	support.offset_top = -76
+	support.offset_bottom = -8
 	var members: Array[Dictionary] = []
 	var names: Array[String] = ["顾予安", "夏之遥", "林知秋", "沈听澜"]
 	for index: int in range(count):
@@ -94,10 +95,7 @@ func scenario(size: Vector2i, count: int) -> void:
 	var state: Dictionary = {"seconds":105, "engine":"等待幸存者", "can_extract":false, "can_gather":true, "practice":false, "threat":threat, "objective":"主目标：食品站点 0/2", "mission_title":"贯通商业街", "day":3, "sites_searched":0, "sites_total":4, "kills":0, "cash":57, "food":2, "loot":4, "food_loot":3, "weapon_loot":1, "paused":false, "members":members, "notice":"已下令集合 · 搜集中的队员完成后归队。", "notice_visible":true, "time_fraction":0.75, "enemy_mode":true, "route_hint":"食品站点与装备站点分别派遣。",
 		"boarding":{"arrived":1, "required":count, "working":1, "ordered":true, "waiting":waiting, "rescue_waiting":true}}
 	adapter.refresh(state)
-	support.present("Q 治疗 · 无受伤存活者", "E 空袭 · 就绪", false, true)
-	var ability_id: String = "speed_boost_v1" if count == 2 else "map_freeze_v1"
-	var duration: float = float(SpecialPowers.POLICY[ability_id].duration)
-	power.present(String(SpecialPowers.POLICY[ability_id].name), "持续 2.0 秒" if count == 4 else "今日已用" if count == 3 else "就绪 · 每日一次", 2.0 if count == 4 else 0.0, duration, count == 2, ability_id)
+	support.present("无受伤存活者", "空槽", false, false)
 	await settle()
 	var bounds: Rect2 = Rect2(Vector2.ZERO, Vector2(size)).grow(0.5)
 	var panels: Array[Control] = []
@@ -124,12 +122,17 @@ func scenario(size: Vector2i, count: int) -> void:
 		member_metrics.append(metrics)
 	check(member_controls.size() == count and disjoint(member_controls) and member_metrics.all(func(value: Dictionary) -> bool: return value.box.fits), label + " every member has a distinct bounded vertical row")
 	check(text_fits, label + " names, HP, work destinations and ammo fit on one line")
-	var skill_controls: Array[Control] = [support.heal_button, support.airstrike_button, power.activation_button]
+	var skill_controls: Array[Control] = [support.rally_button, support.focus_button, support.heal_button, support.special_button]
 	var skill_metrics: Array[Dictionary] = []
 	for control: Control in skill_controls:
 		skill_metrics.append(control_metrics(control, bounds))
-	check(disjoint(skill_controls) and skill_metrics.all(func(value: Dictionary) -> bool: return value.fits), label + " Q/E/3 controls stay separate and inside viewport")
-	check(support.heal_button.icon != null and support.airstrike_button.icon != null and power.activation_button.icon != null and support.size.x <= 200.0 and power.size.x <= 200.0, label + " actual original skill icons retain compact column width")
+	check(disjoint(skill_controls) and skill_metrics.all(func(value: Dictionary) -> bool: return value.fits), label + " Q/W/E/R command keys stay separate and inside viewport")
+	check(support.rally_button.text.contains("集合") and support.focus_button.text.contains("集火") and support.heal_button.text.contains("治疗") and support.special_button.text.contains("特技"), label + " command keycaps keep their locked titles")
+	check(support.rally_button.text.contains("Q") and support.focus_button.text.contains("W") and support.heal_button.text.contains("E") and support.special_button.text.contains("R"), label + " command keycaps keep QWER shortcuts")
+	check(skill_controls.all(func(control: Control) -> bool: return control.icon != null) and support.size.x <= 448.0 and support.size.y <= 80.0, label + " command icons stay on compact bottom keycaps")
+	check(support.heal_button.text.contains("无需") and support.special_button.text.contains("空槽"), label + " heal and special captions keep their actual unavailable meaning")
+	var action_rect: Rect2 = (hud.get_node("ActionsPanel") as Control).get_global_rect()
+	check(not action_rect.intersects(support.get_global_rect()), label + " command strip sits below the bus action cluster")
 	var bus_labels: Array[Dictionary] = [label_metrics(hud._bus_status, bounds), label_metrics(hud._bus_waiting, bounds)]
 	var bus_controls: Array[Control] = [hud._bus_status, hud._bus_waiting, hud._bus_button, hud._hint]
 	check(bus_controls.all(func(control: Control) -> bool: return control.is_visible_in_tree() and bounds.encloses(control.get_global_rect())) and disjoint(bus_controls), label + " collection count, waiting rows, notice and button have separate visible bounds")

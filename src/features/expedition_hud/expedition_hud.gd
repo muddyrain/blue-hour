@@ -480,7 +480,7 @@ func _build_help() -> void:
 	_help.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_help.mouse_filter=Control.MOUSE_FILTER_STOP
 	var content: Label = _label(_help, "HelpText", 15)
-	content.text = "左键地面：移动 / 改目标\n左键建筑：派遣；再点同栋只取消该任务\n空格：暂停 / 继续；Esc：菜单\nWASD 镜头；滚轮缩放\nTab 切换按钮，Space / Enter 确认\nQ 治疗；E 瞄准空袭；3 释放装备的特殊能力"
+	content.text = "左键地面：移动 / 改目标\n左键建筑：派遣；再点同栋只取消该任务\n空格：暂停 / 继续；Esc：菜单\n方向键 镜头；滚轮缩放\nTab 切换按钮，Space / Enter 确认\nQ 集合；W 集火；E 治疗；R 特技\nB 发动 / 集合至巴士（小地图旁）"
 	_wrap(content)
 	_help.hide()
 

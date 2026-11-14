@@ -17,19 +17,19 @@ window/stretch/mode="canvas_items"
 [input]
 camera_left={
 "deadzone": 0.5,
-"events": [Object(InputEventKey,"keycode":65)]
+"events": [Object(InputEventKey,"keycode":4194319)]
 }
 camera_right={
 "deadzone": 0.5,
-"events": [Object(InputEventKey,"keycode":68)]
+"events": [Object(InputEventKey,"keycode":4194321)]
 }
 camera_up={
 "deadzone": 0.5,
-"events": [Object(InputEventKey,"keycode":87)]
+"events": [Object(InputEventKey,"keycode":4194320)]
 }
 camera_down={
 "deadzone": 0.5,
-"events": [Object(InputEventKey,"keycode":83)]
+"events": [Object(InputEventKey,"keycode":4194322)]
 }
 camera_zoom_in={
 "deadzone": 0.5,

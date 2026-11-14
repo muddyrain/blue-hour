@@ -40,14 +40,14 @@ func _make_ui() -> void:
 		x.drill_panel.theme = x.ui_theme
 		x._hud.view.add_child(x.drill_panel)
 		x.drill_panel.visible = false
-	if x.build_mode():
-		x.support_panel=BasicSupportPanel.new()
-		x.support_panel.position=Vector2(16,160)
-		x.support_panel.heal_requested.connect(x.request_heal)
-		x.support_panel.airstrike_requested.connect(x.toggle_support_aim)
-		x._hud.view.add_child(x.support_panel)
-		x.support_aim=BasicSupportAim.new()
-		x._effects.add_child(x.support_aim)
+	x.support_panel=BasicSupportPanel.new()
+	x.support_panel.rally_requested.connect(x.toggle_rally_aim)
+	x.support_panel.focus_requested.connect(x.toggle_focus_aim)
+	x.support_panel.heal_requested.connect(x.request_heal)
+	x.support_panel.special_requested.connect(x.request_special)
+	x._hud.view.add_child(x.support_panel)
+	x.support_aim=BasicSupportAim.new()
+	x._effects.add_child(x.support_aim)
 	if x.power_mode():
 		x.power_panel=PowerSlotPanel.new()
 		x.power_panel.position=Vector2(16,300)
@@ -135,9 +135,6 @@ func _update_ui() -> void:
 	var map_panel: Node = x._hud.view.get_node_or_null("OverviewPanel")
 	if map_panel != null:
 		(map_panel.get_node("Overview") as Control).queue_redraw()
-	if x.support_panel != null:
-		x.support_panel.heal_button.text = x.support_panel.heal_button.text.replace("Q  ", "Q 治疗\n")
-		x.support_panel.airstrike_button.text = x.support_panel.airstrike_button.text.replace("E  ", "E 空袭\n")
 	var timing: Dictionary = x.time_status()
 	var boarding: Dictionary = x.boarding_status(x.phase == Expedition.Phase.BOARDING)
 	var engine_text: String = "发动引擎 →"
@@ -367,33 +364,21 @@ func _arrange_field_hud() -> void:
 	strip.add_theme_constant_override("separation", 8)
 	x._hud.view.add_child(strip)
 	strip.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	strip.offset_left = -200
-	strip.offset_right = 200
+	strip.offset_left = -220
+	strip.offset_right = 220
 	strip.offset_top = -76
 	strip.offset_bottom = -8
-	if x.support_panel != null:
-		x.support_panel.heal_button.reparent(strip)
-		x.support_panel.airstrike_button.reparent(strip)
-		x.support_panel.hide()
+	x.support_panel._build()
+	for button: CommandButton in [x.support_panel.rally_button, x.support_panel.focus_button, x.support_panel.heal_button, x.support_panel.special_button]:
+		button.reparent(strip)
+	x.support_panel.hide()
 	for panel: PowerSlotPanel in [x.power_panel, x.second_power_panel, x.third_power_panel]:
-		if panel == null: continue
-		panel.reparent(strip)
-		panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	if strip.get_child_count() == 3:
-		var bus_command: Button = C1HudButton.new()
-		bus_command.name = "CommandBus"
-		bus_command.text = "B 巴士"
-		bus_command.icon = preload("res://assets/candidates/bus_01.png")
-		bus_command.expand_icon = true
-		bus_command.add_theme_constant_override("icon_max_width", 28)
-		bus_command.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		bus_command.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
-		bus_command.add_theme_font_size_override("font_size", 12)
-		bus_command.pressed.connect(x._hud.view._request_bus)
-		strip.add_child(bus_command)
+		if panel == null:
+			continue
+		# Extra loadout slots stay available to 3/4/5 and R, but no longer occupy the four command keys.
+		panel.hide()
 	for child: Control in strip.get_children():
-		child.custom_minimum_size = Vector2(64, 64)
+		child.custom_minimum_size = Vector2(68, 68)
 		child.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	strip.resized.connect(x._hud.view.place_status_hint)
 	x._hud.view.place_status_hint.call_deferred()

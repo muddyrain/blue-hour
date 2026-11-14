@@ -9,6 +9,9 @@ func _init(owner: Expedition) -> void:
 
 
 func _update_combat() -> void:
+	if expedition.focus_target != null and (not is_instance_valid(expedition.focus_target) or expedition.focus_target.health <= 0.0):
+		expedition.focus_target = null
+		expedition.queue_redraw()
 	for actor: FieldActor in expedition.survivors:
 		if expedition.combat_mode() and CombatRuntime.patterned(String(actor.weapon_definition.id)):
 			expedition.combat.attack(expedition,actor,expedition.combat_delta)
@@ -222,6 +225,11 @@ func _combatant(actor: FieldActor) -> AttackRules.Combatant:
 
 
 func _attack_target(actor: FieldActor) -> FieldActor:
+	var focused: FieldActor = expedition.focus_target
+	if focused != null and is_instance_valid(focused) and focused.health > 0.0:
+		var focused_decision: AttackRules.Decision = expedition.evaluate_attack(actor, focused)
+		if focused_decision.targetable:
+			return focused
 	var closest: float = INF
 	var result: FieldActor
 	for candidate: FieldActor in expedition.enemies:

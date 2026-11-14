@@ -116,6 +116,9 @@ var power_view: PowerEffectView
 var basic_support: BasicSupport = BasicSupport.new()
 var support_commit: Callable
 var support_aiming: bool = false
+var rally_aiming: bool = false
+var focus_aiming: bool = false
+var focus_target: FieldActor
 var pending_support: Dictionary = {}
 var support_panel: BasicSupportPanel
 var support_aim: BasicSupportAim
@@ -553,6 +556,24 @@ func _accept_support(before: Dictionary, request: Dictionary) -> bool:
 
 func toggle_support_aim() -> void:
 	_orders.toggle_support_aim()
+
+func toggle_rally_aim() -> void:
+	_orders.toggle_rally_aim()
+
+func request_rally(point: Vector2) -> bool:
+	return _orders.request_rally(point)
+
+func toggle_focus_aim() -> void:
+	_orders.toggle_focus_aim()
+
+func request_focus_fire(point: Vector2) -> bool:
+	return _orders.request_focus_fire(point)
+
+func clear_command_aims() -> void:
+	_orders.clear_command_aims()
+
+func request_special() -> bool:
+	return _support.request_special()
 
 func _support_input(event: InputEvent) -> bool:
 	return _orders._support_input(event)

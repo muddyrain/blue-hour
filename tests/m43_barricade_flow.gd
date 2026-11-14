@@ -185,7 +185,7 @@ func _strike_retry(world: Expedition) -> bool:
 			injected.count += 1
 			return ERR_CANT_CREATE
 		return OK
-	await _key(KEY_E)
+	world.toggle_support_aim(); await _frame()
 	await _world_click(world, landing)
 	var pending: Dictionary = world.pending_support.duplicate(true)
 	_check(injected.count == 1 and world.is_paused and not pending.is_empty() and not world.barricade_open
@@ -387,8 +387,8 @@ func _strike_edges(world: Expedition) -> void:
 	var action: Dictionary = world.supply.generated
 	var landing: Vector2 = WorldLayout.point(action.barricade.landing)
 	var anchor: Vector2 = WorldLayout.point(action.barricade.anchor)
-	await _key(KEY_E)
-	_check(world.support_aiming, "T3 E enters original aim mode")
+	world.toggle_support_aim(); await _frame()
+	_check(world.support_aiming, "T3 airstrike aim still enters through its remaining command API")
 	await _key(KEY_ESCAPE)
 	_check(not world.support_aiming and world.basic_support.ready("airstrike") and not world.barricade_open,
 		"T3 cancelling aim changes no cooldown or geometry")
@@ -396,7 +396,7 @@ func _strike_edges(world: Expedition) -> void:
 	_check(points.has_all(["range", "wall", "miss"]), "T3 original generated map provides range, wall and valid off-center targets")
 	if not points.has_all(["range", "wall", "miss"]):
 		return
-	await _key(KEY_E)
+	world.toggle_support_aim(); await _frame()
 	for point: Vector2 in [anchor, points.range, points.wall]:
 		_check(world.support_plan_airstrike(point).is_empty(), "T3 original legal-ground and caller gate rejects directed point")
 		await _world_click(world, point)
@@ -406,7 +406,7 @@ func _strike_edges(world: Expedition) -> void:
 	_check(not world.barricade_open and world.basic_support.snapshot().sequence == 1
 		and world.basic_support.remaining("airstrike") == 20.0, "T3 legal miss consumes original cooldown without opening")
 	await _until(world, func() -> bool: return world.basic_support.ready("airstrike"), 610)
-	await _key(KEY_E)
+	world.toggle_support_aim(); await _frame()
 	await _world_click(world, landing)
 	_check(world.barricade_open and world.basic_support.snapshot().sequence == 2,
 		"T3 legal hit after a miss opens through one later original acceptance")
@@ -414,7 +414,7 @@ func _strike_edges(world: Expedition) -> void:
 		return
 	var open_nav: FieldNavigation = world.navigation
 	await _until(world, func() -> bool: return world.basic_support.ready("airstrike"), 610)
-	await _key(KEY_E)
+	world.toggle_support_aim(); await _frame()
 	await _world_click(world, landing)
 	var support: Dictionary = world.basic_support.snapshot()
 	_check(world.barricade_open and world.navigation == open_nav and support.sequence == 3

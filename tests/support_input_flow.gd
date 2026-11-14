@@ -14,19 +14,19 @@ func _journey() -> void:
 	var preview: Dictionary=w.support_plan_airstrike(target)
 	var authoritative: Dictionary=BuildAuthority.plan_airstrike(w.support_world(),target)
 	_check(not preview.is_empty() and TransactionReceipt.same(preview,authoritative),"reused field grid previews the same reachable ground as confirmation")
-	await key(KEY_E)
-	_check(w.support_aiming,"E enters aiming")
+	w.toggle_support_aim(); await _frame()
+	_check(w.support_aiming,"airstrike aim still enters through its remaining command API")
 	await key(KEY_ESCAPE)
 	_check(not w.support_aiming and w.basic_support.snapshot().sequence==0,"cancel has no effect or cooldown")
-	await key(KEY_E)
+	w.toggle_support_aim(); await _frame()
 	await click(w,Vector2(-100,-100))
 	_check(not w.is_paused and w.support_aiming and w.basic_support.snapshot().sequence==0 and w.basic_support.remaining("airstrike")==0.0,"invalid target leaves aiming and cooldown intact")
 	_check("空袭无法落在此处" in w._notice_text and w.support_aim._impact_remaining==0.0,"invalid target shows an actionable notice without impact")
 	await click(w,target)
-	_check(not w.is_paused and w.pending_support.is_empty() and w.basic_support.snapshot().sequence==1,"E then valid left click accepts once at minimum zoom")
+	_check(not w.is_paused and w.pending_support.is_empty() and w.basic_support.snapshot().sequence==1,"aim then valid left click accepts once at minimum zoom")
 	_check(w.basic_support.remaining("airstrike")==20.0,"empty-ground strike consumes exactly one normal cooldown")
 	_check(not w.support_aim._aiming and w.support_aim._impact_remaining==BasicSupportAim.IMPACT_SECONDS and w._notice_text=="空袭已落地","confirmed empty-ground strike immediately replaces aiming with landing feedback")
-	await key(KEY_E)
+	w.toggle_support_aim(); await _frame()
 	_check(not w.support_aiming and not w.request_airstrike(target) and w.basic_support.snapshot().sequence==1,"cooldown repeated inputs cannot accept another strike")
 	var elapsed: float=w.elapsed
 	for i: int in range(601):w.step(1.0/30.0)
@@ -45,7 +45,7 @@ func _journey() -> void:
 	app.progress_session.fault_hook=func(point:String)->Error:
 		if point=="after_record_flush" and not fired.once:fired.once=true;return ERR_CANT_CREATE
 		return OK
-	await key(KEY_E)
+	w.toggle_support_aim(); await _frame()
 	await click(w,target)
 	_check(fired.once and w.is_paused and not w.pending_support.is_empty(),"actual airstrike publication failure freezes its original request")
 	_check(w.basic_support.snapshot().sequence==1 and enemy.health==hp and w.kills==kills,"failure exposes no unconfirmed damage/cooldown/kills")

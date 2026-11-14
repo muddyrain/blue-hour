@@ -28,11 +28,12 @@ func _case(base: Dictionary, size: Vector2i, count: int) -> void:
 	var hud: C1ExpeditionHud=HUD.instantiate() as C1ExpeditionHud
 	viewport.add_child(hud)
 	var support: BasicSupportPanel=BasicSupportPanel.new()
-	support.position=Vector2(16,160)
 	hud.add_child(support)
-	var power: PowerSlotPanel=PowerSlotPanel.new()
-	power.position=Vector2(16,300)
-	hud.add_child(power)
+	support.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	support.offset_left=-220
+	support.offset_right=220
+	support.offset_top=-76
+	support.offset_bottom=-8
 	var members: Array[Dictionary]=[]
 	for id: int in range(1,count+1):
 		var model: Dictionary=PersonaViewModel.camp(base,id,"camp" if id<=2 else "candidate")
@@ -50,8 +51,7 @@ func _case(base: Dictionary, size: Vector2i, count: int) -> void:
 	hud.objective_locate_requested.connect(func(id: String)->void:located.append(id))
 	hud.pause_requested.connect(func()->void:pauses.append(true))
 	hud.refresh({"mission_title":"商业街区","objective":"","day_text":"第 2 天","survivors":members,"exploration_objectives":objectives,"time":{"text":"01:40","compact_hint":"威胁 1","hint":"暮色 · 增援加快"},"resource_text":"货币 53 · 食物 2\n携带：钱1 · 粮0 · 武器0","bus_status_text":"巴士就绪","bus_action_label":"发动巴士","bus_action_enabled":true})
-	support.present("Q 治疗 · 8.3s","E 空袭 · 就绪",false,true)
-	power.present("特殊能力空槽","营地装配 · 每日一次",0,1,false,"")
+	support.present("8.3s","空槽",false,false)
 	await _settle()
 	var bounds: Rect2=Rect2(Vector2.ZERO,Vector2(size)).grow(.5)
 	var clear_center: Rect2=Rect2(300,160,size.x-520,size.y-280)
@@ -72,8 +72,9 @@ func _case(base: Dictionary, size: Vector2i, count: int) -> void:
 		compact=compact and card.portrait.visible and card.health_bar.visible and card.status_label.visible
 		compact=compact and not card.name_label.visible and not card.health_label.visible and not card.ammo_label.visible and not card.positive_label.get_parent().visible
 	_check(compact,tag+" all three/four portraits, health bars and work states fit in compact rows")
-	_check(support.size.x<=74 and power.size.x<=74 and not support.get_global_rect().intersects(power.get_global_rect()),tag+" Q/E/3 stay separate in one narrow column")
-	_check(support.heal_button.text.contains("8.3s") and support.airstrike_button.text.contains("就绪") and power.activation_button.text=="3  空槽" and power.activation_button.tooltip_text.contains("营地装配"),tag+" cooldown, ready and empty ability states keep their actual meaning")
+	var keys: Array[Control]=[support.rally_button,support.focus_button,support.heal_button,support.special_button]
+	_check(support.size.x<=448 and support.size.y<=80 and keys.all(func(button: Control)->bool: return bounds.encloses(button.get_global_rect())) and not clear_center.intersects(support.get_global_rect()),tag+" Q/W/E/R stay on a compact bottom strip outside the play area")
+	_check(support.rally_button.text.contains("集合") and support.focus_button.text.contains("集火") and support.heal_button.text.contains("8.3s") and support.special_button.text.contains("空槽"),tag+" cooldown and empty special states keep their actual meaning")
 	await _activate(viewport,hud._persona_cards[0].info_button)
 	await _settle()
 	_check(hud.persona_details.visible and hud.persona_details.name_label.text.contains(members[0].persona.name) and hud.persona_details.weapon_label.text==members[0].persona.weapon_detail and hud.persona_details.positive_label.text.contains(members[0].persona.positive.name),tag+" keyboard selection reveals the original complete identity and loadout")

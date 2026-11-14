@@ -28,7 +28,7 @@ const SPECIALTY_REWARDS: Dictionary = {
 	"scavenge": STRIDE_HARNESS, "firepower": GUIDED_MAG, "support": "aid_broadcast_v1",
 }
 const SPECIALTY_DEFINITIONS: Dictionary = {
-	AID_KIT: {"name":"急救绑包", "effect":"基础治疗 Q 恢复上限 ×1.20", "key":"heal", "factor":1.20, "source":"PROJECT_TEMP"},
+	AID_KIT: {"name":"急救绑包", "effect":"基础治疗恢复上限 ×1.20", "key":"heal", "factor":1.20, "source":"PROJECT_TEMP"},
 	STRIDE_HARNESS: {"name":"轻行束带", "effect":"队员步行速度 ×1.10", "key":"move", "factor":1.10, "source":"PROJECT_TEMP"},
 	GUIDED_MAG: {"name":"导向弹匣套", "effect":"枪械最终换弹时长 ×0.90", "key":"reload", "factor":0.90, "source":"PROJECT_TEMP"},
 }
@@ -284,8 +284,8 @@ static func effect_text(id: String, enhanced: bool = false, pool: int = M48_CATA
 	if item.is_empty():
 		return ""
 	if enhanced and id == AID_KIT:
-		return "基础治疗 Q 恢复上限 ×1.20 · 新施放冷却 24 秒"
-	return "%s ×%.2f" % [{"damage":"枪械直伤", "reload":"枪械换弹时长", "move":"步行速度", "work":"回收工时", "blast":"空袭半径", "heal":"Q 恢复上限", "poison":"毒区周期实伤", "burst":"爆囊冲击实伤"}[item.key], ENHANCED_FACTORS[id] if enhanced else item.factor]
+		return "基础治疗恢复上限 ×1.20 · 新施放冷却 24 秒"
+	return "%s ×%.2f" % [{"damage":"枪械直伤", "reload":"枪械换弹时长", "move":"步行速度", "work":"回收工时", "blast":"空袭半径", "heal":"治疗恢复上限", "poison":"毒区周期实伤", "burst":"爆囊冲击实伤"}[item.key], ENHANCED_FACTORS[id] if enhanced else item.factor]
 
 
 static func heal_cooldown(build: Dictionary) -> float:

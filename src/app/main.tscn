@@ -124,7 +124,7 @@ offset_left = 100.0
 offset_top = 320.0
 offset_right = 1100.0
 offset_bottom = 408.0
-text = "穿过街口，搜集补给，再回到巴士。\n左键下令，空格暂停；WASD / 滚轮控制镜头。"
+text = "穿过街口，搜集补给，再回到巴士。\n左键下令，空格暂停；方向键 / 滚轮控制镜头。"
 
 [node name="Start" type="Button" parent="Interface/Screen/Title"]
 offset_left = 100.0

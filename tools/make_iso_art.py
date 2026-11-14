@@ -140,15 +140,92 @@ def shade_diamond(img: Image.Image, base, light, dark, noise=0.06, ox=0, oy=0, s
     img.alpha_composite(layer, (minx, miny))
 
 
-def tile_grass() -> Image.Image:
+def fill_cover(img: Image.Image, base, light, dark, noise=0.05, contrast=0.12, seed=0):
+    """Nearly flat diamond fill. A strong per-tile shade would tile into a lattice."""
+    pts = diamond_pts()
+    minx, miny = int(min(p[0] for p in pts)), int(min(p[1] for p in pts))
+    maxx, maxy = int(max(p[0] for p in pts)) + 1, int(max(p[1] for p in pts)) + 1
+    w, h = maxx - minx, maxy - miny
+    layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    px = layer.load()
+    rng = __import__("random").Random(seed)
+    mask = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(mask).polygon([(p[0] - minx, p[1] - miny) for p in pts], fill=255)
+    for y in range(h):
+        for x in range(w):
+            if mask.getpixel((x, y)) < 8:
+                continue
+            t = 0.5 + ((x / max(w - 1, 1)) * 0.45 + (y / max(h - 1, 1)) * 0.55 - 0.5) * contrast
+            n = (rng.random() - 0.5) * 2 * noise
+            c = mix(light, dark, min(1, max(0, t + n)))
+            c = mix(c, base, 0.45)
+            px[x, y] = (c[0], c[1], c[2], 255)
+    img.alpha_composite(layer, (minx, miny))
+
+
+def tile_grass(seed: int = 11) -> Image.Image:
+    """Soft lawn grain: broken blades and faint blotches, no diamond frame."""
     img = Image.new("RGBA", (TW, TH), (0, 0, 0, 0))
-    shade_diamond(img, PAL["grass"], PAL["grass_lt"], PAL["grass_dk"], noise=0.08)
+    fill_cover(
+        img,
+        PAL["grass"],
+        mix(PAL["grass"], PAL["grass_lt"], 0.4),
+        mix(PAL["grass"], PAL["grass_dk"], 0.4),
+        noise=0.045,
+        contrast=0.10,
+        seed=seed,
+    )
+    mask, pts = _diamond_mask()
+    rng = __import__("random").Random(seed + 17)
+    blotch_layer = Image.new("RGBA", (TW, TH), (0, 0, 0, 0))
+    bd = ImageDraw.Draw(blotch_layer)
+    blotches = [
+        mix(PAL["grass"], PAL["grass_lt"], 0.65),
+        mix(PAL["grass"], PAL["grass_dk"], 0.22),
+        (132, 162, 108),
+        (128, 156, 112),
+        (140, 166, 114),
+    ]
+    for _ in range(10):
+        x = rng.randint(28, TW - 29)
+        y = rng.randint(22, TH - 23)
+        if mask.getpixel((x, y)) < 230:
+            continue
+        rx = rng.randint(7, 16)
+        ry = rng.randint(5, 10)
+        color = blotches[rng.randrange(len(blotches))]
+        bd.ellipse((x - rx, y - ry, x + rx, y + ry), fill=rgb(color, rng.randint(22, 40)))
+    img = Image.alpha_composite(img, blotch_layer)
     d = ImageDraw.Draw(img)
-    # a few blades
-    rng_pts = [(40, 50), (90, 70), (150, 40), (200, 80), (120, 100), (70, 90)]
-    for x, y in rng_pts:
-        d.line((x, y, x + 3, y - 8), fill=rgb(PAL["grass_lt"], 140), width=1)
-    # soft edge
+    # Short tufts in mixed directions so a field does not read as a stamped sheet.
+    for _ in range(420):
+        x = rng.randint(6, TW - 7)
+        y = rng.randint(6, TH - 7)
+        if mask.getpixel((x, y)) < 200:
+            continue
+        ang = rng.uniform(-2.6, 2.6)
+        length = rng.uniform(2.2, 6.5)
+        dx = length * math.cos(ang)
+        dy = length * math.sin(ang) * 0.55
+        if rng.random() < 0.55:
+            color = mix(PAL["grass"], PAL["grass_lt"], rng.uniform(0.25, 0.85))
+        elif rng.random() < 0.5:
+            color = mix(PAL["grass"], PAL["grass_dk"], rng.uniform(0.15, 0.55))
+        else:
+            color = (132 + rng.randint(-8, 8), 160 + rng.randint(-8, 8), 108 + rng.randint(-6, 8))
+        d.line((x, y, x + dx, y + dy), fill=rgb(color, rng.randint(110, 190)), width=1)
+    # A few longer tufts so the grain still reads after the 32-unit downscale.
+    for _ in range(90):
+        x = rng.randint(10, TW - 11)
+        y = rng.randint(10, TH - 11)
+        if mask.getpixel((x, y)) < 210:
+            continue
+        ang = rng.uniform(-2.5, 2.5)
+        length = rng.uniform(6.0, 11.0)
+        dx = length * math.cos(ang)
+        dy = length * math.sin(ang) * 0.55
+        color = mix(PAL["grass"], PAL["grass_lt"], rng.uniform(0.35, 0.9))
+        d.line((x, y, x + dx, y + dy), fill=rgb(color, rng.randint(100, 160)), width=1)
     return img
 
 
@@ -263,13 +340,21 @@ def _diamond_mask():
     return mask, pts
 
 
-def tile_gravel() -> Image.Image:
-    """Warm residential grit, distinct from lawn and from the beige sidewalk."""
+def tile_gravel(seed: int = 91) -> Image.Image:
+    """Fine warm grit without a diamond frame, so a walk does not look tiled."""
     img = Image.new("RGBA", (TW, TH), (0, 0, 0, 0))
-    shade_diamond(img, PAL["gravel"], PAL["gravel_lt"], PAL["gravel_dk"], noise=0.06)
-    mask, pts = _diamond_mask()
+    fill_cover(
+        img,
+        PAL["gravel"],
+        mix(PAL["gravel"], PAL["gravel_lt"], 0.4),
+        mix(PAL["gravel"], PAL["gravel_dk"], 0.4),
+        noise=0.04,
+        contrast=0.08,
+        seed=seed,
+    )
+    mask, _pts = _diamond_mask()
     d = ImageDraw.Draw(img)
-    rng = __import__("random").Random(91)
+    rng = __import__("random").Random(seed)
     pebbles = [
         PAL["gravel_lt"],
         PAL["pebble"],
@@ -277,43 +362,114 @@ def tile_gravel() -> Image.Image:
         (164, 152, 132),
         (138, 132, 118),
         (190, 182, 166),
+        (150, 144, 130),
+        (176, 168, 152),
     ]
-    for _ in range(130):
-        x = rng.randint(8, TW - 9)
-        y = rng.randint(8, TH - 9)
-        if mask.getpixel((x, y)) < 200:
+    for _ in range(720):
+        x = rng.randint(4, TW - 5)
+        y = rng.randint(4, TH - 5)
+        if mask.getpixel((x, y)) < 180:
             continue
-        rx = rng.randint(1, 2)
-        ry = rng.randint(1, 2)
-        color = pebbles[rng.randrange(len(pebbles))]
-        d.ellipse((x - rx, y - ry, x + rx, y + ry), fill=rgb(color, rng.randint(170, 230)))
-    d.line(pts + [pts[0]], fill=rgb(PAL["gravel_dk"], 110), width=1)
+        # Mostly 1px grit, with a few slightly larger stones.
+        if rng.random() < 0.82:
+            d.point((x, y), fill=rgb(pebbles[rng.randrange(len(pebbles))], rng.randint(160, 230)))
+        else:
+            rx = rng.randint(1, 1 + (rng.random() < 0.25))
+            ry = 1
+            color = pebbles[rng.randrange(len(pebbles))]
+            d.ellipse((x - rx, y - ry, x + rx, y + ry), fill=rgb(color, rng.randint(150, 210)))
     return img
 
 
-def tile_concrete() -> Image.Image:
-    """Cool shop and warehouse apron tiles, cooler and tighter than the sidewalk."""
+def tile_concrete(seed: int = 53) -> Image.Image:
+    """Cool apron with a hint of pavers, not a heavy grout grid."""
     img = Image.new("RGBA", (TW, TH), (0, 0, 0, 0))
-    shade_diamond(img, PAL["concrete"], PAL["concrete_lt"], PAL["concrete_dk"], noise=0.03)
+    fill_cover(
+        img,
+        PAL["concrete"],
+        mix(PAL["concrete"], PAL["concrete_lt"], 0.35),
+        mix(PAL["concrete"], PAL["concrete_dk"], 0.35),
+        noise=0.035,
+        contrast=0.08,
+        seed=seed,
+    )
+    mask, pts = _diamond_mask()
     d = ImageDraw.Draw(img)
-    pts = diamond_pts()
-    joint = rgb(PAL["grout"], 120)
-    # Three-by-three pavers along both diamond axes, so the apron reads as tile, not asphalt.
-    for t in (1.0 / 3.0, 2.0 / 3.0):
-        a0 = (lerp(pts[0][0], pts[1][0], t), lerp(pts[0][1], pts[1][1], t))
-        a1 = (lerp(pts[3][0], pts[2][0], t), lerp(pts[3][1], pts[2][1], t))
-        b0 = (lerp(pts[0][0], pts[3][0], t), lerp(pts[0][1], pts[3][1], t))
-        b1 = (lerp(pts[1][0], pts[2][0], t), lerp(pts[1][1], pts[2][1], t))
-        d.line([a0, a1], fill=joint, width=1)
-        d.line([b0, b1], fill=joint, width=1)
-    d.line(pts + [pts[0]], fill=rgb(PAL["concrete_dk"], 130), width=1)
+    rng = __import__("random").Random(seed)
+    # Fine mineral speckles so the slab has grain instead of a flat board.
+    for _ in range(380):
+        x = rng.randint(4, TW - 5)
+        y = rng.randint(4, TH - 5)
+        if mask.getpixel((x, y)) < 180:
+            continue
+        if rng.random() < 0.6:
+            color = mix(PAL["concrete"], PAL["concrete_lt"], rng.random())
+        else:
+            color = mix(PAL["concrete"], PAL["concrete_dk"], rng.uniform(0.2, 0.7))
+        d.point((x, y), fill=rgb(color, rng.randint(90, 160)))
+    # Broken, low-contrast mid marks — a hint of pavers, not a continuous lattice.
+    joint = rgb(mix(PAL["concrete"], PAL["grout"], 0.45), 20)
+    t = 0.5
+    a0 = (lerp(pts[0][0], pts[1][0], t), lerp(pts[0][1], pts[1][1], t))
+    a1 = (lerp(pts[3][0], pts[2][0], t), lerp(pts[3][1], pts[2][1], t))
+    b0 = (lerp(pts[0][0], pts[3][0], t), lerp(pts[0][1], pts[3][1], t))
+    b1 = (lerp(pts[1][0], pts[2][0], t), lerp(pts[1][1], pts[2][1], t))
+    def midspan(p, q):
+        return (
+            (lerp(p[0], q[0], 0.22), lerp(p[1], q[1], 0.22)),
+            (lerp(p[0], q[0], 0.78), lerp(p[1], q[1], 0.78)),
+        )
+    d.line(list(midspan(a0, a1)), fill=joint, width=1)
+    d.line(list(midspan(b0, b1)), fill=joint, width=1)
     return img
 
 
-def save_tile(name: str, img: Image.Image):
+def lock_cover_edge(img: Image.Image) -> Image.Image:
+    """Keep the diamond fully opaque so fringes do not tile as a dark grid."""
+    mask, _pts = _diamond_mask()
+    px = img.load()
+    for y in range(img.size[1]):
+        for x in range(img.size[0]):
+            r, g, b, a = px[x, y]
+            if mask.getpixel((x, y)) >= 128:
+                px[x, y] = (r, g, b, 255) if a else (r, g, b, 255)
+            else:
+                px[x, y] = (0, 0, 0, 0)
+    return img
+
+
+def smooth_cover(img: Image.Image) -> Image.Image:
+    """Smooth the interior only. Blurring the rim with transparent black would outline every cell."""
+    mask, _pts = _diamond_mask()
+    locked = lock_cover_edge(img)
+    sm = locked.filter(ImageFilter.SMOOTH)
+    sp = sm.load()
+    op = locked.load()
+    w, h = locked.size
+    for y in range(h):
+        for x in range(w):
+            if mask.getpixel((x, y)) < 128:
+                sp[x, y] = (0, 0, 0, 0)
+                continue
+            rim = False
+            for ny in (y - 1, y, y + 1):
+                for nx in (x - 1, x, x + 1):
+                    if nx < 0 or ny < 0 or nx >= w or ny >= h or mask.getpixel((nx, ny)) < 128:
+                        rim = True
+                        break
+                if rim:
+                    break
+            if rim:
+                sp[x, y] = op[x, y]
+            else:
+                r, g, b, _a = sp[x, y]
+                sp[x, y] = (r, g, b, 255)
+    return sm
+
+
+def save_tile(name: str, img: Image.Image, *, cover: bool = False):
     path = ROOT / "tiles" / f"{name}.png"
-    # mild sharpen after 2x
-    out = img.filter(ImageFilter.SMOOTH)
+    out = smooth_cover(img) if cover else img.filter(ImageFilter.SMOOTH)
     path.parent.mkdir(parents=True, exist_ok=True)
     out.save(path)
     print("tile", path.name, out.size)
@@ -843,14 +999,28 @@ def export_bus_only():
 
 
 def export_path_tiles(root: Path | None = None) -> None:
-    """Write only the door-path tiles, leaving existing grass/road art untouched."""
+    """Write door-path tiles, leaving existing grass/road art untouched."""
+    export_cover_tiles(root, include_grass=False)
+
+
+def export_cover_tiles(root: Path | None = None, include_grass: bool = True) -> None:
+    """Rewrite grass/gravel/concrete covers. Does not touch road or sidewalk art."""
     global ROOT
     previous = ROOT
     if root is not None:
         ROOT = root
     try:
-        save_tile("gravel", tile_gravel())
-        save_tile("concrete", tile_concrete())
+        if include_grass:
+            seeds = (11, 29, 47, 73)
+            for index, seed in enumerate(seeds):
+                name = "grass" if index == 0 else f"grass_{index}"
+                save_tile(name, tile_grass(seed), cover=True)
+        for index, seed in enumerate((91, 113, 151)):
+            name = "gravel" if index == 0 else f"gravel_{index}"
+            save_tile(name, tile_gravel(seed), cover=True)
+        for index, seed in enumerate((53, 89)):
+            name = "concrete" if index == 0 else f"concrete_{index}"
+            save_tile(name, tile_concrete(seed), cover=True)
     finally:
         ROOT = previous
 
@@ -884,5 +1054,7 @@ if __name__ == "__main__":
         export_bridges_only()
     elif "--path-tiles" in sys.argv:
         export_path_tiles()
+    elif "--cover-tiles" in sys.argv:
+        export_cover_tiles()
     else:
         main()

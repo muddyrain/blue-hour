@@ -213,9 +213,18 @@ func _blocked(areas: Array[Rect2], footprints: Array[Rect2], ignore: Rect2) -> b
 	return false
 
 
+func _art_name(cell: Vector2i, name: String) -> String:
+	# Nearby cells pick different cover variants so a field does not stamp one sheet.
+	var count: int = 4 if name == "grass" else 3 if name == "gravel" else 2 if name == "concrete" else 1
+	if count <= 1:
+		return name
+	var index: int = posmod(cell.x * 3 + cell.y * 5, count)
+	return name if index == 0 else "%s_%d" % [name, index]
+
+
 func _draw() -> void:
 	for cell: Vector2i in cells:
-		IsoAtlas.stamp_cell(self, "tiles/%s.png" % cells[cell], cell, TILE)
+		IsoAtlas.stamp_cell(self, "tiles/%s.png" % _art_name(cell, String(cells[cell])), cell, TILE)
 	for road: Rect2 in _road_edges:
 		var poly: PackedVector2Array = IsoSpace.polygon(road)
 		draw_polyline(PackedVector2Array([poly[0], poly[1], poly[2], poly[3], poly[0]]), Color(0.62, 0.65, 0.68, 0.9), 1.25, true)

@@ -176,8 +176,12 @@ static func _fill_front(plot: Dictionary, entities: Array, roads: Array, bus: Di
 	var added: int = 0
 	var cursor: float = west + 16.0
 	var index: int = 0
+	var random: RandomNumberGenerator = RogueLayout.rng("theme-front:" + str(plot.get("id", "p")) + ":" + str(int(foot)))
+	var last: String = ""
 	while cursor + 200.0 < east and added < limit and index < 28:
 		var typ: String = types[index % types.size()]
+		if typ == last and types.size() > 1:
+			typ = types[(index + 1) % types.size()]
 		var width: float = float(WorldgenScale.WIDTH[typ])
 		if cursor + width > east - 8.0:
 			index += 1
@@ -185,8 +189,9 @@ static func _fill_front(plot: Dictionary, entities: Array, roads: Array, bus: Di
 				break
 			continue
 		if WorldgenGeometry._add_building(typ, index + 2, cursor, foot, plot, entities, roads, bus):
-			cursor += width + 28.0
+			cursor += width + 28.0 + 8.0 * float(random.randi_range(0, 1))
 			added += 1
+			last = typ
 		else:
 			cursor += 48.0
 		index += 1

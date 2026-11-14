@@ -12,7 +12,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageChops
 
-ROOT = Path("/workspace/bh-iso/assets/iso")
+ROOT = Path(__file__).resolve().parents[1] / "assets" / "iso"
 TILE = 64
 SCALE = 2  # render 2x for smoother edges
 TW, TH = TILE * 2 * SCALE, TILE * SCALE  # 256x128 at SCALE=2
@@ -944,6 +944,70 @@ def crate() -> Image.Image:
     return img
 
 
+
+def parked_car(color: str = "cream") -> Image.Image:
+    # Small healthy compact in the same boxed iso language as the bus, not a wreck.
+    w, d, h = 76, 32, 28
+    if color == "teal":
+        body, body_dk, roof = (142, 168, 170), (110, 136, 140), (206, 216, 214)
+    else:
+        body, body_dk, roof = (214, 204, 184), (176, 164, 146), (232, 226, 214)
+    img, vx, _ = sprite_canvas(w, d, h + 4, pad=14)
+    draw_box(img, vx, w, d, h, roof, body, body_dk, (240, 236, 228))
+    dr = ImageDraw.Draw(img)
+    # windshield on the +x cab end
+    a, b = vx(w / 2, -3), vx(w / 2, -d + 3)
+    glass = [
+        (a[0] + 1, a[1] - 10 * SCALE),
+        (b[0] + 1, b[1] - 10 * SCALE),
+        (b[0] + 1, b[1] - 22 * SCALE),
+        (a[0] + 1, a[1] - 22 * SCALE),
+    ]
+    dr.polygon(glass, fill=rgb((150, 186, 200), 230))
+    dr.line(glass + [glass[0]], fill=rgb((80, 90, 100)), width=1)
+    # side windows
+    draw_windows_left(img, vx, w, d, h, [(12, 10)], [0.22, 0.52], (90, 90, 92))
+    # headlights
+    for y in (-5, -d + 5):
+        p = vx(w / 2 + 1, y)
+        dr.ellipse((p[0] - 2, p[1] - 10 * SCALE, p[0] + 3, p[1] - 6 * SCALE), fill=rgb((255, 228, 170)))
+    # wheels just under the body
+    for x, y in ((-24, 3), (22, 3), (-24, -d - 2), (22, -d - 2)):
+        p = vx(x, y)
+        dr.ellipse((p[0] - 5, p[1] - 4, p[0] + 5, p[1] + 4), fill=rgb((36, 38, 42)))
+        dr.ellipse((p[0] - 2, p[1] - 1, p[0] + 2, p[1] + 2), fill=rgb((80, 82, 86)))
+    return img
+
+
+def trash_bin() -> Image.Image:
+    w, d, h = 16, 14, 24
+    img, vx, _ = sprite_canvas(w, d, h, pad=10)
+    draw_box(img, vx, w, d, h - 3, (70, 92, 78), (86, 110, 92), (64, 84, 70))
+    draw_box(img, vx, w + 2, d + 2, 4, (60, 78, 66), (74, 96, 80), (54, 72, 60), eave=False)
+    dr = ImageDraw.Draw(img)
+    a, b = vx(-4, 0), vx(4, 0)
+    dr.line((a[0], a[1] - (h - 6) * SCALE, b[0], b[1] - (h - 6) * SCALE), fill=rgb((48, 62, 52)), width=2)
+    return img
+
+
+def street_sign() -> Image.Image:
+    # Post and a blank board in the same language as the tram-stop sign; no lettering.
+    w, d, h = 20, 10, 58
+    img, vx, _ = sprite_canvas(w, d, h, pad=14)
+    dr = ImageDraw.Draw(img)
+    post = vx(0, 0)
+    dr.line((post[0], post[1], post[0], post[1] - (h - 2) * SCALE), fill=rgb((90, 94, 98)), width=3)
+    cx, top = post[0], post[1] - (h - 4) * SCALE
+    board = (cx - 16 * SCALE, top, cx + 16 * SCALE, top + 24 * SCALE)
+    dr.rounded_rectangle(board, radius=3, fill=rgb((214, 208, 190)), outline=rgb((110, 108, 100)), width=1)
+    # abstract color bars, not text
+    mid_y = top + 8 * SCALE
+    dr.rectangle((cx - 10 * SCALE, mid_y, cx + 10 * SCALE, mid_y + 4 * SCALE), fill=rgb((86, 118, 124)))
+    mid_y2 = top + 15 * SCALE
+    dr.rectangle((cx - 8 * SCALE, mid_y2, cx + 8 * SCALE, mid_y2 + 3 * SCALE), fill=rgb((160, 150, 132)))
+    return img
+
+
 MANIFEST = {"scale": 1.0 / SCALE, "sprites": {}}
 
 
@@ -991,6 +1055,24 @@ def main():
     (ROOT / "manifest.json").write_text(json.dumps(MANIFEST, indent=2), encoding="utf-8")
     print("manifest written", len(MANIFEST["sprites"]))
     print("done")
+
+
+
+def export_street_props(root: Path | None = None) -> None:
+    """Add street-dressing props without rewriting existing building or tile art."""
+    global ROOT
+    previous = ROOT
+    if root is not None:
+        ROOT = root
+    try:
+        _export_sprites({
+            "props/parked_car.png": lambda: parked_car("cream"),
+            "props/parked_car_b.png": lambda: parked_car("teal"),
+            "props/trash.png": trash_bin,
+            "props/sign.png": street_sign,
+        }, "street-props")
+    finally:
+        ROOT = previous
 
 
 def export_bus_only():
@@ -1056,5 +1138,7 @@ if __name__ == "__main__":
         export_path_tiles()
     elif "--cover-tiles" in sys.argv:
         export_cover_tiles()
+    elif "--street-props" in sys.argv:
+        export_street_props()
     else:
         main()

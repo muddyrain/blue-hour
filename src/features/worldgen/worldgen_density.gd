@@ -36,6 +36,7 @@ static func _fill_parcel(data: Dictionary, parcel: Dictionary, reserved: Array[R
 	var added: int = 0
 	var last: String = ""
 	var index: int = parcel.get("buildings", []).size()
+	var random: RandomNumberGenerator = RogueLayout.rng("gen-density-row:" + String(data.get("seed", "0")) + ":" + parcel.id)
 	var south: float = box.end.y - 56.0
 	var north_limit: float = box.position.y + 120.0
 	var foot: float = south
@@ -64,7 +65,7 @@ static func _fill_parcel(data: Dictionary, parcel: Dictionary, reserved: Array[R
 					Vector2(cursor + width - 8.0, foot + 24.0), 56.0)
 				reserved.append(WorldgenScale.visible_rect(entity).grow(8.0))
 				reserved.append(Rect2(WorldLayout.point(entity.door) - Vector2(24, 24), Vector2(48, 48)))
-				cursor += width + 20.0
+				cursor += width + 20.0 + 8.0 * float(random.randi_range(0, 1))
 				last = typ
 				added += 1
 				index += 1
@@ -99,15 +100,19 @@ static func _fits(data: Dictionary, parcel: Dictionary, typ: String, variant: in
 	var block: Rect2 = Rect2(x, foot - depth, width, depth)
 	var visible: Rect2 = Rect2(x, foot - WorldgenScale.visible_height(typ, variant), width,
 		WorldgenScale.visible_height(typ, variant))
-	var door: Vector2 = Vector2(x + width * 0.5, foot + 48.0)
+	var door_x: float = x + width * 0.5 + (WorldgenScale.door_x(typ, variant) - 256.0) * width / 448.0
+	var door: Vector2 = Vector2(door_x, foot + 48.0)
 	var apron: Rect2 = Rect2(door - Vector2(28, 28), Vector2(56, 56))
 	var box: Rect2 = WorldLayout.rect(parcel.rect)
 	if not box.grow(-24.0).encloses(block):
 		return false
 	if visible.position.y < box.position.y + 12.0:
 		return false
+	if not box.grow(-16.0).has_point(door):
+		return false
 	for wall: Array in data.get("barriers", []):
-		if WorldLayout.rect(wall).grow(16.0).intersects(block):
+		var fence: Rect2 = WorldLayout.rect(wall)
+		if fence.grow(16.0).intersects(block) or fence.grow(20.0).has_point(door):
 			return false
 	for zone: Rect2 in reserved:
 		if block.grow(16.0).intersects(zone) or apron.grow(14.0).intersects(zone):

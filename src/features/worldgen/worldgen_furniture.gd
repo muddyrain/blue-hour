@@ -10,6 +10,8 @@ func _ready() -> void:
 	if not art.is_empty():
 		IsoAtlas.attach(self, art)
 		set_meta("iso_kind", kind)
+		if bool(detail.get("flip", false)):
+			IsoAtlas.flip_attached(self, art)
 
 
 func _draw() -> void:

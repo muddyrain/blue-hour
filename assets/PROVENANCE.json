@@ -1202,6 +1202,30 @@
       "sha256": "95f16c1a6646fdfc60fa5a2b791cb4a4dd0ab787746e72c4fa57ed7634d5518f",
       "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
       "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/props/parked_car.png",
+      "sha256": "82b2ec6f99ecabd437ecf2c4e05b48e43a2c512396b5797ffc1872dcd731a349",
+      "origin": "Original project isometric art, hand-authored in tools/make_iso_art.py (2:1 street dressing: a small healthy parked compact, a yard trash bin, and a blank pole-mounted board with abstract color bars). Not AI-generated and not a third-party pack.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/props/parked_car_b.png",
+      "sha256": "961b8f859c9aebb016ffa50ae9c0f0a789acd8bc5e2a92104b7a6b4a80fb260c",
+      "origin": "Original project isometric art, hand-authored in tools/make_iso_art.py (2:1 street dressing: a small healthy parked compact, a yard trash bin, and a blank pole-mounted board with abstract color bars). Not AI-generated and not a third-party pack.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/props/trash.png",
+      "sha256": "32ebdc75b96ce29dfba8dbd8ff4f54cef2fb9ab233af0ff7351605babef2d698",
+      "origin": "Original project isometric art, hand-authored in tools/make_iso_art.py (2:1 street dressing: a small healthy parked compact, a yard trash bin, and a blank pole-mounted board with abstract color bars). Not AI-generated and not a third-party pack.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/props/sign.png",
+      "sha256": "5905df28520563ce87a6685b8ce753841619a829bdc5ad1bec40cb3c95936ad0",
+      "origin": "Original project isometric art, hand-authored in tools/make_iso_art.py (2:1 street dressing: a small healthy parked compact, a yard trash bin, and a blank pole-mounted board with abstract color bars). Not AI-generated and not a third-party pack.",
+      "license": "No additional license granted"
     }
   ]
 }

@@ -39,6 +39,7 @@ var _roof: Sprite2D
 var _wall: Sprite2D
 var _lights: Sprite2D
 var window_glow: float = 0.0
+var flip: bool = false
 
 
 func _ready() -> void:
@@ -53,6 +54,8 @@ func _ready() -> void:
 				extra = clampf((front_width + body_depth) / authored, 0.62, 1.22)
 		IsoAtlas.attach(self, iso_art, extra)
 		_attach_window_lights(extra)
+		if flip:
+			IsoAtlas.flip_attached(self, iso_art, extra)
 		_roof = Sprite2D.new()
 		_wall = Sprite2D.new()
 		_roof.visible = false

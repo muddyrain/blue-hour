@@ -104,6 +104,13 @@ func _stamp_generated_paths(source: StreetLayout) -> void:
 			if lane.has_area():
 				walks.append(lane)
 				_stamp_rect(lane, tile, "grass")
+		# Presentation-only parking pads; navigation and world_data keys stay unchanged.
+		for court: Dictionary in parcel.get("courtyards", []):
+			if String(court.get("kind", "")) == "parking":
+				_stamp_rect(WorldLayout.rect(court.rect), "concrete", "grass")
+		for detail: Dictionary in parcel.get("dressing", []):
+			if detail.has("surface") and String(detail.get("kind", "")) in ["parking", "lot"]:
+				_stamp_rect(WorldLayout.rect(detail.surface), "concrete", "grass")
 	for entity: Dictionary in entities:
 		if not entity.has("door"):
 			continue

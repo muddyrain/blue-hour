@@ -314,6 +314,7 @@ func _make_world_buildings() -> void:
 		var block: Rect2 = WorldLayout.rect(entity.rect)
 		var definition: Dictionary = WorldgenArt.definition(entity)
 		var building: FieldProp = FieldProp.new()
+		building.iso_art = IsoBuildingArt.pick(entity)
 		building.facade = definition.texture
 		building.fixed_roof = definition.get("fixed_roof", false)
 		if definition.has("native_size"):

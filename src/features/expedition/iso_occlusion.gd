@@ -6,7 +6,7 @@ extends RefCounted
 const FADE_ALPHA: float = 0.48
 const FADE_SPEED: float = 6.0
 const MIN_OVERLAP: float = 70.0
-const SKIP_KINDS: Array[String] = ["lamp", "bike", "crate", "bridge", "tram"]
+const SKIP_KINDS: Array[String] = ["lamp", "bike", "crate", "bridge", "tram", "rail"]
 
 
 static func update(expedition: Expedition, delta: float) -> void:
@@ -57,7 +57,8 @@ static func _art_rect(host: Node2D) -> Rect2:
 	var size: Vector2 = sprite.texture.get_size() * sprite.scale.abs()
 	# The authored sprite AABB includes transparent corners; inset so a passerby
 	# on the side of a house does not fade the whole facade.
-	var rect: Rect2 = Rect2(sprite.global_position, size).grow_individual(-size.x * 0.12, -size.y * 0.06, -size.x * 0.12, -size.y * 0.10)
+	var side: float = 0.18 if size.x > 420.0 else 0.12
+	var rect: Rect2 = Rect2(sprite.global_position, size).grow_individual(-size.x * side, -size.y * 0.10, -size.x * side, -size.y * 0.16)
 	return rect
 
 

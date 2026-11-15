@@ -22,7 +22,7 @@ static func _assemble(seed: String,size: String,topology: String,attempt: int,fa
 	var dressed: bool = open_streets == OpenStreetsV1.DRESSING_VERSION
 	if dressed and not WarehouseScenery.attach(data):
 		return {}
-	# Extra service buildings go in before decorative props, so leftover lawns still dress.
+	# Freeze solid scenery before site fitting; decorate only after all buildings and walks exist.
 	WorldgenDensity.fill(data)
 	WorldgenDressing.freeze(data)
 	if dressed and not WarehouseScenery.dress(data):
@@ -31,8 +31,7 @@ static func _assemble(seed: String,size: String,topology: String,attempt: int,fa
 		data.scenery_revision = open_streets
 	if open_streets == OpenStreetsV1.SEEDED_VERSION:
 		ParcelScenery.fit(data)
-		# Annexes and new courts are placed after the first dressing pass; fill their lawns too.
-		WorldgenDressing.enrich(data)
+	WorldgenDressing.enrich(data)
 	return ExplorationLayout.complete(data, trace)
 
 static func validate(value: Variant,cached: bool=true) -> String:

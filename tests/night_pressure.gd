@@ -78,6 +78,16 @@ func _check_sortie(supply: MissionSupply) -> void:
 	_expect(sortie.survivors.all(func(actor: FieldActor) -> bool: return actor.visual.modulate.r > 1.0)
 		and sortie.enemies.all(func(actor: FieldActor) -> bool: return actor.visual.modulate.r > 1.0),
 		"the live expedition clock applies night readability to crew and existing enemies")
+	var heavy: FieldActor = sortie._make_actor(true, 900, enemy.position + Vector2(80, 0), {}, EnemyRules.HEAVY)
+	sortie.enemies.append(heavy)
+	heavy.take_damage(heavy.health + 1.0)
+	heavy.visual.advance(0.4, Vector2.ZERO, Vector2.ZERO)
+	sortie._feedback._refresh_night_lighting()
+	_expect(heavy.visual.motion_state == &"defeated" and heavy.visual._body.frame == 15
+		and heavy.visual.modulate.is_equal_approx(ActorVisual.NIGHT_GAIN)
+		and is_equal_approx(float(heavy.visual._body.get_instance_shader_parameter("night_readability")), 1.0)
+		and heavy.visual._body.self_modulate.r >= 0.85 and heavy.visual._body.self_modulate.a == 1.0,
+		"real night refresh still compensates a fallen heavy before corpse fade")
 	_check_special_night_compensation(sortie)
 	for unit: FieldActor in sortie.enemies:
 		unit.queue_free()

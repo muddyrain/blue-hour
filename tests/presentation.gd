@@ -46,7 +46,7 @@ func _check_weapon(view: WeaponPresentation) -> void:
 		var state: Dictionary = actor.visual.presentation_state()
 		_expect(state["hand"].distance_to(state["grip"]) < 0.001, "weapon texture grip remains at the drawn upper-body hand landmark")
 		var flash: Vector2 = actor.visual.position + actor.visual._hold.transform * actor.visual._muzzle.position
-		_expect(flash.distance_to(actor.visual.muzzle_offset()) < 0.001, "flash and combat trace use the rendered muzzle transform")
+		_expect(flash.distance_to(actor.visual.rendered_muzzle_offset()) < 0.001, "flash and combat trace use the rendered muzzle transform")
 		var expected_row: int = state["row"]
 		actor.visual.advance(0.25, Vector2.ZERO, direction)
 		_expect(actor.visual.direction_row == expected_row, "unit aim and distance-scaled aim map to the same facing")

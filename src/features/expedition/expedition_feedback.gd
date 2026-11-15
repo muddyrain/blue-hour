@@ -59,13 +59,26 @@ func _shot_effect(from: Vector2, to: Vector2, damage: float) -> void:
 
 func _shot_trace(from: Vector2, to: Vector2, colour: Color) -> void:
 	var line: Line2D = Line2D.new()
-	line.points = PackedVector2Array([IsoSpace.to_view(from), IsoSpace.to_view(to)])
+	# Rules keep their original hit-plane origin. Only the drawn trace starts at
+	# the new billboard muzzle; a barrel cannot bypass a wall or grant extra range.
+	line.points = PackedVector2Array([_trace_start(from), hit_plane_to_view(to)])
 	line.width = 1.5
 	line.default_color = colour
 	x._effects.add_child(line)
 	var tween: Tween = line.create_tween()
 	tween.tween_property(line, "modulate:a", 0.0, 0.09)
 	tween.tween_callback(line.queue_free)
+
+
+static func hit_plane_to_view(point: Vector2) -> Vector2:
+	return IsoSpace.to_view(point + Vector2.DOWN * AttackRules.HIT_HEIGHT) + Vector2.UP * AttackRules.HIT_HEIGHT
+
+
+func _trace_start(point: Vector2) -> Vector2:
+	for actor: FieldActor in x.survivors:
+		if actor.visual != null and actor.health > 0.0 and (actor.position + actor.visual.muzzle_offset()).distance_squared_to(point) < 0.01:
+			return IsoSpace.to_view(actor.position) + actor.visual.rendered_muzzle_offset()
+	return hit_plane_to_view(point)
 
 
 func _hit_effect(to: Vector2, damage: float, survivor_hit: bool) -> void:
@@ -99,9 +112,11 @@ func _combat_popup(at: Vector2, text: String, colour: Color) -> void:
 	label.add_theme_color_override("font_outline_color", Color("142d36"))
 	label.add_theme_constant_override("outline_size", 3)
 	label.position = IsoSpace.to_view(at)
+	label.add_theme_font_size_override("font_size", 12)
 	x._effects.add_child(label)
 	var popup: Tween = label.create_tween()
 	popup.tween_property(label, "position:y", label.position.y - 18.0, 0.5)
+	popup.parallel().tween_property(label, "modulate:a", 0.0, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	popup.tween_callback(label.queue_free)
 
 

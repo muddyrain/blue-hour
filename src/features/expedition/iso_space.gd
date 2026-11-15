@@ -62,6 +62,8 @@ static func attach_actor(actor: FieldActor, stage: Node2D) -> void:
 	if actor.visual != null:
 		actor.visual.reparent(view, false)
 		actor.visual.position = Vector2.ZERO
+		actor.visual.set_meta("iso_projection", true)
+		actor.visual._apply_pose()
 	if actor._enemy_tag != null:
 		actor._enemy_tag.reparent(view, false)
 	actor.set_meta("iso_view", view)

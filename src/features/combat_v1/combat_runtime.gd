@@ -101,13 +101,7 @@ func attack(world: Expedition,actor: FieldActor,delta: float) -> void:
 	actor.visual.show_fire(actor.aim)
 	for ray: Dictionary in plan.rays:
 		if (ray.to-muzzle).dot(actor.aim)<=0: continue
-		var line: Line2D=Line2D.new()
-		line.add_point(IsoSpace.to_view(muzzle))
-		line.add_point(IsoSpace.to_view(ray.to))
-		line.width=1.8
-		line.default_color=Color("ffd78b")
-		world._effects.add_child(line)
-		line.create_tween().tween_property(line,"modulate:a",0.0,0.10).finished.connect(line.queue_free)
+		world._shot_trace(muzzle, ray.to, Color("ffd78b"))
 		if ray.has("pierce_to"):
 			world._shot_trace(ray.to,ray.pierce_to,Color("a5dfce"))
 	world.combat_feedback.emit({"kind":"shotgun","member_id":actor.member_id,"instance_id":actor.weapon_instance_id,"sequence":state.sequence,"targets":plan.targets,"rays":plan.rays,"rounds_refunded":refunded,"damage":actor.weapon_definition.damage,"magazine":actor.magazine.snapshot(),"elapsed":world.elapsed})

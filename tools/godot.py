@@ -24,7 +24,7 @@ def main():
  def execute(label,args,flags=None,expected=0):
   folder=job/label;folder.mkdir();cmd=[exe,'--headless','--path',str(ROOT),'--audio-driver','Dummy',*args]
   flags=list(flags if flags is not None else [])
-  cmd+=['--',*flags,'--bh-progress='+str(folder/'run.enemy-v1.json'),'--bh-audio-settings='+str(folder/'audio.json')]
+  cmd+=['--',*flags,'--bh-progress='+(folder/'run.enemy-v1.json').as_posix(),'--bh-audio-settings='+(folder/'audio.json').as_posix()]
   if label=='known-hash-cycle':cmd+=['--cycle-output='+(folder/'cycle.json').as_posix()]
   if label=='record-hash':cmd+=['--record-output='+(folder/'data').as_posix()]
   if label=='neighborhood-data':cmd+=['--neighborhood-output='+(folder/'data.json').as_posix()]
@@ -38,7 +38,7 @@ def main():
  execute('startup-default',['--quit-after','3'])
  execute('startup-111',['--quit-after','3'])
  execute('smoke-loop',['--script','res://tests/smoke_loop.gd'],[])
- for name in ['playable_entry','presentation','camp_scene_contracts','weapon_inventory','combat_los','navigation_nearest','night_pressure','harbor_warehouse','contact_damage','contact_separation','animation/motion','animation/normal_stability','animation/infected_v1','animation/special_infected_v1']:
+ for name in ['playable_entry','presentation','camp_scene_contracts','weapon_inventory','combat_los','navigation_nearest','night_pressure','harbor_warehouse','contact_damage','contact_separation','animation/motion','animation/normal_stability','animation/infected_v1','animation/special_infected_v1','animation/survivors_v1','animation/weapon_holding']:
   execute(name.replace('/','-'),['--script','res://tests/'+name+'.gd'])
  for name in ['rogue_navigation','hud_compact','world_data']:
   execute(name.replace('_','-'),['--script','res://tests/'+name+'.gd'])

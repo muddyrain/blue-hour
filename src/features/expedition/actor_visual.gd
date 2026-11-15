@@ -61,6 +61,8 @@ var _special_phase: StringName = &"chase"
 var _special_progress: float = 0.0
 var _special_heading: Vector2 = Vector2.RIGHT
 var _survivor_visual: SurvivorVisualV1 = SurvivorVisualV1.new()
+var night_strength: float = 0.0
+var _weapon_rig: SurvivorWeaponRig
 
 
 func _ready() -> void:
@@ -94,6 +96,8 @@ func _ready() -> void:
 	_muzzle.color = Color("fff0b3")
 	# Local child order keeps every actor inside the parent Y-sort group.
 	_hold.add_child(_muzzle)
+	_weapon_rig = SurvivorWeaponRig.new(self)
+	_weapon_rig.build()
 	_apply_pose()
 
 
@@ -221,6 +225,8 @@ func show_attack(direction: Vector2) -> void:
 
 
 func show_defeat() -> void:
+	if _is_defeated:
+		return
 	_is_defeated = true
 	_defeat_clock = 0.0
 	_screamer_phase = &"cancelled"
@@ -235,6 +241,7 @@ func set_weapon(view: WeaponPresentation) -> void:
 
 func set_night_lighting(amount: float) -> void:
 	var strength: float = smoothstep(0.45, 1.0, clampf(amount, 0.0, 1.0))
+	night_strength = strength
 	# Lift actor detail without lifting the street or cancelling the blue ambient.
 	# Parent modulation also keeps the hair mask, weapon and existing foot ring together.
 	modulate = Color.WHITE.lerp(NIGHT_GAIN, strength)
@@ -244,23 +251,49 @@ func set_night_lighting(amount: float) -> void:
 
 
 func muzzle_offset(_direction: Vector2 = Vector2.ZERO) -> Vector2:
-	return position + _hold.transform * (_weapon.transform * (weapon_view.muzzle_pixel - weapon_view.grip_pixel))
+	# This is the pre-existing map-space ballistic origin, retained for LOS/save contracts.
+	# The new hand rig must not change which targets can be hit around a wall.
+	return _ballistic_offset(_facing, _fire_clock / 0.12)
 
 
 func aimed_shot_offset(direction: Vector2) -> Vector2:
 	# Query the pose that show_fire will commit, without posing blocked candidates or firing.
 	var facing: Vector2 = direction.normalized() if direction != Vector2.ZERO else _facing
+	return _ballistic_offset(facing, 1.0)
+
+
+func _ballistic_offset(facing: Vector2, recoil: float) -> Vector2:
 	var row: int = _row(facing)
 	var hand: Vector2 = _hand_pixels[row] - Vector2(128, 224)
 	var size: Vector2 = weapon_view.direction_scales[row] * field_scale(weapon_view.display_scale)
 	if row == 0 and facing.x < 0.0:
 		hand.x = -hand.x
 		size.y *= -1.0
-	var hold_position: Vector2 = _body.position - facing * 1.5
+	var hold_position: Vector2 = _hit_direction * (_hit_clock / 0.18) * 2.0 - facing * 1.5 * recoil
 	hold_position.y += sin(_walk_clock * 18.0) * 0.5 if _movement.length_squared() > 1.0 else sin(_clock * 2.0) * 0.2
 	var hold: Transform2D = Transform2D(_hit_direction.x * (_hit_clock / 0.18) * 0.07, hold_position)
 	var weapon: Transform2D = Transform2D(facing.angle(), size, 0.0, hand * BODY_SCALE)
 	return position + hold * (weapon * (weapon_view.muzzle_pixel - weapon_view.grip_pixel))
+
+
+func screen_direction(direction: Vector2) -> Vector2:
+	return IsoSpace.to_view(direction).normalized() if has_meta("iso_projection") else direction.normalized()
+
+
+func rendered_muzzle_offset() -> Vector2:
+	return _weapon_rig.rendered_muzzle()
+
+
+func present_weapon_action(heading: Vector2, phase: String, progress: float, values: Dictionary) -> void:
+	if _is_defeated:
+		return
+	_weapon_rig.heading = heading
+	_weapon_rig.phase = phase
+	_weapon_rig.progress = progress
+	_weapon_rig.action_pose = values
+	if phase == "windup":
+		_facing = heading.normalized()
+	_apply_pose()
 
 
 func presentation_state() -> Dictionary:
@@ -272,6 +305,8 @@ func presentation_state() -> Dictionary:
 		"aim_octant": MotionAtlas.octant(_facing), "facing": _facing, "velocity": _movement, "aim": _aim,
 		"muzzle": muzzle_offset(), "grip": grip, "hand": hand, "weapon": String(weapon_view.id),
 		"weapon_layer": _weapon.z_index, "display_offset": position, "defeat_clock": _defeat_clock,
+		"render_muzzle": rendered_muzzle_offset(), "hand_pixel": _weapon_rig.hand_pixel,
+		"render_octant": _weapon_rig.render_octant, "muzzle_light": _weapon_rig.light_enabled(),
 		"local_layers": [_upper.get_index(), _arms.get_index(), _weapon.get_index(), _head.get_index()]}
 
 
@@ -326,7 +361,10 @@ func _apply_pose() -> void:
 		if is_enemy:
 			action = 6
 		_body.position += _hit_direction * (_hit_clock / 0.18) * 2.0
-	var tint: Color = Color("ffd2b3") if _hit_clock > 0.0 else Color.WHITE
+		# A decaying display impulse never moves logical feet, range or navigation.
+		var hit_progress: float = 1.0 - _hit_clock / 0.18
+		_body.position += screen_direction(_hit_direction) * sin(hit_progress * PI) * (3.0 if is_enemy else 1.5)
+	var tint: Color = Color.WHITE
 	if is_enemy and enemy_windup and not _is_defeated and _hit_clock <= 0.0:
 		motion_state = &"windup"
 		action = 4
@@ -378,15 +416,29 @@ func _apply_pose() -> void:
 		_body.material = InfectedSheetV1.MATERIAL if is_enemy and (SpecialInfectedSheetV1.supports(enemy_kind) or enemy_kind in [EnemyRules.RUSH, EnemyRules.HEAVY] or (_normal_enemy() and NormalInfectedV1.enabled())) else null
 		_body.position = _contact_offset() if is_enemy and not _night_hound() else Vector2.ZERO
 		_body.self_modulate = Color(0.70, 0.77, 0.78, clampf(1.0 - (_defeat_clock - 0.50) / 0.45, 0.0, 1.0))
+		if is_enemy and enemy_kind in [EnemyRules.NORMAL, EnemyRules.RUSH, EnemyRules.HEAVY]:
+			# Keep PR #71's per-sprite night palette and parent gain. An additional
+			# blue corpse tint used to bury the fallen silhouette in the night grade.
+			_body.self_modulate = Color(0.90, 0.90, 0.90, _body.self_modulate.a)
+		if not is_enemy:
+			var settle: float = smoothstep(0.0, 0.24, _defeat_clock)
+			_body.rotation = 0.16 * (1.0 - settle) * signf(_facing.x)
+			_body.position.y -= sin(settle * PI) * 2.0
+			# A downed squad member remains legible until the real recovery/removal.
+			_body.self_modulate.a = 1.0
 	_update_hold(tint, moving, upper_action)
+	if is_enemy:
+		_weapon_rig.update_impact()
 	queue_redraw()
 
 
 func _pose_body(direction: Vector2, action: int) -> void:
 	if not is_enemy:
 		var gait: float = _walk_clock * 9.0 * _movement.length() / 125.0
-		_survivor_visual.pose(_body, variant, direction, _facing, motion_state,
-			_clock, gait, _fire_clock, _attack_clock)
+		var body_direction: Vector2 = _facing if _aim.length_squared() > 0.0001 else direction
+		_survivor_visual.pose(_body, variant, screen_direction(body_direction), screen_direction(_facing), motion_state,
+			_clock, gait, _fire_clock, _attack_clock,
+			_weapon_rig.phase if CombatEquipment.melee(String(weapon_view.id)) else "", _weapon_rig.progress)
 		return
 	if _night_hound():
 		NightHoundVisualV1.pose(_body, direction, motion_state, _walk_clock, _attack_clock, _defeat_clock, _special_progress)
@@ -437,31 +489,4 @@ func _update_hold(tint: Color, moving: bool, action: int) -> void:
 	_arms.visible = false
 	_upper.self_modulate = tint
 	_head.self_modulate = tint
-	_hold.position = _body.position - _facing * (_fire_clock / 0.12) * 1.5
-	_hold.position.y += sin(_walk_clock * 18.0) * 0.5 if moving else sin(_clock * 2.0) * 0.2
-	_hold.rotation = _hit_direction.x * (_hit_clock / 0.18) * 0.07
-	var hand: Vector2 = _hand_pixels[direction_row] - Vector2(128, 224)
-	if direction_row == 0 and _facing.x < 0.0:
-		hand.x = -hand.x
-	_weapon.texture = weapon_view.texture
-	_weapon.offset = -weapon_view.grip_pixel
-	_weapon.position = hand * BODY_SCALE
-	_weapon.rotation = _facing.angle()
-	_weapon.scale = weapon_view.direction_scales[direction_row] * field_scale(weapon_view.display_scale)
-	if direction_row == 0 and _facing.x < 0.0:
-		_weapon.scale.y *= -1.0
-	_weapon.z_index = 0
-	# Draw gun above torso and below hair without crossing another actor's Y group.
-	_hold.move_child(_weapon, _head.get_index())
-	_hold.move_child(_head, _hold.get_child_count() - 1)
-	_hold.move_child(_muzzle, _hold.get_child_count() - 1)
-	_arms.facing = _facing
-	_arms.display_scale = BODY_SCALE / SCALE_REF
-	_arms.trigger = _weapon.position
-	_arms.support = _weapon.transform * ((weapon_view.muzzle_pixel - weapon_view.grip_pixel) * 0.32)
-	_arms.modulate = tint
-	_arms.queue_redraw()
-	_muzzle.position = _weapon.transform * (weapon_view.muzzle_pixel - weapon_view.grip_pixel)
-	_muzzle.rotation = _weapon.rotation
-	_muzzle.scale = Vector2.ONE * field_scale(0.65 + _fire_clock * 3.0)
-	SurvivorVisualV1.pose_head(_head, _body, _hold)
+	_weapon_rig.apply(tint)

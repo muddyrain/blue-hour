@@ -108,10 +108,69 @@ func run() -> void:
 		if not fallback_content.is_empty():
 			expect(not LevelSummary.freeze(fallback,fallback_content.sites,fallback_content.objective,"supply").is_empty(), "explicit forced fallback completes real navigation routes and optional choice")
 	_industrial_yard()
+	_street_dressing()
 	_action_choices()
 	write(folder.path_join("summary.json"), {"samples":samples,"checks":checks,"failures":failures,"seeds":seeds})
 	print(JSON.stringify({"suite":"level_generation","checks":checks,"failures":failures,"samples":samples.size()}))
 	quit(1 if failures else 0)
+
+
+func _street_dressing() -> void:
+	var layout: Dictionary = WorldgenLayout._assemble("bh-vis-02", "large", "residential", 0, false,
+		"supply", false, false, OpenStreetsV1.SEEDED_VERSION)
+	expect(not layout.is_empty(), "enclosed dressing retains the complete navigation certificate")
+	if layout.is_empty():
+		return
+	var cars: int = 0
+	var stalls: int = 0
+	var bikes: int = 0
+	var vending: int = 0
+	var paired: bool = true
+	var frontage: bool = true
+	var clear: bool = true
+	var reserved: Array[Rect2] = ExplorationLayout._reserved(layout)
+	var occupied: Array[Rect2] = []
+	for entity: Dictionary in layout.entities:
+		occupied.append(WorldgenScale.visible_rect(entity).merge(WorldLayout.rect(entity.rect)).grow(18))
+	for wall: Array in layout.barriers:
+		occupied.append(WorldLayout.rect(wall).grow(16))
+	var tiles: IsoTiles = IsoTiles.new()
+	tiles.fill_from_layout(NeighborhoodLayout.resource(layout))
+	var painted: bool = true
+	for parcel: Dictionary in layout.parcels:
+		var pads: Array[Rect2] = []
+		for detail: Dictionary in parcel.dressing:
+			if detail.kind == "parking":
+				var pad: Rect2 = WorldLayout.rect(detail.surface)
+				pads.append(pad)
+				stalls += 1
+				frontage = frontage and WorldgenDressing._near_frontage(layout, parcel, pad.get_center())
+				clear = clear and WorldgenDressing._free(layout, parcel, pad, occupied, reserved)
+				var cell: Vector2i = Vector2i((pad.get_center() / IsoTiles.TILE).floor())
+				painted = painted and tiles.cells.get(cell, "") == "concrete" and WorldgenDressing._parking_visible(layout, pad)
+		for detail: Dictionary in parcel.dressing:
+			if detail.kind in ["bike", "bike_shelter", "vending", "trash", "sign", "pole", "lamp", "planter"]:
+				var point: Vector2 = WorldLayout.point(detail.point)
+				frontage = frontage and WorldgenDressing._near_frontage(layout, parcel, point)
+				clear = clear and WorldgenDressing._free(layout, parcel,
+					WorldgenDressing._prop_mark(detail.kind, point), occupied, reserved)
+			if detail.kind == "parked_car":
+				cars += 1
+				var point: Vector2 = WorldLayout.point(detail.point)
+				paired = paired and pads.any(func(pad: Rect2) -> bool:
+					return pad.encloses(WorldgenDressing._prop_mark("parked_car", point)))
+			elif detail.kind == "bike":
+				bikes += 1
+			elif detail.kind == "vending":
+				vending += 1
+	expect(cars >= 4 and cars <= 24 and stalls >= cars and stalls <= 24,
+		"enclosed blocks have a bounded visible car and parking budget")
+	expect(paired, "every decorative car fits on its own parking pad")
+	expect(bikes < 100 and vending < 100, "lawns no longer absorb hundreds of bikes or vending machines")
+	expect(frontage and clear, "street furniture stays by doors or roads and clears walks, buildings and bus reservations")
+	expect(painted and IsoAtlas.texture(IsoBuildingArt.prop_for("parked_car")) != null,
+		"parking paints visible concrete outside building sprites and cars reach their existing sprite")
+	tiles.free()
 
 func _industrial_yard() -> void:
 	for label: String in ["m19-mission-7", "m19-mission-1"]:

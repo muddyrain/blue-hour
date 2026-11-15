@@ -205,12 +205,21 @@ func _field(base: Dictionary, supply: MissionSupply) -> void:
 	var captured: Dictionary = SortieSnapshot.capture(world)
 	expect(not captured.is_empty(), "paused partial work produces a resumable snapshot")
 	var snapshot: Dictionary = RecordEncoding.unpack(JSON.parse_string(RecordEncoding.stringify(captured))).payload
+	expect(not String(snapshot.get("compatibility", "")).is_empty(), "partial snapshot carries an authenticated geometry identity")
 	var source: Dictionary = RecordEncoding.unpack(JSON.parse_string(RecordEncoding.stringify(supply.generated))).payload
 	var restored: Expedition = _new_field(base, DailyActions.supply(source))
 	var geometry: Dictionary = restored.layout.world_data.duplicate(true)
 	restored.layout.world_data.entities[0].door[0] += 16
 	expect(SortieSnapshot.apply(restored, snapshot) == "WORLD_BUILD_DATA_VIEWPORT_MISMATCH", "snapshot rejects a changed harbor work point before restoring state")
-	restored.layout.world_data = geometry
+	expect(restored.search_site(&"cash").progress == 0.0 and restored.search_assignments.ordered().is_empty(), "rejected geometry cannot apply partial work")
+	restored.layout.world_data = geometry.duplicate(true)
+	var bounds: Rect2 = restored.layout.world_bounds
+	restored.layout.world_bounds.size.x += 16.0
+	expect(SortieSnapshot.apply(restored, snapshot) == "WORLD_BUILD_DATA_VIEWPORT_MISMATCH", "snapshot rejects changed harbor bounds")
+	restored.layout.world_bounds = bounds
+	restored.layout.world_data.entities[0].site_id = "different_work"
+	expect(SortieSnapshot.apply(restored, snapshot) == "WORLD_BUILD_DATA_VIEWPORT_MISMATCH", "snapshot rejects changed harbor work bindings")
+	restored.layout.world_data = geometry.duplicate(true)
 	var restore_issue: String = SortieSnapshot.apply(restored, snapshot)
 	expect(restore_issue.is_empty(), "snapshot reapplies using the original source and the same harbor geometry: " + restore_issue)
 	expect(restored.search_site(&"cash").door == main.door and is_equal_approx(restored.search_site(&"cash").progress, main.progress), "partial work and work-point location survive reconstruction")
@@ -268,7 +277,14 @@ func _night_hint(world: Expedition) -> void:
 	expect(hud._hint.max_lines_visible == 2 and hud._hint_panel.size.y <= 56.0, "night route and evacuation notice occupies at most two compact lines")
 	expect(hud._hint.tooltip_text == HarborWarehouse.ROUTE_HINT, "full route notice remains available in its tooltip")
 	var style: StyleBoxFlat = hud._hint_panel.get_theme_stylebox("panel") as StyleBoxFlat
-	expect(style.bg_color.a <= 0.55, "night notice background keeps the field visible")
+	expect(style.bg_color.a >= 0.85 and style.bg_color.a < 1.0, "compact night notice has a translucent but stable reading surface")
+	expect(world._hud.layer > world._night_lighting.layer and hud.get_canvas() != world.get_canvas(), "route notice stays above the vignette on a canvas separate from world tint and lamps")
+	var ink: Color = hud._hint.get_theme_color("font_color")
+	expect(ink == ExpeditionHudTheme.CREAM and ink.a == 1.0, "night route text retains fully opaque cream ink")
+	for backdrop: Color in [ExpeditionAtmosphere.NIGHT_TINT, Color("ffa64a"), Color.WHITE]:
+		var surface: Color = backdrop.blend(style.bg_color)
+		var contrast: float = (ink.srgb_to_linear().get_luminance() + 0.05) / (surface.srgb_to_linear().get_luminance() + 0.05)
+		expect(contrast >= 7.0, "route notice keeps at least 7:1 contrast over deep night and bright work lights")
 	var strip: Control = hud.get_node("CommandStrip") as Control
 	expect(hud._hint_panel.get_global_rect().end.y <= strip.get_global_rect().position.y, "compact notice sits immediately above the command lane")
 

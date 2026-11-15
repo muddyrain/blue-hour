@@ -111,11 +111,12 @@ func refresh(data: Dictionary) -> void:
 	if TraitState.is_family(_data):
 		_subtitle.text = "普通经验与个人特性独立 · PROJECT_TEMP · 归航且存活才结算"
 		status.text = "普通 Lv%d · 累计 %d XP · 下一级 %d XP\n%s" % [int(member.growth.level),int(member.growth.xp_total),GrowthRules.threshold(int(member.growth.level)+1),(TraitRules.description(member).replace(" · PROJECT_TEMP", ""))]
+		status.text += "\n" + GrowthRules.description(member)
 	if TrainingState.is_family(_data):
-		_subtitle.text = "普通经验与Trait独立 · 出击成长归航结算；食物训练营地确认 · PROJECT_TEMP"
+		_subtitle.text = "人物经验与特性分别成长 · 出击成长归航结算；食物训练营地确认"
 	_subtitle.text = "经验与个人特质分别成长；出击成长在存活归航后生效，训练在营地确认。"
 	training_button.text = "返回营地后，在篝火进行训练"
-	training_button.tooltip_text = "在营地篝火预览1粮换本人Trait进度1；训练不增加普通XP、生命或日期。" if TrainingState.is_family(_data) else "本角色训练费用与效果尚未校准；不会扣粮、升级或回血。"
+	training_button.tooltip_text = "在营地篝火预览1粮换本人特性进度1；训练不增加人物经验、生命或日期。" if TrainingState.is_family(_data) else "本角色训练费用与效果尚未校准；不会扣粮、升级或回血。"
 	training_button.text = "食物训练 · 请返回营地篝火" if TrainingState.is_family(_data) else "食物训练 · 尚未开放"
 	for child: Node in records.get_children():
 		records.remove_child(child)

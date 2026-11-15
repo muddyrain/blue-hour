@@ -250,7 +250,7 @@ func refresh(data: Dictionary, feedback: String = "") -> void:
 	if GrowthState.is_family(_data):
 		_service.text = "等级 Lv%d · 累计 %d XP · 下一级 %d XP\n出击 %d 次 / 击退 %d / 受伤 %.0f\n特性和食物训练尚未开放。" % [int(member.growth.level),int(member.growth.xp_total),GrowthRules.threshold(int(member.growth.level)+1),int(member.service.sorties),int(member.service.kills),float(member.service.damage_received)]
 	if TraitState.is_family(_data):
-		_service.text = "普通 Lv%d · %d XP · 下一级 %d XP\n%s\n出击%d / 击退%d · %s" % [int(member.growth.level),int(member.growth.xp_total),GrowthRules.threshold(int(member.growth.level)+1),(TraitRules.description(member).replace(" · PROJECT_TEMP", "")),int(member.service.sorties),int(member.service.kills),("阵亡历史只读，不能训练" if member.health<=0 else "可在篝火查看训练资格") if TrainingState.is_family(_data) else "食物训练未开放"]
+		_service.text = "普通 Lv%d · %d XP · 下一级 %d XP\n%s\n%s\n出击%d / 击退%d · %s" % [int(member.growth.level),int(member.growth.xp_total),GrowthRules.threshold(int(member.growth.level)+1),GrowthRules.description(member),(TraitRules.description(member).replace(" · PROJECT_TEMP", "")),int(member.service.sorties),int(member.service.kills),("阵亡历史只读，不能训练" if member.health<=0 else "可在篝火查看训练资格") if TrainingState.is_family(_data) else "食物训练未开放"]
 	if member.condition=="dead":
 		for death: Dictionary in _data.journey.deaths:
 			if int(death.member_id)==selected_member_id:

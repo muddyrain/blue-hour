@@ -36,6 +36,8 @@ var _retry: Button
 var _build_status: Dictionary[String, Label] = {}
 var _upgrade_status: Dictionary[String, Label] = {}
 var _facility_rows: Dictionary[String, Control] = {}
+var _effects: Dictionary[String, Label] = {}
+var _upgrade_effects: Dictionary[String, Label] = {}
 var _ledger: Label
 
 
@@ -96,16 +98,21 @@ func refresh(camp: Dictionary, rations: Dictionary, feedback: String, pending: b
 	for choice: String in NAMES:
 		_facility_rows[choice].visible = choice != "planning" or EconomyBuildV1.enabled(camp)
 		if EconomyBuildV1.enabled(camp):
+			_effects[choice].text = EconomyBuildV1.facility_effect(choice, 1)
+			_upgrade_effects[choice].text = EconomyBuildV1.facility_effect(choice, 2)
 			var build_offer: Dictionary = EconomyBuildV1.offer(camp, "build", choice)
 			var upgrade_offer: Dictionary = EconomyBuildV1.offer(camp, "upgrade_facility", choice)
 			var level: int = EconomyBuildV1.level(camp, choice)
 			_build_status[choice].text = "%s · %s" % ["未建" if level == 0 else "%d 级" % level,
 				build_offer.summary if build_offer.available else build_offer.reason]
+			_build_status[choice].text += "\n当前效果：" + EconomyBuildV1.facility_effect(choice, level)
 			build_buttons[choice].disabled = pending or not build_offer.available
 			build_buttons[choice].text = "建设 · %d 币 + %d 工具" % [build_offer.cost, build_offer.tools]
 			upgrade_buttons[choice].disabled = pending or not upgrade_offer.available
 			upgrade_buttons[choice].text = "升级 · %d 币 + %d 工具" % [upgrade_offer.cost, upgrade_offer.tools]
 			_upgrade_status[choice].text = upgrade_offer.summary if upgrade_offer.available else upgrade_offer.reason
+			if level < 2:
+				_upgrade_status[choice].text += "\n升级效果：" + EconomyBuildV1.facility_effect(choice, 2)
 			continue
 		var build: Button = build_buttons[choice]
 		build.disabled = pending or not CampFacilities.can_build(camp, choice)
@@ -137,13 +144,13 @@ func _build_route(parent: Container, choice: String) -> void:
 	column.add_theme_constant_override("separation", 9)
 	panel.add_child(column)
 	column.add_child(CampStyle.label(NAMES[choice], 24))
-	_wrapped(column, EFFECTS[choice])
+	_effects[choice] = _wrapped(column, EFFECTS[choice])
 	_build_status[choice] = _wrapped(column, "")
 	build_buttons[choice] = _button(column, "预览建设 · %d 币" % CampFacilities.BUILD_COST,
 		investment_requested.emit.bind(choice, false))
 	column.add_child(HSeparator.new())
 	column.add_child(CampStyle.label(UPGRADES[choice], 22))
-	_wrapped(column, UPGRADE_EFFECTS[choice])
+	_upgrade_effects[choice] = _wrapped(column, UPGRADE_EFFECTS[choice])
 	_upgrade_status[choice] = _wrapped(column, "")
 	upgrade_buttons[choice] = _button(column, "预览升级 · %d 币" % CampFacilities.UPGRADE_COST,
 		investment_requested.emit.bind(choice, true))

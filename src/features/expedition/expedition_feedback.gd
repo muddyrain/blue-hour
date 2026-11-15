@@ -3,6 +3,7 @@ extends RefCounted
 ## Presentation hooks for future hitstop, camera shake, animation and audio.
 
 var _atmosphere: ExpeditionAtmosphere = ExpeditionAtmosphere.new()
+var _special_infected: SpecialInfectedFeedback
 var x: Expedition
 
 
@@ -11,8 +12,6 @@ func _init(owner: Expedition) -> void:
 
 
 func _draw() -> void:
-	if x.combat.burst != null:
-		x.combat.burst.draw_warning(x)
 	for job: Dictionary in x.search_assignments.ordered():
 		var actor: FieldActor = x.search_member(int(job.member_id))
 		if actor != null and actor.activity == FieldActor.Activity.MOVING:
@@ -112,6 +111,10 @@ func _show_notice(message: String) -> void:
 
 
 func _refresh_night_lighting() -> void:
+	if _special_infected == null:
+		_special_infected = SpecialInfectedFeedback.new()
+		x.add_child(_special_infected)
+	_special_infected.refresh(x)
 	if x._night_lighting == null:
 		return
 	var daylight: float = maxf(1.0, x.tuning.daylight_seconds)

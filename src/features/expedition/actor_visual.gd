@@ -57,6 +57,9 @@ var _toxic_progress: float = 0.0
 var _screamer_phase: StringName = &"chase"
 var _screamer_heading: Vector2 = Vector2.RIGHT
 var _screamer_progress: float = 0.0
+var _special_phase: StringName = &"chase"
+var _special_progress: float = 0.0
+var _special_heading: Vector2 = Vector2.RIGHT
 var _survivor_visual: SurvivorVisualV1 = SurvivorVisualV1.new()
 
 
@@ -100,8 +103,6 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO)
 	if not is_enemy and not _is_defeated:
 		draw_arc(Vector2.ZERO, RING_RADIUS, 0.0, TAU, 28, COLOURS[variant % COLOURS.size()], 2.0, true)
-	if _screamer_enemy() and not _is_defeated:
-		ScreamerVisualV1.draw_cue(self, _screamer_phase, _screamer_progress)
 
 
 func advance(delta: float, movement: Vector2, aim: Vector2) -> void:
@@ -173,6 +174,16 @@ func present_screamer(heading: Vector2, phase: StringName, progress: float) -> v
 	_apply_pose()
 
 
+func present_special(phase: StringName, progress: float, heading: Vector2) -> void:
+	if not is_enemy or _is_defeated:
+		return
+	_special_phase = phase
+	_special_progress = clampf(progress, 0.0, 1.0)
+	if heading.is_finite() and heading.length_squared() > 0.001:
+		_special_heading = heading.normalized()
+	_apply_pose()
+
+
 func _face(direction: Vector2) -> void:
 	if not _normal_enemy():
 		_facing = direction.normalized()
@@ -227,7 +238,7 @@ func set_night_lighting(amount: float) -> void:
 	# Lift actor detail without lifting the street or cancelling the blue ambient.
 	# Parent modulation also keeps the hair mask, weapon and existing foot ring together.
 	modulate = Color.WHITE.lerp(NIGHT_GAIN, strength)
-	if is_enemy and enemy_kind in [EnemyRules.NORMAL, EnemyRules.RUSH, EnemyRules.HEAVY]:
+	if is_enemy and _body != null and (enemy_kind in [EnemyRules.NORMAL, EnemyRules.RUSH, EnemyRules.HEAVY] or SpecialInfectedSheetV1.supports(enemy_kind)):
 		# The palette is shared, but daylight state belongs to this sprite/world.
 		_body.set_instance_shader_parameter("night_readability", strength)
 
@@ -332,6 +343,10 @@ func _apply_pose() -> void:
 		elif _screamer_phase == &"released" and _screamer_progress < 1.0:
 			motion_state = &"release"
 			legs = _screamer_heading
+	if is_enemy and not _is_defeated and _special_phase in [&"windup", &"release"]:
+		motion_state = _special_phase
+		legs = _special_heading
+		_body.position = Vector2.ZERO
 	_pose_body(legs, action)
 	_body.scale = Vector2.ONE * BODY_SCALE
 	if is_enemy:
@@ -348,13 +363,19 @@ func _apply_pose() -> void:
 			_body.scale = Vector2.ONE * field_scale(ScreamerVisualV1.DISPLAY_SCALE)
 		elif _night_hound():
 			_body.scale = Vector2.ONE * field_scale(NightHoundVisualV1.DISPLAY_SCALE)
+		elif enemy_kind == BurstRuntimeV1.KIND:
+			_body.scale = Vector2.ONE * field_scale(BurstInfectedVisualV1.DISPLAY_SCALE)
+		elif enemy_kind == BossDefinition.KIND:
+			_body.scale = Vector2.ONE * field_scale(BreacherVisualV1.DISPLAY_SCALE)
 		# Presentation spacing only. Logical feet, navigation, LOS and melee range stay put.
 		_body.position = Vector2.ZERO if _night_hound() else _body.position + _contact_offset()
 	_body.self_modulate = tint
+	if is_enemy and enemy_kind == BurstRuntimeV1.KIND and _special_phase == &"windup" and not _is_defeated:
+		_body.self_modulate *= BurstInfectedVisualV1.flash(_special_progress)
 	if _is_defeated:
 		motion_state = &"defeated"
 		_pose_body(_facing, 7 if is_enemy else 6)
-		_body.material = InfectedSheetV1.MATERIAL if is_enemy and (enemy_kind in [EnemyRules.RUSH, EnemyRules.HEAVY] or (_normal_enemy() and NormalInfectedV1.enabled())) else null
+		_body.material = InfectedSheetV1.MATERIAL if is_enemy and (SpecialInfectedSheetV1.supports(enemy_kind) or enemy_kind in [EnemyRules.RUSH, EnemyRules.HEAVY] or (_normal_enemy() and NormalInfectedV1.enabled())) else null
 		_body.position = _contact_offset() if is_enemy and not _night_hound() else Vector2.ZERO
 		_body.self_modulate = Color(0.70, 0.77, 0.78, clampf(1.0 - (_defeat_clock - 0.50) / 0.45, 0.0, 1.0))
 	_update_hold(tint, moving, upper_action)
@@ -368,10 +389,14 @@ func _pose_body(direction: Vector2, action: int) -> void:
 			_clock, gait, _fire_clock, _attack_clock)
 		return
 	if _night_hound():
-		NightHoundVisualV1.pose(_body, direction, motion_state, _walk_clock, _attack_clock, _defeat_clock)
+		NightHoundVisualV1.pose(_body, direction, motion_state, _walk_clock, _attack_clock, _defeat_clock, _special_progress)
+	elif enemy_kind == BurstRuntimeV1.KIND:
+		BurstInfectedVisualV1.pose(_body, direction, motion_state, _walk_clock, _attack_clock, _defeat_clock, _special_progress)
+	elif enemy_kind == BossDefinition.KIND:
+		BreacherVisualV1.pose(_body, direction, motion_state, _walk_clock, _attack_clock, _defeat_clock, _special_progress)
 	elif _toxic_enemy():
 		ToxicCarrierVisualV1.pose(_body, direction, motion_state, _walk_clock,
-			_attack_clock, _defeat_clock, _toxic_progress)
+			_attack_clock, _defeat_clock, _special_progress if motion_state == &"release" else _toxic_progress)
 	elif _screamer_enemy():
 		ScreamerVisualV1.pose(_body, direction, motion_state, _walk_clock,
 			_attack_clock, _defeat_clock, _screamer_progress)

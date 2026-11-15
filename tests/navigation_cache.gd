@@ -1,0 +1,43 @@
+extends SceneTree
+## Cached certificate routes retain exact AStar output and follow every geometry change.
+
+var checks: int = 0
+var failures: int = 0
+
+
+func _initialize() -> void:
+	var nav: FieldNavigation = FieldNavigation.new()
+	var bounds: Rect2 = Rect2(0, 0, 320, 240)
+	nav.configure([], bounds)
+	var start: Vector2 = Vector2(40, 120)
+	var goal: Vector2 = Vector2(280, 120)
+	var original: PackedVector2Array = nav.path_between(start, goal)
+	_expect(not original.is_empty() and nav.path_between(start, goal) == original, "repeated query retains exact route points")
+	var exposed: PackedVector2Array = nav.path_between(start, goal)
+	exposed[0] = Vector2(-999, -999)
+	_expect(nav.path_between(start, goal) == original, "caller cannot mutate the cached path")
+	var private_nav: FieldNavigation = nav.copy_navigation()
+	var obstacle: Rect2 = Rect2(144, 72, 32, 96)
+	private_nav.path_between(start, goal)
+	private_nav.set_private_blocker(nav, obstacle)
+	var detour: PackedVector2Array = private_nav.path_between(start, goal)
+	var oracle: FieldNavigation = FieldNavigation.new()
+	oracle.configure([obstacle], bounds)
+	_expect(detour != original and detour == oracle.path_between(start, goal), "adding a private blocker invalidates the original route")
+	_expect(nav.path_between(start, goal) == original, "private blocker leaves shared certificate routes untouched")
+	private_nav.set_private_blocker(nav, Rect2())
+	_expect(private_nav.path_between(start, goal) == original, "removing a private blocker invalidates its detour")
+	nav.configure([Rect2(144, 0, 32, 240)], bounds)
+	_expect(nav.path_between(start, goal).is_empty(), "reconfiguration cannot reuse a route through a solid divider")
+	_expect(nav.path_between(start, goal).is_empty(), "empty route is also stable across repeated queries")
+	nav.configure([], bounds)
+	_expect(nav.path_between(start, goal) == original, "reopening geometry invalidates a cached unreachable result")
+	print("BH_NAV_CACHE ", JSON.stringify({"checks":checks, "failures":failures}))
+	quit(0 if failures == 0 else 1)
+
+
+func _expect(valid: bool, label: String) -> void:
+	checks += 1
+	if not valid:
+		failures += 1
+		printerr("BH_NAV_CACHE_FAIL ", label)

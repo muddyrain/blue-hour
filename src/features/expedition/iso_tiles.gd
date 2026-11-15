@@ -53,6 +53,8 @@ func fill_from_layout(source: StreetLayout) -> void:
 	# Authored sidewalks and roads keep priority; generated door paths only replace grass.
 	_stamp_rects(grounds.get("gravel", []), "gravel", "grass")
 	_stamp_rects(grounds.get("concrete", []), "concrete", "grass")
+	for surface: String in ["harbor_water", "harbor_wood", "harbor_steel"]:
+		_stamp_rects(grounds.get(surface, []), surface)
 	_stamp_generated_paths(source)
 	queue_redraw()
 
@@ -87,7 +89,7 @@ func _stamp_rect(area: Rect2, name: String, only: String = "") -> void:
 func _stamp_generated_paths(source: StreetLayout) -> void:
 	# Presentation only: existing walks and door approaches become narrow paths.
 	# Seaside town keeps its authored grounds; layout data and navigation are unchanged.
-	if source.world_data.get("seaside_town") or int(source.world_data.get("version", 0)) != 5:
+	if source.world_data.get("seaside_town") or HarborWarehouse.is_layout(source) or int(source.world_data.get("version", 0)) != 5:
 		return
 	var topology: String = String(source.world_data.get("topology", ""))
 	var parcels: Array = source.world_data.get("parcels", [])
@@ -231,7 +233,9 @@ func _art_name(cell: Vector2i, name: String) -> String:
 
 func _draw() -> void:
 	for cell: Vector2i in cells:
-		IsoAtlas.stamp_cell(self, "tiles/%s.png" % _art_name(cell, String(cells[cell])), cell, TILE)
+		var tile_name: String = _art_name(cell, String(cells[cell]))
+		var extension: String = "svg" if tile_name.begins_with("harbor_") else "png"
+		IsoAtlas.stamp_cell(self, "tiles/%s.%s" % [tile_name, extension], cell, TILE)
 	for road: Rect2 in _road_edges:
 		var poly: PackedVector2Array = IsoSpace.polygon(road)
 		draw_polyline(PackedVector2Array([poly[0], poly[1], poly[2], poly[3], poly[0]]), Color(0.62, 0.65, 0.68, 0.9), 1.25, true)

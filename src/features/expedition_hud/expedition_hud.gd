@@ -416,13 +416,15 @@ func _build_actions() -> void:
 	_hint_panel = _panel(self, "StatusHintPanel")
 	_hint_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hint_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	_hint_panel.offset_left = -200
-	_hint_panel.offset_right = 200
+	_hint_panel.offset_left = -180
+	_hint_panel.offset_right = 180
 	_hint_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_hint = _label(_hint_panel, "StatusHint", 14)
+	_hint = _label(_hint_panel, "StatusHint", 13)
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_hint.clip_text = false
+	_hint.max_lines_visible = 2
+	_hint.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_hint.clip_text = true
 	_hint.mouse_filter = Control.MOUSE_FILTER_PASS
 	_hint.add_theme_color_override("font_outline_color", Color("22201e"))
 	_hint.add_theme_constant_override("outline_size", 3)
@@ -443,8 +445,8 @@ func place_status_hint() -> void:
 		if strip.size.y > 1.0:
 			strip_top = strip.offset_bottom - strip.size.y
 		cluster_top = minf(cluster_top, strip_top)
-	_hint_panel.offset_bottom = cluster_top - 20.0
-	var text_height: float = maxf(36.0, _hint.get_minimum_size().y + 12.0)
+	_hint_panel.offset_bottom = cluster_top - 6.0
+	var text_height: float = maxf(28.0, _hint.get_minimum_size().y + 8.0)
 	_hint_panel.offset_top = _hint_panel.offset_bottom - text_height
 	_hint_panel.visible = _hint.visible and not _hint.text.is_empty()
 

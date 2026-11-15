@@ -29,6 +29,12 @@ static func skin(node: Node) -> void:
 		if node.name == "ActionsPanel":
 			surface.content_margin_top = 2
 			surface.content_margin_bottom = 2
+		if node.name == "StatusHintPanel":
+			surface.bg_color = Color("22201e", 0.52)
+			surface.border_color = Color("e8dcc4", 0.28)
+			surface.content_margin_top = 4
+			surface.content_margin_bottom = 4
+			surface.shadow_size = 0
 		node.add_theme_stylebox_override("panel", surface)
 	if node is Label:
 		node.add_theme_color_override("font_color", CREAM)

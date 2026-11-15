@@ -9,6 +9,7 @@ const BLUE_HOUR: Color = Color(0.46, 0.42, 0.62)
 var _modulate: CanvasModulate
 var _lights: Array[PointLight2D] = []
 var _sources: Array[Vector2] = []
+var _source_colors: Dictionary[Vector2, Color] = {}
 var _scenery_lights: Array[PointLight2D] = []
 
 
@@ -39,9 +40,12 @@ func refresh(world: Expedition, amount: float) -> void:
 		# than the viewport. Two additional lights follow the bus headlights.
 		for prop: Node in world._sort.get_children():
 			if (prop is WorldFurniture and prop.kind == "lamp") or (prop is WorldgenFurniture and (prop.detail.get("kind", "") == "lamp" or prop.detail.get("slot", "") == WarehouseSlots.LAMP)) or (prop is Node2D and prop.has_meta("iso_kind") and String(prop.get_meta("iso_kind")) == "lamp"):
-				_sources.append((prop as Node2D).position + Vector2(0, -40))
-		for prop: FieldProp in world._buildings:
-			_sources.append(prop.position + Vector2(0, -45))
+				var source: Vector2 = (prop as Node2D).position + Vector2(0, -40)
+				_sources.append(source)
+				_source_colors[source] = prop.get_meta("light_color", Color("ffa64a"))
+		if not HarborWarehouse.is_layout(world.layout):
+			for prop: FieldProp in world._buildings:
+				_sources.append(prop.position + Vector2(0, -45))
 		for index: int in range(mini(16, _sources.size())):
 			_add_light(world, _sources[index], texture, 1.25)
 			_scenery_lights.append(_lights.back())
@@ -53,6 +57,7 @@ func refresh(world: Expedition, amount: float) -> void:
 	_sources.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.distance_squared_to(center) < b.distance_squared_to(center))
 	for index: int in range(_scenery_lights.size()):
 		_scenery_lights[index].position = _sources[index]
+		_scenery_lights[index].color = _source_colors.get(_sources[index], Color("ffa64a"))
 	var tint: Color = tint_for(amount)
 	_modulate.color = tint
 	for actor: FieldActor in world.survivors + world.enemies:

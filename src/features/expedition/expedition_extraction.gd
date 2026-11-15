@@ -68,9 +68,13 @@ func _rescue_waiting_for_bus() -> bool:
 
 
 func request_bus_gather() -> void:
+	if expedition.bus_view != null and expedition.bus_view.running():
+		return
 	if not expedition.field_join_error.is_empty():
 		return
-	if expedition.phase != Expedition.Phase.BOARDING or expedition.living_count() == 0:
+	# Gathering is a movement order, available before and during engine startup.
+	# Departure still requires ENGINE -> BOARDING and the original full headcount.
+	if expedition.phase == Expedition.Phase.FINISHED or expedition.suspend_sealed or expedition.living_count() == 0:
 		return
 	# Validate the same formation destinations before acknowledging the whole order.
 	# Hidden workers will use their entrance and the latest goal when work completes.
@@ -91,8 +95,9 @@ func request_bus_gather() -> void:
 				expedition._release_searcher(approaching)
 	# Gathering also releases assistance when the previous group goal was already the bus.
 	if expedition.rescue_target != null: expedition.rescue_target.cancel()
-	if expedition.goal != expedition.layout.bus_door:
-		expedition.command_move(expedition.layout.bus_door)
+	# Reissue even when the shared goal is already the bus: an individual may have
+	# a later order or a stale route. Active jobs still finish before returning.
+	expedition.command_move(expedition.layout.bus_door)
 	var boarding: Dictionary = expedition.boarding_status()
 	expedition._show_notice("已下令集合 · 搜集中的队员完成后归队。" if boarding.working > 0 else "已下令集合 · 队员正前往巴士。")
 	expedition._update_ui()

@@ -38,12 +38,14 @@ func setup() -> void:
 	if SurvivalContracts.integer(expedition.supply.generated.get("version"), 6, 9):
 		expedition.tuning.spawn_seconds *= CampaignPressureV1.spawn_factor(expedition.supply.generated)
 	expedition.layout = expedition.supply.layout
+	if HarborWarehouse.is_layout(expedition.layout):
+		expedition.mission_title = expedition.layout.display_name
 	expedition._supply_entrances = expedition._world._street_supply_entrances()
 	expedition._cash_site.door = expedition.layout.cash_door
 	expedition._food_site.door = expedition.layout.food_door
 	if expedition.supply.generated.has("barricade"):
 		expedition.navigation = BarricadeV1.navigation(expedition.supply.generated, false)
-	elif expedition.exploration_mode() and not expedition.pump_station_mode() and not SeasideTown.is_layout(expedition.layout):
+	elif expedition.exploration_mode() and not expedition.pump_station_mode() and not SeasideTown.is_layout(expedition.layout) and not HarborWarehouse.is_layout(expedition.layout):
 		expedition.navigation = ExplorationLayout._routing(expedition.layout.world_data).nav
 	else:
 		expedition.navigation.configure(expedition.layout.blockers(), expedition.layout.world_bounds)
@@ -113,6 +115,8 @@ func setup() -> void:
 		expedition._world._make_pump_station()
 	elif SeasideTown.is_layout(expedition.layout):
 		SeasideTown.populate(expedition)
+	elif HarborWarehouse.is_layout(expedition.layout):
+		HarborPresentation.populate(expedition)
 	elif not expedition.layout.world_data.is_empty():
 		expedition._world._make_world_buildings()
 	else:

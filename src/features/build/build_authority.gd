@@ -159,7 +159,7 @@ static func plan_airstrike(world: Dictionary, point: Vector2) -> Dictionary:
 	if BarricadeV1.enabled(world.generated):
 		var opened: bool = BarricadeState.opened(world.generated, world.support.accepted, layout)
 		navigation = BarricadeV1.navigation(world.generated, opened)
-	elif world.generated.get("version") == 9 and not PumpStationAction.enabled(world.generated):
+	elif world.generated.get("version") == 9 and not PumpStationAction.enabled(world.generated) and not HarborWarehouse.is_layout(layout):
 		# The same validated final geometry certifies the field and receipt replay.
 		navigation = ExplorationLayout._routing(layout.world_data).nav
 		FreezeProfile.count("airstrike_navigation_reuses")

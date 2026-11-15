@@ -11,6 +11,10 @@ var _state: Dictionary = ToxicV1.initial()
 var _mist: GradientTexture2D = _mist_texture()
 
 
+func _init() -> void:
+	material = InfectedDangerGeometry.unshaded()
+
+
 func _draw() -> void:
 	var radius: float = float(ToxicV1.POLICY.radius)
 	for zone: Dictionary in _state.zones:
@@ -28,33 +32,35 @@ func present(state: Dictionary) -> void:
 
 
 func _warning(point: Vector2, radius: float, remaining: float) -> void:
-	# Windup stays visibly open between dashes, even in its last frame.
 	var charge: float = 1.0 - clampf(remaining / float(ToxicV1.POLICY.windup), 0.0, 1.0)
 	var colour: Color = Color(WARNING, lerpf(0.76, 1.0, charge))
 	var spacing: float = TAU / float(DASHES)
 	for index: int in range(DASHES):
-		var start: float = float(index) * spacing
-		var end: float = start + spacing * 0.61
-		draw_arc(point, radius, start, end, 6, EDGE_SHADOW, 4.8, true)
-		draw_arc(point, radius, start, end, 6, colour, 2.6, true)
+		var points: PackedVector2Array = PackedVector2Array()
+		for step: int in range(7):
+			var angle: float = float(index) * spacing + spacing * 0.61 * float(step) / 6.0
+			points.append(IsoSpace.to_view(point + Vector2.from_angle(angle) * radius))
+		draw_polyline(points, EDGE_SHADOW, 4.8, true)
+		draw_polyline(points, colour, 2.6, true)
+	var center: Vector2 = IsoSpace.to_view(point)
 	for axis: Vector2 in [Vector2.RIGHT, Vector2.DOWN]:
-		draw_line(point - axis * 5.0, point + axis * 5.0, colour, 1.5, true)
+		draw_line(center - axis * 5.0, center + axis * 5.0, colour, 1.5, true)
 
 
 func _gas(point: Vector2, radius: float, age: float) -> void:
 	var density: float = clampf((float(ToxicV1.POLICY.lifetime) - age) / 0.42, 0.32, 1.0)
-	draw_circle(point, radius, Color(GAS, 0.055 * density), true, -1.0, true)
+	draw_colored_polygon(InfectedDangerGeometry.circle(point, radius), Color(GAS, 0.055 * density))
 	# Soft-edged wisps stay within the rim and follow the authoritative gas age.
 	var size: Vector2 = Vector2(0.94, 0.40) * radius
 	for index: int in range(5):
 		var angle: float = float(index) * TAU / 5.0 + age * 0.27
 		var offset: Vector2 = Vector2.from_angle(angle) * radius * (0.26 + float(index % 3) * 0.12)
-		draw_set_transform(point + offset, angle + PI * 0.5)
+		draw_set_transform(IsoSpace.to_view(point + offset), angle + PI * 0.5)
 		draw_texture_rect(_mist, Rect2(-size * 0.5, size), false, Color(GAS, 0.24 * density))
 	draw_set_transform(Vector2.ZERO)
 	# A live rim stays continuous until the authoritative zone retires.
-	draw_arc(point, radius, 0.0, TAU, 64, EDGE_SHADOW, 4.8, true)
-	draw_arc(point, radius, 0.0, TAU, 64, Color(GAS, 0.88), 2.6, true)
+	draw_polyline(InfectedDangerGeometry.circle(point, radius), EDGE_SHADOW, 4.8, true)
+	draw_polyline(InfectedDangerGeometry.circle(point, radius), Color(GAS, 0.88), 2.6, true)
 
 
 static func _mist_texture() -> GradientTexture2D:

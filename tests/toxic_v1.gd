@@ -197,11 +197,11 @@ func run() -> void:
 
 func _carrier_art() -> void:
 	var sprite: Sprite2D = Sprite2D.new()
-	expect(ToxicCarrierVisualV1.SHEET.get_size() == Vector2(800, 1920), "registered atlas has twelve poses in five source views")
+	expect(ToxicCarrierVisualV1.SHEET.get_size() == Vector2(1280, 3072), "registered atlas has twelve poses in five source views")
 	for octant: int in range(8):
 		ToxicCarrierVisualV1.pose(sprite, Vector2.RIGHT.rotated(octant * PI / 4.0), &"windup", 0.0, 0.0, 0.0, 0.8)
-		expect(sprite.frame == 40 + NormalInfectedV1.SOURCE_FOR_OCTANT[octant] and sprite.flip_h == (octant in [3, 4, 5])
-			and sprite.offset == Vector2(0, -64), "late cast uses the normal octant and fixed foot anchor")
+		expect(sprite.frame == 30 + NormalInfectedV1.SOURCE_FOR_OCTANT[octant] and sprite.flip_h == (octant in [3, 4, 5])
+			and sprite.offset == Vector2(0, -112), "late cast uses the normal octant and fixed foot anchor")
 	var rows: Array[int] = [
 		ToxicCarrierVisualV1.frame_for(&"idle", 0.0, 0.0, 0.0, 0.0),
 		ToxicCarrierVisualV1.frame_for(&"move", 0.25, 0.0, 0.0, 0.0),
@@ -210,5 +210,5 @@ func _carrier_art() -> void:
 		ToxicCarrierVisualV1.frame_for(&"hit", 0.0, 0.0, 0.0, 0.0),
 		ToxicCarrierVisualV1.frame_for(&"defeated", 0.0, 0.0, 0.30, 0.0),
 	]
-	expect(rows == [0, 2, 5, 7, 9, 11], "idle, gait, contact, cast, hit and fallen choose distinct frames")
+	expect(rows == [0, 2, 7, 5, 9, 11], "idle, gait, contact, cast, hit and fallen choose distinct frames")
 	sprite.free()

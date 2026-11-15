@@ -108,7 +108,8 @@ func _check_dusk_tint() -> void:
 
 func _check_actor_night_lighting() -> void:
 	var enemies: Array[String] = [EnemyRules.NORMAL, EnemyRules.RUSH, EnemyRules.HEAVY,
-		ScreamerVisualV1.KIND, CombatEnemyRules.TOXIC, NightHoundV1.KIND]
+		ScreamerVisualV1.KIND, CombatEnemyRules.TOXIC, NightHoundV1.KIND,
+		BurstRuntimeV1.KIND, BossDefinition.KIND]
 	for family: int in range(5 + enemies.size()):
 		var actor: FieldActor = FieldActor.new()
 		actor.is_enemy = family >= 5
@@ -133,14 +134,14 @@ func _check_actor_night_lighting() -> void:
 				_expect(visual.modulate.r > previous_gain and visual.modulate.r <= 1.5,
 					"dusk to deep night gradually lifts all five crew and every species within a bounded gain")
 			previous_gain = visual.modulate.r
-			if family in range(5, 8):
+			if actor.is_enemy:
 				var strength: float = float(visual._body.get_instance_shader_parameter("night_readability"))
 				_expect(is_zero_approx(strength) if amount <= 0.45 else strength > 0.0 and strength <= 1.0,
-					"basic infected palette receives this actor's night strength")
+					"every infected species receives this actor's night strength")
 		var night: Color = ExpeditionAtmosphere.tint_for(1.0) * visual.modulate
 		_expect(night.b > night.g and night.g > night.r and night.g < 0.5,
 			"actor compensation retains a dark blue ambient instead of daylight")
-		if family in range(5, 8):
+		if actor.is_enemy:
 			var day_actor: FieldActor = FieldActor.new()
 			day_actor.is_enemy = true
 			root.add_child(day_actor)

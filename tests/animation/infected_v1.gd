@@ -112,14 +112,14 @@ func _check_specials() -> void:
 		for octant: int in range(8):
 			var heading: Vector2 = Vector2.RIGHT.rotated(octant*PI/4.0)
 			visual.advance(0.4, heading*34.0, heading)
-			_expect(visual._body.texture == textures[index] and visual._body.material == null,
+			_expect(visual._body.texture == textures[index] and visual._body.material == InfectedSheetV1.MATERIAL,
 				"special species retains own art and palette "+kinds[index])
 			visual.show_attack(heading)
 			_expect(visual._body.texture == textures[index] and visual._body.hframes == 5,
 				"special attack stays on its independent source")
 		visual.show_defeat()
 		visual.advance(0.4, Vector2.ZERO, Vector2.ZERO)
-		_expect(visual._body.texture == textures[index] and visual._body.material == null,
+		_expect(visual._body.texture == textures[index] and visual._body.material == InfectedSheetV1.MATERIAL,
 			"special defeat retains independent presentation")
 		actor.queue_free()
 

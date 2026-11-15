@@ -122,6 +122,8 @@ static func outdoor_site(value: Dictionary, id: StringName) -> bool:
 
 
 static func site_point(value: Dictionary, site: Dictionary) -> Vector2:
+	if HarborWarehouse.should_apply(value):
+		return HarborWarehouse.site_point(value, String(site.id))
 	if value.get("version")==9: return ExplorationSites.site_point(value.layout,site)
 	if site.has("point"): return WorldLayout.point(site.point)
 	for entity: Dictionary in value.layout.entities:

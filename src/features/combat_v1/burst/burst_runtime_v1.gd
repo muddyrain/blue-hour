@@ -80,23 +80,6 @@ static func cancel(value: Dictionary, actor_id: int) -> bool:
 	return true
 
 
-func draw_warning(world: Expedition) -> void:
-	if world.phase == Expedition.Phase.FINISHED or state.phase not in ["windup", "confirming", "released"]:
-		return
-	var released: bool = state.phase == "released"
-	if released and world.elapsed - float(state.event.at) >= 0.30:
-		return
-	var foot: Vector2 = IsoSpace.to_view(SortieSnapshot._vec(state.origin))
-	var tint: Color = Color("ffb44b")
-	world.draw_circle(foot, RADIUS, Color(tint, 0.16 if released else 0.09))
-	world.draw_arc(foot, RADIUS, 0.0, TAU, 64, tint, 3.0, true)
-	if not released:
-		var fraction: float = clampf(1.0 - float(state.remaining) / WINDUP, 0.0, 1.0)
-		if fraction > 0.0:
-			world.draw_arc(foot, RADIUS - 6.0, -PI / 2.0, -PI / 2.0 + TAU * fraction,
-				64, Color("ffe1a1"), 4.0, true)
-
-
 func feedback(world: Expedition, kind: String) -> void:
 	var event: Dictionary = {"kind":kind, "actor_id":state.actor_id, "elapsed":world.elapsed,
 		"remaining":state.remaining, "event":state.event.duplicate(true)}

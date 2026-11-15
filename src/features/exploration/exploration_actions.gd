@@ -312,9 +312,15 @@ static func supply(value: Dictionary) -> MissionSupply:
 	if SeasideTown.should_apply(value):
 		result.layout = SeasideTown.layout(value)
 		result.display_name = SeasideTown.TITLE
+	elif HarborWarehouse.should_apply(value):
+		result.layout = HarborWarehouse.layout(value)
+		result.display_name = HarborWarehouse.TITLE
 	result.cash_reward=int(value.cash)
 	result.food_reward=int(value.food)
 	result.has_weapon_sample = value.weapons == 1
+	if HarborWarehouse.is_layout(result.layout):
+		result.description = HarborPresentation.card_text(result)
+		return result
 	if EconomyActions.hardware(value):
 		result.display_name = EconomyActions.HARDWARE_TITLE
 		result.description = EconomyActions.card_text(value)

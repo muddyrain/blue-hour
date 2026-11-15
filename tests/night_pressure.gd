@@ -88,6 +88,7 @@ func _check_sortie(supply: MissionSupply) -> void:
 		and is_equal_approx(float(heavy.visual._body.get_instance_shader_parameter("night_readability")), 1.0)
 		and heavy.visual._body.self_modulate.r >= 0.85 and heavy.visual._body.self_modulate.a == 1.0,
 		"real night refresh still compensates a fallen heavy before corpse fade")
+	_check_special_night_compensation(sortie)
 	for unit: FieldActor in sortie.enemies:
 		unit.queue_free()
 	sortie.enemies.clear()
@@ -117,6 +118,43 @@ func _check_sortie(supply: MissionSupply) -> void:
 	sortie.queue_free()
 	await process_frame
 	_expect(not is_instance_valid(sortie), "leaving sortie releases director/actors/HUD with scene instead of retaining a global threat pool")
+
+
+func _check_special_night_compensation(sortie: Expedition) -> void:
+	var elapsed: float = sortie.elapsed
+	var toxic_before: Dictionary = sortie.combat.toxic.duplicate(true)
+	var specials: Array[FieldActor] = []
+	for kind: String in [ScreamerPolicyV1.KIND, ToxicV1.KIND, BurstRuntimeV1.KIND,
+		NightHoundV1.KIND, BossDefinition.KIND]:
+		var rule_kind: String = EnemyRules.HEAVY if kind == BossDefinition.KIND else kind
+		var actor: FieldActor = sortie._make_actor(true, 200 + specials.size(), Vector2(1800, 1000), {}, rule_kind)
+		actor.visual.enemy_kind = kind
+		actor.visual.advance(0.0, Vector2.ZERO, Vector2.RIGHT)
+		sortie.enemies.append(actor)
+		specials.append(actor)
+	for amount: float in [0.85, 1.0, 0.0]:
+		sortie.elapsed = sortie.tuning.daylight_seconds * amount
+		sortie._feedback._refresh_night_lighting()
+		for actor: FieldActor in specials:
+			_expect(is_equal_approx(float(actor.visual._body.get_instance_shader_parameter("night_readability")),
+				smoothstep(0.45, 1.0, amount))
+				and float(actor.visual._body.get_instance_shader_parameter("special_night_lift")) > 0.0,
+				"live atmosphere grades each special and boss at 0.85/1.0 and resets by day")
+	sortie.elapsed = sortie.tuning.daylight_seconds
+	var late_hound: FieldActor = sortie._make_actor(true, 210, Vector2(1800, 1000), {}, NightHoundV1.KIND)
+	sortie.enemies.append(late_hound)
+	specials.append(late_hound)
+	sortie._feedback._refresh_night_lighting()
+	_expect(is_equal_approx(float(late_hound.visual._body.get_instance_shader_parameter("night_readability")), 1.0)
+		and is_equal_approx(float(late_hound.visual._body.get_instance_shader_parameter("special_night_lift")), NightHoundVisualV1.NIGHT_DETAIL_LIFT),
+		"a hound spawned after nightfall receives both grades on the next real refresh")
+	for actor: FieldActor in specials:
+		sortie.enemies.erase(actor)
+		actor.queue_free()
+	# _make_actor registers toxic casters in combat missions; leave no fixture state behind.
+	sortie.combat.toxic = toxic_before
+	sortie.elapsed = elapsed
+	sortie._feedback._refresh_night_lighting()
 
 
 func _expect(condition: bool, label: String) -> void:

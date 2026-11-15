@@ -63,7 +63,8 @@ func _update_search(delta: float) -> void:
 				var start: float = expedition.elapsed - delta
 				expedition.billboard_work.record(actor.member_id, actor.position, start, minf(expedition.elapsed, start + worked))
 		else:
-			site.progress += delta / (actor.trait_search_factor * actor.persona_work_factor * (BuildItems.frozen_factors(expedition.supply.generated.build).work if expedition.build_mode() else 1.0))
+			var location_work: float = HarborWarehouse.WORK_FACTOR if HarborWarehouse.is_layout(expedition.layout) else 1.0
+			site.progress += delta / (actor.trait_search_factor * actor.persona_work_factor * (BuildItems.frozen_factors(expedition.supply.generated.build).work if expedition.build_mode() else 1.0) * location_work)
 		if site.progress > prior_progress and expedition._is_event_site(site) and expedition.task_event.work_at < 0.0:
 			expedition.task_event.work_at = maxf(0.0, expedition.elapsed - delta)
 			if expedition.task_event.branch == EventSortieV1.FORCE:

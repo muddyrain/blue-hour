@@ -91,7 +91,7 @@ func draw_overlays(canvas: CanvasItem) -> void:
 	var bar_h: float = maxf(3.0, ActorVisual.field_scale(5.0))
 	canvas.draw_rect(Rect2(Vector2(-bar_w * 0.5, bar_y) + display, Vector2(bar_w, bar_h)), Color("182b35"))
 	canvas.draw_rect(Rect2(Vector2(-bar_w * 0.5 + 1.0, bar_y + 1.0) + display, Vector2((bar_w - 2.0) * clampf(health / max_health, 0.0, 1.0), maxf(2.0, bar_h - 2.0))), Color("df9a70"))
-	if enemy_behavior!=null and enemy_behavior.state=="windup":
+	if enemy_behavior!=null and enemy_behavior.state=="windup" and enemy_behavior.kind != NightHoundV1.KIND:
 		canvas.draw_circle(Vector2.ZERO,EnemyRules.POLICY.melee_range,Color(1,0.57,0.20,0.16))
 		canvas.draw_arc(Vector2.ZERO,EnemyRules.POLICY.melee_range,-PI*0.5,-PI*0.5+TAU*(1.0-enemy_behavior.windup_remaining/enemy_behavior.windup_duration()),32,Color("ffb65f"),3,true)
 	elif enemy_behavior!=null and enemy_behavior.state=="rush":

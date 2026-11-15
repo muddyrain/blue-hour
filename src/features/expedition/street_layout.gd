@@ -67,7 +67,9 @@ func shot_obstacles() -> Array[ShotObstacle]:
 	if not world_data.is_empty():
 		var walls: Array[ShotObstacle] = []
 		for row: Dictionary in world_data.entities: walls.append(ShotObstacle.new(StringName(row.id),Rect2(row.rect[0],row.rect[1],row.rect[2],row.rect[3]),true))
-		if (world_data.get("version")==3 or world_data.get("version")==5) and not world_data.get("seaside_town"):
+		# Terrain describes whether barriers are walls; this resource must not load
+		# destination generators (which reach mission resources through save rules).
+		if (world_data.get("version")==3 or world_data.get("version")==5) and not world_data.get("seaside_town") and world_data.get("barriers_block_shots", true):
 			for i: int in range(fences.size()): walls.append(ShotObstacle.new(StringName("yard_wall_%d"%i),fences[i],true))
 		walls.append(ShotObstacle.new(&"bus",bus_block,false))
 		return walls

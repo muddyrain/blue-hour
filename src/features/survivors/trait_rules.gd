@@ -109,6 +109,8 @@ static func inputs_problem(value: Variant, token: Dictionary, report: Dictionary
 				fastest=minf(fastest,factor(member,"search")*PersonaState.factor(task,id,"work"))
 			if not is_finite(fastest) or fastest<=0.0: return "TRAIT_SEARCH_SOURCE"
 			minimum_ms=floori(base_seconds*fastest*BuildItems.frozen_factors(task.build).work*1000.0)
+			if HarborWarehouse.should_apply(task):
+				minimum_ms = floori(base_seconds * fastest * BuildItems.frozen_factors(task.build).work * HarborWarehouse.WORK_FACTOR * 1000.0)
 		if SurvivorRoster.member(report.get("participants",[]),int(row.member_id)).is_empty() or SurvivorRoster.member(context.crew,int(row.member_id)).is_empty() or not SurvivalContracts.integer(row.at_ms,minimum_ms,int(report.get("growth_inputs",{}).get("duration_ms",-1))) or row.at_ms < previous:
 			return "TRAIT_SEARCH_SOURCE"
 		if not report.get("field_joins",[]).is_empty() and row.member_id == report.field_joins[0].member_id and row.at_ms < report.field_joins[0].at_ms:

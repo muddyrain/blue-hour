@@ -49,7 +49,7 @@ func _ready() -> void:
 	visual.is_enemy = is_enemy
 	if enemy_behavior!=null:
 		visual.enemy_kind = enemy_behavior.kind
-	visual.variant = actor_id % 2 if is_enemy else int({&"crew_1":0,&"crew_2":1,&"crew_3":2,&"crew_4":3,&"crew_5":4}.get(definition_id,0))
+	visual.variant = actor_id % 2 if is_enemy else SurvivorVisualV1.variant_for(String(definition_id))
 	add_child(visual)
 	if enemy_behavior!=null:
 		_enemy_tag = Label.new()

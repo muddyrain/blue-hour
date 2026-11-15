@@ -2,8 +2,8 @@ class_name MotionHands
 extends Node2D
 ## Small layered sleeve/hand rig adapts original art to the unchanged ballistic grip.
 
-const SLEEVES: Array[Color] = [Color("334a62"), Color("6e8051"), Color("b25b48"), Color("ece1d3"), Color("bb873a")]
-const GLOVES: Array[Color] = [Color("33444b"), Color("edc9a6"), Color("edc9a6"), Color("323140"), Color("3d3b38")]
+const SLEEVES: Array[Color] = [Color("334a62"), Color("6e8051"), Color("b25b48"), Color("ece1d3"), Color("bb873a"), Color("958397"), Color("6e8051"), Color("647a8b")]
+const GLOVES: Array[Color] = [Color("33444b"), Color("edc9a6"), Color("edc9a6"), Color("323140"), Color("3d3b38"), Color("edc9a6"), Color("edc9a6"), Color("edc9a6")]
 var variant: int = 0
 var facing: Vector2 = Vector2.RIGHT
 var trigger: Vector2 = Vector2.ZERO

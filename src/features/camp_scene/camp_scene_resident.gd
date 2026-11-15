@@ -39,7 +39,7 @@ func _ready() -> void:
 
 func configure(member: Dictionary) -> void:
 	var definition: SurvivorDefinition = SurvivorRoster.definition_for(member)
-	_variant = SurvivorRoster.Definitions.find(definition)
+	_variant = SurvivorVisualV1.variant_for(String(definition.id))
 	assert(_variant >= 0 and _variant < SurvivorVisualV1.SHEETS.size())
 	_call_sign = String(member.call_sign)
 	set_meta("definition_id", definition.id)

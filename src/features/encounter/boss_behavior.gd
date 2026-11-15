@@ -204,7 +204,7 @@ static func _result_problem(value: Variant, kind: String) -> String:
 				ids.append(int(row.enemy_id))
 			elif row.enemy_id!=0: return "BOSS_SUMMON_RESULT"
 	else:
-		if not _fields(value,["hits"]) or not value.hits is Array or value.hits.size()>4: return "BOSS_ATTACK_RESULT"
+		if not _fields(value,["hits"]) or not value.hits is Array or value.hits.size()>RosterState.MAX_LIVING: return "BOSS_ATTACK_RESULT"
 		var ids: Array[int] = []
 		for id: Variant in value.hits:
 			if not _integer(id,1,LIMIT) or int(id) in ids: return "BOSS_ATTACK_RESULT"

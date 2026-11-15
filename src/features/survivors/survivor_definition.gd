@@ -8,6 +8,7 @@ extends Resource
 @export var gender: StringName
 @export var colour: Color
 @export var portrait: Texture2D
+@export var visual_variant: int = -1
 
 
 func gender_text() -> String:

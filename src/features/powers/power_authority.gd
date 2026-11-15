@@ -48,7 +48,7 @@ static func transition(previous: Dictionary, next: Dictionary) -> String:
 	var checkpoint: Dictionary=previous.duplicate(true)
 	if not before.get("survivors") is Array: return "POWER_BEFORE_FIELDS"
 	for row: Variant in before.survivors:
-		if not row is Dictionary or not row.get("state") is Dictionary or not SurvivalContracts.integer(row.state.get("member_id"),1,5) or not SurvivalContracts.number(row.state.get("health")): return "POWER_BEFORE_FIELDS"
+		if not row is Dictionary or not row.get("state") is Dictionary or not SurvivalContracts.integer(row.state.get("member_id"),1,RosterState.MAX_HISTORY) or not SurvivalContracts.number(row.state.get("health")): return "POWER_BEFORE_FIELDS"
 		var old: Dictionary=SurvivorRoster.member(previous.health,int(row.state.member_id))
 		if old.is_empty() or row.state.health>old.health: return "POWER_PREVIOUS_HEALTH"
 		SurvivorRoster.member(checkpoint.health,int(row.state.member_id)).health=row.state.health

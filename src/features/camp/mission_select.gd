@@ -188,6 +188,8 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}, prepared: Diction
 	var action_choices: bool = CampaignRules.action_choices_enabled(base.get("journey", {}).get("campaign"))
 	var has_mission_cards: bool = daily_offers.any(func(offer: Dictionary) -> bool: return offer.get("mission_policy") == 1)
 	_subtitle.text = "比较主收益、路线与风险。物资和线索随生还归航确认。" if has_mission_cards else "选择此行的补给方向，准备好后出发。"
+	if RosterState.is_family(base) and RescuePoolState.available(base).is_empty():
+		_subtitle.text += "\n" + RosterState.unavailable_reason(base)
 	_heading.text = "选择行动 · 第 %d 天" % int(base.day)
 	if CampaignState.is_short(base):
 		var display: Dictionary=CampaignRules.display(base.journey.campaign)
@@ -241,7 +243,7 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}, prepared: Diction
 			if SortieRiskV1.enabled(supply.generated):
 				title = "装备 · 深入回收" if supply.generated.sortie_risk.tier == SortieRiskV1.DEEP else "装备 · 常规回收"
 			_titles[index].text = "%02d / %s" % [index + 1, title]
-			_descriptions[index].text = LevelSummary.mission_card_text(supply.generated, base if action_choices else {}, rations)
+			_descriptions[index].text = _rescue_card_text(supply) if rescue else LevelSummary.mission_card_text(supply.generated, base if action_choices else {}, rations)
 			if ReconActionV1.enabled(supply.generated):
 				var lines: PackedStringArray = _descriptions[index].text.split("\n")
 				lines.insert(1, "可侦察 · 标记装备点及 1 处可搜建筑")
@@ -435,7 +437,7 @@ func _rescue_card_text(supply: MissionSupply) -> String:
 	var area: String = (size + "街区 · " if not size.is_empty() else "") + supply.layout.display_name
 	var goal: String = "援救 10 秒后现场接纳，生还归航后登记入营。"
 	var route: String = LevelSummary.description(supply.generated, true)
-	var text: String = "%s ×1\n%s\n%s" % [RescueTarget.ANONYMOUS_NAME, area, goal]
+	var text: String = "%s ×1\n%s\n%s" % [SurvivorRoster.definition(int(supply.generated.get("recruit", 3))).default_display_name, area, goal]
 	if not route.is_empty():
 		text += "\n" + route
 	return text

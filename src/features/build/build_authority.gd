@@ -25,7 +25,7 @@ static func ability(event: Variant) -> bool:
 	return event is Dictionary and event.get("source")=="ability"
 
 static func ability_problem(event: Dictionary, transaction: String, include_member: bool = true) -> String:
-	if include_member and not SurvivalContracts.integer(event.get("member_id"),1,5): return "ABILITY_DEFEAT_MEMBER"
+	if include_member and not SurvivalContracts.integer(event.get("member_id"),1,RosterState.MAX_HISTORY): return "ABILITY_DEFEAT_MEMBER"
 	if event.size()!=(7 if include_member else 6) or not event.has_all(["kind","source","ability_id","request_id","enemy_id","at_ms"]) or event.kind!="defeat" or event.source!="ability" or event.ability_id!="airstrike_v1" or not event.request_id is String or not event.request_id.begins_with(transaction+":basic:"): return "ABILITY_DEFEAT_SOURCE"
 	return ""
 
@@ -40,7 +40,7 @@ static func support_problem(value: Variant, token: Dictionary, generated: Dictio
 		var facts: Dictionary=event.facts
 		if not SurvivalContracts.integer(facts.get("at_ms"),0,RunSave.MAX_COUNTER) or facts.at_ms<previous or not SurvivalContracts.number(facts.get("at")) or not SortieSnapshot.duration_matches(float(facts.at),facts.at_ms): return "SUPPORT_FACT_TIME"
 		if event.kind in BasicSupport.KINDS and facts.at-last[event.kind]<cooldown(generated,event.kind)-0.00000001: return "SUPPORT_FACT_TIME"
-		if not SurvivalContracts.integer(facts.get("member_id"),1,5): return "SUPPORT_FACT_MEMBER"
+		if not SurvivalContracts.integer(facts.get("member_id"),1,RosterState.MAX_HISTORY): return "SUPPORT_FACT_MEMBER"
 		if event.kind in ["heal", SpecialPowers.RADIO]:
 			if facts.size()!=7 or not facts.has_all(["at","at_ms","member_id","health_before","health_after","amount","damage_received"]): return "HEAL_FACT_FIELDS"
 			for key: String in ["health_before","health_after","amount","damage_received"]:

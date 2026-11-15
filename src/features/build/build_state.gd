@@ -91,7 +91,7 @@ static func _problem(camp: Dictionary, opening_item: String, item_pool: int, spe
 	if not CampaignState.is_short(camp) or not v is Dictionary or v.size()!=(6 if v.get("version")==2 else 5) or not v.has_all(["version","owned","slots","sources","healing"]) or ((v.version!=1 and v.version!=2) or (v.version==2 and v.get("combat_version")!=1)) or not v.sources is Array: return "BUILD_FIELDS"
 	var issue: String=BuildItems.problem(v.owned,v.slots,item_pool)
 	if not issue.is_empty(): return issue
-	if not v.healing is Dictionary or v.healing.size()>5: return "BUILD_HEALING_HISTORY"
+	if not v.healing is Dictionary or v.healing.size()>RosterState.MAX_HISTORY: return "BUILD_HEALING_HISTORY"
 	for id: Variant in v.healing:
 		if not id is String or id not in ["1","2","3","4","5"] or not SurvivalContracts.number(v.healing[id]) or v.healing[id]<0 or v.healing[id]>RunSave.MAX_COUNTER: return "BUILD_HEALING_HISTORY"
 	if v.sources.size() + int(not opening_item.is_empty()) != v.owned.size(): return "BUILD_ACQUISITION_COUNT"

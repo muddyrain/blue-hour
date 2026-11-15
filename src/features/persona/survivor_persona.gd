@@ -27,6 +27,7 @@ const METRICS: Dictionary = {
 	"ranged_direct_damage":"ranged", "melee_direct_damage":"melee", "move_speed":"move",
 	"reload_duration":"reload", "work_duration":"work",
 }
+static var _extended: Dictionary = {}
 
 
 static func policy() -> Dictionary:
@@ -39,11 +40,15 @@ static func policy() -> Dictionary:
 
 
 static func generate(seed: String) -> Dictionary:
-	if not _seed_valid(seed):
+	return _generate(seed, 5)
+
+
+static func _generate(seed: String, count: int) -> Dictionary:
+	if not _seed_valid(seed) or count < 5 or count > RosterState.MAX_HISTORY:
 		return {}
 	var members: Array[Dictionary] = []
 	var used: Dictionary = {}
-	for id: int in range(1, 6):
+	for id: int in range(1, count + 1):
 		var ranked: Array[Dictionary] = []
 		for positive: String in POSITIVE:
 			for negative: String in NEGATIVE:
@@ -80,16 +85,23 @@ static func problem(value: Variant, seed: String) -> String:
 
 
 static func member(bundle: Dictionary, id: int, definition_id: String = "") -> Dictionary:
-	# Callers authenticate the seed once at their boundary; identity reads never regenerate it.
-	if id < 1 or id > 5 or (not definition_id.is_empty() and definition_id != "crew_%d" % id) or not _shape_problem(bundle).is_empty():
+	# The signed five-member seed payload also binds later identities, without
+	# changing the existing action hashes. Cache the deterministic continuation.
+	if id < 1 or id > RosterState.MAX_HISTORY or (not definition_id.is_empty() and definition_id != "crew_%d" % id) or not _shape_problem(bundle).is_empty():
 		return {}
+	if id > bundle.members.size():
+		if not _extended.has(bundle.seed):
+			if _extended.size() >= 16:
+				_extended.clear()
+			_extended[bundle.seed] = _generate(String(bundle.seed), RosterState.MAX_HISTORY).members
+		return _extended[bundle.seed][id - 1].duplicate(true)
 	return bundle.members[id - 1].duplicate(true)
 
 
 static func recipe_problem(value: Variant) -> String:
 	if not _keys(value, RECIPE_KEYS):
 		return "PERSONA_RECIPE_FIELDS"
-	if not _integer(value.member_id, 1, 5) or not value.definition_id is String or value.definition_id != "crew_%d" % int(value.member_id):
+	if not _integer(value.member_id, 1, RosterState.MAX_HISTORY) or not value.definition_id is String or value.definition_id != "crew_%d" % int(value.member_id):
 		return "PERSONA_RECIPE_IDENTITY"
 	if not value.positive_id is String or not POSITIVE.has(value.positive_id) or not value.negative_id is String or not NEGATIVE.has(value.negative_id):
 		return "PERSONA_RECIPE_TRAIT"

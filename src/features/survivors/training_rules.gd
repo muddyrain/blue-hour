@@ -50,7 +50,7 @@ static func intent_for(request: Dictionary) -> Dictionary:
 
 
 static func propose(before: Dictionary, request: Dictionary) -> Dictionary:
-	if request.size()!=3 or not request.get("kind") is String or request.kind!="train_trait" or not SurvivalContracts.integer(request.get("member_id"),1,5 if RescuePoolState.is_family(before) else 3) or not availability(before,int(request.member_id)).is_empty():
+	if request.size()!=3 or not request.get("kind") is String or request.kind!="train_trait" or not SurvivalContracts.integer(request.get("member_id"),1,RosterState.MAX_HISTORY if RescuePoolState.is_family(before) else 3) or not availability(before,int(request.member_id)).is_empty():
 		return {}
 	var intent: Dictionary = intent_for(request)
 	if intent.size()!=10 or not intent.has_all(["ruleset_id","trait_ruleset_id","edit_id","run_id","root_id","base_hash","member_id","trait","cost","gained"]):

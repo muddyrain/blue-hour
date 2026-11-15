@@ -1349,7 +1349,7 @@
     },
     {
       "path": "src/features/presentation/survivor_weapon_rig.gd",
-      "sha256": "71b69d4136b4d26d130ee1e6624a4a8a4af995addab83d0e498f60d5050e61b7",
+      "sha256": "ea4202d41301ec8962e30da59d12895e034a6cc6330743513e9bec20e6e91d23",
       "origin": "Original procedural hand rig and 48px radial warm muzzle-light texture; landmarks registered against existing survivor art. Tool: Codex-assisted GDScript authoring, Godot GradientTexture2D. AI-assisted code, no new generated bitmap or third-party material.",
       "license": "No additional license granted"
     },
@@ -1537,7 +1537,7 @@
     },
     {
       "path": "src/features/camp_scene/camp_scene_world.gd",
-      "sha256": "95b83c0b86730e51e61594e6811eed2eae9930b73f58c59d9725465348774d07",
+      "sha256": "cb34b6920581f42ac074cfb03f9f13f186cc68729a84f73fe0c02f82cde7db5b",
       "origin": "Original project procedural camp illustration and composition, authored with AI assistance in GDScript; Godot CanvasItem / IsoDraw primitives and existing project IsoAtlas art. No new raster generation or third-party asset pack.",
       "tool": "Godot 4 CanvasItem drawing API; AI-assisted code authoring by Codex",
       "ai_assisted": true,
@@ -1553,7 +1553,7 @@
     },
     {
       "path": "src/features/camp_scene/camp_scene_resident.gd",
-      "sha256": "83b5317087752760c2da9da5486262a4bf4f4df11ee0f736eaf5a79ae9c620ee",
+      "sha256": "75a8dbb830d7ed59734eddc321007edcbd18dd925f60f7c2e7e4a595e81c7131",
       "origin": "Original project procedural camp illustration and composition, authored with AI assistance in GDScript; Godot CanvasItem / IsoDraw primitives and existing project IsoAtlas art. No new raster generation or third-party asset pack.",
       "tool": "Godot 4 CanvasItem drawing API; AI-assisted code authoring by Codex",
       "ai_assisted": true,
@@ -1565,7 +1565,49 @@
       "tool": "Godot 4 CanvasItem drawing API; AI-assisted code authoring by Codex",
       "ai_assisted": true,
       "license": "No additional license granted",
-      "sha256": "4adb68c5261eefc8b397fa9ac21d5cdf5191e5d121d3092407b070fd4377d699"
+      "sha256": "0e4b9cfddef527eda6127e5da965cfaee4c0a64659034c76a1335c20d49c891d"
+    },
+    {
+      "path": "assets/survivors_v1/ruan.png",
+      "sha256": "172a1d0d24158d68536ab5e2017772cef902259a0bf72f49429bad9ab9caa46e",
+      "origin": "Original AI-assisted OpenAI image_gen character atlas; deterministic Pillow slice, scale and foot registration / portrait crop via tools/build_recruit_atlas.py. Prompts: assets/survivors_v1/recruit_generation.json",
+      "ai_generated": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/chars/ruan_portrait.png",
+      "sha256": "28bc0b422cee87bf3c6081b3f0bb344d83ea74e17c1294409920003e0dae0f61",
+      "origin": "Original AI-assisted OpenAI image_gen character atlas; deterministic Pillow slice, scale and foot registration / portrait crop via tools/build_recruit_atlas.py. Prompts: assets/survivors_v1/recruit_generation.json",
+      "ai_generated": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/survivors_v1/ye.png",
+      "sha256": "c5b9ded78c6421707cab64ada61b506547b49985ede726cf85daca30be1a0cf7",
+      "origin": "Original AI-assisted OpenAI image_gen character atlas; deterministic Pillow slice, scale and foot registration / portrait crop via tools/build_recruit_atlas.py. Prompts: assets/survivors_v1/recruit_generation.json",
+      "ai_generated": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/chars/ye_portrait.png",
+      "sha256": "58e5db7ad74a196ea616e55da9f66a0c5ef81394fbbec343d15529eaf4a0cc35",
+      "origin": "Original AI-assisted OpenAI image_gen character atlas; deterministic Pillow slice, scale and foot registration / portrait crop via tools/build_recruit_atlas.py. Prompts: assets/survivors_v1/recruit_generation.json",
+      "ai_generated": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/survivors_v1/he.png",
+      "sha256": "b4fedbee7edf6a4929c31d20cd3b70ca221700754a1fe1b9ee2b3d0f3265b728",
+      "origin": "Original AI-assisted OpenAI image_gen character atlas; deterministic Pillow slice, scale and foot registration / portrait crop via tools/build_recruit_atlas.py. Prompts: assets/survivors_v1/recruit_generation.json",
+      "ai_generated": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/chars/he_portrait.png",
+      "sha256": "7786eb422eba2ea581060ab1f63f00659a79b447f40523d2a70aa2f7a1dce4a5",
+      "origin": "Original AI-assisted OpenAI image_gen character atlas; deterministic Pillow slice, scale and foot registration / portrait crop via tools/build_recruit_atlas.py. Prompts: assets/survivors_v1/recruit_generation.json",
+      "ai_generated": true,
+      "license": "No additional license granted"
     },
     {
       "path": "assets/audio/b1/melee_swing.wav",

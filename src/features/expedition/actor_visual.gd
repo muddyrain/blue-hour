@@ -71,19 +71,19 @@ func _ready() -> void:
 	var shen: bool = not is_enemy and variant==3
 	var lu: bool = not is_enemy and variant==4
 	_hand_pixels = CrewAppearance.POOL_HANDS if shen or lu else CrewAppearance.LIN_HANDS if lin else (CrewAppearance.AMBER_HANDS if amber else HAND_PIXELS)
-	_body = _sprite(MotionAtlas.RIGHT[variant], 5, 7)
+	_body = _sprite(MotionAtlas.RIGHT[mini(variant, MotionAtlas.RIGHT.size() - 1)], 5, 7)
 	if not is_enemy:
 		_body.material = MotionAtlas.material(0)
 	add_child(_body)
 	_hold = Node2D.new()
 	add_child(_hold)
-	_upper = _sprite(MotionAtlas.RIGHT[variant], 5, 7)
+	_upper = _sprite(MotionAtlas.RIGHT[mini(variant, MotionAtlas.RIGHT.size() - 1)], 5, 7)
 	_upper.material = MotionAtlas.material(1)
 	_hold.add_child(_upper)
 	_arms = MotionHands.new()
 	_arms.variant = variant
 	_hold.add_child(_arms)
-	_head = _sprite(MotionAtlas.RIGHT[variant], 5, 7)
+	_head = _sprite(MotionAtlas.RIGHT[mini(variant, MotionAtlas.RIGHT.size() - 1)], 5, 7)
 	_head.material = MotionAtlas.material(2)
 	_hold.add_child(_head)
 	_weapon = Sprite2D.new()
@@ -423,6 +423,11 @@ func _apply_pose() -> void:
 		if not is_enemy:
 			var settle: float = smoothstep(0.0, 0.24, _defeat_clock)
 			_body.rotation = 0.16 * (1.0 - settle) * signf(_facing.x)
+			if variant >= MotionAtlas.RIGHT.size():
+				# New eight-direction atlases have no old fallen strip. Lay the
+				# same identity down instead of substituting another person's art.
+				_body.rotation += PI * 0.5 * settle
+				_body.position.x = -20.0 * settle
 			_body.position.y -= sin(settle * PI) * 2.0
 			# A downed squad member remains legible until the real recovery/removal.
 			_body.self_modulate.a = 1.0

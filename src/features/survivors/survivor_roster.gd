@@ -5,7 +5,13 @@ extends RefCounted
 const MAX_MEMBER_ID: int = 2_147_483_645
 
 const Definitions: Array[SurvivorDefinition] = [preload("res://src/features/survivors/crew_one.tres"),
-	preload("res://src/features/survivors/crew_two.tres"), preload("res://src/features/survivors/crew_three.tres"), preload("res://src/features/survivors/crew_4.tres"), preload("res://src/features/survivors/crew_5.tres")]
+	preload("res://src/features/survivors/crew_two.tres"), preload("res://src/features/survivors/crew_three.tres"), preload("res://src/features/survivors/crew_4.tres"),
+	preload("res://src/features/survivors/crew_5.tres"),
+	preload("res://src/features/survivors/crew_6.tres"),
+	preload("res://src/features/survivors/crew_7.tres"),
+	preload("res://src/features/survivors/crew_8.tres"),
+	preload("res://src/features/survivors/crew_9.tres"),
+	preload("res://src/features/survivors/crew_10.tres")]
 
 
 static func definition(member_id: int) -> SurvivorDefinition:

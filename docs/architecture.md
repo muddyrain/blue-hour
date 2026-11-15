@@ -89,6 +89,12 @@
 
 港口 SVG 使用现有 `IsoAtlas` 的脚点/地图尺寸协议，由 `tools/make_harbor_art.py`（纯 Python 标准库）生成并登记 SHA；没有 AI 生成图像或第三方素材。`tests/harbor_warehouse.gd` 检查实际任务选择、布局可达、窄巷、水面、登车区域、源数据不变、作业耗时与部分作业快照重建，已纳入 `tools/godot.py check`。
 
+`CapeStation` 是手摆地点“海边町·岬角车站”（`cape_station`）。第 4 天起的偶数日，普通 `supply` 食品任务在 `ExplorationActions.supply()` 投影到车站；带独立空间锚点的任务保留原图。源 `generated`、任务/地图 ID、收益和名义工时保持原值，`TaskActions.site_point()` 与 `outdoor_site()` 同时供运行时及回放读取车站屋外工位。站房、商店、民居封闭，短轨阻挡通行但不挡弹，低站台两端可绕行。`StationPresentation` 绑定搜刮点，`StationGround` 展示轨道与低站台，共用导航、派工、支援、刷怪与巴士流程；完整地形加入快照兼容哈希。8 个原创 SVG 由 `tools/make_station_art.py` 复用港口绘图原语生成并登记来源，不修改港口地形。
+
+`SortieEvents` 只投影现有事件：`EventSortieV1` 的临时物资点保留现场二选一、开工警报和 `task_event` 结算；`RareSortie` 的断电冷库关闭两处食品站点的窗光，保留路灯和车灯，并从 `site_facts` 展示近处/远端搜集结果。提示持续显示在场内，状态均从原收据重建，不新增事件存档格式，也不重新抽选。既有种子选择器、概率与奖励保持不变。
+
+`CampaignPressureV1.blockade_night()` 在启用跨日压力的普通第 4、7、10…天出击预告“封锁夜”（调查、稀有、事件、终局除外）。入夜后普通敌种抽签按 actor ID 模 3，把其中两类普通槽分别升级为重压、疾奔，其余槽与特殊种优先级沿用原规则；`CombatEnemyRules.pick_for()` 同供刷怪与回放证明使用。任务卡、顶部时钟、黄昏和入夜均有提示，结算从原收据的任务日期及经过时间还原是否经历封锁夜。上限、间隔、出入口、安全距离和 `ExpeditionAtmosphere` 曲线不变；策略参数进入快照哈希。`tests/maps_events.gd` 覆盖车站正式选卡、导航/屋外作业/登车/恢复与封锁夜来源校验；`tests/sortie_events.gd` 覆盖事件两分支、冷库断电与结算事实，两者均纳入 `check`。
+
 ### 存档说明
 
 - 不再兼容旧存档：v1–v5 `RunSave` 升级、v5 迁移导入、旧位置 `user://saves/run.json` 保护都已删除。读到不认识的存档会被拒绝，需要开新旅程。

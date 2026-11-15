@@ -13,15 +13,15 @@ var cancel_button: Button
 func _ready() -> void:
 	CampStyle.place(self, Rect2(150, 270, 550, 200))
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	var surface: StyleBoxFlat = CampStyle.box(Color("102530"), Color("537981"), 16)
-	surface.set_corner_radius_all(8)
+	var surface: StyleBoxFlat = CampStyle.box(Color("22201e"), Color("e8dcc48c"), 16)
+	surface.set_corner_radius_all(3)
 	add_theme_stylebox_override("panel", surface)
 
 	var column: VBoxContainer = VBoxContainer.new()
 	column.add_theme_constant_override("separation", 9)
 	add_child(column)
 	column.add_child(CampStyle.label(EventSortieV1.TITLE, 27))
-	column.add_child(CampStyle.label("已抵达 · 确认后锁定一条路线", 16, CampStyle.MUTED))
+	column.add_child(CampStyle.label("已抵达 · 确认后锁定方案，场内时间继续推进", 16, CampStyle.MUTED))
 
 	var routes: HBoxContainer = HBoxContainer.new()
 	routes.add_theme_constant_override("separation", 10)

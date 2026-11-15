@@ -8,6 +8,13 @@ func _init(owner: Expedition) -> void:
 	expedition = owner
 
 
+func announce_stage(state: Dictionary) -> void:
+	if CampaignPressureV1.blockade_night(expedition.supply.generated):
+		expedition._show_notice(CampaignPressureV1.BLOCKADE_WARNING if expedition.threat.stage == ThreatDirector.Stage.LATE else "封锁夜来袭 · 重压与疾奔结伴；集火掩护并集合回车。")
+	else:
+		expedition._show_notice("%s · 增援更密集；仍可发动巴士集合撤离。" % state.label)
+
+
 func _spawn_enemy(forced_kind: String = "", pressure_point: Vector2 = Vector2.INF, provenance: Dictionary = {}) -> Dictionary:
 	var point: Vector2 = expedition._threat._safe_spawn_point(pressure_point)
 	if not point.is_finite():

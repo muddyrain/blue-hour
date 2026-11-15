@@ -107,6 +107,8 @@ static func _airdrop_point(layout: Dictionary) -> Array:
 	return []
 
 static func outdoor_site(value: Dictionary, id: StringName) -> bool:
+	if CapeStation.should_apply(value):
+		return value.sites.any(func(site: Dictionary) -> bool: return site.id == String(id))
 	if String(id) == ReconActionV1.SITE_ID:
 		return ReconActionV1.enabled(value)
 	if String(id) == BillboardActionV1.SITE_ID:
@@ -122,6 +124,8 @@ static func outdoor_site(value: Dictionary, id: StringName) -> bool:
 
 
 static func site_point(value: Dictionary, site: Dictionary) -> Vector2:
+	if CapeStation.should_apply(value):
+		return CapeStation.site_point(value, String(site.id))
 	if HarborWarehouse.should_apply(value):
 		return HarborWarehouse.site_point(value, String(site.id))
 	if value.get("version")==9: return ExplorationSites.site_point(value.layout,site)

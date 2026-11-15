@@ -292,6 +292,13 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}, prepared: Diction
 			_descriptions[index].text = supply.description
 			_pictures[index].texture = IsoAtlas.texture("harbor/cold_store.svg")
 			_crates[index].hide()
+		elif CapeStation.is_layout(supply.layout):
+			_titles[index].text = "%02d / %s" % [index + 1, CapeStation.TITLE]
+			_descriptions[index].text = supply.description
+			_pictures[index].texture = IsoAtlas.texture("station/station.svg")
+			_crates[index].hide()
+		if CampaignPressureV1.blockade_night(supply.generated):
+			_descriptions[index].text = CampaignPressureV1.BLOCKADE_WARNING + "\n" + _descriptions[index].text
 	_link_choices()
 
 

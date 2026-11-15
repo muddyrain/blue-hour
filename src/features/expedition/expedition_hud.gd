@@ -65,6 +65,9 @@ func refresh(state: Dictionary) -> void:
 	if threat.get("enabled", false):
 		time_label = "已入夜" if night else "距入夜"
 		compact_hint = time_label
+	var night_hint: String = state.get("night_hint", "")
+	if not night_hint.is_empty():
+		compact_hint = "封锁夜" if night else "封锁夜预告"
 	var action: String = "发动巴士"
 	var bus_waiting: PackedStringArray = []
 	if not enabled:
@@ -95,11 +98,11 @@ func refresh(state: Dictionary) -> void:
 		"time":{"label":time_label,
 			"text":("+" if night else "") + "%02d:%02d" % [display_seconds / 60, display_seconds % 60],
 			"compact_hint":compact_hint,
-			"hint":threat.get("hint", "") if threat.get("enabled", false) else ""},
+			"hint":night_hint if not night_hint.is_empty() else threat.get("hint", "") if threat.get("enabled", false) else ""},
 		"bus_status_text":"巴士就绪" if enabled else bus_text,
 		"bus_waiting_text":"\n".join(bus_waiting), "bus_count_visible":gathering,
 		"bus_action_label":action, "bus_action_enabled":enabled or gathering,
-		"status_hint":state["notice"] if state["notice_visible"] else "",
+		"status_hint":state["notice"] if state["notice_visible"] else state.get("event_hint", ""),
 	})
 	_burst_warning.text = state.get("burst_warning", "")
 	_burst_warning.visible = not _burst_warning.text.is_empty()

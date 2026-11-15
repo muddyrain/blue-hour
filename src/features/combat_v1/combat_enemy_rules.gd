@@ -4,6 +4,9 @@ const TOXIC: String="toxic_zombie_v1"
 static func pick(identity: String,index: int,stage: int) -> String:
 	return ToxicV1.pick(identity,index,stage)
 
+static func pick_for(action: Dictionary, identity: String, index: int, stage: int) -> String:
+	return CampaignPressureV1.blockade_kind(action, pick(identity, index, stage), index, stage)
+
 static func snapshot_problem(row: Dictionary,world: Dictionary,receipt: Dictionary,summoned: bool=false) -> String:
 	if not SortieSnapshot.combat_version(world.get("version")): return EnemyRules.snapshot_problem(row,world,receipt,summoned)
 	var state: Dictionary=row.state
@@ -37,7 +40,7 @@ static func snapshot_problem(row: Dictionary,world: Dictionary,receipt: Dictiona
 	if summoned or state.actor_id>=10000: return EnemyRules.snapshot_problem(row,world,receipt,true)
 	var source: Variant=world.combat.spawns.get(str(int(state.actor_id)))
 	if not source is Dictionary or source.size()!=3 or not source.has_all(["kind","stage","fallback"]) or source.stage!=behavior.spawn_stage: return "COMBAT_ENEMY_SOURCE"
-	var rolled: String=pick(receipt.transaction_id,int(state.actor_id),int(behavior.spawn_stage))
+	var rolled: String=pick_for(world.generated,receipt.transaction_id,int(state.actor_id),int(behavior.spawn_stage))
 	if source.kind!=behavior.kind or (source.kind!=rolled and not (rolled==TOXIC and source.kind==EnemyRules.NORMAL and SurvivalContracts.integer(source.fallback,0,int(state.actor_id)-1) and world.combat.spawns.get(str(int(source.fallback)),{}).get("kind")==TOXIC)): return "COMBAT_ENEMY_ROLL"
 	var active_target: Dictionary=SortieSnapshot._member(world.survivors,int(behavior.target_id))
 	if behavior.target_id!=0 and (active_target.is_empty() or active_target.state.health<=0 or not active_target.state.visible or int(active_target.state.activity) in [2,3]): return "COMBAT_ENEMY_TARGET"

@@ -41,7 +41,7 @@ def main():
  execute('smoke-wait',['--script','res://tests/smoke_wait.gd'],[])
  execute('mission-loading',['--script','res://tests/mission_loading.gd'],[])
  execute('navigation-cache',['--script','res://tests/navigation_cache.gd'],[])
- for name in ['playable_entry','presentation','camp_scene_contracts','weapon_inventory','combat_los','navigation_nearest','night_pressure','harbor_warehouse','progression_contracts','progression_save','contact_damage','contact_separation','animation/motion','animation/normal_stability','animation/infected_v1','animation/special_infected_v1','animation/survivors_v1','animation/weapon_holding']:
+ for name in ['playable_entry','presentation','camp_scene_contracts','weapon_inventory','combat_los','navigation_nearest','night_pressure','harbor_warehouse','progression_contracts','progression_save','maps_events','sortie_events','contact_damage','contact_separation','animation/motion','animation/normal_stability','animation/infected_v1','animation/special_infected_v1','animation/survivors_v1','animation/weapon_holding']:
   execute(name.replace('/','-'),['--script','res://tests/'+name+'.gd'])
  for name in ['rogue_navigation','hud_compact','world_data']:
   execute(name.replace('_','-'),['--script','res://tests/'+name+'.gd'])

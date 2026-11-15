@@ -128,6 +128,11 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	if not catalog_notice.is_empty():
 		text += catalog_notice + "\n"
 	var generated: Dictionary = frozen.get("rules",{}).get("mission",{}).get("generated",{})
+	if CapeStation.should_apply(generated):
+		text += "归航地点 · " + CapeStation.TITLE + "\n"
+	var event_summary: String = SortieEvents.summary(generated, battle, float(generated.get("exploration", {}).get("level", {}).get("assumptions", {}).get("night_seconds", 105.0)))
+	if not event_summary.is_empty():
+		text += event_summary + "\n"
 	if BillboardActionV1.enabled(generated):
 		if not BillboardIntelV1.opportunity(snapshot).is_empty():
 			text += "超市广告牌 · 下次选卡保证出现超市补给%s\n" % ("" if durable else "（确认后生效）")

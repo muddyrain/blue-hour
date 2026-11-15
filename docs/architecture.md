@@ -116,6 +116,10 @@
 - 美术为项目原创：AI 辅助生成的 PNG（统一透明裁切、等比缩放、登记脚点后入图集，见各目录 `atlas.json`/`manifest.json`）、手绘 SVG、代码绘制；音效由 `src/features/audio_settings/generate_cues.py` 数学合成。生图提示要点在 `assets/world_v1/source/PROMPTS.md`、`assets/world_v2/source/prompts.md`。
 - 不使用 Deadly Days 的任何图像、声音或录屏。
 
+音效沿用应用持有的 `B1AudioService`，没有 Autoload 或全局 AudioServer 总线写入。`ExpeditionFeedback` 通过 `audio_cue_requested` 上报开火（含霰弹）、近战提交、统一命中、特殊种蓄势和入夜；`AppSortie` 把意图接回已有服务，搜刮/发动与营地、任务选择、声音设置的 UI 确认仍走原回调。毒气和夜犬读取现有蓄势边沿，重复刷新不重播；暂停恢复快照只记录已存在的提示状态。巴士演出单独发登车/驶离提示，在结算冻结、战斗事件断开后继续接入同一服务。
+
+音量默认仍为主音量 0.8、世界 0.75、UI 0.7、非静音。静音/分类归零立即停止对应尾音并拒绝新声音；世界暂停冻结现有声流、拒绝新请求，UI 保持可用，恢复不补播。服务固定 6 个世界与 2 个 UI 声部，其中世界的 2 个优先留给搜刮、巴士和预警；重要提示可替换较低优先级声音，满载不排队。15 个 WAV 为纯 Python 标准库数学合成（Codex 辅助代码、没有 AI 音频模型或采样素材），每个峰值 0.55，`VOICE_GAIN = 0.20`（PROJECT_TEMP 表现参数，原 0.16）；8 声部满滑杆的离散峰值和不超过 0.88。`tests/audio_feedback.gd` 已纳入 `check`；`python tests/test_audio_assets.py` 可脱离引擎校验生成可复现性、注册、来源与混音余量。
+
 ## 测试与工具
 
 - `tools/godot.py check`：导入、启动（`BH_READY`）与 `tests/` 下的单元/契约测试，任何 `SCRIPT ERROR`/`ERROR` 或 `"failures": N>0` 都判失败。

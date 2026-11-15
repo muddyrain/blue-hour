@@ -1,0 +1,148 @@
+{
+  "source": "Original mathematical synthesis; no recordings, audio models, external audio or Deadly Days assets.",
+  "ai_generated_audio": false,
+  "ai_assisted_code": true,
+  "generator": "src/features/audio_settings/generate_cues.py",
+  "generator_sha256": "4a98c3d54bd13d8edda3ca9f786045a0c3b5f5c3f68484b3893bc56d33254baf",
+  "format": "mono PCM signed 16-bit little-endian WAV, 44100 Hz, no loops",
+  "seed": 20261115,
+  "processing": "DC reduction, 4 ms attack / 20 ms release sine-squared envelope, peak normalized to 0.55",
+  "status": "integrated; headphone and speaker listening pending",
+  "assets": [
+    {
+      "cue": "ui_confirm",
+      "file": "assets/audio/b1/ui_confirm.wav",
+      "duration_s": 0.2,
+      "method": "felt C5/E5 upward dyad",
+      "peak": 0.54998779296875,
+      "rms": 0.15835018790994201,
+      "sha256": "e2d149b4695b8043301f739b3454ec7b223433023999b28bf5e7d36d44bdb27d"
+    },
+    {
+      "cue": "ui_back",
+      "file": "assets/audio/b1/ui_back.wav",
+      "duration_s": 0.2,
+      "method": "felt E5/C5 downward dyad",
+      "peak": 0.54998779296875,
+      "rms": 0.1623223335657157,
+      "sha256": "556d669a457c759e03f6b7d4e8f08c6f1e895b5e2ba1f6a5377f496c2c90034b"
+    },
+    {
+      "cue": "fire",
+      "file": "assets/audio/b1/fire.wav",
+      "duration_s": 0.19,
+      "method": "filtered air snap and descending wooden 230-150 Hz body",
+      "peak": 0.54998779296875,
+      "rms": 0.11598151547418586,
+      "sha256": "b4e98cbabeafbe609d90d9926754ff42558497f9ca4ddd333faa9923b53e454e"
+    },
+    {
+      "cue": "melee_swing",
+      "file": "assets/audio/b1/melee_swing.wav",
+      "duration_s": 0.24,
+      "method": "band-limited air swish with rounded 220 Hz contact",
+      "peak": 0.54998779296875,
+      "rms": 0.10704184442539601,
+      "sha256": "816660051ca65ac84feca9e41df78e3fb197afa44955b37cccc789a3658da1d8"
+    },
+    {
+      "cue": "hit",
+      "file": "assets/audio/b1/hit.wav",
+      "duration_s": 0.16,
+      "method": "wooden 370/590 Hz tap and filtered air; no flesh sample",
+      "peak": 0.54998779296875,
+      "rms": 0.11211681682632947,
+      "sha256": "3e5237e4cb763e3830bb850d62fedcc0c90c265852a2bd2d33e27aa1ca8f1186"
+    },
+    {
+      "cue": "survivor_hit",
+      "file": "assets/audio/b1/survivor_hit.wav",
+      "duration_s": 0.23,
+      "method": "padded 210/280 Hz double knock; no vocalization",
+      "peak": 0.54998779296875,
+      "rms": 0.14310121327087144,
+      "sha256": "aeea58189f95569b7b59a7c176c9e75d7f8d4985392866f62a2da551cd8b54dc"
+    },
+    {
+      "cue": "collect_complete",
+      "file": "assets/audio/b1/collect_complete.wav",
+      "duration_s": 0.48,
+      "method": "felt C5/E5/G5 ascending completion",
+      "peak": 0.54998779296875,
+      "rms": 0.15517300120468228,
+      "sha256": "7dc3b6a23b5febc01c5ae87cef0c7acd0c1baeae305c8a11b6847f1e0adb1c1e"
+    },
+    {
+      "cue": "bus_start",
+      "file": "assets/audio/b1/bus_start.wav",
+      "duration_s": 0.9,
+      "method": "warm small motor rising 72-114 Hz with soft latch",
+      "peak": 0.54998779296875,
+      "rms": 0.27956118227405835,
+      "sha256": "56d966f4ac4d565c7387d5b7fb9b660353b3eb5df0aae48b6c86031c1f392dc5"
+    },
+    {
+      "cue": "bus_board",
+      "file": "assets/audio/b1/bus_board.wav",
+      "duration_s": 0.32,
+      "method": "two soft door/step taps and rounded E5 bell",
+      "peak": 0.54998779296875,
+      "rms": 0.1562055618359246,
+      "sha256": "7174d963f57913ab7ce93ee5ed26c61954adb18c4eeebe72ee6cee43e17b62f4"
+    },
+    {
+      "cue": "bus_depart",
+      "file": "assets/audio/b1/bus_depart.wav",
+      "duration_s": 0.85,
+      "method": "warm 90-145 Hz motor lift with C5 send-off",
+      "peak": 0.54998779296875,
+      "rms": 0.2823955463785617,
+      "sha256": "129300a0d2e06606f5cf461999e4728c0120873b8257506b3333028ab0b6aa2d"
+    },
+    {
+      "cue": "screamer_warning",
+      "file": "assets/audio/b1/screamer_warning.wav",
+      "duration_s": 0.54,
+      "method": "two rounded rising A4/D5 reed pulses; no scream",
+      "peak": 0.54998779296875,
+      "rms": 0.15396319575799405,
+      "sha256": "51dd1a71e6c6ed456092a81149a97675f4fb543780e2c0dffcce97de23b9b902"
+    },
+    {
+      "cue": "toxic_warning",
+      "file": "assets/audio/b1/toxic_warning.wav",
+      "duration_s": 0.46,
+      "method": "three airy puffs with descending E5/C5/G4 droplets",
+      "peak": 0.54998779296875,
+      "rms": 0.09306911463215672,
+      "sha256": "b0c1a95970798089155d6195ff0dc38d99bdf503a784c7f1a402d29ab30af300"
+    },
+    {
+      "cue": "burst_warning",
+      "file": "assets/audio/b1/burst_warning.wav",
+      "duration_s": 0.48,
+      "method": "three ascending low wooden pressure taps; no explosion",
+      "peak": 0.54998779296875,
+      "rms": 0.15321508152487837,
+      "sha256": "695e524d3b9a053e2b1897f412476256652001f86df0983290913fea704a99cf"
+    },
+    {
+      "cue": "hound_warning",
+      "file": "assets/audio/b1/hound_warning.wav",
+      "duration_s": 0.3,
+      "method": "quick G4/C5 wooden pair; no animal recording",
+      "peak": 0.54998779296875,
+      "rms": 0.15155814466052364,
+      "sha256": "a8e2bdc88a5c5cb054f502cd686d2f231ae87ac1b2929d0c7201fb44a7a92d03"
+    },
+    {
+      "cue": "nightfall",
+      "file": "assets/audio/b1/nightfall.wav",
+      "duration_s": 0.78,
+      "method": "low C4/G3 felt bell cadence, once; no rumble or loop",
+      "peak": 0.54998779296875,
+      "rms": 0.14122661739320133,
+      "sha256": "b8014b25993a6344e0737ed0fe478d1b570139e09c13836f82233f3c4523c34b"
+    }
+  ]
+}

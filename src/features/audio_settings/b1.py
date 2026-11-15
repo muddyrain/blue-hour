@@ -57,7 +57,10 @@ def invoke(engine, label, args, timeout=120):
 def analyze_assets():
     manifest = json.loads((ROOT / "assets/audio/b1/manifest.json").read_text(encoding="utf-8"))
     report = []
-    assert len(manifest["assets"]) == 6
+    service = (MODULE / "audio_service.gd").read_text(encoding="utf-8")
+    registered = set(re.findall(r'&"(\w+)": \{"channel"', service))
+    assert {asset["cue"] for asset in manifest["assets"]} == registered
+    assert len(manifest["assets"]) == len(registered)
     assert manifest["generator_sha256"] == hashlib.sha256((MODULE / "generate_cues.py").read_bytes()).hexdigest()
     for asset in manifest["assets"]:
         path = ROOT / asset["file"]
@@ -72,7 +75,7 @@ def analyze_assets():
         report.append({"cue": asset["cue"], "peak": peak, "dc": dc, "samples": len(samples),
                        "zero_endpoints": True, "sha256": asset["sha256"]})
     (LOGS / "asset-analysis.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    print("PASS six WAV hashes, formats, lengths, peak headroom, DC and zero endpoints; listening pending")
+    print(f"PASS {len(report)} WAV hashes, formats, lengths, peak headroom, DC and zero endpoints; listening pending")
 
 
 def main():

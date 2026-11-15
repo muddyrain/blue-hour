@@ -24,7 +24,9 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	mouse_force_pass_scroll_events = false
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color("122d39")
+	style.bg_color = Color("22201e")
+	style.border_color = Color("e8dcc48c")
+	style.set_border_width_all(1)
 	style.content_margin_left = 28
 	style.content_margin_right = 28
 	style.content_margin_top = 24

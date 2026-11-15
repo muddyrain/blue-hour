@@ -1327,7 +1327,36 @@
       "path": "assets/survivors_v1/lu.png",
       "sha256": "91c0fecba6ba31fc534a9d5ac7314e3a5156d51d0065604e78e61165dec7f3da",
       "origin": "AI-assisted redraw/extension of original assets/m5_anim_01/lu_full.png using built-in OpenAI imagegen (2026-11-15); independently drawn eight directions, idle + four walk + three attack poses. Southwest correction for gu/xia/lin/shen. Pillow alpha cleanup (<12), slicing and fixed per-direction root registration by tools/build_survivor_atlas.py. No third-party asset pack or Deadly Days artwork. Generation specification: assets/survivors_v1/generation.json.",
-
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/infected_v1/screamer/actions.png",
+      "sha256": "7e827917c59ea35d7c9ecc574f6f5917e3ff8fff28cc42c749836cf6fed8cbf4",
+      "origin": "Original project AI-generated art using OpenAI built-in image_gen, 2026-11-15. Project heavy sheet used only as style reference. Five independently drawn directions, twelve articulated poses each, three disclosed horizontal mirrors. Pillow removes alpha <20 and islands <24 source pixels, then uniform species scaling and fixed roots. No third-party pack or Deadly Days material. Exact prompt, source SHA and packing: assets/infected_v1/special_generation.json.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/infected_v1/toxic/actions.png",
+      "sha256": "88b1286b9eccbf465b2cc4eb6b12524ae9886fca0241db118b615a0bd6e6165a",
+      "origin": "Original project AI-generated art using OpenAI built-in image_gen, 2026-11-15. Project heavy sheet used only as style reference. Five independently drawn directions, twelve articulated poses each, three disclosed horizontal mirrors. Pillow removes alpha <20 and islands <24 source pixels, then uniform species scaling and fixed roots. No third-party pack or Deadly Days material. Exact prompt, source SHA and packing: assets/infected_v1/special_generation.json.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/infected_v1/burst/actions.png",
+      "sha256": "88a518f60ebe437116d4cbbdda4a4993e126558b30c4a17d7c5b56ccc9ef8333",
+      "origin": "Original project AI-generated art using OpenAI built-in image_gen, 2026-11-15. Project heavy sheet used only as style reference. Five independently drawn directions, twelve articulated poses each, three disclosed horizontal mirrors. Pillow removes alpha <20 and islands <24 source pixels, then uniform species scaling and fixed roots. No third-party pack or Deadly Days material. Exact prompt, source SHA and packing: assets/infected_v1/special_generation.json.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/infected_v1/hound/actions.png",
+      "sha256": "18720a9f31774680aa80a5d70d4638ba049440ab8847b4e30728e194d872ac4f",
+      "origin": "Original project AI-generated art using OpenAI built-in image_gen, 2026-11-15. Project heavy sheet used only as style reference. Five independently drawn directions, twelve articulated poses each, three disclosed horizontal mirrors. Pillow removes alpha <20 and islands <24 source pixels, then uniform species scaling and fixed roots. No third-party pack or Deadly Days material. Exact prompt, source SHA and packing: assets/infected_v1/special_generation.json.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/infected_v1/breacher/actions.png",
+      "sha256": "30506fa2b361996d8b56aa41b24a4e67af380ba5e9b65b17ccbe03e742ae9cf8",
+      "origin": "Original project AI-generated art using OpenAI built-in image_gen, 2026-11-15. Project heavy sheet used only as style reference. Five independently drawn directions, twelve articulated poses each, three disclosed horizontal mirrors. Pillow removes alpha <20 and islands <24 source pixels, then uniform species scaling and fixed roots. No third-party pack or Deadly Days material. Exact prompt, source SHA and packing: assets/infected_v1/special_generation.json.",
       "license": "No additional license granted"
     }
   ]

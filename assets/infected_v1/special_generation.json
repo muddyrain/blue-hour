@@ -1,0 +1,198 @@
+{
+  "tool": "OpenAI built-in image_gen + Pillow registration",
+  "ai_generated": true,
+  "cell": 256,
+  "root": [
+    128,
+    240
+  ],
+  "columns": [
+    "e",
+    "se",
+    "s",
+    "ne",
+    "n"
+  ],
+  "rows": [
+    "idle",
+    "walk_left",
+    "walk_left_pass",
+    "walk_right",
+    "walk_right_pass",
+    "windup",
+    "windup_full",
+    "release",
+    "recovery",
+    "hit",
+    "fall",
+    "fallen"
+  ],
+  "files": [
+    {
+      "kind": "screamer",
+      "path": "assets/infected_v1/screamer/actions.png",
+      "sha256": "7e827917c59ea35d7c9ecc574f6f5917e3ff8fff28cc42c749836cf6fed8cbf4",
+      "source_sha256": "3faccc7d5b388ec9a84ff5b06756cd6202d0b11d065fd692f6d584c38c6b538a",
+      "source_size": [
+        1942,
+        809
+      ],
+      "scale": 1.4834437086092715,
+      "source_anchors": [
+        [
+          83.0,
+          155
+        ],
+        [
+          79.5,
+          155
+        ],
+        [
+          79.5,
+          154
+        ],
+        [
+          80.5,
+          155
+        ],
+        [
+          77.5,
+          154
+        ]
+      ]
+    },
+    {
+      "kind": "toxic",
+      "path": "assets/infected_v1/toxic/actions.png",
+      "sha256": "88b1286b9eccbf465b2cc4eb6b12524ae9886fca0241db118b615a0bd6e6165a",
+      "source_sha256": "df6cb02d0e9fc6718a98dee5925bfde6672a307c761788731dfabfc0b2c59054",
+      "source_size": [
+        1942,
+        809
+      ],
+      "scale": 1.4267515923566878,
+      "source_anchors": [
+        [
+          79.0,
+          154
+        ],
+        [
+          79.5,
+          152
+        ],
+        [
+          83.0,
+          150
+        ],
+        [
+          78.0,
+          155
+        ],
+        [
+          83.5,
+          151
+        ]
+      ]
+    },
+    {
+      "kind": "burst",
+      "path": "assets/infected_v1/burst/actions.png",
+      "sha256": "88a518f60ebe437116d4cbbdda4a4993e126558b30c4a17d7c5b56ccc9ef8333",
+      "source_sha256": "14efe27286d074254dd9e32eb0dc6a7d514d061f4efa96ea4006f0cc58cef26d",
+      "source_size": [
+        1942,
+        809
+      ],
+      "scale": 1.382716049382716,
+      "source_anchors": [
+        [
+          84.5,
+          152
+        ],
+        [
+          87.0,
+          150
+        ],
+        [
+          89.0,
+          149
+        ],
+        [
+          83.0,
+          150
+        ],
+        [
+          86.5,
+          148
+        ]
+      ]
+    },
+    {
+      "kind": "hound",
+      "path": "assets/infected_v1/hound/actions.png",
+      "sha256": "18720a9f31774680aa80a5d70d4638ba049440ab8847b4e30728e194d872ac4f",
+      "source_sha256": "55a5105948f0f1c9b392b90b88f4eb030834733678294a6b2aad83a37e1ebd14",
+      "source_size": [
+        1942,
+        809
+      ],
+      "scale": 1.382716049382716,
+      "source_anchors": [
+        [
+          82.5,
+          141
+        ],
+        [
+          78.5,
+          147
+        ],
+        [
+          76.0,
+          148
+        ],
+        [
+          84.5,
+          144
+        ],
+        [
+          79.0,
+          146
+        ]
+      ]
+    },
+    {
+      "kind": "breacher",
+      "path": "assets/infected_v1/breacher/actions.png",
+      "sha256": "30506fa2b361996d8b56aa41b24a4e67af380ba5e9b65b17ccbe03e742ae9cf8",
+      "source_sha256": "ec44c5b566954bd4b7e38bda37a351b9ab64c15fc547f23688c9d98f5e6dd598",
+      "source_size": [
+        1942,
+        809
+      ],
+      "scale": 1.3625,
+      "source_anchors": [
+        [
+          85.0,
+          162
+        ],
+        [
+          87.0,
+          162
+        ],
+        [
+          85.0,
+          160
+        ],
+        [
+          83.5,
+          162
+        ],
+        [
+          85.5,
+          160
+        ]
+      ]
+    }
+  ],
+  "prompts": "assets/infected_v1/special_prompts.json"
+}

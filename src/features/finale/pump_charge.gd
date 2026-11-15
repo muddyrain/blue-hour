@@ -64,12 +64,15 @@ static func draw_warning(canvas: CanvasItem, state: Dictionary, offset: Vector2 
 	var direction: Vector2 = (_vector(state.target) - _vector(state.from)).normalized()
 	var side: Vector2 = direction.orthogonal() * HALF_WIDTH
 	var boundary: PackedVector2Array = PackedVector2Array([from + side, to + side, to - side, from - side])
-	canvas.draw_colored_polygon(boundary, Color(0.87, 0.17, 0.07, 0.24))
+	var projected: PackedVector2Array = PackedVector2Array()
+	for point: Vector2 in boundary:
+		projected.append(IsoSpace.to_view(point))
+	canvas.draw_colored_polygon(projected, Color(0.87, 0.17, 0.07, 0.24))
 	for index: int in range(boundary.size()):
-		canvas.draw_dashed_line(boundary[index], boundary[(index + 1) % boundary.size()], Color("ff9058"), 3.0, 12.0)
+		canvas.draw_dashed_line(projected[index], projected[(index + 1) % projected.size()], Color("ff9058"), 3.0, 12.0)
 	var tip: Vector2 = from.lerp(to, 0.62)
 	var tail: Vector2 = tip - direction * minf(16.0, from.distance_to(to) * 0.4)
-	var chevron: PackedVector2Array = PackedVector2Array([tail + side * 0.47, tip, tail - side * 0.47])
+	var chevron: PackedVector2Array = PackedVector2Array([IsoSpace.to_view(tail + side * 0.47), IsoSpace.to_view(tip), IsoSpace.to_view(tail - side * 0.47)])
 	canvas.draw_polyline(chevron, Color("ffdfa3"), 3.0, true)
 
 

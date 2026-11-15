@@ -28,7 +28,7 @@ def main():
   if label=='known-hash-cycle':cmd+=['--cycle-output='+(folder/'cycle.json').as_posix()]
   if label=='record-hash':cmd+=['--record-output='+(folder/'data').as_posix()]
   if label=='neighborhood-data':cmd+=['--neighborhood-output='+(folder/'data.json').as_posix()]
-  with (folder/'console.txt').open('xb') as out:z=subprocess.run(cmd,cwd=ROOT,stdout=out,stderr=out,env=env,timeout=300 if label=='m48-sources' else 150)
+  with (folder/'console.txt').open('xb') as out:z=subprocess.run(cmd,cwd=ROOT,stdout=out,stderr=out,env=env,timeout=600 if label=='progression_save' else 300 if label=='m48-sources' else 150)
   text=(folder/'console.txt').read_text(encoding='utf-8',errors='replace');assert z.returncode==expected and not re.search(r'(?m)^(SCRIPT ERROR|ERROR):',text),(label,z.returncode,text[-2000:])
   assert all(int(n)==0 for n in re.findall(r'"failures"\s*:\s*(\d+)',text)),(label,'structured failures')
   if label=='known-hash-cycle':assert 'MINIMAL_HASH_CYCLE=true' in text and 'EXACT_RECORD_ROUNDTRIP=true' in text
@@ -38,7 +38,11 @@ def main():
  execute('startup-default',['--quit-after','3'])
  execute('startup-111',['--quit-after','3'])
  execute('smoke-loop',['--script','res://tests/smoke_loop.gd'],[])
- for name in ['playable_entry','presentation','camp_scene_contracts','squad_recruit','weapon_inventory','combat_los','navigation_nearest','night_pressure','harbor_warehouse','contact_damage','contact_separation','animation/motion','animation/normal_stability','animation/infected_v1','animation/special_infected_v1','animation/survivors_v1','animation/weapon_holding']:
+ execute('smoke-wait',['--script','res://tests/smoke_wait.gd'],[])
+ execute('mission-loading',['--script','res://tests/mission_loading.gd'],[])
+ execute('navigation-cache',['--script','res://tests/navigation_cache.gd'],[])
+ execute('audio-feedback',['--script','res://tests/audio_feedback.gd'],[])
+ for name in ['playable_entry','presentation','camp_scene_contracts','squad_recruit','weapon_inventory','combat_los','navigation_nearest','night_pressure','harbor_warehouse','progression_contracts','progression_save','maps_events','sortie_events','contact_damage','contact_separation','animation/motion','animation/normal_stability','animation/infected_v1','animation/special_infected_v1','animation/survivors_v1','animation/weapon_holding']:
   execute(name.replace('/','-'),['--script','res://tests/'+name+'.gd'])
  for name in ['rogue_navigation','hud_compact','world_data']:
   execute(name.replace('_','-'),['--script','res://tests/'+name+'.gd'])

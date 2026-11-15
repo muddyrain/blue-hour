@@ -6,6 +6,7 @@ signal membership_committed()
 
 signal finished(report: Dictionary)
 signal combat_feedback(event: Dictionary)
+signal audio_cue_requested(cue: StringName)
 signal search_completed(reward: int)
 signal engine_started
 signal pause_changed(paused: bool)
@@ -217,7 +218,7 @@ func step(delta: float) -> void:
 			_spawn_clock = minf(_spawn_clock, threat.interval)
 		var state: Dictionary = threat_status()
 		threat_changed.emit(state)
-		_show_notice("%s · 增援更密集；仍可发动巴士集合撤离。" % state.label)
+		_threat.announce_stage(state)
 	_spawn_clock -= delta
 	_ai_clock -= delta
 	if _spawn_clock <= 0.0:

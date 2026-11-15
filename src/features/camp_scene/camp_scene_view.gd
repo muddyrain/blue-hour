@@ -373,6 +373,8 @@ func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, r
 		button.visible = choice != "planning" or EconomyBuildV1.enabled(data)
 		button.text = "%s · %s" % [FACILITY_NAMES[choice], "待建" if level == 0 else "%d 级" % level]
 		button.tooltip_text = "点击查看设施与建设" if level == 0 else "点击打开工坊" if choice == "workshop" else "点击打开特长训练" if choice == "planning" else "点击查看补给与升级"
+		if EconomyBuildV1.enabled(data):
+			button.tooltip_text += "\n" + EconomyBuildV1.facility_effect(choice, level)
 		button.disabled = false
 		scene_buttons[&"bus"].disabled = not can_depart
 	_return_summary.visible = not last.is_empty()
@@ -448,6 +450,9 @@ func _refresh_blue_hour_member(button: Button, data: Dictionary, id: int) -> voi
 	var equipped: Dictionary = WeaponInventory.for_member(data, id)
 	weapon.text = WeaponInventory.definition(equipped.weapon_id).display_name if not equipped.is_empty() else "未装备"
 	button.tooltip_text = "%s · %s\n%s · %s\n查看队员档案" % [specialty.text, call_sign.text, health.text, weapon.text]
+	button.tooltip_text += "\n" + GrowthRules.description(member)
+	if TraitState.is_family(data):
+		button.tooltip_text += "\n" + TraitRules.description(member).replace(" · PROJECT_TEMP", "")
 
 
 func clear() -> void:

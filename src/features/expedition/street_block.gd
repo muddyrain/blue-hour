@@ -19,6 +19,9 @@ func _ready() -> void:
 		add_child(tiles)
 		if layout.world_data.get("seaside_town"):
 			return
+		if CapeStation.is_layout(layout):
+			add_child(StationGround.new())
+			return
 		if HarborWarehouse.is_layout(layout):
 			var quay: HarborGround = HarborGround.new()
 			quay.layout = layout

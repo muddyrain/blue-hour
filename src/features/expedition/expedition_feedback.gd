@@ -4,6 +4,8 @@ extends RefCounted
 
 var _atmosphere: ExpeditionAtmosphere = ExpeditionAtmosphere.new()
 var _special_infected: SpecialInfectedFeedback
+var _night_audio_seen: bool = false
+var _warning_audio: Dictionary[String, int] = {}
 var x: Expedition
 
 
@@ -86,6 +88,8 @@ func _hit_effect(to: Vector2, damage: float, survivor_hit: bool) -> void:
 
 
 func _draw_hit_effect(to: Vector2, damage: float, survivor_hit: bool, prefix: String) -> void:
+	if damage > 0.0:
+		x.audio_cue_requested.emit(&"survivor_hit" if survivor_hit else &"hit")
 	var impact: Node2D = Node2D.new()
 	impact.position = IsoSpace.to_view(to) + Vector2(0, -30)
 	x._effects.add_child(impact)
@@ -126,6 +130,7 @@ func _show_notice(message: String) -> void:
 
 
 func _refresh_night_lighting() -> void:
+	_refresh_audio()
 	if _special_infected == null:
 		_special_infected = SpecialInfectedFeedback.new()
 		x.add_child(_special_infected)
@@ -137,6 +142,43 @@ func _refresh_night_lighting() -> void:
 	_atmosphere.refresh(x, amount)
 	x._night_lighting.refresh(amount, x._bus_sprite.get_global_transform_with_canvas().origin, x.camera.zoom.x)
 	_keep_squad_in_view()
+
+
+func present_combat_audio(event: Dictionary) -> void:
+	# These are committed events; windup cues coincide with the existing warning rings.
+	match String(event.get("kind", "")):
+		"shot", "shotgun":
+			x.audio_cue_requested.emit(&"fire")
+		"axe_swing", "hammer_swing":
+			x.audio_cue_requested.emit(&"melee_swing")
+		"screamer_windup":
+			x.audio_cue_requested.emit(&"screamer_warning")
+		"burst_windup":
+			x.audio_cue_requested.emit(&"burst_warning")
+
+
+func _refresh_audio() -> void:
+	# Read presentation edges only: no timers, damage, saved fields or accumulated queue.
+	var audible: bool = not x.is_paused and not x.suspend_sealed and x.phase != Expedition.Phase.FINISHED
+	var night: bool = x.elapsed >= x.tuning.daylight_seconds
+	if audible and night and not _night_audio_seen:
+		x.audio_cue_requested.emit(&"nightfall")
+	_night_audio_seen = night
+	var current: Dictionary[String, int] = {}
+	for key: String in x.combat.toxic.get("casters", {}):
+		var intent: Dictionary = x.combat.toxic.casters[key]
+		if intent.get("phase") == "windup":
+			var identity: String = "toxic:" + key
+			current[identity] = int(intent.sequence)
+			if audible and _warning_audio.get(identity, -1) != current[identity]:
+				x.audio_cue_requested.emit(&"toxic_warning")
+	for actor: FieldActor in x.enemies:
+		if actor.health > 0.0 and actor.enemy_behavior != null and actor.enemy_behavior.kind == NightHoundV1.KIND and actor.enemy_behavior.state == "windup":
+			var identity: String = "hound:" + str(actor.actor_id)
+			current[identity] = 0
+			if audible and not _warning_audio.has(identity):
+				x.audio_cue_requested.emit(&"hound_warning")
+	_warning_audio = current
 
 
 func _keep_squad_in_view() -> void:

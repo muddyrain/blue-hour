@@ -2,6 +2,7 @@ class_name BusJourney
 extends Node
 ## Presentation clock only. Frozen result is published by Main before departure begins.
 signal departed()
+signal audio_cue_requested(cue: StringName)
 const DRIVE_IN: float = 2.4
 const DISEMBARK: float = 1.0
 const EMBARK: float = 0.9
@@ -102,6 +103,7 @@ func advance(delta: float) -> void:
 				for actor: FieldActor in world.survivors:
 					if actor.health>0: actor.hide()
 				stage="departing"; clock=0; skip_button.text="巴士驶离 · 跳过演出"
+				audio_cue_requested.emit(&"bus_depart")
 				_show_boarding("巴士驶离")
 		"departing":
 			IsoSpace.place(sprite, stop.lerp(WorldLayout.point(route.exit),smoothstep(0,1,minf(clock/DRIVE_OUT,1))))
@@ -130,6 +132,7 @@ func skip() -> void:
 
 func departure() -> void:
 	if stage!="exploring" or world.phase!=Expedition.Phase.FINISHED: return
+	audio_cue_requested.emit(&"bus_board")
 	if _open_body != null:
 		_begin_open_boarding()
 		return
@@ -218,6 +221,7 @@ func _advance_open_boarding(delta: float) -> void:
 		clock = 0.0
 		delta -= step
 	stage = "departing"
+	audio_cue_requested.emit(&"bus_depart")
 	_open_body.show_door(false)
 	_show_boarding("巴士驶离")
 	if delta > 0.0:

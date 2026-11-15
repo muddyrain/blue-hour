@@ -281,7 +281,7 @@ static func repair_offer(data: Dictionary, item: Dictionary) -> Dictionary:
 	var discount: int = 0
 	var source: String = ""
 	if CampFacilities.selected(data) == CampFacilities.WORKSHOP:
-		discount = CampFacilities.REPAIR_DISCOUNT
+		discount = EconomyBuildV1.repair_discount(data) if EconomyBuildV1.enabled(data) else CampFacilities.REPAIR_DISCOUNT
 		source = "工坊"
 	elif mechanic_available(data):
 		discount = MECHANIC_DISCOUNT

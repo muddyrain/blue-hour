@@ -30,8 +30,9 @@ static func skin(node: Node) -> void:
 			surface.content_margin_top = 2
 			surface.content_margin_bottom = 2
 		if node.name == "StatusHintPanel":
-			surface.bg_color = Color("22201e", 0.52)
-			surface.border_color = Color("e8dcc4", 0.28)
+			# Small notices need a stable reading surface over both blue night and lamps.
+			surface.bg_color = Color("22201e", 0.90)
+			surface.border_color = Color("e8dcc4", 0.55)
 			surface.content_margin_top = 4
 			surface.content_margin_bottom = 4
 			surface.shadow_size = 0

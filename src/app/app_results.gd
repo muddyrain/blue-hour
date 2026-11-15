@@ -128,6 +128,11 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	if not catalog_notice.is_empty():
 		text += catalog_notice + "\n"
 	var generated: Dictionary = frozen.get("rules",{}).get("mission",{}).get("generated",{})
+	if CapeStation.should_apply(generated):
+		text += "归航地点 · " + CapeStation.TITLE + "\n"
+	var event_summary: String = SortieEvents.summary(generated, battle, float(generated.get("exploration", {}).get("level", {}).get("assumptions", {}).get("night_seconds", 105.0)))
+	if not event_summary.is_empty():
+		text += event_summary + "\n"
 	if BillboardActionV1.enabled(generated):
 		if not BillboardIntelV1.opportunity(snapshot).is_empty():
 			text += "超市广告牌 · 下次选卡保证出现超市补给%s\n" % ("" if durable else "（确认后生效）")
@@ -202,6 +207,18 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 		var awarded: Dictionary = GrowthRules.member_row(frozen.get("xp",{}).get("members",[]),int(member.id))
 		var fate: String = app._member_fate(snapshot,int(member.id)).replace(" / STARVATION", "").replace(" / BATTLE", "")
 		text += "\n%02d %s · %s · 生命%.0f/%.0f\nLv%d · %d XP（本次+%d）\n" % [member.id,member.call_sign,fate,member.health,GrowthRules.maximum(member),member.growth.level,member.growth.xp_total,awarded.get("xp_gained",0)]
+		if not awarded.is_empty() and float(awarded.max_after) > float(awarded.max_before):
+			text += "生命上限 %.0f → %.0f\n" % [awarded.max_before, awarded.max_after]
+		var trait_award: Dictionary = GrowthRules.member_row(frozen.get("traits", {}).get("members", []), int(member.id))
+		if not trait_award.is_empty():
+			text += "特性等级 %d → %d · 进度 +%d\n" % [trait_award.before.level, trait_award.after.level, trait_award.gained]
+	if EconomyBuildV1.enabled(snapshot) and not EconomyBuildV1.state(snapshot).returns.is_empty():
+		var facilities: Dictionary = EconomyBuildV1.state(snapshot).returns.back()
+		if facilities.transaction_id == snapshot.last_settlement_id:
+			text += "\n设施回营收益：补给 %d 粮 · 自动维修 %d 件\n" % [facilities.food, facilities.repairs.size()]
+			if not facilities.planning.is_empty():
+				var target: Dictionary = SurvivorRoster.member(snapshot.crew, int(facilities.planning.member_id))
+				text += "规划室：%s 特性进度 +%d，等级 %d → %d\n" % [target.call_sign, facilities.planning.points, facilities.planning.before.level, facilities.planning.after.level]
 	text += "\n营地：第%d天 · 货币%d · 存活%d人\n" % [snapshot.day,snapshot.cash,snapshot.journey.active_member_ids.size()]
 	text += "旅程已结束，不能再次出击。" if ended else "确认结算后可回营整备，再次出击。"
 	return text

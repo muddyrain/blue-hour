@@ -69,9 +69,17 @@
 
 `CampSceneResident` 仅给当前存活名册成员播放 `SurvivorVisualV1` 的正式八向待机/行走；沿院内固定环线散步，在补给、工坊、规划室和篝火旁停留，不实例化战斗角色、不写入存档。`CampSceneScenery` 绘制原创围栏、篝火和家具，所有立体物按脚点 Y 排序；暖暮复用 `ExpeditionAtmosphere.tint_for()` 及径向暖色点光，色调与灯光限制在世界层。`CampSceneStyle` 将营地与既有面板调整为暖炭灰，保留原面板布局参数。
 
+成长沿现有 `CampEdit` / `FrozenSettlement` → `RunTransaction` 链路保存。`EconomyBuildV1` 三个设施键 `supply` / `workshop` / `planning` 独立建设、最高二级：补给成功归航应发 2/3 粮；工坊回营自动修复最多 1/2 件出发前损坏的闲置武器，维修减免 4/6 币，下次出击换弹耗时乘 0.95/0.90；规划室成功归航给合格队员中的最低特性等级者增加 1/2 点进度。自动收益读取出发前状态，建设不会追溯补发；补给受库存容量限制，规划室不选择未登记、阵亡或特性满级者。
+
+枪械强化复用 `upgrade_weapon` 交易，初始枪、回收枪及自制枪均可升至五级；一级工坊开放二、三级，二级开放四、五级。实例 ID、品质、词条和弹匣保留，直伤沿用每级增加基础值 10% 的规则。来源校验先从第一次实例编辑的前态或冻结掉落重建来源，再按经济编辑历史重放，旧规则校验只读取来源投影，不保存第二套武器。工坊换弹倍率取 `field_departure`，在 `ExpeditionSupport.apply_build()` 与个人特质、道具倍率各乘一次；`SortieSnapshot` 的校验和兼容哈希使用同一倍率。营地配装预览、档案与场内卡片显示一致的有效换弹时间。
+
+人物经验每次个人击退记 10，存活归航后生效；等级提高时生命上限每级增加 5，并恢复新增生命。特性独立使用 `TraitRules` 的五级阈值，射击间隔、搜刮耗时、移速由现有场内接线生效；篝火训练每 1 粮增加 1 点个人特性进度。档案与悬停卡说明成长来源及具体效果，训练预览同时列出前后效果；结算显示生命上限变化、特性变化和设施回营收益。`tests/progression_contracts.gd` 验证实际弹匣与工作进度，`tests/progression_save.gd` 在 `.local/` 定向验证冻结结算、设施/武器/训练交易、独立读档及下次出击/快照重建，不作为正常玩家路线的完成证明。
+
 营地底色层级为 -20，低于共用 `IsoTiles` 的 -10；设施、家具与人物留在 0 层的 Y 排序节点。`CampSceneLayout.PATHS` 定义碎石院内的混凝土通道，`DRESSING` 定义避开设施、门前与人物环线的生活摆件；不参与碰撞、导航或存档。镜头使用等比缩放，归航摘要出现时给摘要让出空间。氛围标题订阅 `CampSceneWorld.atmosphere_changed`，外部调用 `set_dusk()` 也会同步更新；场内标签平时缩小淡显，鼠标悬停或键盘焦点时强调。
 
-生成关先由 `WorldgenDensity` 补房，`WorldgenDressing.freeze` 冻结碰撞景物，再由 `ParcelScenery.fit` 补齐场地，最后只运行一次 `WorldgenDressing.enrich`。装饰先预留停车垫和车棚，再沿道路及门前步道两侧放小件；开阔草坪不按面积填充日用品。装饰仍受门口、步道、巴士与装卸场保留区约束，不新增交互或碰撞。
+生成关先由 `WorldgenDensity` 补房，`WorldgenDressing.freeze` 冻结碰撞景物，再由 `ParcelScenery.fit` 补齐场地。`ExplorationLayout.complete` 在门口路线与道具拟合前先拒绝已被挡住的街区必经通道，放置道具后仍保留最终通道校验；全部几何校验通过后才运行一次无碰撞的 `WorldgenDressing.enrich`，随后计算地图指纹。装饰先预留停车垫和车棚，再沿道路及门前步道两侧放小件；开阔草坪不按面积填充日用品。装饰仍受门口、步道、巴士与装卸场保留区约束，不新增交互或碰撞。
+
+`FieldNavigation` 为每张图缓存最多 2048 组精确起终点的原始 AStar 路径（含不可达结果），供任务证书和卡片摘要复用；不改变择路规则。网格重建或临时路障变更会清空缓存，返回数组独立复制，私有路障图不共享路径状态。
 
 `HarborWarehouse` 是第二个手摆地点“海边町·北港仓库”（地点键 `north_harbor`）。从第 3 天起，普通 `airdrop` 装备回收和定期五金补给通过 `ExplorationActions.supply()` 投影到港口；带独立空间锚点的侦察、路障、稀有/事件、深入回收和终局保留原图。与 `SeasideTown` 一样保留原任务/地图收据 ID 和 `generated`，不改变 `offers()`、奖励或源站点名义时长。港口地形和搜刮绑定集中在 `harbor_warehouse.gd`；`TaskActions.site_point()` 同时供运行时及快照校验使用，避免只有画面搬了位置。`HarborPresentation` 负责闭合建筑与外部门口工位，`HarborGround` 负责码头岸线表现，仍共用 `FieldNavigation`、原刷怪/入夜、派工、登车与结算。港口仅五盏工作灯（暖色/冷白）参与场景光池，货柜不充当光源。
 
@@ -80,6 +88,12 @@
 港口作业耗时局部乘 `HarborWarehouse.WORK_FACTOR = 1.5`（PROJECT_TEMP）：名义进度与源站点时长保持原值，推进速度变慢；货台基础 18 秒，仓储点基础 27–45 秒，再应用既有人物/构筑倍率。不改全局时钟、奖励、刷怪权重；倍率参与港口快照兼容性哈希。
 
 港口 SVG 使用现有 `IsoAtlas` 的脚点/地图尺寸协议，由 `tools/make_harbor_art.py`（纯 Python 标准库）生成并登记 SHA；没有 AI 生成图像或第三方素材。`tests/harbor_warehouse.gd` 检查实际任务选择、布局可达、窄巷、水面、登车区域、源数据不变、作业耗时与部分作业快照重建，已纳入 `tools/godot.py check`。
+
+`CapeStation` 是手摆地点“海边町·岬角车站”（`cape_station`）。第 4 天起的偶数日，普通 `supply` 食品任务在 `ExplorationActions.supply()` 投影到车站；带独立空间锚点的任务保留原图。源 `generated`、任务/地图 ID、收益和名义工时保持原值，`TaskActions.site_point()` 与 `outdoor_site()` 同时供运行时及回放读取车站屋外工位。站房、商店、民居封闭，短轨阻挡通行但不挡弹，低站台两端可绕行。`StationPresentation` 绑定搜刮点，`StationGround` 展示轨道与低站台，共用导航、派工、支援、刷怪与巴士流程；完整地形加入快照兼容哈希。8 个原创 SVG 由 `tools/make_station_art.py` 复用港口绘图原语生成并登记来源，不修改港口地形。
+
+`SortieEvents` 只投影现有事件：`EventSortieV1` 的临时物资点保留现场二选一、开工警报和 `task_event` 结算；`RareSortie` 的断电冷库关闭两处食品站点的窗光，保留路灯和车灯，并从 `site_facts` 展示近处/远端搜集结果。提示持续显示在场内，状态均从原收据重建，不新增事件存档格式，也不重新抽选。既有种子选择器、概率与奖励保持不变。
+
+`CampaignPressureV1.blockade_night()` 在启用跨日压力的普通第 4、7、10…天出击预告“封锁夜”（调查、稀有、事件、终局除外）。入夜后普通敌种抽签按 actor ID 模 3，把其中两类普通槽分别升级为重压、疾奔，其余槽与特殊种优先级沿用原规则；`CombatEnemyRules.pick_for()` 同供刷怪与回放证明使用。任务卡、顶部时钟、黄昏和入夜均有提示，结算从原收据的任务日期及经过时间还原是否经历封锁夜。上限、间隔、出入口、安全距离和 `ExpeditionAtmosphere` 曲线不变；策略参数进入快照哈希。`tests/maps_events.gd` 覆盖车站正式选卡、导航/屋外作业/登车/恢复与封锁夜来源校验；`tests/sortie_events.gd` 覆盖事件两分支、冷库断电与结算事实，两者均纳入 `check`。
 
 ### 存档说明
 
@@ -107,6 +121,10 @@
 - `assets/`：运行时美术/音频。逐文件来源与 SHA 登记在 `assets/PROVENANCE.json`，`tools/validate_assets.py` 校验（`check` 会运行）。
 - 美术为项目原创：AI 辅助生成的 PNG（统一透明裁切、等比缩放、登记脚点后入图集，见各目录 `atlas.json`/`manifest.json`）、手绘 SVG、代码绘制；音效由 `src/features/audio_settings/generate_cues.py` 数学合成。生图提示要点在 `assets/world_v1/source/PROMPTS.md`、`assets/world_v2/source/prompts.md`。
 - 不使用 Deadly Days 的任何图像、声音或录屏。
+
+音效沿用应用持有的 `B1AudioService`，没有 Autoload 或全局 AudioServer 总线写入。`ExpeditionFeedback` 通过 `audio_cue_requested` 上报开火（含霰弹）、近战提交、统一命中、特殊种蓄势和入夜；`AppSortie` 把意图接回已有服务，搜刮/发动与营地、任务选择、声音设置的 UI 确认仍走原回调。毒气和夜犬读取现有蓄势边沿，重复刷新不重播；暂停恢复快照只记录已存在的提示状态。巴士演出单独发登车/驶离提示，在结算冻结、战斗事件断开后继续接入同一服务。
+
+音量默认仍为主音量 0.8、世界 0.75、UI 0.7、非静音。静音/分类归零立即停止对应尾音并拒绝新声音；世界暂停冻结现有声流、拒绝新请求，UI 保持可用，恢复不补播。服务固定 6 个世界与 2 个 UI 声部，其中世界的 2 个优先留给搜刮、巴士和预警；重要提示可替换较低优先级声音，满载不排队。15 个 WAV 为纯 Python 标准库数学合成（Codex 辅助代码、没有 AI 音频模型或采样素材），每个峰值 0.55，`VOICE_GAIN = 0.20`（PROJECT_TEMP 表现参数，原 0.16）；8 声部满滑杆的离散峰值和不超过 0.88。`tests/audio_feedback.gd` 已纳入 `check`；`python tests/test_audio_assets.py` 可脱离引擎校验生成可复现性、注册、来源与混音余量。
 
 ## 测试与工具
 

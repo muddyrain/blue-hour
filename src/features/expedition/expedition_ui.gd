@@ -203,6 +203,8 @@ func _update_ui() -> void:
 		"weapon_loot":x.weapon_loot.size(),
 		"searched": x.searched, "kills": x.kills, "engine": engine_text,
 		"notice": x._notice_text, "notice_visible": x._notice_clock > 0.0,
+		"event_hint":SortieEvents.field_hint(x),
+		"night_hint":SortieEvents.night_hint(x.supply.generated, x.elapsed, x.tuning.daylight_seconds),
 		"threat":x.threat_status(),
 		"burst_warning":x.combat.burst.warning_text() if x.combat.burst != null and x.phase != Expedition.Phase.FINISHED else "",
 	})
@@ -297,6 +299,10 @@ func _exploration_objective_rows() -> Array[Dictionary]:
 				row.title = "搜集周转货柜"
 			elif row.id == "fruit_trees_all":
 				row.title = "搜集码头补给箱"
+	if CapeStation.is_layout(x.layout):
+		for row: Dictionary in rows:
+			if row.id == "searchable_vehicles_all" or row.id == "fruit_trees_all":
+				row.title = "搜集站前周转箱"
 	if x.pump_station_mode():
 		var stopped: bool = x.station_stopped()
 		rows[0].title = "停机完成 · 击败破阵者" if stopped else "控制柜 · 派工停机"

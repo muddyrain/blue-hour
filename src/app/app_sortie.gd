@@ -173,11 +173,14 @@ func _open_sortie(resume: Dictionary = {}) -> void:
 	app.expedition.finished.connect(app._finish_callback)
 	app.expedition.combat_feedback.connect(app._on_combat_feedback)
 	app.expedition.search_completed.connect(app._on_search_completed)
+	app.expedition.audio_cue_requested.connect(app._request_audio.bind(true))
 	app.expedition.engine_started.connect(app._on_engine_started)
 	app.expedition.pause_changed.connect(app._on_pause_changed)
 	app.expedition.help_changed.connect(app._on_help_changed)
 	app.phase = app.Phase.EXPEDITION
 	app.get_node("World").add_child(app.expedition)
+	if app.expedition.bus_view != null:
+		app.expedition.bus_view.audio_cue_requested.connect(app._request_audio.bind(true))
 	app._frozen_world = {}
 	if not resume.is_empty():
 		var world: Dictionary = resume.receipt.envelope.world
@@ -268,6 +271,7 @@ func _disconnect_sortie_events() -> void:
 		return
 	if app.expedition.combat_feedback.is_connected(app._on_combat_feedback):
 		app.expedition.combat_feedback.disconnect(app._on_combat_feedback)
+		app.expedition.audio_cue_requested.disconnect(app._request_audio.bind(true))
 		app.expedition.search_completed.disconnect(app._on_search_completed)
 		app.expedition.engine_started.disconnect(app._on_engine_started)
 		app.expedition.pause_changed.disconnect(app._on_pause_changed)
@@ -287,12 +291,7 @@ func _attach_damage_gates() -> void:
 
 
 func _on_combat_feedback(event: Dictionary) -> void:
-	if event["kind"] == "shot":
-		app._request_audio(&"fire", true)
-		if float(event.get("applied_damage", 0.0)) > 0.0:
-			app._request_audio(&"hit", true)
-	elif event["kind"] == "hit" and float(event.get("applied_damage", 0.0)) > 0.0:
-		app._request_audio(&"hit", true)
+	app.expedition._feedback.present_combat_audio(event)
 
 
 func _on_search_completed(_reward: int) -> void:

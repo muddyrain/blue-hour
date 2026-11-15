@@ -60,7 +60,7 @@ static func problem(event: Variant, state: Dictionary, world: Dictionary, layout
 			or not event.occupied.any(func(point: Array) -> bool: return SortieSnapshot._vec(point) == SortieSnapshot._vec(state.origin)):
 		return "SCREAMER_EVENT_POSITIONS"
 	var navigation: FieldNavigation
-	if HarborWarehouse.is_layout(layout):
+	if HarborWarehouse.is_layout(layout) or CapeStation.is_layout(layout):
 		navigation = FieldNavigation.new()
 		navigation.configure(layout.blockers(), layout.world_bounds)
 	else:

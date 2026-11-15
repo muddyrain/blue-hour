@@ -1,0 +1,441 @@
+{
+  "cell": [
+    256,
+    256
+  ],
+  "root": [
+    128,
+    224
+  ],
+  "grid": [
+    8,
+    8
+  ],
+  "directions": [
+    "e",
+    "se",
+    "s",
+    "sw",
+    "w",
+    "nw",
+    "n",
+    "ne"
+  ],
+  "display_scale": 0.22,
+  "clips": {
+    "idle": [
+      0
+    ],
+    "walk": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "attack": [
+      5,
+      6,
+      7
+    ]
+  },
+  "walk_fps": 8.0,
+  "attack_seconds": 0.24,
+  "characters": {
+    "gu": {
+      "sheet": "gu.png",
+      "source_sha256": "521971c7de5fd507de615aec9dd3f722d33b2fec84df93b7004718e371287175",
+      "target_idle_height": 182,
+      "registration": [
+        {
+          "direction": "e",
+          "source_root": [
+            83.0,
+            149
+          ],
+          "scale": 1.3946360153256705,
+          "southwest_correction": false
+        },
+        {
+          "direction": "se",
+          "source_root": [
+            80.5,
+            149
+          ],
+          "scale": 1.3946360153256705,
+          "southwest_correction": false
+        },
+        {
+          "direction": "s",
+          "source_root": [
+            79.5,
+            147
+          ],
+          "scale": 1.3946360153256705,
+          "southwest_correction": false
+        },
+        {
+          "direction": "sw",
+          "source_root": [
+            123.5,
+            212
+          ],
+          "scale": 0.9285714285714286,
+          "southwest_correction": true
+        },
+        {
+          "direction": "w",
+          "source_root": [
+            78.0,
+            146
+          ],
+          "scale": 1.3946360153256705,
+          "southwest_correction": false
+        },
+        {
+          "direction": "nw",
+          "source_root": [
+            80.0,
+            147
+          ],
+          "scale": 1.3946360153256705,
+          "southwest_correction": false
+        },
+        {
+          "direction": "n",
+          "source_root": [
+            79.5,
+            147
+          ],
+          "scale": 1.3946360153256705,
+          "southwest_correction": false
+        },
+        {
+          "direction": "ne",
+          "source_root": [
+            80.0,
+            144
+          ],
+          "scale": 1.3946360153256705,
+          "southwest_correction": false
+        }
+      ]
+    },
+    "xia": {
+      "sheet": "xia.png",
+      "source_sha256": "e88eb66c47ade080e4ab097b6477bb82d1b61a67989ebe4d1fba86369011c65a",
+      "target_idle_height": 180,
+      "registration": [
+        {
+          "direction": "e",
+          "source_root": [
+            84.0,
+            152
+          ],
+          "scale": 1.2765957446808511,
+          "southwest_correction": false
+        },
+        {
+          "direction": "se",
+          "source_root": [
+            79.5,
+            149
+          ],
+          "scale": 1.2765957446808511,
+          "southwest_correction": false
+        },
+        {
+          "direction": "s",
+          "source_root": [
+            76.5,
+            150
+          ],
+          "scale": 1.2765957446808511,
+          "southwest_correction": false
+        },
+        {
+          "direction": "sw",
+          "source_root": [
+            125.5,
+            211
+          ],
+          "scale": 0.9230769230769231,
+          "southwest_correction": true
+        },
+        {
+          "direction": "w",
+          "source_root": [
+            79.0,
+            150
+          ],
+          "scale": 1.2765957446808511,
+          "southwest_correction": false
+        },
+        {
+          "direction": "nw",
+          "source_root": [
+            77.0,
+            149
+          ],
+          "scale": 1.2765957446808511,
+          "southwest_correction": false
+        },
+        {
+          "direction": "n",
+          "source_root": [
+            78.5,
+            152
+          ],
+          "scale": 1.2765957446808511,
+          "southwest_correction": false
+        },
+        {
+          "direction": "ne",
+          "source_root": [
+            79.5,
+            151
+          ],
+          "scale": 1.2765957446808511,
+          "southwest_correction": false
+        }
+      ]
+    },
+    "lin": {
+      "sheet": "lin.png",
+      "source_sha256": "a543d41296b4ac5c2dce6a06f7809a4e5617343c079ba68d9a85302c0b620c09",
+      "target_idle_height": 188,
+      "registration": [
+        {
+          "direction": "e",
+          "source_root": [
+            100.0,
+            150
+          ],
+          "scale": 1.3286219081272084,
+          "southwest_correction": false
+        },
+        {
+          "direction": "se",
+          "source_root": [
+            97.0,
+            152
+          ],
+          "scale": 1.3286219081272084,
+          "southwest_correction": false
+        },
+        {
+          "direction": "s",
+          "source_root": [
+            95.5,
+            152
+          ],
+          "scale": 1.3286219081272084,
+          "southwest_correction": false
+        },
+        {
+          "direction": "sw",
+          "source_root": [
+            127.5,
+            211
+          ],
+          "scale": 0.9791666666666666,
+          "southwest_correction": true
+        },
+        {
+          "direction": "w",
+          "source_root": [
+            89.0,
+            153
+          ],
+          "scale": 1.3286219081272084,
+          "southwest_correction": false
+        },
+        {
+          "direction": "nw",
+          "source_root": [
+            84.0,
+            153
+          ],
+          "scale": 1.3286219081272084,
+          "southwest_correction": false
+        },
+        {
+          "direction": "n",
+          "source_root": [
+            86.5,
+            153
+          ],
+          "scale": 1.3286219081272084,
+          "southwest_correction": false
+        },
+        {
+          "direction": "ne",
+          "source_root": [
+            89.0,
+            151
+          ],
+          "scale": 1.3286219081272084,
+          "southwest_correction": false
+        }
+      ]
+    },
+    "shen": {
+      "sheet": "shen.png",
+      "source_sha256": "5441e7daad45ccd492ccc8ab2f39c07459cd4136eaa04390045ab72fe0fe2669",
+      "target_idle_height": 179,
+      "registration": [
+        {
+          "direction": "e",
+          "source_root": [
+            89.0,
+            151
+          ],
+          "scale": 1.256140350877193,
+          "southwest_correction": false
+        },
+        {
+          "direction": "se",
+          "source_root": [
+            84.5,
+            150
+          ],
+          "scale": 1.256140350877193,
+          "southwest_correction": false
+        },
+        {
+          "direction": "s",
+          "source_root": [
+            82.0,
+            151
+          ],
+          "scale": 1.256140350877193,
+          "southwest_correction": false
+        },
+        {
+          "direction": "sw",
+          "source_root": [
+            136.0,
+            210
+          ],
+          "scale": 0.9086294416243654,
+          "southwest_correction": true
+        },
+        {
+          "direction": "w",
+          "source_root": [
+            96.5,
+            151
+          ],
+          "scale": 1.256140350877193,
+          "southwest_correction": false
+        },
+        {
+          "direction": "nw",
+          "source_root": [
+            90.5,
+            150
+          ],
+          "scale": 1.256140350877193,
+          "southwest_correction": false
+        },
+        {
+          "direction": "n",
+          "source_root": [
+            88.0,
+            149
+          ],
+          "scale": 1.256140350877193,
+          "southwest_correction": false
+        },
+        {
+          "direction": "ne",
+          "source_root": [
+            85.0,
+            147
+          ],
+          "scale": 1.256140350877193,
+          "southwest_correction": false
+        }
+      ]
+    },
+    "lu": {
+      "sheet": "lu.png",
+      "source_sha256": "33758955032451cb79bbdfc2dd3db56ddbb7ea671996bf493ee2c2771dd9fda9",
+      "target_idle_height": 183,
+      "registration": [
+        {
+          "direction": "e",
+          "source_root": [
+            95.5,
+            151
+          ],
+          "scale": 1.381132075471698,
+          "southwest_correction": false
+        },
+        {
+          "direction": "se",
+          "source_root": [
+            90.5,
+            149
+          ],
+          "scale": 1.381132075471698,
+          "southwest_correction": false
+        },
+        {
+          "direction": "s",
+          "source_root": [
+            87.5,
+            149
+          ],
+          "scale": 1.381132075471698,
+          "southwest_correction": false
+        },
+        {
+          "direction": "sw",
+          "source_root": [
+            85.0,
+            150
+          ],
+          "scale": 1.381132075471698,
+          "southwest_correction": false
+        },
+        {
+          "direction": "w",
+          "source_root": [
+            82.0,
+            151
+          ],
+          "scale": 1.381132075471698,
+          "southwest_correction": false
+        },
+        {
+          "direction": "nw",
+          "source_root": [
+            81.5,
+            152
+          ],
+          "scale": 1.381132075471698,
+          "southwest_correction": false
+        },
+        {
+          "direction": "n",
+          "source_root": [
+            84.0,
+            150
+          ],
+          "scale": 1.381132075471698,
+          "southwest_correction": false
+        },
+        {
+          "direction": "ne",
+          "source_root": [
+            81.0,
+            149
+          ],
+          "scale": 1.381132075471698,
+          "southwest_correction": false
+        }
+      ]
+    }
+  },
+  "southwest_source_sha256": "1bd32c874cd2abe1bd94eeb076ce3dfafb56317948fc9a7ad526e408dda5ca2c"
+}

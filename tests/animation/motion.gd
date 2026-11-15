@@ -27,12 +27,14 @@ func _run() -> void:
 			if infected_v1:
 				var source_name: String = ["e", "se", "s", "se", "e", "ne", "n", "ne"][oct]
 				_expect(visual._body.texture.resource_path.ends_with("/" + source_name + ".png"), "actual V1 directional source sheet")
+			elif family < 5:
+				_expect(visual._body.texture == SurvivorVisualV1.SHEETS[family] and visual._body.frame / 8 == oct, "independently drawn survivor direction")
 			else:
 				_expect(visual._body.frame % visual._body.hframes == (MotionAtlas.LEFT_COLUMNS[oct] if family < 5 and MotionAtlas.LEFT_COLUMNS.has(oct) else MotionAtlas.COLUMNS[oct]), "actual drawn directional frame")
 			_expect(visual._body.flip_h == (family >= 5 and oct in [3, 4, 5]), "only disclosed enemy mirror")
 			if not actor.is_enemy:
 				visual.show_fire(direction)
-				_expect(visual.motion_state == &"move_fire" and visual._upper.frame / visual._upper.hframes == 4, "separate firing upper pose while legs walk")
+				_expect(visual.motion_state == &"move_fire" and visual._body.frame % 8 == 5 and not visual._upper.visible, "full-body attack starts without static upper overlay")
 				_expect(visual.presentation_state().hand.distance_to(visual.presentation_state().grip) < 0.001, "drawn trigger hand reaches canonical grip")
 				var prediction: Vector2 = visual.aimed_shot_offset(direction)
 				visual.show_fire(direction)

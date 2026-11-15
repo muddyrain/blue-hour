@@ -1298,6 +1298,37 @@
       "sha256": "d013bc216d701e3846e4f7c7287d886de4094170ae4b806e4498cfaa4d6d9fa4",
       "origin": "Original project AI-generated animation art using OpenAI built-in image_gen, 2026-11-15; existing project AI sprites used as identity/style references; individually drawn six-phase gait, attack, hit and fall poses; alpha-preserving grid registration and uniform per-direction scaling. Prompt/source SHA and packing values: assets/infected_v1/PROMPTS.md. Not a third-party asset pack; no Deadly Days material.",
       "license": "No additional license granted"
+    },
+    {
+      "path": "assets/survivors_v1/gu.png",
+      "sha256": "225bf20aa2451fba8d46e5254af408477db660eedcec2e58ab6b1480f1f96d62",
+      "origin": "AI-assisted redraw/extension of original assets/m5_anim_01/gu_full.png using built-in OpenAI imagegen (2026-11-15); independently drawn eight directions, idle + four walk + three attack poses. Southwest correction for gu/xia/lin/shen. Pillow alpha cleanup (<12), slicing and fixed per-direction root registration by tools/build_survivor_atlas.py. No third-party asset pack or Deadly Days artwork. Generation specification: assets/survivors_v1/generation.json.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/survivors_v1/xia.png",
+      "sha256": "f65e932b5036e5804b8b8e2aa0eafe36330a2b6766fa42756ab62694871711f3",
+      "origin": "AI-assisted redraw/extension of original assets/m5_anim_01/xia_full.png using built-in OpenAI imagegen (2026-11-15); independently drawn eight directions, idle + four walk + three attack poses. Southwest correction for gu/xia/lin/shen. Pillow alpha cleanup (<12), slicing and fixed per-direction root registration by tools/build_survivor_atlas.py. No third-party asset pack or Deadly Days artwork. Generation specification: assets/survivors_v1/generation.json.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/survivors_v1/lin.png",
+      "sha256": "5c0ae3dc9471dc6dccf076149d5f12a974207a1f315f9f2550074d199f940a9c",
+      "origin": "AI-assisted redraw/extension of original assets/m5_anim_01/lin_full.png using built-in OpenAI imagegen (2026-11-15); independently drawn eight directions, idle + four walk + three attack poses. Southwest correction for gu/xia/lin/shen. Pillow alpha cleanup (<12), slicing and fixed per-direction root registration by tools/build_survivor_atlas.py. No third-party asset pack or Deadly Days artwork. Generation specification: assets/survivors_v1/generation.json.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/survivors_v1/shen.png",
+      "sha256": "4aab2e4810b547485eb8d4e85379257b17d1b43272873227c845e3b3b02ca411",
+      "origin": "AI-assisted redraw/extension of original assets/m5_anim_01/shen_full.png using built-in OpenAI imagegen (2026-11-15); independently drawn eight directions, idle + four walk + three attack poses. Southwest correction for gu/xia/lin/shen. Pillow alpha cleanup (<12), slicing and fixed per-direction root registration by tools/build_survivor_atlas.py. No third-party asset pack or Deadly Days artwork. Generation specification: assets/survivors_v1/generation.json.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/survivors_v1/lu.png",
+      "sha256": "91c0fecba6ba31fc534a9d5ac7314e3a5156d51d0065604e78e61165dec7f3da",
+      "origin": "AI-assisted redraw/extension of original assets/m5_anim_01/lu_full.png using built-in OpenAI imagegen (2026-11-15); independently drawn eight directions, idle + four walk + three attack poses. Southwest correction for gu/xia/lin/shen. Pillow alpha cleanup (<12), slicing and fixed per-direction root registration by tools/build_survivor_atlas.py. No third-party asset pack or Deadly Days artwork. Generation specification: assets/survivors_v1/generation.json.",
+
+      "license": "No additional license granted"
     }
   ]
 }

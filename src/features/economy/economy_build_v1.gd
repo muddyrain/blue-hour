@@ -79,6 +79,7 @@ static func offer(camp: Dictionary, op: String, target: String = "", choice: Str
 					elif int(camp.settled_sorties) <= int(state(camp).facilities[target].built_sortie) or camp.get("last_day", {}).get("evacuated") != true:
 						reason = "建成后须再完成一次成功归航并确认"
 				quote.summary = "%s %d → %d 级" % [facility_name(target), level(camp, target), level(camp, target) + 1]
+				quote.summary += "\n" + facility_effect(target, mini(2, level(camp, target) + 1))
 			"sell":
 				if item.is_empty(): reason = "该实例已出售或不存在"
 				elif WeaponInventory.owner(camp, target) > 0: reason = "请先在装备仓换下这件武器"
@@ -102,7 +103,7 @@ static func offer(camp: Dictionary, op: String, target: String = "", choice: Str
 				elif level(camp, "workshop") < 1: reason = "需要一级工坊"
 				elif op == "upgrade_weapon":
 					var old_level: int = int(item.get("weapon_level", 1))
-					if not crafted(item): reason = "普通掉落等级由来源冻结，仅自制枪可升级"
+					if item.weapon_id not in GUNS: reason = "当前工坊只强化卡宾枪、长管步枪和霰弹枪"
 					elif old_level >= 5: reason = "已达五级"
 					elif old_level >= 3 and level(camp, "workshop") < 2: reason = "四、五级升级需要二级工坊"
 					quote.cost = int({1:8, 2:10, 3:12, 4:16}.get(old_level, 0))
@@ -137,6 +138,28 @@ static func offer(camp: Dictionary, op: String, target: String = "", choice: Str
 
 static func crafted(item: Dictionary) -> bool:
 	return item.get("economy", {}).get("crafted") == true
+
+
+static func repair_discount(camp: Dictionary) -> int:
+	return [0, 4, 6][level(camp, "workshop")]
+
+
+static func reload_factor(camp: Dictionary) -> float:
+	# Read the departure camp, never live edits or the mission offer fingerprint.
+	return [1.0, 0.95, 0.90][level(camp, "workshop")]
+
+
+static func facility_effect(id: String, tier: int) -> String:
+	if tier <= 0:
+		return "未建设，尚无出击收益"
+	match id:
+		"supply":
+			return "下次出击成功归航补给 %d 粮，受库存容量限制。" % (tier + 1)
+		"workshop":
+			return "下次出击全队换弹耗时减少 %d%%；维修减免 %d 币（最低 1 币）；成功归航自动修复最多 %d 件出发前损坏的闲置武器。开放%s。" % [tier * 5, 4 if tier == 1 else 6, tier, "三种自制枪、枪械二至三级强化、卡宾弹匣" if tier == 1 else "枪械四至五级强化、长管与霰弹弹匣"]
+		"planning":
+			return "下次出击成功归航，给特性等级最低的一名存活已登记队员增加 %d 点特性进度（满级除外）。同级先比较进度，再按队员编号。" % tier
+	return ""
 
 
 static func request(camp: Dictionary, op: String, target: String, choice: String, edit_id: String) -> Dictionary:
@@ -353,7 +376,7 @@ static func problem(camp: Dictionary) -> String:
 				cost = 12
 				if edit.target not in GUNS or facilities.workshop.level < 1: return "ECONOMY_CRAFT_SOURCE"
 			"upgrade_weapon":
-				if not SurvivalContracts.integer(edit.before.get("weapon_level"), 1, 4) or not crafted(edit.before): return "ECONOMY_WEAPON_UPGRADE_SOURCE"
+				if not SurvivalContracts.integer(edit.before.get("weapon_level"), 1, 4) or edit.before.get("weapon_id") not in GUNS: return "ECONOMY_WEAPON_UPGRADE_SOURCE"
 				var old_level: int = int(edit.before.weapon_level)
 				if facilities.workshop.level < (2 if old_level >= 3 else 1): return "ECONOMY_WEAPON_UPGRADE_SOURCE"
 				cost = int({1:8, 2:10, 3:12, 4:16}[old_level])
@@ -457,9 +480,7 @@ static func weapon_problem(camp: Dictionary) -> String:
 	for item: Variant in all:
 		if not item is Dictionary or not item.get("instance_id") is String or not WeaponModifiers.problem(item).is_empty(): return "ECONOMY_WEAPON_FIELDS"
 		if not crafted(item) and item.get("drop", {}).get("version") != 5:
-			var base: Dictionary = item.duplicate(true)
-			base.erase("economy")
-			expected[item.instance_id] = base
+			expected[item.instance_id] = original_instance(camp, item)
 	for source: Dictionary in ledger.sources:
 		var action: Dictionary = source_action(source)
 		if action.is_empty(): return "ECONOMY_ACTION_CODEC"
@@ -518,6 +539,19 @@ static func weapon_problem(camp: Dictionary) -> String:
 	return ""
 
 
+static func original_instance(camp: Dictionary, item: Dictionary) -> Dictionary:
+	# The first prestate seeds replay; the source validator authenticates it separately.
+	# Seeding from today's level would accept unauthenticated growth.
+	var original: Dictionary = item.duplicate(true)
+	for edit: Dictionary in state(camp).get("edits", []):
+		if edit.target == item.instance_id and not edit.before.is_empty():
+			original = edit.before.duplicate(true)
+			break
+	original.erase("economy")
+	original.condition = item.condition
+	return original
+
+
 static func legacy_projection(camp: Dictionary) -> Dictionary:
 	# Authenticate the new policy first. This view is never saved or used in play.
 	var projected: Dictionary = camp.duplicate(true)
@@ -527,8 +561,7 @@ static func legacy_projection(camp: Dictionary) -> Dictionary:
 	var mapping: Dictionary = {}
 	for item: Dictionary in originals:
 		if crafted(item): continue
-		var old: Dictionary = item.duplicate(true)
-		old.erase("economy")
+		var old: Dictionary = original_instance(camp, item)
 		if old.get("drop", {}).get("version") == 5:
 			var source_action_id: String = old.drop.action_id
 			var source_site_id: String = old.drop.site_id

@@ -19,7 +19,7 @@ static func availability(before: Dictionary, member_id: int) -> String:
 	if member_id>2 and not before.recruits.any(func(row: Dictionary) -> bool: return row.member_id==member_id and row.field_status=="RETURNED"):
 		return "新同行必须成功归航登记后才能训练。"
 	if member.growth.trait.level>=TraitRules.THRESHOLDS.size():
-		return "已达当前Trait Lv5上限，不能购买训练。"
+		return "特性已达五级上限，不能继续训练。"
 	if before.food<1:
 		return "食物不足1份，未执行训练。"
 	return ""

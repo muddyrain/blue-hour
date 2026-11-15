@@ -10,6 +10,7 @@ func _init(owner: Expedition) -> void:
 
 func apply_build(actor: FieldActor, profile: Dictionary = {}, item: Dictionary = {}) -> void:
 	var factors: Dictionary=BuildItems.frozen_factors(expedition.supply.generated.build)
+	var workshop_reload: float = EconomyBuildV1.reload_factor(expedition.field_departure)
 	if expedition.persona_mode():
 		if profile.is_empty(): profile=SurvivorRoster.member(expedition._setup_crew,actor.member_id)
 		var recipe: Dictionary=PersonaState.recipe(expedition.supply.generated,actor.member_id,actor.definition_id)
@@ -26,13 +27,13 @@ func apply_build(actor: FieldActor, profile: Dictionary = {}, item: Dictionary =
 		actor.trait_search_factor=TraitRules.factor(profile,"search")
 		actor.persona_work_factor=personal.work
 		actor.power_move_factor=SpecialPowers.move_factor(expedition.powers,expedition.elapsed)
-		if actor.magazine!=null: actor.magazine.reload_factor=personal.reload*factors.reload
+		if actor.magazine!=null: actor.magazine.reload_factor=personal.reload*factors.reload*workshop_reload
 		return
 	# Definitions are freshly derived from immutable inventory once per actor setup.
 	if not CombatEquipment.melee(String(actor.weapon_definition.id)): actor.weapon_definition.damage*=factors.damage
 	actor.speed*=factors.move
 	actor.power_move_factor=SpecialPowers.move_factor(expedition.powers,expedition.elapsed) if expedition.power_mode() else 1.0
-	if actor.magazine!=null: actor.magazine.reload_factor=factors.reload
+	if actor.magazine!=null: actor.magazine.reload_factor=factors.reload*workshop_reload
 
 
 func support_available() -> bool:

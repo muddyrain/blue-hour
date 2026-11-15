@@ -301,7 +301,7 @@ func _build_detail(column: VBoxContainer) -> void:
 	_economy_box.add_theme_constant_override("separation", 6)
 	_detail_body.add_child(_economy_box)
 	var operations: Array[Array] = [
-		["sell", "", "预览出售"], ["upgrade_weapon", "", "升级自制武器"],
+		["sell", "", "预览出售"], ["upgrade_weapon", "", "强化枪械"],
 		["basic_component", "quick_v1", "安装轻快机件"], ["basic_component", "reach_v1", "安装延伸瞄具"],
 		["combat_component", WeaponModifiers.PIERCE, "安装穿透弹"],
 		["combat_component", WeaponModifiers.REFUND, "安装击倒补弹"],
@@ -691,7 +691,7 @@ func _stat_text(item: Dictionary, member_id: int) -> String:
 	var mod: String = WorkshopV1.mod_for(_camp, item.instance_id)
 	var magazine: Dictionary = WeaponMagazine.parameters(item.weapon_id, mod)
 	if not magazine.is_empty():
-		text += "\n%d 发 · 换弹 %.3f 秒" % [magazine.capacity, float(magazine.seconds) * float(personal.get("reload", 1.0)) * float(passive.get("reload", 1.0))]
+		text += "\n%d 发 · 换弹 %.3f 秒（含工坊）" % [magazine.capacity, float(magazine.seconds) * float(personal.get("reload", 1.0)) * float(passive.get("reload", 1.0)) * EconomyBuildV1.reload_factor(_camp)]
 	return text
 
 
@@ -721,7 +721,7 @@ func _show_repair(item: Dictionary) -> void:
 
 func _show_modifications(item: Dictionary, owner: int) -> void:
 	var installed: String = WorkshopV1.mod_for(_camp, _selected)
-	_detail.text = "每件符合条件的枪械仅可改装一次。方案随实例转配。\n已装：%s" % WorkshopV1.name_for(installed)
+	_detail.text = ("强化与弹匣方案随同一实例保留；可付费更换方案。" if EconomyBuildV1.enabled(_camp) else "每件符合条件的枪械仅可改装一次。方案随实例转配。") + "\n已装：%s" % WorkshopV1.name_for(installed)
 	for mod: String in MODS:
 		var problem: String = WorkshopV1.mod_problem(_camp, _selected, mod)
 		var button: Button = workshop_buttons[mod]
@@ -744,7 +744,7 @@ func _magazine_preview(item: Dictionary, owner: int, mod: String) -> String:
 		return "此型号没有对应改装方案。"
 	var result: String = "%d → %d 发 · 基础换弹 %.2f → %.2f 秒" % [stock.capacity, option.capacity, stock.seconds, option.seconds]
 	if owner > 0:
-		var factor: float = float(_personal_factors(owner).get("reload", 1.0)) * float(_passive_factors().get("reload", 1.0))
+		var factor: float = float(_personal_factors(owner).get("reload", 1.0)) * float(_passive_factors().get("reload", 1.0)) * EconomyBuildV1.reload_factor(_camp)
 		result += "\n%s 有效换弹 %.3f → %.3f 秒" % [_member_label(owner), float(stock.seconds) * factor, float(option.seconds) * factor]
 	return result
 

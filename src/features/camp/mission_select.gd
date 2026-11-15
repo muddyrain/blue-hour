@@ -382,7 +382,10 @@ func _refresh_departure_team(base: Dictionary, rations: Dictionary) -> void:
 			var mod: String = WorkshopV1.mod_for(base, item.instance_id)
 			if not mod.is_empty():
 				weapon += " · " + WorkshopV1.name_for(mod)
-		_review_details.add_child(CampStyle.label("%s · HP %d" % [SurvivorRoster.display_label(member), ceili(member.health)], 18))
+		var crew_label: Label = CampStyle.label("%s · 生命 %d/%.0f" % [SurvivorRoster.display_label(member), ceili(member.health), GrowthRules.maximum(member)], 18)
+		crew_label.tooltip_text = GrowthRules.description(member) + "\n" + TraitRules.description(member).replace(" · PROJECT_TEMP", "")
+		_review_details.add_child(crew_label)
+		weapon += " · 等级 %d" % int(item.get("weapon_level", 1))
 		_review_details.add_child(CampStyle.label(weapon, 15, CampStyle.MUTED))
 		_review_details.add_child(HSeparator.new())
 	if EconomyActions.camp_enabled(base):
@@ -391,6 +394,8 @@ func _refresh_departure_team(base: Dictionary, rations: Dictionary) -> void:
 			levels.append("%s Lv%d" % [{"supply":"补给", "workshop":"工坊", "planning":"规划"}[facility], EconomyBuildV1.level(base, facility)])
 		var rooms: Label = CampStyle.label("设施 · " + " / ".join(levels), 15, CampStyle.MUTED)
 		rooms.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		for facility: String in EconomyBuildV1.FACILITIES:
+			rooms.tooltip_text += EconomyBuildV1.facility_name(facility) + "：" + EconomyBuildV1.facility_effect(facility, EconomyBuildV1.level(base, facility)) + "\n"
 		_review_details.add_child(rooms)
 		_review_details.add_child(CampStyle.label("工具 %d" % EconomyBuildV1.tools(base), 16, CampStyle.TEAL))
 	var build: Dictionary = base.get("journey", {}).get("build", {})

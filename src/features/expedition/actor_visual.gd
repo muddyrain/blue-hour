@@ -16,6 +16,7 @@ const RING_RADIUS: float = 17.0 * BODY_SCALE / SCALE_REF
 const COLOURS: Array[Color] = [Color("80ddd8"), Color("f2c37f"), Color("e88266")]
 const NORMAL_DIRECTION_MARGIN: float = PI / 36.0
 const NORMAL_CONTACT_RESPONSE: float = 96.0
+const NIGHT_GAIN: Color = Color(1.5, 1.5, 1.25)
 
 var is_enemy: bool = false
 var enemy_kind: String = EnemyRules.NORMAL
@@ -219,6 +220,16 @@ func set_weapon(view: WeaponPresentation) -> void:
 	weapon_view = view
 	if _body != null:
 		_apply_pose()
+
+
+func set_night_lighting(amount: float) -> void:
+	var strength: float = smoothstep(0.45, 1.0, clampf(amount, 0.0, 1.0))
+	# Lift actor detail without lifting the street or cancelling the blue ambient.
+	# Parent modulation also keeps the hair mask, weapon and existing foot ring together.
+	modulate = Color.WHITE.lerp(NIGHT_GAIN, strength)
+	if is_enemy and enemy_kind in [EnemyRules.NORMAL, EnemyRules.RUSH, EnemyRules.HEAVY]:
+		# The palette is shared, but daylight state belongs to this sprite/world.
+		_body.set_instance_shader_parameter("night_readability", strength)
 
 
 func muzzle_offset(_direction: Vector2 = Vector2.ZERO) -> Vector2:

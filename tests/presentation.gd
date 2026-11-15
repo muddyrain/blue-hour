@@ -29,6 +29,7 @@ func _run() -> void:
 	_check_weapon(ActorVisual.LongRifleView)
 	_check_readouts()
 	_check_dusk_tint()
+	_check_actor_night_lighting()
 	await process_frame
 	print("BH_PRESENTATION checks=%d failures=%d" % [_checks, _failures])
 	quit(0 if _failures == 0 else 1)
@@ -103,6 +104,54 @@ func _check_dusk_tint() -> void:
 	var mid: Color = ExpeditionAtmosphere.tint_for(0.65)
 	var linear: Color = Color.WHITE.lerp(night, 0.65)
 	_expect(mid.r - mid.b > linear.r - linear.b and mid.r > mid.b * 0.9, "mid-dusk is warmer than a linear grey-blue lerp")
+
+
+func _check_actor_night_lighting() -> void:
+	var enemies: Array[String] = [EnemyRules.NORMAL, EnemyRules.RUSH, EnemyRules.HEAVY,
+		ScreamerVisualV1.KIND, CombatEnemyRules.TOXIC, NightHoundV1.KIND]
+	for family: int in range(5 + enemies.size()):
+		var actor: FieldActor = FieldActor.new()
+		actor.is_enemy = family >= 5
+		if actor.is_enemy:
+			actor.enemy_behavior = EnemyBehavior.new()
+			actor.enemy_behavior.kind = enemies[family - 5]
+		else:
+			actor.definition_id = StringName("crew_%d" % (family + 1))
+		root.add_child(actor)
+		var visual: ActorVisual = actor.visual
+		visual.advance(0.4, Vector2.RIGHT * 34.0, Vector2.RIGHT)
+		var pose: Dictionary = visual.presentation_state()
+		var palette: Material = visual._body.material
+		var previous_gain: float = 1.0
+		for amount: float in [0.0, 0.45, 0.65, 0.85, 1.0]:
+			visual.set_night_lighting(amount)
+			_expect(visual.presentation_state() == pose and visual._body.material == palette,
+				"night lighting preserves directions, action clocks, grip and species material")
+			if amount <= 0.45:
+				_expect(visual.modulate.is_equal_approx(Color.WHITE), "day and warm dusk keep original actor colour")
+			else:
+				_expect(visual.modulate.r > previous_gain and visual.modulate.r <= 1.5,
+					"dusk to deep night gradually lifts all five crew and every species within a bounded gain")
+			previous_gain = visual.modulate.r
+			if family in range(5, 8):
+				var strength: float = float(visual._body.get_instance_shader_parameter("night_readability"))
+				_expect(is_zero_approx(strength) if amount <= 0.45 else strength > 0.0 and strength <= 1.0,
+					"basic infected palette receives this actor's night strength")
+		var night: Color = ExpeditionAtmosphere.tint_for(1.0) * visual.modulate
+		_expect(night.b > night.g and night.g > night.r and night.g < 0.5,
+			"actor compensation retains a dark blue ambient instead of daylight")
+		if family in range(5, 8):
+			var day_actor: FieldActor = FieldActor.new()
+			day_actor.is_enemy = true
+			root.add_child(day_actor)
+			day_actor.visual.set_night_lighting(0.0)
+			_expect(is_zero_approx(float(day_actor.visual._body.get_instance_shader_parameter("night_readability")))
+				and is_equal_approx(float(visual._body.get_instance_shader_parameter("night_readability")), 1.0),
+				"shared palette does not leak a night actor's grade into a daylight actor")
+			day_actor.queue_free()
+		visual.set_night_lighting(0.0)
+		_expect(visual.modulate.is_equal_approx(Color.WHITE), "returning to day clears actor compensation")
+		actor.queue_free()
 
 
 func _expect(condition: bool, label: String) -> void:

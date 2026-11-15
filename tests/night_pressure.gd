@@ -75,6 +75,9 @@ func _check_sortie(supply: MissionSupply) -> void:
 	sortie.step(500.0)
 	_expect(sortie._spawn_count <= 3 and sortie.threat.stage == ThreatDirector.Stage.DEEP and sortie.phase != Expedition.Phase.FINISHED, "large unpaused delta coalesces to one attempt, zero deadline cannot force failure")
 	_expect(sortie._night_lighting.amount == 1.0, "deep night reaches the bounded final grade")
+	_expect(sortie.survivors.all(func(actor: FieldActor) -> bool: return actor.visual.modulate.r > 1.0)
+		and sortie.enemies.all(func(actor: FieldActor) -> bool: return actor.visual.modulate.r > 1.0),
+		"the live expedition clock applies night readability to crew and existing enemies")
 	for unit: FieldActor in sortie.enemies:
 		unit.queue_free()
 	sortie.enemies.clear()
@@ -84,6 +87,8 @@ func _check_sortie(supply: MissionSupply) -> void:
 	var count: int = sortie._spawn_count
 	sortie.step(0.01)
 	_expect(sortie._spawn_count == count and spawns[-1].reason == "capacity" and sortie._spawn_clock > 0.0, "full cap consumes deadline without overflow or queued debt")
+	_expect(sortie.enemies.all(func(actor: FieldActor) -> bool: return actor.visual.modulate.r > 1.0),
+		"enemies added after nightfall receive the current grade on the next refresh")
 	for unit: FieldActor in sortie.enemies:
 		unit.queue_free()
 	sortie.enemies.clear()

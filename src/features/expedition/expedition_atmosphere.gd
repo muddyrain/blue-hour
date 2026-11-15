@@ -55,6 +55,8 @@ func refresh(world: Expedition, amount: float) -> void:
 		_scenery_lights[index].position = _sources[index]
 	var tint: Color = tint_for(amount)
 	_modulate.color = tint
+	for actor: FieldActor in world.survivors + world.enemies:
+		actor.visual.set_night_lighting(amount)
 	for light: PointLight2D in _lights:
 		light.energy = 1.25 * smoothstep(0.35, 1.0, amount)
 		light.visible = amount > 0.01

@@ -1,0 +1,6 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://src/features/presentation/infected_palette.gdshader" id="1_palette"]
+
+[resource]
+shader = ExtResource("1_palette")

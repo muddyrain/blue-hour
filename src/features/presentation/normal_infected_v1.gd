@@ -28,30 +28,13 @@ static func enabled() -> bool:
 
 static func frame_for(state: StringName, walk_clock: float, attack_clock: float,
 		hit_clock: float, defeat_clock: float) -> int:
-	match state:
-		&"defeated":
-			return 12 if defeat_clock < 0.08 else 13 if defeat_clock < 0.18 else 14 if defeat_clock < 0.34 else 15
-		&"hit":
-			return 10 if hit_clock > 0.09 else 11
-		&"attack":
-			# The authoritative hit already happened: contact first, then recovery.
-			return 7 if attack_clock > 0.22 else 8 if attack_clock > 0.10 else 9
-		&"move", &"move_fire":
-			return 1 + int(maxf(walk_clock, 0.0) * WALK_FPS) % WALK_COUNT
-	return 0
+	return InfectedSheetV1.frame_for(state, walk_clock, attack_clock,
+		hit_clock, defeat_clock, WALK_FPS)
 
 
 static func pose(sprite: Sprite2D, direction: Vector2, state: StringName,
 		walk_clock: float, attack_clock: float, hit_clock: float, defeat_clock: float) -> void:
 	var octant: int = MotionAtlas.octant(direction)
 	var source: int = SOURCE_FOR_OCTANT[octant]
-	sprite.texture = SHEETS[source]
-	sprite.hframes = 4
-	sprite.vframes = 4
-	sprite.flip_h = octant in [3, 4, 5]
-	var cell: Vector2 = sprite.texture.get_size() / 4.0
-	var anchor: Vector2 = ROOTS[source]
-	if sprite.flip_h:
-		anchor.x = cell.x - anchor.x
-	sprite.offset = cell * 0.5 - anchor
-	sprite.frame = frame_for(state, walk_clock, attack_clock, hit_clock, defeat_clock)
+	InfectedSheetV1.pose(sprite, SHEETS[source], ROOTS[source], octant,
+		frame_for(state, walk_clock, attack_clock, hit_clock, defeat_clock))

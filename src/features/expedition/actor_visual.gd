@@ -56,6 +56,7 @@ var _toxic_progress: float = 0.0
 var _screamer_phase: StringName = &"chase"
 var _screamer_heading: Vector2 = Vector2.RIGHT
 var _screamer_progress: float = 0.0
+var _survivor_visual: SurvivorVisualV1 = SurvivorVisualV1.new()
 
 
 func _ready() -> void:
@@ -346,6 +347,11 @@ func _apply_pose() -> void:
 
 
 func _pose_body(direction: Vector2, action: int) -> void:
+	if not is_enemy:
+		var gait: float = _walk_clock * 9.0 * _movement.length() / 125.0
+		_survivor_visual.pose(_body, variant, direction, _facing, motion_state,
+			_clock, gait, _fire_clock, _attack_clock)
+		return
 	if _night_hound():
 		NightHoundVisualV1.pose(_body, direction, motion_state, _walk_clock, _attack_clock, _defeat_clock)
 	elif _toxic_enemy():
@@ -382,6 +388,9 @@ func _update_hold(tint: Color, moving: bool, action: int) -> void:
 		return
 	MotionAtlas.pose(_upper, false, enemy_kind, variant, _facing, action)
 	MotionAtlas.pose(_head, false, enemy_kind, variant, _facing, action)
+	# The full-body clip already contains the moving torso and hands.
+	_upper.visible = false
+	_arms.visible = false
 	_upper.self_modulate = tint
 	_head.self_modulate = tint
 	_hold.position = _body.position - _facing * (_fire_clock / 0.12) * 1.5
@@ -411,3 +420,4 @@ func _update_hold(tint: Color, moving: bool, action: int) -> void:
 	_muzzle.position = _weapon.transform * (weapon_view.muzzle_pixel - weapon_view.grip_pixel)
 	_muzzle.rotation = _weapon.rotation
 	_muzzle.scale = Vector2.ONE * field_scale(0.65 + _fire_clock * 3.0)
+	SurvivorVisualV1.pose_head(_head, _body, _hold)

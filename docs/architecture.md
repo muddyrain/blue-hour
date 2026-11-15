@@ -74,6 +74,8 @@
 
 ## 资源
 
+- 场内五名幸存者：`SurvivorVisualV1` 读取 `assets/survivors_v1/{gu,xia,lin,shen,lu}.png`，每表 2048×2048 / 8×8 格。行按屏幕方向 E、SE、S、SW、W、NW、N、NE；列为待机 1 帧、走路 4 帧、攻击 3 帧。所有朝向直接绘制，不翻转。固定脚点 (128,224)，`ActorVisual.BODY_SCALE = 0.22`。全身帧替代幸存者旧的静态上身/程序手臂叠层；头部仅保留同帧、同变换的遮挡层，保证枪械仍在头发后方。枪械、枪口和弹道预测继续使用原有握点与时钟。开火事件触发表现模块内 0.24 秒的准备/出招/回收，受击与倒地沿用 m5 全身图。来源与生成规格见该目录 `generation.json`，切片注册由 `tools/build_survivor_atlas.py` 完成；敌人展示仍走各自原有模块。
+
 - `assets/`：运行时美术/音频。逐文件来源与 SHA 登记在 `assets/PROVENANCE.json`，`tools/validate_assets.py` 校验（`check` 会运行）。
 - 美术为项目原创：AI 辅助生成的 PNG（统一透明裁切、等比缩放、登记脚点后入图集，见各目录 `atlas.json`/`manifest.json`）、手绘 SVG、代码绘制；音效由 `src/features/audio_settings/generate_cues.py` 数学合成。生图提示要点在 `assets/world_v1/source/PROMPTS.md`、`assets/world_v2/source/prompts.md`。
 - 不使用 Deadly Days 的任何图像、声音或录屏。

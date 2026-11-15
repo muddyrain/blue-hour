@@ -33,39 +33,57 @@
     },
     {
       "path": "assets/audio/b1/bus_start.wav",
-      "sha256": "0171ead05c755e110850b1d13d3d4bf0994fa1b94f0685b04ddea7cb6adf42d8",
-      "origin": "original mathematical synthesis",
-      "license": "No additional license granted"
+      "sha256": "56d966f4ac4d565c7387d5b7fb9b660353b3eb5df0aae48b6c86031c1f392dc5",
+      "origin": "Original mathematical synthesis using Python standard-library DSP; Codex-assisted generator code; no audio model or sampled input",
+      "license": "No additional license granted",
+      "tool": "src/features/audio_settings/generate_cues.py",
+      "ai_generated_audio": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/audio/b1/collect_complete.wav",
-      "sha256": "14c7d3fad4fbc03460573ae2d1ba0aeae3bfa1cbd5eaaa73e008bc2b7411522c",
-      "origin": "original mathematical synthesis",
-      "license": "No additional license granted"
+      "sha256": "7dc3b6a23b5febc01c5ae87cef0c7acd0c1baeae305c8a11b6847f1e0adb1c1e",
+      "origin": "Original mathematical synthesis using Python standard-library DSP; Codex-assisted generator code; no audio model or sampled input",
+      "license": "No additional license granted",
+      "tool": "src/features/audio_settings/generate_cues.py",
+      "ai_generated_audio": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/audio/b1/fire.wav",
-      "sha256": "2c7bf3923520177826dc10d72db412748e82c68b896b60f518082b365199007d",
-      "origin": "original mathematical synthesis",
-      "license": "No additional license granted"
+      "sha256": "b4e98cbabeafbe609d90d9926754ff42558497f9ca4ddd333faa9923b53e454e",
+      "origin": "Original mathematical synthesis using Python standard-library DSP; Codex-assisted generator code; no audio model or sampled input",
+      "license": "No additional license granted",
+      "tool": "src/features/audio_settings/generate_cues.py",
+      "ai_generated_audio": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/audio/b1/hit.wav",
-      "sha256": "9dff622c2a6020457b1f9a6e972895c554dc939dc9ffee1fd21b731e3180e62c",
-      "origin": "original mathematical synthesis",
-      "license": "No additional license granted"
+      "sha256": "3e5237e4cb763e3830bb850d62fedcc0c90c265852a2bd2d33e27aa1ca8f1186",
+      "origin": "Original mathematical synthesis using Python standard-library DSP; Codex-assisted generator code; no audio model or sampled input",
+      "license": "No additional license granted",
+      "tool": "src/features/audio_settings/generate_cues.py",
+      "ai_generated_audio": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/audio/b1/ui_back.wav",
-      "sha256": "44c44c1f0378a78357cdb5e8a4370b5b43a747382b3214c4de09635dc323711b",
-      "origin": "original mathematical synthesis",
-      "license": "No additional license granted"
+      "sha256": "556d669a457c759e03f6b7d4e8f08c6f1e895b5e2ba1f6a5377f496c2c90034b",
+      "origin": "Original mathematical synthesis using Python standard-library DSP; Codex-assisted generator code; no audio model or sampled input",
+      "license": "No additional license granted",
+      "tool": "src/features/audio_settings/generate_cues.py",
+      "ai_generated_audio": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/audio/b1/ui_confirm.wav",
-      "sha256": "fb6f48b63c2adcc54464bc61b3af982270ab57acd50e4cae361f9e72e49d214d",
-      "origin": "original mathematical synthesis",
-      "license": "No additional license granted"
+      "sha256": "e2d149b4695b8043301f739b3454ec7b223433023999b28bf5e7d36d44bdb27d",
+      "origin": "Original mathematical synthesis using Python standard-library DSP; Codex-assisted generator code; no audio model or sampled input",
+      "license": "No additional license granted",
+      "tool": "src/features/audio_settings/generate_cues.py",
+      "ai_generated_audio": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/candidates/bus_01.png",
@@ -1347,7 +1365,7 @@
       "origin": "Original 48px radial warm-light alpha texture defined with Godot GradientTexture2D; shared by survivor muzzle lights. Tool: Codex-assisted Godot resource authoring. AI-assisted code, no generated bitmap, recordings or third-party assets.",
       "license": "No additional license granted"
     },
-{
+    {
       "path": "assets/infected_v1/screamer/actions.png",
       "sha256": "7e827917c59ea35d7c9ecc574f6f5917e3ff8fff28cc42c749836cf6fed8cbf4",
       "origin": "Original project AI-generated art using OpenAI built-in image_gen, 2026-11-15. Project heavy sheet used only as style reference. Five independently drawn directions, twelve articulated poses each, three disclosed horizontal mirrors. Pillow removes alpha <20 and islands <24 source pixels, then uniform species scaling and fixed roots. No third-party pack or Deadly Days material. Exact prompt, source SHA and packing: assets/infected_v1/special_generation.json.",
@@ -1377,7 +1395,7 @@
       "origin": "Original project AI-generated art using OpenAI built-in image_gen, 2026-11-15. Project heavy sheet used only as style reference. Five independently drawn directions, twelve articulated poses each, three disclosed horizontal mirrors. Pillow removes alpha <20 and islands <24 source pixels, then uniform species scaling and fixed roots. No third-party pack or Deadly Days material. Exact prompt, source SHA and packing: assets/infected_v1/special_generation.json.",
       "license": "No additional license granted"
     },
-{
+    {
       "path": "assets/iso/harbor/container_teal.svg",
       "sha256": "13cb474ba9c93feb953f25321e31d41226f3b76ac9ef84d4a4874dcd68700d07",
       "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
@@ -1517,7 +1535,7 @@
       "ai_generated": false,
       "license": "No additional license granted"
     },
-{
+    {
       "path": "src/features/camp_scene/camp_scene_world.gd",
       "sha256": "95b83c0b86730e51e61594e6811eed2eae9930b73f58c59d9725465348774d07",
       "origin": "Original project procedural camp illustration and composition, authored with AI assistance in GDScript; Godot CanvasItem / IsoDraw primitives and existing project IsoAtlas art. No new raster generation or third-party asset pack.",
@@ -1548,6 +1566,87 @@
       "ai_assisted": true,
       "license": "No additional license granted",
       "sha256": "4adb68c5261eefc8b397fa9ac21d5cdf5191e5d121d3092407b070fd4377d699"
+    },
+    {
+      "path": "assets/audio/b1/melee_swing.wav",
+      "sha256": "816660051ca65ac84feca9e41df78e3fb197afa44955b37cccc789a3658da1d8",
+      "origin": "Original mathematical synthesis using Python standard-library DSP; Codex-assisted generator code; no audio model or sampled input",
+      "tool": "src/features/audio_settings/generate_cues.py",
+      "ai_generated_audio": false,
+      "ai_assisted_code": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/audio/b1/survivor_hit.wav",
+      "sha256": "aeea58189f95569b7b59a7c176c9e75d7f8d4985392866f62a2da551cd8b54dc",
+      "origin": "Original mathematical synthesis using Python standard-library DSP; Codex-assisted generator code; no audio model or sampled input",
+      "tool": "src/features/audio_settings/generate_cues.py",
+      "ai_generated_audio": false,
+      "ai_assisted_code": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/audio/b1/bus_board.wav",
+      "sha256": "7174d963f57913ab7ce93ee5ed26c61954adb18c4eeebe72ee6cee43e17b62f4",
+      "origin": "Original mathematical synthesis using Python standard-library DSP; Codex-assisted generator code; no audio model or sampled input",
+      "tool": "src/features/audio_settings/generate_cues.py",
+      "ai_generated_audio": false,
+      "ai_assisted_code": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/audio/b1/bus_depart.wav",
+      "sha256": "129300a0d2e06606f5cf461999e4728c0120873b8257506b3333028ab0b6aa2d",
+      "origin": "Original mathematical synthesis using Python standard-library DSP; Codex-assisted generator code; no audio model or sampled input",
+      "tool": "src/features/audio_settings/generate_cues.py",
+      "ai_generated_audio": false,
+      "ai_assisted_code": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/audio/b1/screamer_warning.wav",
+      "sha256": "51dd1a71e6c6ed456092a81149a97675f4fb543780e2c0dffcce97de23b9b902",
+      "origin": "Original mathematical synthesis using Python standard-library DSP; Codex-assisted generator code; no audio model or sampled input",
+      "tool": "src/features/audio_settings/generate_cues.py",
+      "ai_generated_audio": false,
+      "ai_assisted_code": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/audio/b1/toxic_warning.wav",
+      "sha256": "b0c1a95970798089155d6195ff0dc38d99bdf503a784c7f1a402d29ab30af300",
+      "origin": "Original mathematical synthesis using Python standard-library DSP; Codex-assisted generator code; no audio model or sampled input",
+      "tool": "src/features/audio_settings/generate_cues.py",
+      "ai_generated_audio": false,
+      "ai_assisted_code": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/audio/b1/burst_warning.wav",
+      "sha256": "695e524d3b9a053e2b1897f412476256652001f86df0983290913fea704a99cf",
+      "origin": "Original mathematical synthesis using Python standard-library DSP; Codex-assisted generator code; no audio model or sampled input",
+      "tool": "src/features/audio_settings/generate_cues.py",
+      "ai_generated_audio": false,
+      "ai_assisted_code": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/audio/b1/hound_warning.wav",
+      "sha256": "a8e2bdc88a5c5cb054f502cd686d2f231ae87ac1b2929d0c7201fb44a7a92d03",
+      "origin": "Original mathematical synthesis using Python standard-library DSP; Codex-assisted generator code; no audio model or sampled input",
+      "tool": "src/features/audio_settings/generate_cues.py",
+      "ai_generated_audio": false,
+      "ai_assisted_code": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/audio/b1/nightfall.wav",
+      "sha256": "b8014b25993a6344e0737ed0fe478d1b570139e09c13836f82233f3c4523c34b",
+      "origin": "Original mathematical synthesis using Python standard-library DSP; Codex-assisted generator code; no audio model or sampled input",
+      "tool": "src/features/audio_settings/generate_cues.py",
+      "ai_generated_audio": false,
+      "ai_assisted_code": true,
+      "license": "No additional license granted"
     }
   ]
 }

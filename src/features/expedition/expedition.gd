@@ -6,6 +6,7 @@ signal membership_committed()
 
 signal finished(report: Dictionary)
 signal combat_feedback(event: Dictionary)
+signal audio_cue_requested(cue: StringName)
 signal search_completed(reward: int)
 signal engine_started
 signal pause_changed(paused: bool)

@@ -65,6 +65,12 @@
 | `audio_settings/` | 音量设置与合成音效服务。 |
 | `run_save/` | 存档：`ProductionProgress`（会话）+ `RunTransaction` + `ReceiptJournal`（带哈希的收据日志）+ `*State` 校验链。 |
 
+营地玩家入口直接显示 `CampSceneWorld` 的旧渔协院落，不再隐藏世界后展示静态背景。`CampSceneLayout` 只定义营地表现坐标；`IsoSpace` / `IsoTiles` / `IsoBuildingArt` / `IsoAtlas` 与出征场共用，世界和设施标签共同等比缩放。三个设施位读取 `EconomyBuildV1.level()`（已有营地数据仍经 `CampFacilities` 读取）：未建为空地与材料，一级为小屋，二级换闭合屋顶建筑并补齐门前摆件。场景只发原有建设、补给、工坊、特长训练、名册和任务选择意图，不拥有交易或存档规则。装备台继续打开已有配装页，其中保留支援与构筑入口。
+
+`CampSceneResident` 仅给当前存活名册成员播放 `SurvivorVisualV1` 的正式八向待机/行走；沿院内固定环线散步，在补给、工坊、规划室和篝火旁停留，不实例化战斗角色、不写入存档。`CampSceneScenery` 绘制原创围栏、篝火和家具，所有立体物按脚点 Y 排序；暖暮复用 `ExpeditionAtmosphere.tint_for()` 及径向暖色点光，色调与灯光限制在世界层。`CampSceneStyle` 将营地与既有面板调整为暖炭灰，保留原面板布局参数。
+
+营地底色层级为 -20，低于共用 `IsoTiles` 的 -10；设施、家具与人物留在 0 层的 Y 排序节点。`CampSceneLayout.PATHS` 定义碎石院内的混凝土通道，`DRESSING` 定义避开设施、门前与人物环线的生活摆件；不参与碰撞、导航或存档。镜头使用等比缩放，归航摘要出现时给摘要让出空间。氛围标题订阅 `CampSceneWorld.atmosphere_changed`，外部调用 `set_dusk()` 也会同步更新；场内标签平时缩小淡显，鼠标悬停或键盘焦点时强调。
+
 生成关先由 `WorldgenDensity` 补房，`WorldgenDressing.freeze` 冻结碰撞景物，再由 `ParcelScenery.fit` 补齐场地，最后只运行一次 `WorldgenDressing.enrich`。装饰先预留停车垫和车棚，再沿道路及门前步道两侧放小件；开阔草坪不按面积填充日用品。装饰仍受门口、步道、巴士与装卸场保留区约束，不新增交互或碰撞。
 
 `HarborWarehouse` 是第二个手摆地点“海边町·北港仓库”（地点键 `north_harbor`）。从第 3 天起，普通 `airdrop` 装备回收和定期五金补给通过 `ExplorationActions.supply()` 投影到港口；带独立空间锚点的侦察、路障、稀有/事件、深入回收和终局保留原图。与 `SeasideTown` 一样保留原任务/地图收据 ID 和 `generated`，不改变 `offers()`、奖励或源站点名义时长。港口地形和搜刮绑定集中在 `harbor_warehouse.gd`；`TaskActions.site_point()` 同时供运行时及快照校验使用，避免只有画面搬了位置。`HarborPresentation` 负责闭合建筑与外部门口工位，`HarborGround` 负责码头岸线表现，仍共用 `FieldNavigation`、原刷怪/入夜、派工、登车与结算。港口仅五盏工作灯（暖色/冷白）参与场景光池，货柜不充当光源。

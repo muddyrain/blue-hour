@@ -38,7 +38,7 @@ def main():
  execute('startup-default',['--quit-after','3'])
  execute('startup-111',['--quit-after','3'])
  execute('smoke-loop',['--script','res://tests/smoke_loop.gd'],[])
- for name in ['playable_entry','presentation','weapon_inventory','combat_los','navigation_nearest','night_pressure','harbor_warehouse','contact_damage','contact_separation','animation/motion','animation/normal_stability','animation/infected_v1']:
+ for name in ['playable_entry','presentation','camp_scene_contracts','weapon_inventory','combat_los','navigation_nearest','night_pressure','harbor_warehouse','contact_damage','contact_separation','animation/motion','animation/normal_stability','animation/infected_v1']:
   execute(name.replace('/','-'),['--script','res://tests/'+name+'.gd'])
  for name in ['rogue_navigation','hud_compact','world_data']:
   execute(name.replace('_','-'),['--script','res://tests/'+name+'.gd'])

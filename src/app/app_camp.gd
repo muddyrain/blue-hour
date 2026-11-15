@@ -45,6 +45,7 @@ func open_roster() -> void:
 	if not is_instance_valid(app.roster_panel):
 		app.roster_panel = RosterPanel.new()
 		app._screen.add_child(app.roster_panel)
+		CampSceneStyle.apply_to(app.roster_panel)
 		app.roster_panel.call_sign_requested.connect(app.rename_survivor)
 		app.roster_panel.equipment_requested.connect(app._roster_equipment)
 		app.roster_panel.growth_requested.connect(app.open_growth)
@@ -93,6 +94,7 @@ func open_growth(member_id: int, discard_pending: bool = false) -> void:
 	if not is_instance_valid(app.growth_panel):
 		app.growth_panel = GrowthPanel.new()
 		app._screen.add_child(app.growth_panel)
+		CampSceneStyle.apply_to(app.growth_panel)
 		app.growth_panel.closed.connect(app.close_growth)
 	app.growth_panel.selected_member_id = member_id
 	app.growth_panel.show()
@@ -141,6 +143,7 @@ func open_loadout(workshop: bool = false) -> void:
 	if not is_instance_valid(app.loadout_panel):
 		app.loadout_panel = LoadoutPanel.new()
 		app._screen.add_child(app.loadout_panel)
+		CampSceneStyle.apply_to(app.loadout_panel)
 		app.loadout_panel.equip_requested.connect(app.equip_weapon)
 		app.loadout_panel.build_requested.connect(app.equip_build_item)
 		app.loadout_panel.power_requested.connect(app.equip_power)
@@ -283,6 +286,7 @@ func _setup_camp_scene() -> void:
 	app._camp_leave_dialog.confirmed.connect(func() -> void: app._camp_leave_action.call_deferred())
 	app._camp_leave_dialog.canceled.connect(func() -> void: app.roster_panel.name_edit.grab_focus.call_deferred())
 	app._screen.add_child(app._camp_leave_dialog)
+	CampSceneStyle.apply_to(app._camp_leave_dialog)
 	var path: String = "res://src/features/camp_scene/camp_scene.tscn"
 	var packed: PackedScene = load(path) as PackedScene if ResourceLoader.exists(path) else null
 	if packed == null or not packed.can_instantiate():
@@ -296,9 +300,10 @@ func _setup_camp_scene() -> void:
 	app.camp_scene = candidate as CampSceneView
 	app.camp_scene.player_mode = true
 	if app.camp_scene.player_mode:
-		app.camp_scene.theme = CampStyle.blue_hour_theme(app._screen.theme)
+		app.camp_scene.theme = CampSceneStyle.theme(app._screen.theme)
 	app._title.add_child(app.camp_scene)
-	app.camp_scene.input_allowed = app._camp_input_allowed
+	app.camp_scene.input_allowed = func() -> bool:
+		return app._camp_input_allowed() and not (is_instance_valid(app._facility_confirmation) and app._facility_confirmation.visible)
 	app.camp_scene.action_requested.connect(app._camp_action)
 	app.camp_scene.facility_requested.connect(app._offer_camp_facility)
 	app._facility_confirmation = ConfirmationDialog.new()
@@ -311,6 +316,7 @@ func _setup_camp_scene() -> void:
 		app._economy_request = {}
 		app._restore_facility_focus.call_deferred())
 	app._screen.add_child(app._facility_confirmation)
+	CampSceneStyle.apply_to(app._facility_confirmation)
 	app.camp_scene.hide()
 
 
@@ -379,8 +385,9 @@ func open_supplies() -> void:
 		return
 	if not is_instance_valid(app.supply_panel):
 		app.supply_panel = CampSupplyPanel.new()
-		app.supply_panel.theme = CampStyle.blue_hour_theme(app._screen.theme)
+		app.supply_panel.theme = CampSceneStyle.theme(app._screen.theme)
 		app._screen.add_child(app.supply_panel)
+		CampSceneStyle.apply_to(app.supply_panel)
 		app.supply_panel.investment_requested.connect(app._offer_camp_facility)
 		app.supply_panel.retry_requested.connect(app._retry_facility)
 		app.supply_panel.navigation_requested.connect(app._leave_supplies_for)
@@ -456,7 +463,7 @@ func _camp_action(action: StringName, member_id: int) -> void:
 				app.open_supplies()
 			else:
 				app.camp_scene.open_info(action)
-		&"training":
+		&"training", &"planning":
 			app.open_training()
 		&"specialties": app._show_equipment_catalog(app.progress_session.refresh_catalog())
 		&"sound": app.open_sound_settings()
@@ -536,6 +543,7 @@ func open_training() -> void:
 	if not is_instance_valid(app.training_panel):
 		app.training_panel = TrainingPanel.new()
 		app._screen.add_child(app.training_panel)
+		CampSceneStyle.apply_to(app.training_panel)
 		app.training_panel.closed.connect(app.close_training)
 		app.training_panel.confirmed.connect(app.confirm_training)
 		app.training_panel.retry_requested.connect(app.retry_training)
@@ -577,8 +585,9 @@ func retry_training() -> void:
 func _show_equipment_catalog(state: Dictionary) -> void:
 	if app._equipment_catalog == null:
 		app._equipment_catalog = EquipmentCatalog.new()
-		app._equipment_catalog.theme = CampStyle.blue_hour_theme(app._screen.theme)
+		app._equipment_catalog.theme = CampSceneStyle.theme(app._screen.theme)
 		app._screen.add_child(app._equipment_catalog)
+		CampSceneStyle.apply_to(app._equipment_catalog)
 		app._equipment_catalog.closed.connect(app._close_equipment_catalog)
 		app._equipment_catalog.retry_requested.connect(func() -> void:
 			app._equipment_catalog.present(app.progress_session.refresh_catalog()))

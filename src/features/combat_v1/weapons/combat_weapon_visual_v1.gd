@@ -13,10 +13,13 @@ var _grip: Vector2 = Vector2.ZERO
 func _draw() -> void:
 	if not visible or not CombatEquipment.melee(_mode):
 		return
+	if is_instance_valid(_actor) and _actor.get("_is_defeated"):
+		return
 	var pivot: Vector2 = _grip
 	var alpha: float = 0.0
 	var arc: float = deg_to_rad(float(CombatEquipment.melee_policy(_mode).angle_degrees))
-	var start: float = _heading.angle() - arc * 0.5
+	var direction: Vector2 = (_actor as ActorVisual).screen_direction(_heading) if _actor is ActorVisual else _heading
+	var start: float = direction.angle() - arc * 0.5
 	var finish: float = start
 	if _phase == "strike":
 		finish = start + arc * maxf(0.25, _progress)
@@ -49,8 +52,9 @@ func pose() -> Dictionary:
 	var twist: float = 0.0
 	var recoil: float = 0.0
 	var support_fraction: float = 0.32
+	var direction: Vector2 = (_actor as ActorVisual).screen_direction(_heading) if _actor is ActorVisual else _heading
 	if CombatEquipment.melee(_mode):
-		var mirror: float = -1.0 if _heading.x < -0.1 else 1.0
+		var mirror: float = -1.0 if direction.x < -0.1 else 1.0
 		support_fraction = 0.47
 		match _phase:
 			"windup":
@@ -75,24 +79,8 @@ func pose() -> Dictionary:
 
 
 func _apply_actor_pose() -> void:
-	var weapon: Sprite2D = _actor.get("_weapon") as Sprite2D
-	var hold: Node2D = _actor.get("_hold") as Node2D
-	var arms: MotionHands = _actor.get("_arms") as MotionHands
-	var muzzle: Polygon2D = _actor.get("_muzzle") as Polygon2D
-	if weapon == null or hold == null or arms == null:
+	if not _actor is ActorVisual:
 		return
-	var view: WeaponPresentation = _actor.get("weapon_view") as WeaponPresentation
-	if view == null or not visible:
-		return
-	var values: Dictionary = pose()
-	weapon.rotation += float(values.weapon_angle)
-	weapon.position -= _heading * float(values.recoil)
-	hold.rotation += float(values.hold_twist)
-	arms.trigger = weapon.position
-	arms.support = weapon.transform * ((view.muzzle_pixel - view.grip_pixel) * float(values.support_fraction))
-	arms.queue_redraw()
-	_grip = hold.transform * weapon.position
-	if muzzle != null:
-		muzzle.visible = false if CombatEquipment.melee(_mode) else muzzle.visible
-		muzzle.position = weapon.transform * (view.muzzle_pixel - view.grip_pixel)
-		muzzle.rotation = weapon.rotation
+	var visual: ActorVisual = _actor as ActorVisual
+	visual.present_weapon_action(_heading, _phase, _progress, pose())
+	_grip = visual._hold.transform * visual._weapon.position

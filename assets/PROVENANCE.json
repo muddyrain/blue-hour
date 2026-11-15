@@ -1327,7 +1327,24 @@
       "path": "assets/survivors_v1/lu.png",
       "sha256": "91c0fecba6ba31fc534a9d5ac7314e3a5156d51d0065604e78e61165dec7f3da",
       "origin": "AI-assisted redraw/extension of original assets/m5_anim_01/lu_full.png using built-in OpenAI imagegen (2026-11-15); independently drawn eight directions, idle + four walk + three attack poses. Southwest correction for gu/xia/lin/shen. Pillow alpha cleanup (<12), slicing and fixed per-direction root registration by tools/build_survivor_atlas.py. No third-party asset pack or Deadly Days artwork. Generation specification: assets/survivors_v1/generation.json.",
-
+      "license": "No additional license granted"
+    },
+    {
+      "path": "src/features/presentation/survivor_weapon_rig.gd",
+      "sha256": "71b69d4136b4d26d130ee1e6624a4a8a4af995addab83d0e498f60d5050e61b7",
+      "origin": "Original procedural hand rig and 48px radial warm muzzle-light texture; landmarks registered against existing survivor art. Tool: Codex-assisted GDScript authoring, Godot GradientTexture2D. AI-assisted code, no new generated bitmap or third-party material.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "src/features/presentation/hand_occlusion.gdshader",
+      "sha256": "f3e3ffb83102416ed2bc4b0acd59c733491ecb0374efdd3360463e9edb2f22e6",
+      "origin": "Original runtime mask reusing current survivor-frame pixels over the grip. Tool: Codex-assisted Godot canvas shader authoring. AI-assisted code; no new character image.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/combat_v1/weapons/muzzle_glow.tres",
+      "sha256": "41168ed03327bf0aa1ef30ba5007b34f6e017316deef7bb0cda7dc7f8699af74",
+      "origin": "Original 48px radial warm-light alpha texture defined with Godot GradientTexture2D; shared by survivor muzzle lights. Tool: Codex-assisted Godot resource authoring. AI-assisted code, no generated bitmap, recordings or third-party assets.",
       "license": "No additional license granted"
     }
   ]

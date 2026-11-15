@@ -42,7 +42,7 @@ static func pose_head(head: Sprite2D, body: Sprite2D, hold: Node2D) -> void:
 
 func pose(sprite: Sprite2D, variant: int, direction: Vector2, facing: Vector2,
 		state: StringName, clock: float, gait: float, fire_clock: float,
-		attack_clock: float) -> void:
+		attack_clock: float, weapon_phase: String = "", weapon_progress: float = 0.0) -> void:
 	# Keep the visual follow-through after the existing muzzle flash expires.
 	# The logical shot, weapon grip and LOS prediction retain their original clocks.
 	if fire_clock > _last_fire_clock:
@@ -52,6 +52,14 @@ func pose(sprite: Sprite2D, variant: int, direction: Vector2, facing: Vector2,
 	var elapsed: float = clock - _attack_started if _attack_started >= 0.0 else -1.0
 	if attack_clock > 0.0:
 		elapsed = 0.30 - attack_clock
+		_attack_facing = facing
+	# Melee anticipation is supplied by the real windup; contact is the first
+	# committed recovery frame, including an empty swing. No second attack timer.
+	if weapon_phase == "windup":
+		elapsed = 0.01
+		_attack_facing = facing
+	elif weapon_phase in ["recover", "recovery"] and weapon_progress < 0.45:
+		elapsed = 0.08 if weapon_progress < 0.20 else 0.17
 		_attack_facing = facing
 	# Retain authored hit and fallen artwork; neither uses the old split shader.
 	if state in [&"hit", &"defeated"]:

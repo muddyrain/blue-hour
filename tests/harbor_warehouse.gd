@@ -275,6 +275,8 @@ func _night_hint(world: Expedition) -> void:
 
 func _new_field(base: Dictionary, supply: MissionSupply) -> Expedition:
 	var world: Expedition = Expedition.new()
+	# Snapshot capture requires the real survival mode (and its drill state).
+	world.battle_survival = true
 	world.supply = supply
 	world.sortie_id = base.profile_id + ":2"
 	world.day = 3

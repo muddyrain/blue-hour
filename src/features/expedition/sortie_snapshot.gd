@@ -529,6 +529,10 @@ static func compatibility(world: Expedition) -> String:
 	if world.power_mode(): data.power_policy=SpecialPowers.policy(int(world.supply.generated.powers.version))
 	if world.persona_mode(): data.persona_policy=SurvivorPersona.policy()
 	if world.exploration_mode(): data.exploration_policy=ExplorationLayout.policy()
+	if CapeStation.is_layout(world.layout):
+		data.station_policy = {"location":CapeStation.LOCATION_ID, "bounds":_encode(world.layout.world_bounds), "geometry":world.layout.world_data}
+	if CampaignPressureV1.blockade_night(world.supply.generated):
+		data.blockade_policy = CampaignPressureV1.BLOCKADE_POLICY
 	if HarborWarehouse.is_layout(world.layout):
 		# world_data and world_bounds are deliberately not exported Resource fields.
 		# Bind the actual terrain/work-point data as well as the signed source.

@@ -131,7 +131,7 @@ static func problem(value: Variant, world: Dictionary, receipt: Dictionary, layo
 		var id: int = int(key)
 		var row: Dictionary = world.combat.spawns[key]
 		if int(row.stage) == ThreatDirector.Stage.LATE and row.kind != ScreamerPolicyV1.KIND \
-				and CombatEnemyRules.pick(receipt.transaction_id, id, int(row.stage)) == EnemyRules.NORMAL \
+				and CombatEnemyRules.pick_for(world.generated, receipt.transaction_id, id, int(row.stage)) == EnemyRules.NORMAL \
 				and (first < 0 or id < first):
 			first = id
 	if value.actor_id != first or (first >= 0 and world.combat.spawns[str(first)].kind != KIND):

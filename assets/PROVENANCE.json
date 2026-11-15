@@ -1647,6 +1647,62 @@
       "ai_generated_audio": false,
       "ai_assisted_code": true,
       "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/station/station.svg",
+      "sha256": "3cde8b7e878a7fbbce35682be7df5a3ec801c77d2d935ae86ce9a5aea025ed58",
+      "origin": "Original procedural 2:1 SVG; tools/make_station_art.py using Sprite from make_harbor_art.py; Python standard library; AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/station/bakery.svg",
+      "sha256": "06c831c5e46d60a761f342db9b5f4ccf54c61bc7e1bf1b3e16236d95fbfb2b43",
+      "origin": "Original procedural 2:1 SVG; tools/make_station_art.py using Sprite from make_harbor_art.py; Python standard library; AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/station/house.svg",
+      "sha256": "0a3b1e8e7a6e28f5e7d7cb708425b98ebb2c811f9321d4c5776d5c24187a7800",
+      "origin": "Original procedural 2:1 SVG; tools/make_station_art.py using Sprite from make_harbor_art.py; Python standard library; AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/station/kiosk.svg",
+      "sha256": "ed94f80f70c055f1c7dd4f101b5a8061ec878be1439c9bf06d1057af9e3e9108",
+      "origin": "Original procedural 2:1 SVG; tools/make_station_art.py using Sprite from make_harbor_art.py; Python standard library; AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/station/shed.svg",
+      "sha256": "e762e2b99bef0d1a6128d0d6278240523fc2cac481881bc6f4e105aee3f49088",
+      "origin": "Original procedural 2:1 SVG; tools/make_station_art.py using Sprite from make_harbor_art.py; Python standard library; AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/station/track.svg",
+      "sha256": "0943c6b318e88c1b3c65db6b0e2044a4b7f0e93007b163725eb79e56241a16bd",
+      "origin": "Original procedural 2:1 SVG; tools/make_station_art.py using Sprite from make_harbor_art.py; Python standard library; AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/station/platform.svg",
+      "sha256": "76d6ef9892784c934cd837c4c3a66bded6eee26182f4a72ff29c708071d0c9c0",
+      "origin": "Original procedural 2:1 SVG; tools/make_station_art.py using Sprite from make_harbor_art.py; Python standard library; AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/station/bench.svg",
+      "sha256": "603de5196bf0ec850ec3d83f165cb26a623597b759902388c1a6c24ae55f4137",
+      "origin": "Original procedural 2:1 SVG; tools/make_station_art.py using Sprite from make_harbor_art.py; Python standard library; AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
     }
   ]
 }

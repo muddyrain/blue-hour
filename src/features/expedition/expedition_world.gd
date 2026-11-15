@@ -38,14 +38,14 @@ func setup() -> void:
 	if SurvivalContracts.integer(expedition.supply.generated.get("version"), 6, 9):
 		expedition.tuning.spawn_seconds *= CampaignPressureV1.spawn_factor(expedition.supply.generated)
 	expedition.layout = expedition.supply.layout
-	if HarborWarehouse.is_layout(expedition.layout):
+	if HarborWarehouse.is_layout(expedition.layout) or CapeStation.is_layout(expedition.layout):
 		expedition.mission_title = expedition.layout.display_name
 	expedition._supply_entrances = expedition._world._street_supply_entrances()
 	expedition._cash_site.door = expedition.layout.cash_door
 	expedition._food_site.door = expedition.layout.food_door
 	if expedition.supply.generated.has("barricade"):
 		expedition.navigation = BarricadeV1.navigation(expedition.supply.generated, false)
-	elif expedition.exploration_mode() and not expedition.pump_station_mode() and not SeasideTown.is_layout(expedition.layout) and not HarborWarehouse.is_layout(expedition.layout):
+	elif expedition.exploration_mode() and not expedition.pump_station_mode() and not SeasideTown.is_layout(expedition.layout) and not HarborWarehouse.is_layout(expedition.layout) and not CapeStation.is_layout(expedition.layout):
 		expedition.navigation = ExplorationLayout._routing(expedition.layout.world_data).nav
 	else:
 		expedition.navigation.configure(expedition.layout.blockers(), expedition.layout.world_bounds)
@@ -117,6 +117,8 @@ func setup() -> void:
 		SeasideTown.populate(expedition)
 	elif HarborWarehouse.is_layout(expedition.layout):
 		HarborPresentation.populate(expedition)
+	elif CapeStation.is_layout(expedition.layout):
+		StationPresentation.populate(expedition)
 	elif not expedition.layout.world_data.is_empty():
 		expedition._world._make_world_buildings()
 	else:
@@ -171,6 +173,7 @@ func setup() -> void:
 		expedition._support._update_recon_knowledge()
 	if (expedition.supply.generated.get("version")==6 or (expedition.supply.generated.get("version")==7 or (expedition.supply.generated.get("version")==8 or expedition.supply.generated.get("version")==9))):
 		expedition.encounter=EncounterRuntime.new();expedition.encounter.setup(expedition,expedition.restoring_world)
+	SortieEvents.prepare(expedition)
 	expedition._make_ui()
 	var readout_layer: CanvasLayer = CanvasLayer.new()
 	readout_layer.layer = 5
@@ -190,6 +193,11 @@ func setup() -> void:
 	else:
 		expedition._show_notice(expedition.layout.route_hint if expedition._supply_entrances.is_empty() else
 			"先搜近点食品 · 可回巴士撤离，也可沿街追加第二处。")
+	var event_hint: String = SortieEvents.field_hint(expedition)
+	if not event_hint.is_empty():
+		expedition._show_notice(event_hint)
+	if CampaignPressureV1.blockade_night(expedition.supply.generated):
+		expedition._show_notice(CampaignPressureV1.BLOCKADE_WARNING)
 	if not expedition.layout.world_data.is_empty():
 		expedition.bus_view = BusJourney.new()
 		expedition.bus_view.configure(expedition,expedition._bus_sprite,expedition.layout.world_data.bus)

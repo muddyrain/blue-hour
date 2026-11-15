@@ -166,7 +166,7 @@ func present(actor: FieldActor) -> void:
 	actor.combat_view.present(String(actor.weapon_definition.id),Vector2(state.heading[0],state.heading[1]) if state.remaining>0 else actor.visual._facing,phase,clampf(progress,0.0,1.0))
 
 func pick_spawn(world: Expedition,index: int) -> String:
-	var kind: String=CombatEnemyRules.pick(world.sortie_id,index,int(world.threat.stage))
+	var kind: String=CombatEnemyRules.pick_for(world.supply.generated,world.sortie_id,index,int(world.threat.stage))
 	var fallback: int=-1
 	if kind == EnemyRules.NORMAL and screamer != null and screamer.state.actor_id == -1 \
 			and world.threat.stage >= ThreatDirector.Stage.LATE:
@@ -292,7 +292,7 @@ static func problem(value: Variant,world: Dictionary,receipt: Dictionary) -> Str
 	for key: Variant in value.spawns:
 		var source: Variant=value.spawns[key]
 		if not key is String or not key.is_valid_int() or key!=str(int(key)) or int(key)<0 or int(key)>=world.sim._spawn_count or not source is Dictionary or source.size()!=3 or not source.has_all(["kind","stage","fallback"]) or not SurvivalContracts.integer(source.stage,0,int(world.threat.stage)) or not source.kind is String or not SurvivalContracts.integer(source.fallback,-1,int(key)-1): return "COMBAT_SPAWN_FIELDS"
-		var rolled: String=CombatEnemyRules.pick(receipt.transaction_id,int(key),int(source.stage))
+		var rolled: String=CombatEnemyRules.pick_for(world.generated,receipt.transaction_id,int(key),int(source.stage))
 		var replacement: bool = screaming and source.kind == ScreamerPolicyV1.KIND and rolled == EnemyRules.NORMAL \
 			and int(source.stage) >= ThreatDirector.Stage.LATE and source.fallback == -1 \
 			and value.get("screamer") is Dictionary and value.screamer.get("actor_id") == int(key)

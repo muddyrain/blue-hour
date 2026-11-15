@@ -89,7 +89,7 @@ func _stamp_rect(area: Rect2, name: String, only: String = "") -> void:
 func _stamp_generated_paths(source: StreetLayout) -> void:
 	# Presentation only: existing walks and door approaches become narrow paths.
 	# Seaside town keeps its authored grounds; layout data and navigation are unchanged.
-	if source.world_data.get("seaside_town") or HarborWarehouse.is_layout(source) or int(source.world_data.get("version", 0)) != 5:
+	if source.world_data.get("authored", false) or source.world_data.get("seaside_town") or int(source.world_data.get("version", 0)) != 5:
 		return
 	var topology: String = String(source.world_data.get("topology", ""))
 	var parcels: Array = source.world_data.get("parcels", [])

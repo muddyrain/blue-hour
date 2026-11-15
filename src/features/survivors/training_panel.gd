@@ -95,10 +95,10 @@ func refresh(data: Dictionary, message: String = "", pending: bool = false) -> v
 		if member.health<=0:
 			continue
 		var id: int = int(member.id)
-		var button: Button = _button(_members,"%02d  %s\n普通Lv%d · Trait Lv%d" % [id,member.call_sign,int(member.growth.level),int(member.growth.trait.level)],func() -> void: _select(id))
+		var button: Button = _button(_members,"%02d  %s\n人物等级%d · 特性等级%d" % [id,member.call_sign,int(member.growth.level),int(member.growth.trait.level)],func() -> void: _select(id))
 		button.tooltip_text = member.call_sign
 		if RescuePoolState.is_family(_data):
-			button.text = "%02d %s\n普通Lv%d · Trait Lv%d" % [id,member.call_sign if member.call_sign.length()<=5 else member.call_sign.left(4)+"…",int(member.growth.level),int(member.growth.trait.level)]
+			button.text = "%02d %s\n人物等级%d · 特性等级%d" % [id,member.call_sign if member.call_sign.length()<=5 else member.call_sign.left(4)+"…",int(member.growth.level),int(member.growth.trait.level)]
 		button.toggle_mode = true
 		button.disabled = pending
 		member_buttons[id] = button
@@ -119,7 +119,7 @@ func refresh(data: Dictionary, message: String = "", pending: bool = false) -> v
 		else:
 			_quote = quote
 			var next: Dictionary = SurvivorRoster.member(quote.after.crew,selected_member_id)
-			preview_text.text = "消耗1份食物 → 本人累计进度 %d → %d\nTrait Lv%d → Lv%d%s\n训练后：%s" % [member.growth.trait.progress,next.growth.trait.progress,member.growth.trait.level,next.growth.trait.level,"（本次不升级）" if member.growth.trait.level==next.growth.trait.level else "（下次出击使用新效果）",(TraitRules.description(next).replace(" · PROJECT_TEMP", "")).get_slice("\n",1)]
+			preview_text.text = "消耗1份食物 → 本人累计进度 %d → %d\n特性等级%d → %d%s\n训练前：%s\n训练后：%s" % [member.growth.trait.progress,next.growth.trait.progress,member.growth.trait.level,next.growth.trait.level,"（本次不升级）" if member.growth.trait.level==next.growth.trait.level else "（下次出击使用新效果）",TraitRules.description(member).replace(" · PROJECT_TEMP", "").get_slice("\n",1),TraitRules.description(next).replace(" · PROJECT_TEMP", "").get_slice("\n",1)]
 			risk_text.text = "存活%d人 · 食物%d − 训练1 = 剩余%d\n假设下次归航零补给：需%d粮，可能缺%d粮。\n静态风险预估；未执行晚餐，不预定死亡人选。" % [_data.journey.active_member_ids.size(),_data.food,quote.after.food,quote.risk.required,quote.risk.shortage]
 	train_button.disabled = _quote.is_empty() or pending
 	retry_button.visible = pending
@@ -138,7 +138,7 @@ func _select(id: int) -> void:
 func _open_confirmation() -> void:
 	if _busy or _pending or _quote.is_empty() or confirmation.visible:
 		return
-	confirmation.dialog_text = "%s\n\n%s\n\n%s\n确认只花1粮、给该成员Trait进度+1；不增加普通XP或HP。" % [detail.text,preview_text.text,risk_text.text]
+	confirmation.dialog_text = "%s\n\n%s\n\n%s\n确认花费1粮，给该队员特性进度+1；不增加人物经验或生命。" % [detail.text,preview_text.text,risk_text.text]
 	_confirmation_armed = true
 	confirmation.popup_centered(Vector2i(720,430))
 	confirmation.get_cancel_button().grab_focus.call_deferred()

@@ -48,6 +48,11 @@ static func initialize(crew: Array) -> void:
 			"training_state":"unavailable","last_action":{}}
 
 
+static func description(member: Dictionary) -> String:
+	var level: int = int(member.get("growth", {}).get("level", 1))
+	return "人物等级 %d · 生命上限 %.0f（成长 +%.0f）\n每次个人击退获得 10 经验，存活归航后结算；每升一级生命上限 +5，并恢复新增的 5 点生命。" % [level, maximum(member), maximum(member) - 200.0]
+
+
 static func member_problem(member: Dictionary) -> String:
 	var value: Variant = member.get("growth")
 	if not value is Dictionary or value.size() != 5 or not value.has_all(["level","xp_total","trait","training_state","last_action"]):

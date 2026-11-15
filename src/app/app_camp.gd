@@ -570,7 +570,7 @@ func confirm_training(request: Dictionary) -> void:
 	if app.phase!=app.Phase.TITLE or not app._camp_open or not is_instance_valid(app.training_panel) or not app.training_panel.visible or app._requires_continue or app._progress_blocked or not app._pending_settlement.is_empty():
 		return
 	var accepted: bool = app._accept_transaction(app.progress_session.edit(app.camp_snapshot(),request),true)
-	app.training_panel.refresh(app.camp_snapshot(),"训练已保存。粮食与本人Trait已同时确认；下次出击按新等级生效。" if accepted else app._progress_message,app._progress_blocked)
+	app.training_panel.refresh(app.camp_snapshot(),"训练已保存。粮食与个人特性进度已同时确认；下次出击按新等级生效。" if accepted else app._progress_message,app._progress_blocked)
 	if accepted:
 		app._request_audio(&"ui_confirm")
 

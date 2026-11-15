@@ -199,7 +199,7 @@ static func _sources_problem(value: Dictionary, world: Dictionary, receipt: Dict
 		var id: int = int(key)
 		var source: Dictionary = world.combat.spawns[key]
 		accounted[id] = true
-		if int(source.stage) >= ThreatDirector.Stage.LATE and CombatEnemyRules.pick(receipt.transaction_id, id, int(source.stage)) == EnemyRules.NORMAL:
+		if int(source.stage) >= ThreatDirector.Stage.LATE and CombatEnemyRules.pick_for(world.generated, receipt.transaction_id, id, int(source.stage)) == EnemyRules.NORMAL:
 			if first == -1 or id < first:
 				first = id
 	if value.actor_id != first or (first >= 0 and world.combat.spawns[str(first)].kind != ScreamerPolicyV1.KIND):

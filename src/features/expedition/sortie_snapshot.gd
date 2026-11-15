@@ -239,7 +239,7 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 				return "WORLD_ATTACK_MODE_FIELDS"
 			if not melee:
 				var mod: String = WorkshopV1.mod_for(action_context, state.weapon_instance_id)
-				var reload_factor: float = PersonaState.factor(value.get("generated",{}),id,"reload")*BuildAuthority.factor(value,"reload")
+				var reload_factor: float = PersonaState.factor(value.get("generated",{}),id,"reload")*BuildAuthority.factor(value,"reload")*EconomyBuildV1.reload_factor(action_context)
 				var magazine_issue: String = WeaponMagazine.problem(row.magazine, state.weapon_instance_id, weapon.weapon_id, reload_factor, mod)
 				if not magazine_issue.is_empty():
 					return magazine_issue
@@ -502,6 +502,8 @@ static func compatibility(world: Expedition) -> String:
 				"parameters":WeaponMagazine.parameters(magazine.weapon_id, magazine.modification)}
 	if not workshop_magazines.is_empty():
 		data.workshop_magazines = workshop_magazines
+	if EconomyBuildV1.enabled(world.field_departure):
+		data.workshop_reload_factor = EconomyBuildV1.reload_factor(world.field_departure)
 	if (world.supply.generated.get("version")==6 or (world.supply.generated.get("version")==7 or (world.supply.generated.get("version")==8 or world.supply.generated.get("version")==9))): data.campaign_policy={"version":CampaignRules.VERSION,"preparations":CampaignRules.PREPARATIONS,"pressure":CampaignRules.BREAKOUT_INTERVAL,"boss":BossDefinition.POLICY}
 	if (world.supply.generated.get("version")==7 or (world.supply.generated.get("version")==8 or world.supply.generated.get("version")==9)): data.build_policy=world.supply.generated.build.policy.duplicate(true)
 	data.contact = {"distance":FieldContacts.DISTANCE,"approach":FieldContacts.APPROACH,"rechase":FieldContacts.RECHASE,"step":FieldContacts.STEP_DISTANCE,"steps":FieldContacts.MAX_STEPS,"path_parts":FieldContacts.MAX_PATH_PARTS,"pass_dot":FieldContacts.PASS_DOT,"recovery_speed":FieldContacts.RECOVERY_SPEED,"recovery_cap":FieldContacts.MAX_RECOVERY,"recovery_passes":FieldContacts.RECOVERY_PASSES,"yield_speed":FieldContacts.YIELD_SPEED}
@@ -529,6 +531,10 @@ static func compatibility(world: Expedition) -> String:
 	if world.power_mode(): data.power_policy=SpecialPowers.policy(int(world.supply.generated.powers.version))
 	if world.persona_mode(): data.persona_policy=SurvivorPersona.policy()
 	if world.exploration_mode(): data.exploration_policy=ExplorationLayout.policy()
+	if CapeStation.is_layout(world.layout):
+		data.station_policy = {"location":CapeStation.LOCATION_ID, "bounds":_encode(world.layout.world_bounds), "geometry":world.layout.world_data}
+	if CampaignPressureV1.blockade_night(world.supply.generated):
+		data.blockade_policy = CampaignPressureV1.BLOCKADE_POLICY
 	if HarborWarehouse.is_layout(world.layout):
 		# world_data and world_bounds are deliberately not exported Resource fields.
 		# Bind the actual terrain/work-point data as well as the signed source.

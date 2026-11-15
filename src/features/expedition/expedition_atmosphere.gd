@@ -45,7 +45,8 @@ func refresh(world: Expedition, amount: float) -> void:
 				_source_colors[source] = prop.get_meta("light_color", Color("ffa64a"))
 		if not HarborWarehouse.is_layout(world.layout):
 			for prop: FieldProp in world._buildings:
-				_sources.append(prop.position + Vector2(0, -45))
+				if not prop.get_meta("power_outage", false):
+					_sources.append(prop.position + Vector2(0, -45))
 		for index: int in range(mini(16, _sources.size())):
 			_add_light(world, _sources[index], texture, 1.25)
 			_scenery_lights.append(_lights.back())
@@ -66,7 +67,7 @@ func refresh(world: Expedition, amount: float) -> void:
 		light.energy = 1.25 * smoothstep(0.35, 1.0, amount)
 		light.visible = amount > 0.01
 	for prop: FieldProp in world._buildings:
-		prop.set_window_glow(amount, tint)
+		prop.set_window_glow(0.0 if prop.get_meta("power_outage", false) else amount, tint)
 
 func _add_light(parent: Node2D, offset: Vector2, texture: Texture2D, spread: float) -> void:
 	var light: PointLight2D = PointLight2D.new()

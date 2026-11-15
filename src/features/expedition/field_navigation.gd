@@ -5,6 +5,7 @@ extends RefCounted
 const CELL: float = 16.0
 const BOUNDS: Rect2 = StreetBlock.BOUNDS
 const FOOT_RADIUS: float = 10.0
+const MAX_CACHED_ROUTES: int = 2048
 
 var bounds: Rect2 = BOUNDS
 var obstacles: Array[Rect2] = []
@@ -12,6 +13,7 @@ var _grid: AStarGrid2D = AStarGrid2D.new()
 # Published route certificates keep their geometry immutable, but AStar stores
 # search scratch data on the grid. Serialize queries on the shared instance.
 var _query_mutex: Mutex = Mutex.new()
+var _routes: Dictionary[Vector4, PackedVector2Array] = {}
 
 
 func configure(blockers: Array[Rect2], world_bounds: Rect2 = BOUNDS) -> void:
@@ -40,6 +42,8 @@ func configure(blockers: Array[Rect2], world_bounds: Rect2 = BOUNDS) -> void:
 
 
 func _prepare_grid() -> void:
+	_routes.clear()
+	_grid.clear()
 	_grid.region = Rect2i(0, 0, int(bounds.size.x / CELL), int(bounds.size.y / CELL))
 	_grid.cell_size = Vector2(CELL, CELL)
 	_grid.offset = bounds.position + Vector2.ONE * CELL * 0.5
@@ -68,6 +72,7 @@ func copy_navigation() -> FieldNavigation:
 
 
 func set_private_blocker(base: FieldNavigation, blocker: Rect2) -> void:
+	_routes.clear()
 	if obstacles.size() > base.obstacles.size():
 		base._query_mutex.lock()
 		_paint_blocker(base, obstacles[-1], false)
@@ -100,6 +105,13 @@ func is_clear(point: Vector2) -> bool:
 
 func path_between(start: Vector2, goal: Vector2) -> PackedVector2Array:
 	_query_mutex.lock()
+	# Route proofs revisit exact endpoints on an immutable certificate grid.
+	# Keep the original AStar result, including its tie breaks and real start point.
+	var key: Vector4 = Vector4(start.x, start.y, goal.x, goal.y)
+	if _routes.has(key):
+		var cached: PackedVector2Array = _routes[key]
+		_query_mutex.unlock()
+		return cached.duplicate()
 	var from_id: Vector2i = _nearest_walkable(start)
 	var to_id: Vector2i = _nearest_walkable(goal)
 	var points: PackedVector2Array = _grid.get_point_path(from_id, to_id)
@@ -108,6 +120,9 @@ func path_between(start: Vector2, goal: Vector2) -> PackedVector2Array:
 	if points.size() > 1 and start.distance_to(points[0]) <= CELL * 0.71:
 		if _segment_is_clear(start, points[1]):
 			points[0] = start
+	if _routes.size() >= MAX_CACHED_ROUTES:
+		_routes.clear()
+	_routes[key] = points.duplicate()
 	_query_mutex.unlock()
 	return points
 

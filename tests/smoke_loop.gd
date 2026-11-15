@@ -35,7 +35,8 @@ func _timeout() -> void:
 
 func _wait(done: Callable, label: String, seconds: int = 20) -> bool:
 	var deadline: int = mini(started_ms + WALL_LIMIT_MS, Time.get_ticks_msec() + seconds * 1000)
-	for frame: int in range(12000):
+	# Headless frames can run much faster than the background mission worker.
+	while not finished:
 		if done.call():
 			return _check(true, label)
 		if Time.get_ticks_msec() >= deadline:
@@ -73,11 +74,14 @@ func _load_app() -> bool:
 
 
 func _start_sortie() -> Expedition:
+	var loading_started: int = Time.get_ticks_msec()
 	app.open_mission_select()
 	if not await _wait(func() -> bool:
 		return (app.mission_select.visible and not app.mission_select.loading
 			and not app.mission_select.daily_offers.is_empty()), "mission select finishes loading", 90):
+		_mission_timing(loading_started)
 		return null
+	_mission_timing(loading_started)
 	var menu: MissionSelect = app.mission_select
 	var first: int = -1
 	for index: int in range(menu.choices.size()):
@@ -103,6 +107,12 @@ func _start_sortie() -> Expedition:
 		"bus arrival completes through simulation", 1500):
 		return null
 	return world
+
+
+func _mission_timing(started: int) -> void:
+	print("BH_SMOKE_MISSIONS " + JSON.stringify({"day":app.day,
+		"wait_ms":Time.get_ticks_msec() - started, "loading":app.mission_select.loading,
+		"worker_alive":app._mission_worker != null and app._mission_worker.is_alive()}))
 
 
 func _observe_hit(event: Dictionary) -> void:

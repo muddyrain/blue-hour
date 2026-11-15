@@ -26,6 +26,7 @@ func _ready() -> void:
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.custom_minimum_size.x = 200
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.z_index = 9
 	world._sort.add_child(label)
 	button = C1HudButton.new()
 	button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
@@ -47,9 +48,12 @@ func _ready() -> void:
 func _draw() -> void:
 	# Read-only assistance cue. No extra clock, state, interaction rule or save field.
 	if npc != null and status in ["AVAILABLE", "IN_PROGRESS"]:
-		draw_arc(npc.position, 34, 0, TAU, 32, Color("ffca91"), 3, true)
-		var marker: Vector2 = npc.position + Vector2(0, -68)
-		draw_circle(marker, 24.0, Color("22343c"))
+		var foot: Vector2 = IsoSpace.to_view(npc.position)
+		draw_set_transform(foot, 0.0, Vector2(1.0, 0.5))
+		draw_arc(Vector2.ZERO, 34, 0, TAU, 32, Color("ffca91"), 3, true)
+		draw_set_transform(Vector2.ZERO)
+		var marker: Vector2 = foot + Vector2(0, -68)
+		draw_circle(marker, 24.0, Color("22201e"))
 		draw_arc(marker, 24.0, 0, TAU, 24, Color("ffca91"), 2.0, true)
 		draw_circle(marker + Vector2(0, -6), 6.0, Color("ffe2bf"))
 		draw_arc(marker + Vector2(0, 12), 11.0, PI, TAU, 16, Color("ffe2bf"), 4.0, true)
@@ -60,8 +64,8 @@ func _draw() -> void:
 			continue
 		var pulse: float = 0.6 + 0.3 * sin(world.elapsed * 8.0)
 		var colour: Color = Color(0.55, 0.95, 0.85, pulse)
-		draw_arc(npc.position + Vector2(0, -36), 23, -PI * 0.5, -PI * 0.5 + TAU * progress / SECONDS, 32, colour, 2.0, true)
-		for point: Vector2 in [actor.position + Vector2(18, -36), npc.position + Vector2(-18, -36)]:
+		draw_arc(IsoSpace.to_view(npc.position) + Vector2(0, -36), 23, -PI * 0.5, -PI * 0.5 + TAU * progress / SECONDS, 32, colour, 2.0, true)
+		for point: Vector2 in [IsoSpace.to_view(actor.position) + Vector2(18, -36), IsoSpace.to_view(npc.position) + Vector2(-18, -36)]:
 			draw_arc(point, 5, PI * 0.2, PI * 1.8, 12, colour, 2.0, true)
 		return
 
@@ -71,8 +75,6 @@ func revealed() -> bool:
 
 
 func candidate_name() -> String:
-	if not revealed():
-		return ANONYMOUS_NAME
 	var id: int = world.candidate_id()
 	var display_name: String = SurvivorRoster.definition(id).default_display_name
 	if id == WeaponInventory.MECHANIC_ID and ContentWaveV1.marked(world.supply.generated):
@@ -155,9 +157,9 @@ func delivered() -> bool:
 
 func refresh() -> void:
 	# Keep the real actor and its visual state for promotion and snapshot replay.
-	npc.visual.visible = revealed()
+	npc.visual.visible = true
 	label.visible = not (status == "IN_FIELD_JOINED")
-	label.position = npc.position + Vector2(-100,-132)
+	label.position = IsoSpace.to_view(npc.position) + Vector2(-100, -124)
 	var display_name: String = candidate_name()
 	match status:
 		"AVAILABLE":

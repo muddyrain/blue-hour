@@ -138,13 +138,14 @@ func source_problem(world: Dictionary) -> String:
 	var latest: Dictionary = {}
 	var speed_limits: Dictionary = {}
 	var layout: Dictionary = generated.layout
-	if world.survivors.size() > layout.arrivals.size():
+	var arrivals: Array[Vector2] = SquadDeployment.positions(layout.arrivals, world.survivors.size(), ExplorationLayout._routing(layout).nav)
+	if arrivals.size() != world.survivors.size():
 		return "RECON_ARRIVAL_SOURCE"
 	derived.reveal(WorldLayout.point(layout.bus.door))
 	for index: int in range(world.survivors.size()):
 		var actor: Dictionary = world.survivors[index].state
 		var id: int = int(actor.member_id)
-		var start: Vector2 = WorldLayout.point(layout.arrivals[index])
+		var start: Vector2 = arrivals[index]
 		starts[id] = start
 		latest[id] = [0.0, start]
 		# Contact separation and cooperative yielding can add to powered walking.

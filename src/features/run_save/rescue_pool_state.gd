@@ -5,8 +5,8 @@ extends RefCounted
 const SCHEMA: int = 108
 const FORMAT: String = "BH_RESCUE_POOL_V1"
 const SCOPE: String = "RESCUE_POOL_PILOT"
-const MAX_ROSTER: int = 4 # PROJECT_TEMP, includes permanent history; five actors not enabled.
-const CANDIDATES: Array[int] = [3,4,5]
+const MAX_ROSTER: int = RosterState.MAX_HISTORY # Shared permanent-history capacity.
+const CANDIDATES: Array[int] = [3,4,5,6,7,8,9,10]
 
 
 static func is_state(data: Dictionary) -> bool:
@@ -32,10 +32,10 @@ static func snapshot(camp: Dictionary, journey: Dictionary, recruits: Array, his
 
 static func available(base: Dictionary) -> Array[int]:
 	var ids: Array[int] = []
-	if (base.crew.size()>=RosterState.MAX_HISTORY or RosterState.living_count(base)>=RosterState.MAX_LIVING) if RosterState.is_family(base) else base.crew.size()>=MAX_ROSTER:
+	if base.crew.size() >= MAX_ROSTER or RosterState.living_count(base) >= RosterState.MAX_LIVING:
 		return ids
 	for id: int in CANDIDATES:
-		if SurvivorRoster.member(base.crew,id).is_empty():
+		if SurvivorRoster.member(base.crew,id).is_empty() and (id <= 8 or base.crew.size() >= 8):
 			ids.append(id)
 	return ids
 
@@ -44,6 +44,13 @@ static func choice(base: Dictionary, identity: String) -> int:
 	var ids: Array[int] = available(base)
 	if ids.is_empty():
 		return 0
+	# Preserve existing candidates and offer fingerprints until their pool is used.
+	var original: Array[int] = []
+	for id: int in ids:
+		if id <= 5:
+			original.append(id)
+	if not original.is_empty():
+		ids = original
 	# Entropy is reproducible; the original base/rules hashes bind it to run/root/sortie.
 	var seed: String = String(base.journey.seed)+":"+identity.get_slice(":",1)+":rescue"
 	return ids[seed.sha256_text().substr(0,8).hex_to_int() % ids.size()]
@@ -78,7 +85,7 @@ static func problem(data: Dictionary) -> String:
 
 
 static func natural_problem(data: Dictionary, roster: bool = false, generated_maps: bool = false, build_context: Dictionary = {}) -> String:
-	if data.size()!=15 or not data.has_all(FrozenSettlement.STATE_KEYS) or not data.get("origin") is Dictionary or not data.origin.is_empty() or not SurvivalContracts.integer(data.get("settled_sorties"),0,RunSave.MAX_COUNTER) or not data.get("crew") is Array or data.crew.size()<2 or data.crew.size()>(RosterState.MAX_HISTORY if roster else MAX_ROSTER) or not data.get("recruits") is Array or data.recruits.size()>(3 if roster else 2) or not data.get("journey") is Dictionary:
+	if data.size()!=15 or not data.has_all(FrozenSettlement.STATE_KEYS) or not data.get("origin") is Dictionary or not data.origin.is_empty() or not SurvivalContracts.integer(data.get("settled_sorties"),0,RunSave.MAX_COUNTER) or not data.get("crew") is Array or data.crew.size()<2 or data.crew.size()>(RosterState.MAX_HISTORY if roster else MAX_ROSTER) or not data.get("recruits") is Array or data.recruits.size()>(MAX_ROSTER - 2) or not data.get("journey") is Dictionary:
 		return "POOL_FIELDS"
 	var meta: Dictionary = data.journey
 	for key: String in ["format","state"]:
@@ -88,7 +95,7 @@ static func natural_problem(data: Dictionary, roster: bool = false, generated_ma
 		return "POOL_JOURNEY"
 	var ids: Array[int] = []
 	for member: Variant in data.crew:
-		if not member is Dictionary or not SurvivalContracts.integer(member.get("id"),1,5) or int(member.id) in ids or not member.get("definition_id") is String or member.definition_id!="crew_%d" % int(member.id) or not TraitRules.member_problem(member,0,true).is_empty() or not SurvivalContracts.number(member.get("health")) or member.health<0 or member.health>GrowthRules.maximum(member) or not member.get("condition") is String or member.condition!=("active" if member.health>0 else "dead"):
+		if not member is Dictionary or not SurvivalContracts.integer(member.get("id"),1,RosterState.MAX_HISTORY) or int(member.id) in ids or not member.get("definition_id") is String or member.definition_id!="crew_%d" % int(member.id) or not TraitRules.member_problem(member,0,true).is_empty() or not SurvivalContracts.number(member.get("health")) or member.health<0 or member.health>GrowthRules.maximum(member) or not member.get("condition") is String or member.condition!=("active" if member.health>0 else "dead"):
 			return "POOL_MEMBER"
 		ids.append(int(member.id))
 	if 1 not in ids or 2 not in ids or ids.size()!=2+data.recruits.size():
@@ -107,7 +114,7 @@ static func natural_problem(data: Dictionary, roster: bool = false, generated_ma
 		for key: String in ["rescue_id","recruit_id","settlement_id","field_status"]:
 			if not record[key] is String:
 				return "POOL_RECRUIT_TYPES"
-		if not SurvivalContracts.integer(record.member_id,3,5) or int(record.member_id) in seen or int(record.member_id) not in ids or record.rescue_id!=RescueState.TARGET or record.recruit_id!="%s:recruit:%d" % [data.profile_id,int(record.member_id)] or record.field_status not in ["RETURNED","LOST"] or not SurvivalContracts.integer(record.joined_at_ms,10000,RunSave.MAX_COUNTER):
+		if not SurvivalContracts.integer(record.member_id,3,RosterState.MAX_HISTORY) or int(record.member_id) in seen or int(record.member_id) not in ids or record.rescue_id!=RescueState.TARGET or record.recruit_id!="%s:recruit:%d" % [data.profile_id,int(record.member_id)] or record.field_status not in ["RETURNED","LOST"] or not SurvivalContracts.integer(record.joined_at_ms,10000,RunSave.MAX_COUNTER):
 			return "POOL_RECRUIT_RECORD"
 		var index: String = record.settlement_id.get_slice(":",1)
 		if not index.is_valid_int() or not SurvivalContracts.integer(int(index),previous_sortie+1,int(data.settled_sorties)) or record.settlement_id!="%s:%d" % [data.profile_id,int(index)] or WeaponInventory.find(data,weapon(data.profile_id,int(record.member_id)).instance_id).is_empty():
@@ -131,7 +138,7 @@ static func natural_problem(data: Dictionary, roster: bool = false, generated_ma
 		if member.health>0:
 			active.append(int(member.id))
 	active.sort()
-	if roster and active.size()>RosterState.MAX_LIVING:
+	if active.size()>RosterState.MAX_LIVING:
 		return "ROSTER_LIVING_LIMIT"
 	if not TransactionReceipt.same({"v":active},{"v":meta.active_member_ids}):
 		return "POOL_ACTIVE_IDENTITIES"

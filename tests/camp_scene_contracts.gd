@@ -182,7 +182,7 @@ func _fixture() -> Dictionary:
 
 
 func _check_identity_templates(opening_member: Dictionary) -> void:
-	# Check each existing sheet in isolation; five living people are not a legal opening.
+	# Check all identity templates, including distinct reserve people sharing artwork.
 	for definition: SurvivorDefinition in SurvivorRoster.Definitions:
 		var member: Dictionary = opening_member.duplicate(true)
 		member.definition_id = String(definition.id)
@@ -190,7 +190,7 @@ func _check_identity_templates(opening_member: Dictionary) -> void:
 		var resident: CampSceneResident = CampSceneResident.new()
 		root.add_child(resident)
 		resident.configure(member)
-		var index: int = SurvivorRoster.Definitions.find(definition)
+		var index: int = SurvivorVisualV1.variant_for(String(definition.id))
 		_check(resident.body.texture == SurvivorVisualV1.SHEETS[index] and not resident.body.flip_h, "existing identity sheet " + String(definition.id))
 		resident.free()
 

@@ -145,7 +145,7 @@ static func problem(value: Variant) -> String:
 		if not SurvivalContracts.integer(value[key],0,RunSave.MAX_COUNTER): return "TASK_VALUE"
 	if not NeighborhoodLayout.validate(value.layout).is_empty(): return "TASK_LAYOUT"
 	if value.type=="equipment" and value.layout.topology=="residential": return "TASK_THEME"
-	if (value.type=="rescue" and int(value.recruit) not in [3,4,5]) or (value.type!="rescue" and value.recruit!=0): return "TASK_RECRUIT"
+	if (value.type=="rescue" and int(value.recruit) not in RescuePoolState.CANDIDATES) or (value.type!="rescue" and value.recruit!=0): return "TASK_RECRUIT"
 	var signature: String = SurvivalContracts.fingerprint(value)
 	if ActionMemo.lookup(_checked, signature) == true: return ""
 	if not TransactionReceipt.same(value,_make(value.seed,int(value.day),int(value.slot),value.type,value.layout.topology,value.layout["size"],int(value.recruit))): return "TASK_CANONICAL"

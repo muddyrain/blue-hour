@@ -10,7 +10,7 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	for variant: int in range(5):
+	for variant: int in range(SurvivorVisualV1.SHEETS.size()):
 		var visual: ActorVisual = ActorVisual.new()
 		visual.variant = variant
 		root.add_child(visual)

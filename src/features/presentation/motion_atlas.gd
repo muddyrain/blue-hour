@@ -33,6 +33,7 @@ static func octant(direction: Vector2) -> int:
 
 static func pose(sprite: Sprite2D, enemy: bool, kind: String, variant: int,
 		direction: Vector2, action: int) -> void:
+	variant = mini(variant, RIGHT.size() - 1)
 	var oct: int = octant(direction)
 	var left: bool = not enemy and LEFT_COLUMNS.has(oct)
 	sprite.texture = ENEMIES.get(kind, ENEMIES[EnemyRules.NORMAL]) if enemy else LEFT[variant] if left else RIGHT[variant]

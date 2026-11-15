@@ -39,10 +39,10 @@ static func problem(generated: Dictionary, state: Variant, elapsed: float, crew:
 		return "BILLBOARD_WORK_PROGRESS"
 	if state.work.is_empty():
 		return "" if state.progress == 0.0 else "BILLBOARD_WORK_SOURCE"
-	var arrivals: Array = generated.layout.arrivals
 	var living: Array = crew.filter(func(member: Dictionary) -> bool: return member.health > 0.0)
 	living.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.id) < int(b.id))
-	if living.size() > arrivals.size():
+	var arrivals: Array[Vector2] = SquadDeployment.positions(generated.layout.arrivals, living.size(), ExplorationLayout._routing(generated.layout).nav)
+	if arrivals.size() != living.size():
 		return "BILLBOARD_WORK_ARRIVALS"
 	var starts: Dictionary[int, Vector2] = {}
 	var speeds: Dictionary[int, float] = {}
@@ -53,7 +53,7 @@ static func problem(generated: Dictionary, state: Variant, elapsed: float, crew:
 	for index: int in range(living.size()):
 		var member: Dictionary = living[index]
 		var id: int = int(member.id)
-		starts[id] = WorldLayout.point(arrivals[index])
+		starts[id] = arrivals[index]
 		var speed: float = 125.0 * TraitRules.factor(member, "move") * PersonaState.factor(generated, id, "move") * build_move
 		speeds[id] = speed * power_limit + FieldContacts.RECOVERY_SPEED + FieldContacts.YIELD_SPEED * (living.size() - 1)
 	var station: Vector2 = BillboardActionV1.point(generated)

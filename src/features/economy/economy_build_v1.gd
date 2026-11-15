@@ -392,7 +392,7 @@ static func problem(camp: Dictionary) -> String:
 		var last_candidate: Dictionary = {}
 		var candidate_ids: Array[int] = []
 		for candidate: Variant in row.planning_candidates:
-			if not candidate is Dictionary or candidate.size() != 2 or not candidate.has_all(["member_id", "trait"]) or not SurvivalContracts.integer(candidate.member_id, 1, 5) or int(candidate.member_id) in candidate_ids or not candidate.trait is Dictionary: return "ECONOMY_PLANNING_CANDIDATE"
+			if not candidate is Dictionary or candidate.size() != 2 or not candidate.has_all(["member_id", "trait"]) or not SurvivalContracts.integer(candidate.member_id, 1, RosterState.MAX_HISTORY) or int(candidate.member_id) in candidate_ids or not candidate.trait is Dictionary: return "ECONOMY_PLANNING_CANDIDATE"
 			if not planning_eligible(camp, int(candidate.member_id), int(row.sortie)): return "ECONOMY_PLANNING_UNREGISTERED_TARGET"
 			var trait_value: Dictionary = candidate.trait
 			if trait_value.size() != 3 or not trait_value.has_all(["id", "level", "progress"]) or trait_value.id != TraitRules.IDS[TraitRules.role({"id":candidate.member_id}) - 1] or not SurvivalContracts.integer(trait_value.progress, 0, RunSave.MAX_COUNTER) or not SurvivalContracts.integer(trait_value.level, 1, 4) or trait_value.level != TraitRules.level_for(int(trait_value.progress)): return "ECONOMY_PLANNING_CANDIDATE_TRAIT"
@@ -401,7 +401,7 @@ static func problem(camp: Dictionary) -> String:
 			last_candidate = candidate
 		if not row.planning.is_empty():
 			var award: Dictionary = row.planning
-			if planning == 0 or award.size() != 4 or not award.has_all(["member_id", "points", "before", "after"]) or award.points != planning or not award.before is Dictionary or not award.after is Dictionary or not SurvivalContracts.integer(award.get("member_id"), 1, 5) or row.planning_candidates.is_empty() or row.planning_candidates[0].get("member_id") != award.member_id or not TransactionReceipt.same(row.planning_candidates[0].get("trait", {}), award.before) or award.before.get("level", 5) >= 5: return "ECONOMY_PLANNING_SOURCE"
+			if planning == 0 or award.size() != 4 or not award.has_all(["member_id", "points", "before", "after"]) or award.points != planning or not award.before is Dictionary or not award.after is Dictionary or not SurvivalContracts.integer(award.get("member_id"), 1, RosterState.MAX_HISTORY) or row.planning_candidates.is_empty() or row.planning_candidates[0].get("member_id") != award.member_id or not TransactionReceipt.same(row.planning_candidates[0].get("trait", {}), award.before) or award.before.get("level", 5) >= 5: return "ECONOMY_PLANNING_SOURCE"
 			if not planning_eligible(camp, int(award.member_id), int(row.sortie)): return "ECONOMY_PLANNING_UNREGISTERED_TARGET"
 			var expected: Dictionary = award.before.duplicate(true)
 			expected.progress += planning
@@ -510,7 +510,7 @@ static func weapon_problem(camp: Dictionary) -> String:
 	var owners: Array[int] = []
 	var equipped: Array[String] = []
 	for row: Variant in camp.loadout:
-		if not row is Dictionary or row.size() != 2 or not SurvivalContracts.integer(row.get("member_id"), 1, 5) or not row.get("instance_id") is String or int(row.member_id) in owners or row.instance_id in equipped or not WeaponInventory._living(camp, int(row.member_id)) or WeaponInventory.find(camp, row.instance_id).get("condition") != "ready": return "ECONOMY_LOADOUT"
+		if not row is Dictionary or row.size() != 2 or not SurvivalContracts.integer(row.get("member_id"), 1, RosterState.MAX_HISTORY) or not row.get("instance_id") is String or int(row.member_id) in owners or row.instance_id in equipped or not WeaponInventory._living(camp, int(row.member_id)) or WeaponInventory.find(camp, row.instance_id).get("condition") != "ready": return "ECONOMY_LOADOUT"
 		owners.append(int(row.member_id))
 		equipped.append(row.instance_id)
 	for member: Dictionary in camp.crew:
@@ -659,7 +659,7 @@ static func holder_preview(camp: Dictionary, before: Dictionary, after: Dictiona
 
 static func planning_eligible(camp: Dictionary, member_id: int, sortie: int) -> bool:
 	# Eligibility belongs to that return, so a later death does not erase earned credit.
-	if member_id < 1 or member_id > 5 or sortie < 1 or SurvivorRoster.member(camp.get("crew", []), member_id).is_empty(): return false
+	if member_id < 1 or member_id > RosterState.MAX_HISTORY or sortie < 1 or SurvivorRoster.member(camp.get("crew", []), member_id).is_empty(): return false
 	if member_id > 2:
 		var registered: bool = false
 		for recruit: Variant in camp.get("recruits", []):

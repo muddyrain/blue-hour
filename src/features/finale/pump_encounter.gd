@@ -41,7 +41,7 @@ static func problem(value: Variant, generated: Dictionary, stopped: bool, alive:
 		return "PUMP_CHARGE_ACTIVE"
 	var seen: Array[int] = []
 	for member: Variant in value.hits:
-		if not SurvivalContracts.integer(member, 1, 5) or int(member) in seen:
+		if not SurvivalContracts.integer(member, 1, RosterState.MAX_HISTORY) or int(member) in seen:
 			return "PUMP_CHARGE_HITS"
 		seen.append(int(member))
 	return ""

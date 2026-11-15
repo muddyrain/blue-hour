@@ -4,8 +4,8 @@ extends RefCounted
 
 const SCHEMA: int = 109
 const FORMAT: String = "BH_ROSTER_V1"
-const MAX_HISTORY: int = 5 # PROJECT_TEMP, not a verified original-game limit.
-const MAX_LIVING: int = 4
+const MAX_HISTORY: int = 10 # PROJECT_TEMP, not a verified original-game limit.
+const MAX_LIVING: int = 8
 
 
 static func is_state(data: Dictionary) -> bool:
@@ -38,5 +38,5 @@ static func living_count(data: Dictionary) -> int:
 
 static func unavailable_reason(data: Dictionary) -> String:
 	if living_count(data)>=MAX_LIVING:
-		return "存活编制已满（4人）；历史名册%d/5" % data.crew.size()
-	return "候选已全部登记；历史名册%d/5" % data.crew.size()
+		return "存活编制已满（%d人）；历史名册%d/%d" % [MAX_LIVING, data.crew.size(), MAX_HISTORY]
+	return "候选已全部登记；历史名册%d/%d" % [data.crew.size(), MAX_HISTORY]

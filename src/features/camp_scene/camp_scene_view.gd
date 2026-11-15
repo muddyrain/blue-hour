@@ -221,7 +221,7 @@ func _build_blue_hour_team() -> void:
 	var roster: VBoxContainer = VBoxContainer.new()
 	roster.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_team_scroll.add_child(roster)
-	for id: int in [1, 2, 3, 4, 5]:
+	for id: int in range(1, RosterState.MAX_HISTORY + 1):
 		var button: Button = _blue_hour_button(roster, StringName("member%d" % id), "")
 		button.set_meta("member_id", id)
 		button.custom_minimum_size.y = 94
@@ -522,7 +522,7 @@ func _link_focus() -> void:
 	for action: StringName in [&"bus", &"crew", &"weapons", &"workshop", &"supplies", &"training"]:
 		if hotspots.has(action) and not hotspots[action].disabled:
 			sequence.append(hotspots[action])
-	for id: int in [1, 2, 3, 4, 5]:
+	for id: int in range(1, RosterState.MAX_HISTORY + 1):
 		if member_buttons[id].visible:
 			sequence.append(member_buttons[id])
 	for button: Button in facility_buttons.values():

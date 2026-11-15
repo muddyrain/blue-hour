@@ -63,7 +63,7 @@ static func _profiled_problem(value: Variant) -> String:
 	if ActionMemo.lookup(_checked, signature) == true:return ""
 	var expected: Dictionary=_make(value.seed,int(value.day),int(value.slot),value.type,value.layout.topology,value.layout["size"],int(value.recruit))
 	if not TransactionReceipt.same(value,expected):return "DAILY_CANONICAL"
-	if (value.type=="rescue" and int(value.recruit) not in [3,4,5]) or (value.type!="rescue" and value.recruit!=0):return "DAILY_RECRUIT"
+	if (value.type=="rescue" and int(value.recruit) not in RescuePoolState.CANDIDATES) or (value.type!="rescue" and value.recruit!=0):return "DAILY_RECRUIT"
 	ActionMemo.store(_checked, signature, true, 128)
 	return ""
 

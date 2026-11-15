@@ -59,7 +59,7 @@ func _generation() -> void:
 	var detached: Dictionary = SurvivorPersona.member(original, 1)
 	detached.positive_id = "ranged_focus_v1"
 	expect(original.members[0].positive_id == "keen_search_v1", "member reads return detached facts")
-	expect(SurvivorPersona.member(original, 0).is_empty() and SurvivorPersona.member(original, 6).is_empty() and SurvivorPersona.member(original, 1, "crew_2").is_empty(), "unknown or mismatched stable identities return no recipe")
+	expect(SurvivorPersona.member(original, 0).is_empty() and SurvivorPersona.member(original, RosterState.MAX_HISTORY + 1).is_empty() and SurvivorPersona.member(original, 1, "crew_2").is_empty(), "unknown or mismatched stable identities return no recipe")
 	var transported: Dictionary = RecordEncoding.unpack(JSON.parse_string(RecordEncoding.stringify(original))).payload
 	expect(SurvivorPersona.problem(transported, SEED_ONE).is_empty(), "exact transport retains versioned identity and seeded source")
 	var catalogue: Dictionary = SurvivorPersona.policy()

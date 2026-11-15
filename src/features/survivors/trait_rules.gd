@@ -23,7 +23,8 @@ static func level_for(progress: int) -> int:
 
 
 static func role(member: Dictionary) -> int:
-	return int({1:1,2:2,3:3,4:1,5:2}.get(int(member.get("id",0)),0))
+	var id: int = int(member.get("id", 0))
+	return (id - 1) % IDS.size() + 1 if id >= 1 and id <= RosterState.MAX_HISTORY else 0
 
 
 static func initialize(crew: Array) -> void:
@@ -32,14 +33,14 @@ static func initialize(crew: Array) -> void:
 
 
 static func member_problem(member: Dictionary, training_credit: int = 0, pool: bool = false) -> String:
-	if not SurvivalContracts.integer(member.get("id"),1,5 if pool else 3) or not member.get("service") is Dictionary or not SurvivalContracts.integer(member.service.get("sorties"),0,RunSave.MAX_COUNTER):
+	if not SurvivalContracts.integer(member.get("id"),1,RosterState.MAX_HISTORY if pool else 3) or not member.get("service") is Dictionary or not SurvivalContracts.integer(member.service.get("sorties"),0,RunSave.MAX_COUNTER):
 		return "TRAIT_MEMBER_ID_OR_SERVICE"
 	var issue: String = GrowthRules.member_problem(member)
 	if not issue.is_empty():
 		return issue
 	var id: int = int(member.get("id",0))
 	var value: Variant = member.growth.get("trait")
-	if id < 1 or id > (5 if pool else 3) or not member.get("definition_id") is String or member.get("definition_id") != "crew_%d" % id or not value is Dictionary or value.size() != 3 or not value.has_all(["id","level","progress"]):
+	if id < 1 or id > (RosterState.MAX_HISTORY if pool else 3) or not member.get("definition_id") is String or member.get("definition_id") != "crew_%d" % id or not value is Dictionary or value.size() != 3 or not value.has_all(["id","level","progress"]):
 		return "TRAIT_MEMBER_FIELDS"
 	if not value.id is String or value.id != IDS[role(member)-1] or not SurvivalContracts.integer(value.progress,0,RunSave.MAX_COUNTER) or not SurvivalContracts.integer(value.level,1,5) or value.level != level_for(int(value.progress)):
 		return "TRAIT_ID_OR_PROGRESS"
@@ -52,7 +53,7 @@ static func factor(member: Dictionary, kind: String) -> float:
 	if not value is Dictionary or not value.get("id") is String or value.id not in IDS or not SurvivalContracts.integer(value.get("level"),1,5):
 		return 1.0
 	var owner: int = IDS.find(value.id)+1
-	if not SurvivalContracts.integer(member.get("id"),1,5) or not member.get("definition_id") is String or role(member) != owner or member.definition_id != "crew_%d" % int(member.id):
+	if not SurvivalContracts.integer(member.get("id"),1,RosterState.MAX_HISTORY) or not member.get("definition_id") is String or role(member) != owner or member.definition_id != "crew_%d" % int(member.id):
 		return 1.0
 	if (kind == "shot" and owner == 1) or (kind == "search" and owner == 2) or (kind == "move" and owner == 3):
 		return policy()[kind][int(value.level)-1]
@@ -83,7 +84,7 @@ static func inputs_problem(value: Variant, token: Dictionary, report: Dictionary
 	var seen: Array[String] = []
 	var previous: int = -1
 	for row: Variant in value.events:
-		if not row is Dictionary or row.size() != 4 or not row.has_all(["member_id","kind","site","at_ms"]) or not row.kind is String or row.kind != "search_complete" or not row.site is String or row.site not in ["cash","food"] or row.site in seen or not SurvivalContracts.integer(row.member_id,1,5 if RescuePoolState.is_family(context) else 3):
+		if not row is Dictionary or row.size() != 4 or not row.has_all(["member_id","kind","site","at_ms"]) or not row.kind is String or row.kind != "search_complete" or not row.site is String or row.site not in ["cash","food"] or row.site in seen or not SurvivalContracts.integer(row.member_id,1,RosterState.MAX_HISTORY if RescuePoolState.is_family(context) else 3):
 			return "TRAIT_SEARCH_IDENTITY"
 		var minimum_ms: int = floori(TaskActions.PARAMETERS.airdrop_seconds*700.0) if (task.get("version")==4 or (task.get("version")==5 or (task.get("version")==6 or (task.get("version")==7 or task.get("version")==8)))) and task.get("type")=="airdrop" and row.site=="cash" else 21000
 		if (task.get("version")==7 or task.get("version")==8): minimum_ms=floori(minimum_ms*BuildItems.frozen_factors(task.build).work)

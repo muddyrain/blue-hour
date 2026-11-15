@@ -435,6 +435,219 @@
           "southwest_correction": false
         }
       ]
+    },
+    "ruan": {
+      "sheet": "ruan.png",
+      "target_idle_height": 184,
+      "source_sha256": "23e01a47ed3381e87c6d0dc8670275680e501b4b25faf866d76dee6fab7dfe2e",
+      "registration": [
+        {
+          "direction": "e",
+          "source_root": [
+            91.5,
+            152
+          ],
+          "scale": 1.2689655172413794
+        },
+        {
+          "direction": "se",
+          "source_root": [
+            83.0,
+            151
+          ],
+          "scale": 1.2689655172413794
+        },
+        {
+          "direction": "s",
+          "source_root": [
+            78.5,
+            151
+          ],
+          "scale": 1.2689655172413794
+        },
+        {
+          "direction": "sw",
+          "source_root": [
+            77.5,
+            153
+          ],
+          "scale": 1.2689655172413794
+        },
+        {
+          "direction": "w",
+          "source_root": [
+            81.5,
+            152
+          ],
+          "scale": 1.2777777777777777
+        },
+        {
+          "direction": "nw",
+          "source_root": [
+            80.5,
+            152
+          ],
+          "scale": 1.2602739726027397
+        },
+        {
+          "direction": "n",
+          "source_root": [
+            79.5,
+            152
+          ],
+          "scale": 1.2777777777777777
+        },
+        {
+          "direction": "ne",
+          "source_root": [
+            78.0,
+            153
+          ],
+          "scale": 1.2689655172413794
+        }
+      ]
+    },
+    "ye": {
+      "sheet": "ye.png",
+      "target_idle_height": 184,
+      "source_sha256": "1ade03e2edde3141b4e9fe0f6c41208a13092151c73582a50c32e6db2671239a",
+      "registration": [
+        {
+          "direction": "e",
+          "source_root": [
+            88.5,
+            153
+          ],
+          "scale": 1.2266666666666666
+        },
+        {
+          "direction": "se",
+          "source_root": [
+            85.0,
+            152
+          ],
+          "scale": 1.2348993288590604
+        },
+        {
+          "direction": "s",
+          "source_root": [
+            82.5,
+            153
+          ],
+          "scale": 1.2266666666666666
+        },
+        {
+          "direction": "sw",
+          "source_root": [
+            84.5,
+            155
+          ],
+          "scale": 1.218543046357616
+        },
+        {
+          "direction": "w",
+          "source_root": [
+            83.0,
+            154
+          ],
+          "scale": 1.2266666666666666
+        },
+        {
+          "direction": "nw",
+          "source_root": [
+            83.0,
+            154
+          ],
+          "scale": 1.2266666666666666
+        },
+        {
+          "direction": "n",
+          "source_root": [
+            81.5,
+            154
+          ],
+          "scale": 1.2348993288590604
+        },
+        {
+          "direction": "ne",
+          "source_root": [
+            83.0,
+            153
+          ],
+          "scale": 1.2432432432432432
+        }
+      ]
+    },
+    "he": {
+      "sheet": "he.png",
+      "target_idle_height": 184,
+      "source_sha256": "43b9ba6904789e2cbf7cd00a63a98b4a803312c552772e2bfe924981447985db",
+      "registration": [
+        {
+          "direction": "e",
+          "source_root": [
+            92.0,
+            153
+          ],
+          "scale": 1.251700680272109
+        },
+        {
+          "direction": "se",
+          "source_root": [
+            88.5,
+            152
+          ],
+          "scale": 1.251700680272109
+        },
+        {
+          "direction": "s",
+          "source_root": [
+            84.5,
+            152
+          ],
+          "scale": 1.251700680272109
+        },
+        {
+          "direction": "sw",
+          "source_root": [
+            85.0,
+            153
+          ],
+          "scale": 1.251700680272109
+        },
+        {
+          "direction": "w",
+          "source_root": [
+            85.5,
+            152
+          ],
+          "scale": 1.251700680272109
+        },
+        {
+          "direction": "nw",
+          "source_root": [
+            85.5,
+            151
+          ],
+          "scale": 1.251700680272109
+        },
+        {
+          "direction": "n",
+          "source_root": [
+            82.5,
+            152
+          ],
+          "scale": 1.2432432432432432
+        },
+        {
+          "direction": "ne",
+          "source_root": [
+            87.0,
+            152
+          ],
+          "scale": 1.251700680272109
+        }
+      ]
     }
   },
   "southwest_source_sha256": "1bd32c874cd2abe1bd94eeb076ce3dfafb56317948fc9a7ad526e408dda5ca2c"

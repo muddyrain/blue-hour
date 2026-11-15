@@ -69,7 +69,8 @@ func _ready() -> void:
 		IsoSpace.place(tree, at)
 		stage.add_child(tree)
 		IsoAtlas.attach(tree, IsoBuildingArt.prop_for("tree", int(at.x)), 0.8)
-	for id: int in [1, 2, 3, 4, 5]:
+	for definition: SurvivorDefinition in SurvivorRoster.Definitions:
+		var id: int = definition.member_id
 		var resident: CampSceneResident = CampSceneResident.new()
 		resident.name = "Resident%d" % id
 		resident.member_id = id

@@ -86,10 +86,16 @@
 - 不再兼容旧存档：v1–v5 `RunSave` 升级、v5 迁移导入、旧位置 `user://saves/run.json` 保护都已删除。读到不认识的存档会被拒绝，需要开新旅程。
 - 当前存档的校验仍是“新状态投影到旧校验器”的链式结构（`EnemyState → WeaponState → …`），收据日志仍做哈希校验。这一部分与当前存档格式耦合，未在本轮删除；后续可整体替换为简单的单文件 JSON 存档。
 
+## 小队与救援
+
+`RosterState.MAX_LIVING = 8`、`MAX_HISTORY = 10`，开局仍由 `SurvivorRoster.new_crew()` 创建两人。`RescuePoolState` 继续决定唯一冻结候选，`RescueTarget` 接近后援救 10 秒，经原 `field_join_gate` 的持久化确认提升同一个 NPC，接入现有战斗、派工、成长、登车和结算；成功归航登记，同行中阵亡则写入永久历史。原三名候选优先，耗尽后选 crew_6–8；登记过八人后，空编可救 crew_9 程见川或 crew_10 许映禾。后备是不同身份，分别复用何清晏、阮疏影外观，不复活死者。有限候选全部登记后明确提示耗尽。
+
+任务卡与援救目标展示冻结候选姓名；未接纳者不开放队员详情。救援标记、进度与标签使用 `IsoSpace` 投影，规则坐标和任务收据不变。`SquadDeployment` 共用原额外出生点搜索，供运行时、侦察证据与广告牌作业证据重建使用，不扩写源地图的 arrivals。原五人 `SurvivorPersona` 事实与 policy 保持原字节结构，以保留既有 offers 指纹；第 6–10 人按同一种子排序继续生成，按种子缓存、按身份读取，不增加存档字段或迁移分支。容量校验同步覆盖训练、特性、配装、治疗、能力、敌人目标、Boss 命中名单与快照；现行 EnemyState schema 111 无需改变。
+
 ## 资源
 
-- 场内五名幸存者：`SurvivorVisualV1` 读取 `assets/survivors_v1/{gu,xia,lin,shen,lu}.png`，每表 2048×2048 / 8×8 格。行按屏幕方向 E、SE、S、SW、W、NW、N、NE；列为待机 1 帧、走路 4 帧、攻击 3 帧。所有朝向直接绘制，不翻转。固定脚点 (128,224)，`ActorVisual.BODY_SCALE = 0.22`。`IsoSpace.attach_actor()` 标记画面投影，幸存者用投影后的朝向选择整帧；有瞄准意图时走路整帧随瞄准方向，避免身体与握持使用不同朝向。来源与生成规格见该目录 `generation.json`，切片注册由 `tools/build_survivor_atlas.py` 完成；敌人各自的方向与动作模块不变。
-- 幸存者握持：`SurvivorWeaponRig` 的 5×8×8 原帧像素挂点驱动现有五种武器（卡宾、长管、霰弹、斧、锤），不增加身体或武器位图。原帧手部通过 `hand_occlusion.gdshader` 在握柄上重绘，头发层沿用原帧；背向三个朝向将整个握持节点放到身体后方，握点沿原帧袖口外缘校准；北向额外向持握侧外撇 15°，让枪身从肩侧露出，所有局部层仍留在角色的 Y 排序组。后坐同时移动身体、原手部和枪。近战通过 `CombatWeaponVisualV1` 读取 `CombatRuntime` 的蓄力/恢复阶段，命中当步显示接触帧与挥砍弧；重复 `present()` 不累积旋转，也不推进规则时钟。远程沿用 `show_fire()` 事件触发的 0.24 秒动作，枪口闪光仅前 0.06 秒；入夜后同位置有半径约 24 像素、能量最高 0.42 的短时暖光（PROJECT_TEMP 表现参数）。
+- 场内八套幸存者外观：`SurvivorVisualV1` 读取 `assets/survivors_v1/{gu,xia,lin,shen,lu,ruan,ye,he}.png`，每表 2048×2048 / 8×8 格。行按屏幕方向 E、SE、S、SW、W、NW、N、NE；列为待机 1 帧、走路 4 帧、攻击 3 帧。所有朝向直接绘制，不翻转。固定脚点 (128,224)，`ActorVisual.BODY_SCALE = 0.22`。`IsoSpace.attach_actor()` 标记画面投影，幸存者用投影后的朝向选择整帧；有瞄准意图时走路整帧随瞄准方向，避免身体与握持使用不同朝向。来源与生成规格见该目录 `generation.json`，原五套切片注册由 `tools/build_survivor_atlas.py` 完成；新人由 `tools/build_recruit_atlas.py` 归一化并裁切头像，提示词见 `recruit_generation.json`；敌人各自的方向与动作模块不变。
+- 幸存者握持：`SurvivorWeaponRig` 的 8×8×8 原帧像素挂点驱动现有五种武器（卡宾、长管、霰弹、斧、锤），不增加身体或武器位图。原帧手部通过 `hand_occlusion.gdshader` 在握柄上重绘，头发层沿用原帧；背向三个朝向将整个握持节点放到身体后方，握点沿原帧袖口外缘校准；北向额外向持握侧外撇 15°，让枪身从肩侧露出，所有局部层仍留在角色的 Y 排序组。后坐同时移动身体、原手部和枪。近战通过 `CombatWeaponVisualV1` 读取 `CombatRuntime` 的蓄力/恢复阶段，命中当步显示接触帧与挥砍弧；重复 `present()` 不累积旋转，也不推进规则时钟。远程沿用 `show_fire()` 事件触发的 0.24 秒动作，枪口闪光仅前 0.06 秒；入夜后同位置有半径约 24 像素、能量最高 0.42 的短时暖光（PROJECT_TEMP 表现参数）。
 - 弹道坐标边界：`aimed_shot_offset()` / `muzzle_offset()` 保留原三向挂点的地图空间弹道起点，供规则判墙、穿透和存档验证使用。`rendered_muzzle_offset()` 返回当前画面局部枪口；`ExpeditionFeedback._shot_trace()` 将已提交弹道接到这个枪口，并将命中平面的高度转换成直立看板高度。霰弹也复用此表现入口；不改变范围、伤害、冷却、弹量或墙体判定。
 - 通用受击：`ActorVisual` 的原受击事件叠加保留原贴图/物种材质的弱暖色提亮与衰减位移：底层始终不透明，叠加层峰值 alpha 0.20、RGB 增益不超过 1.5，0.18 秒内平方衰减，逻辑脚点不动。三种基础感染者直接复用原来的四帧倒地，仍在原 0.95 秒尸体生命周期内短停后淡出，倒地保持原夜间补偿并用中性 0.90 明度代替额外偏蓝压暗；幸存者沿用 m5 倒地图并短时落定，保留可见直至原流程移除。新效果不增加存档字段，不修改特殊感染者的图或动作模块。
 - 三种基础感染者由 `NormalInfectedV1`、`RushInfectedV1`、`HeavyInfectedV1` 独立展示，`ActorVisual._pose_body()` 按敌人类型接线；特殊种继续走各自模块。每种有 e/se/s/ne/n 五个源朝向，西侧三个朝向镜像；每向 4×4 格，0 待机、1–6 步态、7–9 攻击接触/跟进/恢复、10–11 受击、12–15 倒地。普通种保留原 1254×1254 源表；冲刺/重型为 1280×1280、320 方格，统一脚点 (160,304)，生成提示见 `assets/infected_v1/PROMPTS.md`。

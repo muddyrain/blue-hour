@@ -160,20 +160,15 @@ func _release_searcher(member_id: int = 0) -> void:
 
 
 func _arrival(index: int) -> Vector2:
-	if index < expedition.layout.arrivals.size():
-		return expedition.layout.arrivals[index]
-	var anchor: Vector2 = expedition.layout.arrivals[0]
-	for ring: int in range(1, 17):
-		for x: int in range(-ring, ring + 1):
-			for y: int in range(-ring, ring + 1):
-				var point: Vector2 = anchor + Vector2(x,y) * 48.0
-				if not expedition.navigation.is_clear(point) or expedition.survivors.any(func(actor: FieldActor) -> bool: return actor.position.distance_to(point) < 32.0):
-					continue
-				if not expedition.navigation.path_between(anchor, point).is_empty():
-					return point
+	var occupied: Array[Vector2] = []
+	for actor: FieldActor in expedition.survivors:
+		occupied.append(actor.position)
+	var point: Vector2 = SquadDeployment.arrival(index, expedition.layout.arrivals, occupied, expedition.navigation)
+	if point != Vector2.INF:
+		return point
 	# Explicit construction error; never drop members from the participant set.
 	expedition.setup_problem = "本图没有足够的合法出生位置"
-	return anchor
+	return expedition.layout.arrivals[0]
 
 
 func _clear_dead_worker() -> void:

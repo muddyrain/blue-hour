@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="SurvivorDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/features/survivors/survivor_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/iso/chars/he_portrait.png" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"crew_9"
+member_id = 9
+default_display_name = "程见川"
+gender = &"male"
+colour = Color(0.55, 0.68, 0.75, 1)
+portrait = ExtResource("2")
+visual_variant = 7

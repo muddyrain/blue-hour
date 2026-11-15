@@ -63,7 +63,8 @@ static func facility_door(id: String) -> Vector2:
 
 
 static func member_position(member_id: int) -> Vector2:
-	return LOOP[posmod((member_id - 1) * 2, LOOP.size())]
+	var index: int = posmod((member_id - 1) * 2, LOOP.size())
+	return LOOP[index].lerp(LOOP[(index + 1) % LOOP.size()], 0.5) if member_id > LOOP.size() else LOOP[index]
 
 
 static func isolated(path: String) -> bool:

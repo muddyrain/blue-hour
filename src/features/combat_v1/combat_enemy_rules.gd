@@ -9,7 +9,7 @@ static func snapshot_problem(row: Dictionary,world: Dictionary,receipt: Dictiona
 	var state: Dictionary=row.state
 	var behavior: Variant=row.get("behavior")
 	if not behavior is Dictionary or behavior.size()!=5 or not behavior.has_all(["kind","spawn_stage","target_id","state","windup_remaining"]): return "COMBAT_ENEMY_FIELDS"
-	if not SurvivalContracts.integer(behavior.spawn_stage,0,int(world.threat.stage)) or behavior.state not in ["chase","rush","windup"] or not SurvivalContracts.integer(behavior.target_id,0,5) or not SurvivalContracts.number(behavior.windup_remaining): return "COMBAT_ENEMY_STATE"
+	if not SurvivalContracts.integer(behavior.spawn_stage,0,int(world.threat.stage)) or behavior.state not in ["chase","rush","windup"] or not SurvivalContracts.integer(behavior.target_id,0,RosterState.MAX_HISTORY) or not SurvivalContracts.number(behavior.windup_remaining): return "COMBAT_ENEMY_STATE"
 	for resolution: Dictionary in world.task_event.resolutions:
 		if resolution.reason=="spawned" and resolution.enemy_id==state.actor_id: summoned=true
 	if behavior.kind == NightHoundV1.KIND:

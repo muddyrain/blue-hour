@@ -51,7 +51,7 @@ func present(model: Dictionary, compact: bool = false) -> void:
 	negative_label.tooltip_text = trait_detail(model.get("negative", ""))
 	var picture: Texture2D = model.get("portrait") as Texture2D
 	portrait.present(picture, alive, primary)
-	portrait_button.tooltip_text = primary + "\n" + name_label.text + "\n查看人物详情"
+	portrait_button.tooltip_text = name_label.text + "\n" + health_label.text + "\n" + ammo_label.text + "\n" + primary + "\n" + positive_label.text + "\n" + negative_label.text
 	info_button.tooltip_text = "查看" + text(model, "name", "该成员") + "的特长、属性与计算来源"
 	_apply_size(compact)
 	var colour: Color = Color("80ddd8") if alive else Color("a7b5bd")

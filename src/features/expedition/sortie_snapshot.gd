@@ -318,7 +318,7 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 			return "RESCUE_WORLD_REQUIRED"
 		var expected_target: bool = supply.id == &"rescue" and (not RescuePoolState.available(receipt.base).is_empty() if RescuePoolState.is_family(receipt.base) else receipt.base.recruits.is_empty())
 		if expected_target:
-			var rescue_issue: String = RescueTarget.snapshot_problem(value.rescue,ids,FieldJoinState.is_family(receipt.base),RescuePoolState.choice(receipt.base,receipt.transaction_id) if RescuePoolState.is_family(receipt.base) else 3,5 if RescuePoolState.is_family(receipt.base) else 3,supply.layout.world_bounds)
+			var rescue_issue: String = RescueTarget.snapshot_problem(value.rescue,ids,FieldJoinState.is_family(receipt.base),RescuePoolState.choice(receipt.base,receipt.transaction_id) if RescuePoolState.is_family(receipt.base) else 3,RosterState.MAX_HISTORY if RescuePoolState.is_family(receipt.base) else 3,supply.layout.world_bounds)
 			if not rescue_issue.is_empty(): return rescue_issue
 		elif not value.rescue.is_empty(): return "RESCUE_WORLD_UNEXPECTED"
 	if FieldJoinState.is_family(receipt.base):

@@ -196,7 +196,7 @@ func _resume() -> void:
 	world=await _start(rescue_slot)
 	var candidate: int=world.candidate_id()
 	var recipe: Dictionary=PersonaState.recipe(world.supply.generated,candidate)
-	_check(not world.rescue_target.revealed() and not world.rescue_target.npc.visual.visible and not recipe.is_empty(),
+	_check(not world.rescue_target.revealed() and world.rescue_target.npc.visual.visible and not recipe.is_empty(),
 		"pending rescue keeps the original fixed recipe and conceals the actor")
 	world.rescue_target.request()
 	await _until(world,func()->bool:return world.rescue_target.progress>=RescueTarget.SECONDS)
@@ -221,7 +221,7 @@ func _rescue(world: Expedition) -> void:
 	var candidate: int=world.candidate_id()
 	var recipe: Dictionary=PersonaState.recipe(world.supply.generated,candidate)
 	var original: Dictionary=world.field_departure.journey.build.persona.duplicate(true)
-	_check(not world.rescue_target.revealed() and not world.rescue_target.npc.visual.visible and not recipe.is_empty(),
+	_check(not world.rescue_target.revealed() and world.rescue_target.npc.visual.visible and not recipe.is_empty(),
 		"continued pending rescue retains a fixed identity behind the anonymous marker")
 	# Cancel jobs through original intentions to free a real rescuer.
 	for job: Dictionary in world.search_assignments.ordered():world.request_search(StringName(job.site_id))

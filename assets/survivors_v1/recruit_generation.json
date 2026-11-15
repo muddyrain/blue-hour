@@ -1,0 +1,26 @@
+{
+  "tool": "OpenAI image_gen (built-in)",
+  "ai_generated": true,
+  "status": "PROJECT_TEMP; runtime visual QA pending on the render machine",
+  "normalizer": "tools/build_recruit_atlas.py",
+  "spec": {
+    "grid": [
+      8,
+      8
+    ],
+    "cell": [
+      256,
+      256
+    ],
+    "root": [
+      128,
+      224
+    ],
+    "display_scale": 0.22
+  },
+  "prompts": {
+    "ruan": "Use case: stylized-concept. Production transparent sprite atlas for an original wholesome chibi anime survivor in a Japanese seaside-town 2:1 isometric squad game. Character Ruan Shuying, female adult, dark plum hair in a tidy low side braid, small cream hair clip, muted lavender cardigan over ivory blouse, full length charcoal trousers and brown ankle boots. Healthy cute 2.5-head proportions, large expressive eyes, soft detailed painted shading, crisp clean outlines. No sexy clothing, military, pixel art, gore, text, letters, labels, weapons, scenery or watermark. Exact 2048x2048 PNG with real transparent alpha. STRICT 8 rows x 8 columns equally spaced grid, each cell 256x256. One full-body character centered in every cell, same scale and costume, feet root around (128,224) in each cell, body height ~184 pixels, clear padding. Row directions, top to bottom: E right profile, SE front-right, S front, SW front-left, W left profile, NW rear-left, N full back, NE rear-right. Each row must have all eight frames: col1 idle neutral; col2 left-leg stride; col3 left passing raised knee; col4 right-leg stride; col5 right passing raised knee; col6 combat anticipation bent elbows; col7 forward hand attack thrust; col8 return to guard. Eight genuinely different camera directions, not identical front characters. Stable head/body volume and clear distinct walking poses. Transparent empty cell margins, no grid lines. Original everyday civilian outfit.",
+    "ye": "Use case: stylized-concept. Production transparent sprite atlas for an original wholesome chibi anime survivor in a Japanese seaside-town 2:1 isometric squad game. Character Ye Chengzhou, male adult, tousled dark chestnut short hair, sage green everyday hooded jacket with cream lining over white t-shirt, full length dark indigo trousers and brown sneakers. Healthy cute 2.5-head proportions, large expressive eyes, soft detailed painted shading, crisp clean outlines. No sexy clothing, military, pixel art, gore, text, letters, labels, weapons, scenery or watermark. Exact 2048x2048 PNG with real transparent alpha. STRICT 8 rows x 8 columns equally spaced grid, each cell 256x256. One full-body character centered in every cell, same scale and costume, feet root around (128,224) in each cell, body height ~184 pixels, clear padding. Row directions, top to bottom: E right profile, SE front-right, S front, SW front-left, W left profile, NW rear-left, N full back, NE rear-right. Each row must have all eight frames: col1 idle neutral; col2 left-leg stride; col3 left passing raised knee; col4 right-leg stride; col5 right passing raised knee; col6 combat anticipation bent elbows; col7 forward hand attack thrust; col8 return to guard. Eight genuinely different camera directions, not identical front characters. Stable head/body volume and clear distinct walking poses. Transparent empty cell margins, no grid lines. Original everyday civilian outfit.",
+    "he": "Use case: stylized-concept. Production transparent sprite atlas for an original wholesome chibi anime survivor in a Japanese seaside-town 2:1 isometric squad game. Character He Qingyan, male adult, short ash black side-parted hair, round thin brown glasses, muted blue everyday overshirt over a cream knitted top, full length warm tan trousers and dark brown shoes. Healthy cute 2.5-head proportions, large expressive eyes, soft detailed painted shading, crisp clean outlines. No sexy clothing, military, pixel art, gore, text, letters, labels, weapons, scenery or watermark. Exact 2048x2048 PNG with real transparent alpha. STRICT 8 rows x 8 columns equally spaced grid, each cell 256x256. One full-body character centered in every cell, same scale and costume, feet root around (128,224) in each cell, body height ~184 pixels, clear padding. Row directions, top to bottom: E right profile, SE front-right, S front, SW front-left, W left profile, NW rear-left, N full back, NE rear-right. Each row must have all eight frames: col1 idle neutral; col2 left-leg stride; col3 left passing raised knee; col4 right-leg stride; col5 right passing raised knee; col6 combat anticipation bent elbows; col7 forward hand attack thrust; col8 return to guard. Eight genuinely different camera directions, not identical front characters. Stable head/body volume and clear distinct walking poses. Transparent empty cell margins, no grid lines. Original everyday civilian outfit."
+  }
+}

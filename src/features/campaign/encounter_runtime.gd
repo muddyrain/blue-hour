@@ -171,14 +171,14 @@ static func facts_problem(value: Variant, generated: Dictionary, xp: Variant, si
 			if event.enemy_id==0 and TransactionReceipt.same(event,value.defeat): found=true
 		if not found: return "ENCOUNTER_DEFEAT_SOURCE"
 	if not value.handling.is_empty():
-		if value.handling.size()!=2 or not value.handling.has_all(["request_id","hits"]) or not value.handling.request_id is String or not value.handling.hits is Array or value.handling.hits.size()>4: return "ENCOUNTER_HANDLING"
+		if value.handling.size()!=2 or not value.handling.has_all(["request_id","hits"]) or not value.handling.request_id is String or not value.handling.hits is Array or value.handling.hits.size()>RosterState.MAX_LIVING: return "ENCOUNTER_HANDLING"
 		var request_found: bool=false
 		for request: Dictionary in value.behavior.pending:
 			if request.id==value.handling.request_id and request.kind in ["melee","slam"]: request_found=true
 		if not request_found: return "ENCOUNTER_HANDLING_SOURCE"
 		var seen: Array[int]=[]
 		for id: Variant in value.handling.hits:
-			if not SurvivalContracts.integer(id,1,5) or int(id) in seen: return "ENCOUNTER_HANDLING_MEMBER"
+			if not SurvivalContracts.integer(id,1,RosterState.MAX_HISTORY) or int(id) in seen: return "ENCOUNTER_HANDLING_MEMBER"
 			seen.append(int(id))
 	return ""
 

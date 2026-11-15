@@ -1327,8 +1327,39 @@
       "path": "assets/survivors_v1/lu.png",
       "sha256": "91c0fecba6ba31fc534a9d5ac7314e3a5156d51d0065604e78e61165dec7f3da",
       "origin": "AI-assisted redraw/extension of original assets/m5_anim_01/lu_full.png using built-in OpenAI imagegen (2026-11-15); independently drawn eight directions, idle + four walk + three attack poses. Southwest correction for gu/xia/lin/shen. Pillow alpha cleanup (<12), slicing and fixed per-direction root registration by tools/build_survivor_atlas.py. No third-party asset pack or Deadly Days artwork. Generation specification: assets/survivors_v1/generation.json.",
-
       "license": "No additional license granted"
+    },
+    {
+      "path": "src/features/camp_scene/camp_scene_world.gd",
+      "sha256": "95b83c0b86730e51e61594e6811eed2eae9930b73f58c59d9725465348774d07",
+      "origin": "Original project procedural camp illustration and composition, authored with AI assistance in GDScript; Godot CanvasItem / IsoDraw primitives and existing project IsoAtlas art. No new raster generation or third-party asset pack.",
+      "tool": "Godot 4 CanvasItem drawing API; AI-assisted code authoring by Codex",
+      "ai_assisted": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "src/features/camp_scene/camp_scene_scenery.gd",
+      "sha256": "84d33f6fa8a72751fd74a3af460ecd2ae667c0a40e423d37cc566942923502f7",
+      "origin": "Original project procedural camp furnishings: fences, fire, clothesline with hanging cloth, metal buckets, braced wooden crates, town bicycle, flowering planters, old chalkboard and slatted benches. AI-assisted GDScript authoring; rendered by Godot CanvasItem / IsoDraw primitives. No image model, third-party asset pack or Deadly Days material.",
+      "tool": "Godot 4 CanvasItem drawing API; AI-assisted code authoring by Codex",
+      "ai_assisted": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "src/features/camp_scene/camp_scene_resident.gd",
+      "sha256": "83b5317087752760c2da9da5486262a4bf4f4df11ee0f736eaf5a79ae9c620ee",
+      "origin": "Original project procedural camp illustration and composition, authored with AI assistance in GDScript; Godot CanvasItem / IsoDraw primitives and existing project IsoAtlas art. No new raster generation or third-party asset pack.",
+      "tool": "Godot 4 CanvasItem drawing API; AI-assisted code authoring by Codex",
+      "ai_assisted": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "src/features/camp_scene/camp_scene_layout.gd",
+      "origin": "Original project procedural camp illustration and composition, authored with AI assistance in GDScript; Godot CanvasItem / IsoDraw primitives and existing project IsoAtlas art. Original fishing-cooperative yard paths, clothesline, buckets, braced crates, bicycle, planters, chalkboard and slatted benches. No new raster generation or third-party asset pack.",
+      "tool": "Godot 4 CanvasItem drawing API; AI-assisted code authoring by Codex",
+      "ai_assisted": true,
+      "license": "No additional license granted",
+      "sha256": "4adb68c5261eefc8b397fa9ac21d5cdf5191e5d121d3092407b070fd4377d699"
     }
   ]
 }

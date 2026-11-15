@@ -77,7 +77,9 @@
 
 营地底色层级为 -20，低于共用 `IsoTiles` 的 -10；设施、家具与人物留在 0 层的 Y 排序节点。`CampSceneLayout.PATHS` 定义碎石院内的混凝土通道，`DRESSING` 定义避开设施、门前与人物环线的生活摆件；不参与碰撞、导航或存档。镜头使用等比缩放，归航摘要出现时给摘要让出空间。氛围标题订阅 `CampSceneWorld.atmosphere_changed`，外部调用 `set_dusk()` 也会同步更新；场内标签平时缩小淡显，鼠标悬停或键盘焦点时强调。
 
-生成关先由 `WorldgenDensity` 补房，`WorldgenDressing.freeze` 冻结碰撞景物，再由 `ParcelScenery.fit` 补齐场地，最后只运行一次 `WorldgenDressing.enrich`。装饰先预留停车垫和车棚，再沿道路及门前步道两侧放小件；开阔草坪不按面积填充日用品。装饰仍受门口、步道、巴士与装卸场保留区约束，不新增交互或碰撞。
+生成关先由 `WorldgenDensity` 补房，`WorldgenDressing.freeze` 冻结碰撞景物，再由 `ParcelScenery.fit` 补齐场地。`ExplorationLayout.complete` 在门口路线与道具拟合前先拒绝已被挡住的街区必经通道，放置道具后仍保留最终通道校验；全部几何校验通过后才运行一次无碰撞的 `WorldgenDressing.enrich`，随后计算地图指纹。装饰先预留停车垫和车棚，再沿道路及门前步道两侧放小件；开阔草坪不按面积填充日用品。装饰仍受门口、步道、巴士与装卸场保留区约束，不新增交互或碰撞。
+
+`FieldNavigation` 为每张图缓存最多 2048 组精确起终点的原始 AStar 路径（含不可达结果），供任务证书和卡片摘要复用；不改变择路规则。网格重建或临时路障变更会清空缓存，返回数组独立复制，私有路障图不共享路径状态。
 
 `HarborWarehouse` 是第二个手摆地点“海边町·北港仓库”（地点键 `north_harbor`）。从第 3 天起，普通 `airdrop` 装备回收和定期五金补给通过 `ExplorationActions.supply()` 投影到港口；带独立空间锚点的侦察、路障、稀有/事件、深入回收和终局保留原图。与 `SeasideTown` 一样保留原任务/地图收据 ID 和 `generated`，不改变 `offers()`、奖励或源站点名义时长。港口地形和搜刮绑定集中在 `harbor_warehouse.gd`；`TaskActions.site_point()` 同时供运行时及快照校验使用，避免只有画面搬了位置。`HarborPresentation` 负责闭合建筑与外部门口工位，`HarborGround` 负责码头岸线表现，仍共用 `FieldNavigation`、原刷怪/入夜、派工、登车与结算。港口仅五盏工作灯（暖色/冷白）参与场景光池，货柜不充当光源。
 

@@ -50,6 +50,12 @@ static func complete(data: Dictionary, trace: Array[String] = []) -> Dictionary:
 	var street: StreetLayout = NeighborhoodLayout.resource(data)
 	var base_nav: FieldNavigation = FieldNavigation.new()
 	base_nav.configure(street.blockers(), street.world_bounds)
+	# Props only add blockers. An already blocked authored approach cannot become
+	# valid later; reject it before hundreds of door paths and decorative placement.
+	var approach_issue: String = _approach_problem(data, base_nav, street)
+	if not approach_issue.is_empty():
+		trace.append(approach_issue)
+		return {}
 	var prop_anchors: Array[String] = []
 	if data.has("warehouse_district") or data.has("themed_district"):
 		prop_anchors = WarehouseDistrict.prop_anchors(data.entities)
@@ -77,6 +83,14 @@ static func complete(data: Dictionary, trace: Array[String] = []) -> Dictionary:
 			return {}
 	var nav: FieldNavigation = FieldNavigation.new()
 	nav.configure(street.blockers(), street.world_bounds)
+	approach_issue = _approach_problem(data, nav, street)
+	if not approach_issue.is_empty():
+		trace.append(approach_issue)
+		return {}
+	if data.has("loading_yard") and not IndustrialYard.certified(data, nav):
+		return {}
+	if data.has("rescue_court") and not RescueCourt.certified(data, nav, street.shot_obstacles()):
+		return {}
 	var certificate: Dictionary = _door_routes(data, nav, [], trace)
 	if certificate.is_empty() or not _all_routes(data, nav, trace):
 		trace.append("final_access")
@@ -84,20 +98,9 @@ static func complete(data: Dictionary, trace: Array[String] = []) -> Dictionary:
 	if not WorldgenLayout.content_reachable(data,certificate):
 		trace.append("building_categories")
 		return {}
-	if data.has("warehouse_district"):
-		var district: Dictionary = data.warehouse_district
-		var certified: bool = SeededWarehouseDistrict.certified(district, nav, street.bus_door) if district.has("family") \
-			else WarehouseDistrict.certified(district, data.gates, nav, street.bus_door)
-		if not certified:
-			trace.append("warehouse_approach")
-			return {}
-	if data.has("themed_district") and not SeededWarehouseDistrict.certified(data.themed_district, nav, street.bus_door):
-		trace.append("themed_approach")
-		return {}
-	if data.has("loading_yard") and not IndustrialYard.certified(data, nav):
-		return {}
-	if data.has("rescue_court") and not RescueCourt.certified(data, nav, street.shot_obstacles()):
-		return {}
+	# Cosmetic dressing has no collision and reads neither objects nor spawn points.
+	# Keep its seeded output, but only build it for geometry that passed all checks.
+	WorldgenDressing.enrich(data)
 	data.enemy_points = _spawn_points(data, nav)
 	if data.enemy_points.size() < data.entities.size():
 		return {}
@@ -107,6 +110,18 @@ static func complete(data: Dictionary, trace: Array[String] = []) -> Dictionary:
 	certificate.nav = nav
 	_store_certificate(origin_key, signature, data.duplicate(true), certificate)
 	return data
+
+
+static func _approach_problem(data: Dictionary, nav: FieldNavigation, street: StreetLayout) -> String:
+	if data.has("warehouse_district"):
+		var district: Dictionary = data.warehouse_district
+		var certified: bool = SeededWarehouseDistrict.certified(district, nav, street.bus_door) if district.has("family") \
+			else WarehouseDistrict.certified(district, data.gates, nav, street.bus_door)
+		if not certified:
+			return "warehouse_approach"
+	if data.has("themed_district") and not SeededWarehouseDistrict.certified(data.themed_district, nav, street.bus_door):
+		return "themed_approach"
+	return ""
 
 
 static func has_certificate(signature: String) -> bool:

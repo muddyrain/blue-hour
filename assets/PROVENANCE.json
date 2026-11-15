@@ -1358,6 +1358,178 @@
       "sha256": "30506fa2b361996d8b56aa41b24a4e67af380ba5e9b65b17ccbe03e742ae9cf8",
       "origin": "Original project AI-generated art using OpenAI built-in image_gen, 2026-11-15. Project heavy sheet used only as style reference. Five independently drawn directions, twelve articulated poses each, three disclosed horizontal mirrors. Pillow removes alpha <20 and islands <24 source pixels, then uniform species scaling and fixed roots. No third-party pack or Deadly Days material. Exact prompt, source SHA and packing: assets/infected_v1/special_generation.json.",
       "license": "No additional license granted"
+    },
+{
+      "path": "assets/iso/harbor/container_teal.svg",
+      "sha256": "13cb474ba9c93feb953f25321e31d41226f3b76ac9ef84d4a4874dcd68700d07",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/harbor/container_clay.svg",
+      "sha256": "1856a84858bc003bbf1e6c1e903f7ec6499d739c745fc52543b95614f18e40d1",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/harbor/container_blue.svg",
+      "sha256": "98504a5493d94b01862349ce914a662a48882667d90dedf52c8c6c1afa24e6c7",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/harbor/container_cream.svg",
+      "sha256": "7d86f5cbc6da267614b6fde8fc8df322b9a6a459e807ad7acf177cfbbe314d5b",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/harbor/fishery.svg",
+      "sha256": "62805b309e5bc11b4a1a379596f3c1dc4ae43e24a5e604fb964c2d858fdbebc7",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/harbor/cold_store.svg",
+      "sha256": "3bf763de073d4f72c5a8cdbf409703ce21fce1753c180e09ff2a38b33790a89f",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/harbor/office.svg",
+      "sha256": "6e5edc88fe865a5074e618e84daa372dbb01099b7182baf314795b9f196e1ef1",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/harbor/workshop.svg",
+      "sha256": "a42f7a7eecb7a11c0e74a310bfb7cbdbeb5feef37b16f75d4c53f2a35ac54e15",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/harbor/crane.svg",
+      "sha256": "2ef1259bc7d797929c62e957f582a56e7f98a769022c6557639c14950fc61a1f",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/harbor/forklift.svg",
+      "sha256": "944af44d30e35900d3cd65430b7cd40b320d144d218c383fe7528dff100bf1f0",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/harbor/pallets.svg",
+      "sha256": "40182b8d04e14e3a3baf3f1e2631396fec28844d87ec9eaf52665c3567acc3aa",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/harbor/nets.svg",
+      "sha256": "7845abdc854ce8c8a012080c82e3a1e762a20c81beb96701b68198c5f17344a4",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/harbor/bollard.svg",
+      "sha256": "58cdb4f91a674aa17cfcdbefdee278cf4459e2cab8c9cd5b2c271782f779f4e0",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/harbor/buoys.svg",
+      "sha256": "1336fd7fdd9a6ff33d60af0d58a6234fd5215bccb4ef26af76679423bb4acc61",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/harbor/barrels.svg",
+      "sha256": "19d6d524ddc639d035c4fbfb48389acc229006d458f60befde4ef99142e32280",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/harbor/cargo.svg",
+      "sha256": "1ba9ca43681b3a1c37a4fdd2f2986b04328fedb1d04dacda81c122d72786d141",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/harbor/work_lamp.svg",
+      "sha256": "c7ca6be9935bc2b1cb08a47bd77bd4c7c840c25c849fd9dd7bea2d4a08409db5",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/tiles/harbor_steel.svg",
+      "sha256": "931f3b93ef6b291f10cba29d067cc66d1bf6f0d665ae73181bb83ea7c7dc0084",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/tiles/harbor_water.svg",
+      "sha256": "27fcb691ae87871a76126df417a9a39ee38c457d6351757dbb2a60b8e210aabf",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/iso/tiles/harbor_wood.svg",
+      "sha256": "315eb343843adfe60235d2dbea55d7bf0972e2c481c63d7ec83855cfa28992b0",
+      "origin": "Original procedural 2:1 SVG; tools/make_harbor_art.py (Python standard library); AI-assisted code, no AI-generated imagery; no third-party assets",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+{
+      "path": "src/features/camp_scene/camp_scene_world.gd",
+      "sha256": "95b83c0b86730e51e61594e6811eed2eae9930b73f58c59d9725465348774d07",
+      "origin": "Original project procedural camp illustration and composition, authored with AI assistance in GDScript; Godot CanvasItem / IsoDraw primitives and existing project IsoAtlas art. No new raster generation or third-party asset pack.",
+      "tool": "Godot 4 CanvasItem drawing API; AI-assisted code authoring by Codex",
+      "ai_assisted": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "src/features/camp_scene/camp_scene_scenery.gd",
+      "sha256": "84d33f6fa8a72751fd74a3af460ecd2ae667c0a40e423d37cc566942923502f7",
+      "origin": "Original project procedural camp furnishings: fences, fire, clothesline with hanging cloth, metal buckets, braced wooden crates, town bicycle, flowering planters, old chalkboard and slatted benches. AI-assisted GDScript authoring; rendered by Godot CanvasItem / IsoDraw primitives. No image model, third-party asset pack or Deadly Days material.",
+      "tool": "Godot 4 CanvasItem drawing API; AI-assisted code authoring by Codex",
+      "ai_assisted": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "src/features/camp_scene/camp_scene_resident.gd",
+      "sha256": "83b5317087752760c2da9da5486262a4bf4f4df11ee0f736eaf5a79ae9c620ee",
+      "origin": "Original project procedural camp illustration and composition, authored with AI assistance in GDScript; Godot CanvasItem / IsoDraw primitives and existing project IsoAtlas art. No new raster generation or third-party asset pack.",
+      "tool": "Godot 4 CanvasItem drawing API; AI-assisted code authoring by Codex",
+      "ai_assisted": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "src/features/camp_scene/camp_scene_layout.gd",
+      "origin": "Original project procedural camp illustration and composition, authored with AI assistance in GDScript; Godot CanvasItem / IsoDraw primitives and existing project IsoAtlas art. Original fishing-cooperative yard paths, clothesline, buckets, braced crates, bicycle, planters, chalkboard and slatted benches. No new raster generation or third-party asset pack.",
+      "tool": "Godot 4 CanvasItem drawing API; AI-assisted code authoring by Codex",
+      "ai_assisted": true,
+      "license": "No additional license granted",
+      "sha256": "4adb68c5261eefc8b397fa9ac21d5cdf5191e5d121d3092407b070fd4377d699"
     }
   ]
 }

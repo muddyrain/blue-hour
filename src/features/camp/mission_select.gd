@@ -287,6 +287,11 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}, prepared: Diction
 		choices[index].text = "选择此行动 →"
 		choices[index].tooltip_text = "只有真实搜集并成功撤离，确认结算才入账。"
 		_refresh_blue_hour_card(index, supply.generated)
+		if HarborWarehouse.is_layout(supply.layout):
+			_titles[index].text = "%02d / %s" % [index + 1, HarborWarehouse.TITLE]
+			_descriptions[index].text = supply.description
+			_pictures[index].texture = IsoAtlas.texture("harbor/cold_store.svg")
+			_crates[index].hide()
 	_link_choices()
 
 

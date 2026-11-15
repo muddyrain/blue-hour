@@ -529,6 +529,11 @@ static func compatibility(world: Expedition) -> String:
 	if world.power_mode(): data.power_policy=SpecialPowers.policy(int(world.supply.generated.powers.version))
 	if world.persona_mode(): data.persona_policy=SurvivorPersona.policy()
 	if world.exploration_mode(): data.exploration_policy=ExplorationLayout.policy()
+	if HarborWarehouse.is_layout(world.layout):
+		# world_data and world_bounds are deliberately not exported Resource fields.
+		# Bind the actual terrain/work-point data as well as the signed source.
+		data.harbor_policy = {"location":HarborWarehouse.LOCATION_ID, "work_factor":HarborWarehouse.WORK_FACTOR,
+			"bounds":_encode(world.layout.world_bounds), "geometry":world.layout.world_data}
 	return SurvivalContracts.fingerprint(data)
 
 

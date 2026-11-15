@@ -135,6 +135,9 @@ func _trigger_airdrop() -> void:
 	if expedition.task_event.started:
 		return
 	expedition._request_task_wave(expedition.search_site(&"cash"), int(TaskActions.PARAMETERS.reinforcements))
+	if HarborWarehouse.is_layout(expedition.layout):
+		expedition._show_notice("货台回收已开工 · 声响引来增援，留意集装箱巷口。")
+		return
 	expedition._show_notice("武器箱开工 · 增援接近；拿到武器即可集合归航。" if expedition.supply.generated.has("rare_policy")
 		else "空投信标已启动 · 留意来袭；回收后可直接集合归航。")
 

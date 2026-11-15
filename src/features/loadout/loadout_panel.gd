@@ -356,7 +356,7 @@ func _reload_factor(owner_id: int) -> float:
 	if owner_id > 0 and PersonaState.enabled(_data):
 		var recipe: Dictionary = SurvivorPersona.member(_data.journey.build.persona, owner_id)
 		factor *= float(SurvivorPersona.factors(recipe).get("reload", 1.0))
-	return factor
+	return factor * EconomyBuildV1.reload_factor(_data)
 
 
 func _confirm_workshop(mod: String) -> void:

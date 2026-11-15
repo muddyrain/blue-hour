@@ -12,6 +12,7 @@ static func camp(base: Dictionary, id: int, scope: String = "camp") -> Dictionar
 	var personal: Dictionary=SurvivorPersona.factors(recipe)
 	if personal.is_empty(): return {}
 	var passive: Dictionary=BuildItems.camp_factors(base)
+	var workshop_reload: float = EconomyBuildV1.reload_factor(base)
 	var definition: SurvivorDefinition=SurvivorRoster.definition(id)
 	var positive: Dictionary=SurvivorPersona.POSITIVE[recipe.positive_id]
 	var negative: Dictionary=SurvivorPersona.NEGATIVE[recipe.negative_id]
@@ -22,6 +23,7 @@ static func camp(base: Dictionary, id: int, scope: String = "camp") -> Dictionar
 		"positive":{"name":positive.name,"detail":positive.description},"negative":{"name":negative.name,"detail":negative.description},
 		"trait_detail":TraitRules.description(member).replace("Trait ","").replace(" · PROJECT_TEMP",""),
 		"scope":scope,"editable":scope=="camp" and member.health>0}
+	model.trait_detail += "\n" + GrowthRules.description(member)
 	if id == FirstAidV1.SOURCE_ID and CampaignRules.first_aid_enabled(base.journey.get("campaign")):
 		if scope == "candidate":
 			_show_first_aid(model)
@@ -37,11 +39,12 @@ static func camp(base: Dictionary, id: int, scope: String = "camp") -> Dictionar
 		model.trait_detail = benefit + "与工坊取较高折扣，最低 1 币。\n" + String(model.trait_detail)
 	var item: Dictionary=WeaponInventory.for_member(source,id)
 	var mod: String = WorkshopV1.mod_for(source, item.get("instance_id", ""))
-	_weapon(model,item,personal,passive,TraitRules.factor(member,"shot"),mod)
+	_weapon(model,item,personal,passive,TraitRules.factor(member,"shot"),mod,workshop_reload)
 	var speed: float=125.0*TraitRules.factor(member,"move")*personal.move*passive.move
 	model.move_detail="常态 %.2f · 当前 %.2f 像素/秒\n无临时疾行"%[speed,speed]
 	model.work_detail="基准搜刮（30秒室内） %.4f 秒\n不影响救援接纳等待与奖励"%(30.0*TraitRules.factor(member,"search")*personal.work*passive.work)
 	model.sources_detail="武器基础与实例等级/词条 → 主特长 → 个人特质 → 装备道具 → 临时能力，各自作用一次。\n主特长：射击间隔×%.3f，移动×%.2f，搜刮耗时×%.2f\n个人：枪伤×%.2f，近战×%.2f，移动×%.2f，换弹×%.2f，工作×%.2f\n道具：枪伤×%.2f，移动×%.2f，换弹×%.2f，工作×%.2f"%[TraitRules.factor(member,"shot"),TraitRules.factor(member,"move"),TraitRules.factor(member,"search"),personal.ranged,personal.melee,personal.move,personal.reload,personal.work,passive.damage,passive.move,passive.reload,passive.work]
+	model.sources_detail += "\n工坊：换弹耗时×%.2f（按出发前设施等级）" % workshop_reload
 	return model
 
 static func field(world: Expedition, actor: FieldActor, status: String) -> Dictionary:
@@ -88,7 +91,7 @@ static func _show_first_aid(model: Dictionary) -> void:
 		FirstAidV1.HEALTH_RATIO * 100.0, FirstAidV1.RANGE, FirstAidV1.HEAL_AMOUNT, model.trait_detail]
 
 
-static func _weapon(model: Dictionary, item: Dictionary, personal: Dictionary, passive: Dictionary, shot_factor: float, mod: String) -> void:
+static func _weapon(model: Dictionary, item: Dictionary, personal: Dictionary, passive: Dictionary, shot_factor: float, mod: String, workshop_reload: float) -> void:
 	if item.is_empty():
 		model.weapon_detail="无当前装备 · 历史武器以归航档案为准"
 		model.reload_detail="无弹匣"
@@ -111,7 +114,7 @@ static func _weapon(model: Dictionary, item: Dictionary, personal: Dictionary, p
 		var capacity: int = int(setup.get("capacity", 0))
 		var seconds: float = float(setup.get("seconds", 0.0))
 		model.ammo="弹匣 %d/%d"%[capacity,capacity]
-		model.reload_detail="容量 %d · 实际换弹 %.3f 秒\n备弹无限；搜刮期间暂停换弹"%[capacity,seconds*personal.reload*passive.reload]
+		model.reload_detail="容量 %d · 实际换弹 %.3f 秒\n备弹无限；搜刮期间暂停换弹"%[capacity,seconds*personal.reload*passive.reload*workshop_reload]
 
 static func _weapon_text(gun: WeaponDefinition, shot_factor: float) -> String:
 	var melee: bool=CombatEquipment.melee(String(gun.id))

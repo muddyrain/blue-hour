@@ -69,8 +69,9 @@ static func description(member: Dictionary) -> String:
 	var value: Dictionary = member.growth.trait
 	var next: String = "%d / %d" % [int(value.progress),THRESHOLDS[int(value.level)]] if value.level < 5 else "%d · 本轮Lv5上限" % int(value.progress)
 	var id: int = role(member)
-	var effect: String = ["本人射击冷却×%.3f" % factor(member,"shot"), "本人搜集耗时×%.2f" % factor(member,"search"), "本人移动速度×%.2f" % factor(member,"move")][id-1]
-	return "%s · Trait Lv%d · 进度 %s\n%s · PROJECT_TEMP" % [NAMES[id-1],int(value.level),next,effect]
+	var effect: String = ["本人射击间隔缩短 %s%%" % String.num((1.0 - factor(member,"shot")) * 100.0, 1), "本人搜刮耗时减少 %.0f%%" % ((1.0 - factor(member,"search")) * 100.0), "本人移动速度提高 %.0f%%" % ((factor(member,"move") - 1.0) * 100.0)][id-1]
+	var source: String = "本人击退记 1 点" if id != 2 else "每局首次完成货币、食物搜刮，各记 1 点"
+	return "%s · 特性等级 %d · 进度 %s\n%s · PROJECT_TEMP\n成长来源：%s，存活归航后结算；篝火训练每 1 粮增加 1 点。" % [NAMES[id-1],int(value.level),next,effect,source]
 
 
 static func inputs_problem(value: Variant, token: Dictionary, report: Dictionary, context: Dictionary, task: Dictionary = {}) -> String:

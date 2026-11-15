@@ -59,7 +59,12 @@ static func problem(event: Variant, state: Dictionary, world: Dictionary, layout
 			or event.occupied.size() > int(event.first_id) \
 			or not event.occupied.any(func(point: Array) -> bool: return SortieSnapshot._vec(point) == SortieSnapshot._vec(state.origin)):
 		return "SCREAMER_EVENT_POSITIONS"
-	var navigation: FieldNavigation = ExplorationLayout._routing(layout.world_data).nav
+	var navigation: FieldNavigation
+	if HarborWarehouse.is_layout(layout):
+		navigation = FieldNavigation.new()
+		navigation.configure(layout.blockers(), layout.world_bounds)
+	else:
+		navigation = ExplorationLayout._routing(layout.world_data).nav
 	var expected: Dictionary = plan(event, layout, navigation, director.rules)
 	if not event.spawned is Array or event.spawned.size() + event.first_id > world.sim._spawn_count \
 			or event.spawned.size() + event.attempt > world.sim._spawn_attempts \

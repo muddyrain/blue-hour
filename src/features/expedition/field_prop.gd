@@ -139,7 +139,7 @@ func _part(region: Rect2, point: Vector2, factor: float) -> Sprite2D:
 
 
 func _attach_window_lights(extra_scale: float) -> void:
-	var rel: String = iso_art.replace(".png", "_lights.png")
+	var rel: String = iso_art.get_basename() + "_lights." + iso_art.get_extension()
 	if IsoAtlas.info(rel).is_empty() or IsoAtlas.texture(rel) == null:
 		return
 	var sprite: Sprite2D = Sprite2D.new()

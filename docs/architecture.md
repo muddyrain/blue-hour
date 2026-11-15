@@ -73,6 +73,14 @@
 
 生成关先由 `WorldgenDensity` 补房，`WorldgenDressing.freeze` 冻结碰撞景物，再由 `ParcelScenery.fit` 补齐场地，最后只运行一次 `WorldgenDressing.enrich`。装饰先预留停车垫和车棚，再沿道路及门前步道两侧放小件；开阔草坪不按面积填充日用品。装饰仍受门口、步道、巴士与装卸场保留区约束，不新增交互或碰撞。
 
+`HarborWarehouse` 是第二个手摆地点“海边町·北港仓库”（地点键 `north_harbor`）。从第 3 天起，普通 `airdrop` 装备回收和定期五金补给通过 `ExplorationActions.supply()` 投影到港口；带独立空间锚点的侦察、路障、稀有/事件、深入回收和终局保留原图。与 `SeasideTown` 一样保留原任务/地图收据 ID 和 `generated`，不改变 `offers()`、奖励或源站点名义时长。港口地形和搜刮绑定集中在 `harbor_warehouse.gd`；`TaskActions.site_point()` 同时供运行时及快照校验使用，避免只有画面搬了位置。`HarborPresentation` 负责闭合建筑与外部门口工位，`HarborGround` 负责码头岸线表现，仍共用 `FieldNavigation`、原刷怪/入夜、派工、登车与结算。港口仅五盏工作灯（暖色/冷白）参与场景光池，货柜不充当光源。
+
+`StreetLayout` 只读取 `world_data.barriers_block_shots`（默认 true），不反向引用地点生成器，避免资源导入经存档校验链回到任务资源。港口将水岸障碍标为不挡弹，并把非导出的完整地形、作业绑定和边界加入快照兼容哈希；捕获仍要求暂停。成组货柜只分配一个工位，其余有碰撞但无标签，额外源站点使用南侧周转箱。`HarborGround` 以 10 Hz 重绘低透明度慢漂水纹，避开栈桥并服从世界夜色。集合属于移动命令，可在 ACTIVE / ENGINE / BOARDING 下达；发动、全员登车与归航条件保持原规则。
+
+港口作业耗时局部乘 `HarborWarehouse.WORK_FACTOR = 1.5`（PROJECT_TEMP）：名义进度与源站点时长保持原值，推进速度变慢；货台基础 18 秒，仓储点基础 27–45 秒，再应用既有人物/构筑倍率。不改全局时钟、奖励、刷怪权重；倍率参与港口快照兼容性哈希。
+
+港口 SVG 使用现有 `IsoAtlas` 的脚点/地图尺寸协议，由 `tools/make_harbor_art.py`（纯 Python 标准库）生成并登记 SHA；没有 AI 生成图像或第三方素材。`tests/harbor_warehouse.gd` 检查实际任务选择、布局可达、窄巷、水面、登车区域、源数据不变、作业耗时与部分作业快照重建，已纳入 `tools/godot.py check`。
+
 ### 存档说明
 
 - 不再兼容旧存档：v1–v5 `RunSave` 升级、v5 迁移导入、旧位置 `user://saves/run.json` 保护都已删除。读到不认识的存档会被拒绝，需要开新旅程。

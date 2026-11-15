@@ -291,6 +291,12 @@ func _exploration_objective_rows() -> Array[Dictionary]:
 		WorldSites.facts(x),rescue_revealed and x.rescue_target.npc.health > 0.0,
 		x.rescue_target.candidate_name() if rescue_revealed else "")
 	var investigation: Dictionary = generated.get("investigation", {})
+	if HarborWarehouse.is_layout(x.layout):
+		for row: Dictionary in rows:
+			if row.id == "searchable_vehicles_all":
+				row.title = "搜集周转货柜"
+			elif row.id == "fruit_trees_all":
+				row.title = "搜集码头补给箱"
 	if x.pump_station_mode():
 		var stopped: bool = x.station_stopped()
 		rows[0].title = "停机完成 · 击败破阵者" if stopped else "控制柜 · 派工停机"
@@ -325,7 +331,7 @@ func _exploration_objective_rows() -> Array[Dictionary]:
 			rows[1].title = "器材库 · %d 币" % RareSortie.EQUIPMENT_CASH
 			rows[1].hint = "可选，带回用于维修或建设。"
 	elif generated.get("mission_policy") == 1 and generated.type == "airdrop":
-		rows[0].title = "装备 · 露天回收"
+		rows[0].title = "北港货台 · 器材回收" if HarborWarehouse.is_layout(x.layout) else "装备 · 露天回收"
 		if generated.has("gear_build_policy") and not generated.build.drops.is_empty():
 			rows[0].title += " · 道具 %d 件" % generated.build.drops.size()
 		rows[0].hint = "一次性增援已触发。" if x.task_event.started else "首次开工触发一次增援，工作中可受击。"

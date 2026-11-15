@@ -1240,6 +1240,66 @@
       "license": "No additional license granted"
     },
     {
+      "path": "assets/infected_v1/rush/e.png",
+      "sha256": "3d312c9d0c21adb8000d11e82cecdd09b507cf0eacdde756d8a0bbac8cf12ce0",
+      "origin": "Original project AI-generated animation art using OpenAI built-in image_gen, 2026-11-15; existing project AI sprites used as identity/style references; individually drawn six-phase gait, attack, hit and fall poses; alpha-preserving grid registration and uniform per-direction scaling. Prompt/source SHA and packing values: assets/infected_v1/PROMPTS.md. Not a third-party asset pack; no Deadly Days material.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/infected_v1/rush/se.png",
+      "sha256": "43b6ab42be9cd1e32f0c40c3788a39831f9e2820ea85372247b705b3529d1964",
+      "origin": "Original project AI-generated animation art using OpenAI built-in image_gen, 2026-11-15; existing project AI sprites used as identity/style references; individually drawn six-phase gait, attack, hit and fall poses; alpha-preserving grid registration and uniform per-direction scaling. Prompt/source SHA and packing values: assets/infected_v1/PROMPTS.md. Not a third-party asset pack; no Deadly Days material.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/infected_v1/rush/s.png",
+      "sha256": "d4d9c862e5490fc0bb9f0331b6a2b1135d865e98f993c2a18eb0646cb0e80c6e",
+      "origin": "Original project AI-generated animation art using OpenAI built-in image_gen, 2026-11-15; existing project AI sprites used as identity/style references; individually drawn six-phase gait, attack, hit and fall poses; alpha-preserving grid registration and uniform per-direction scaling. Prompt/source SHA and packing values: assets/infected_v1/PROMPTS.md. Not a third-party asset pack; no Deadly Days material.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/infected_v1/rush/ne.png",
+      "sha256": "d2bc0d9bd594b68e3eb68eaa7eca076f5a821c99606de115ea0e3f7a7cbb46ac",
+      "origin": "Original project AI-generated animation art using OpenAI built-in image_gen, 2026-11-15; existing project AI sprites used as identity/style references; individually drawn six-phase gait, attack, hit and fall poses; alpha-preserving grid registration and uniform per-direction scaling. Prompt/source SHA and packing values: assets/infected_v1/PROMPTS.md. Not a third-party asset pack; no Deadly Days material.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/infected_v1/rush/n.png",
+      "sha256": "9f7b1eef7d2726edf0aff70cf8b6b22377cf8699417b4dc9f33e542476695c9e",
+      "origin": "Original project AI-generated animation art using OpenAI built-in image_gen, 2026-11-15; existing project AI sprites used as identity/style references; individually drawn six-phase gait, attack, hit and fall poses; alpha-preserving grid registration and uniform per-direction scaling. Prompt/source SHA and packing values: assets/infected_v1/PROMPTS.md. Not a third-party asset pack; no Deadly Days material.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/infected_v1/heavy/e.png",
+      "sha256": "0510d84f86f56d127aa330bded3304be7e027c763fe7494b0256cc2018760e13",
+      "origin": "Original project AI-generated animation art using OpenAI built-in image_gen, 2026-11-15; existing project AI sprites used as identity/style references; individually drawn six-phase gait, attack, hit and fall poses; alpha-preserving grid registration and uniform per-direction scaling. Prompt/source SHA and packing values: assets/infected_v1/PROMPTS.md. Not a third-party asset pack; no Deadly Days material.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/infected_v1/heavy/se.png",
+      "sha256": "acc940ffe44d691b9b7add92f05ebf75b3428d74795265d01c4d2810a276b9cb",
+      "origin": "Original project AI-generated animation art using OpenAI built-in image_gen, 2026-11-15; existing project AI sprites used as identity/style references; individually drawn six-phase gait, attack, hit and fall poses; alpha-preserving grid registration and uniform per-direction scaling. Prompt/source SHA and packing values: assets/infected_v1/PROMPTS.md. Not a third-party asset pack; no Deadly Days material.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/infected_v1/heavy/s.png",
+      "sha256": "00b2f61cf72584e2064b12c2be387357c5c50b7b6f7165142f5cd113a1ae59a7",
+      "origin": "Original project AI-generated animation art using OpenAI built-in image_gen, 2026-11-15; existing project AI sprites used as identity/style references; individually drawn six-phase gait, attack, hit and fall poses; alpha-preserving grid registration and uniform per-direction scaling. Prompt/source SHA and packing values: assets/infected_v1/PROMPTS.md. Not a third-party asset pack; no Deadly Days material.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/infected_v1/heavy/ne.png",
+      "sha256": "355a5ce1ec2c0c1617757208ce31d64662c94ea7e50d31eb3b0d382e58429a92",
+      "origin": "Original project AI-generated animation art using OpenAI built-in image_gen, 2026-11-15; existing project AI sprites used as identity/style references; individually drawn six-phase gait, attack, hit and fall poses; alpha-preserving grid registration and uniform per-direction scaling. Prompt/source SHA and packing values: assets/infected_v1/PROMPTS.md. Not a third-party asset pack; no Deadly Days material.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/infected_v1/heavy/n.png",
+      "sha256": "d013bc216d701e3846e4f7c7287d886de4094170ae4b806e4498cfaa4d6d9fa4",
+      "origin": "Original project AI-generated animation art using OpenAI built-in image_gen, 2026-11-15; existing project AI sprites used as identity/style references; individually drawn six-phase gait, attack, hit and fall poses; alpha-preserving grid registration and uniform per-direction scaling. Prompt/source SHA and packing values: assets/infected_v1/PROMPTS.md. Not a third-party asset pack; no Deadly Days material.",
+      "license": "No additional license granted"
+    },
+    {
       "path": "assets/survivors_v1/gu.png",
       "sha256": "225bf20aa2451fba8d46e5254af408477db660eedcec2e58ab6b1480f1f96d62",
       "origin": "AI-assisted redraw/extension of original assets/m5_anim_01/gu_full.png using built-in OpenAI imagegen (2026-11-15); independently drawn eight directions, idle + four walk + three attack poses. Southwest correction for gu/xia/lin/shen. Pillow alpha cleanup (<12), slicing and fixed per-direction root registration by tools/build_survivor_atlas.py. No third-party asset pack or Deadly Days artwork. Generation specification: assets/survivors_v1/generation.json.",
@@ -1267,6 +1327,7 @@
       "path": "assets/survivors_v1/lu.png",
       "sha256": "91c0fecba6ba31fc534a9d5ac7314e3a5156d51d0065604e78e61165dec7f3da",
       "origin": "AI-assisted redraw/extension of original assets/m5_anim_01/lu_full.png using built-in OpenAI imagegen (2026-11-15); independently drawn eight directions, idle + four walk + three attack poses. Southwest correction for gu/xia/lin/shen. Pillow alpha cleanup (<12), slicing and fixed per-direction root registration by tools/build_survivor_atlas.py. No third-party asset pack or Deadly Days artwork. Generation specification: assets/survivors_v1/generation.json.",
+
       "license": "No additional license granted"
     }
   ]

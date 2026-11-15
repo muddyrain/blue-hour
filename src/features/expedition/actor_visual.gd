@@ -327,6 +327,10 @@ func _apply_pose() -> void:
 		_body.scale *= Vector2(1.25, 1.18) if enemy_kind == EnemyRules.HEAVY else Vector2(0.90, 1.03) if enemy_kind == EnemyRules.RUSH else Vector2.ONE
 		if _normal_enemy() and NormalInfectedV1.enabled():
 			_body.scale = Vector2.ONE * field_scale(NormalInfectedV1.DISPLAY_SCALE)
+		elif enemy_kind == EnemyRules.RUSH:
+			_body.scale = Vector2.ONE * field_scale(RushInfectedV1.DISPLAY_SCALE)
+		elif enemy_kind == EnemyRules.HEAVY:
+			_body.scale = Vector2.ONE * field_scale(HeavyInfectedV1.DISPLAY_SCALE)
 		elif _toxic_enemy():
 			_body.scale = Vector2.ONE * field_scale(ToxicCarrierVisualV1.DISPLAY_SCALE)
 		elif _screamer_enemy():
@@ -339,7 +343,7 @@ func _apply_pose() -> void:
 	if _is_defeated:
 		motion_state = &"defeated"
 		_pose_body(_facing, 7 if is_enemy else 6)
-		_body.material = null
+		_body.material = InfectedSheetV1.MATERIAL if is_enemy and (enemy_kind in [EnemyRules.RUSH, EnemyRules.HEAVY] or (_normal_enemy() and NormalInfectedV1.enabled())) else null
 		_body.position = _contact_offset() if is_enemy and not _night_hound() else Vector2.ZERO
 		_body.self_modulate = Color(0.70, 0.77, 0.78, clampf(1.0 - (_defeat_clock - 0.50) / 0.45, 0.0, 1.0))
 	_update_hold(tint, moving, upper_action)
@@ -362,6 +366,10 @@ func _pose_body(direction: Vector2, action: int) -> void:
 			_attack_clock, _defeat_clock, _screamer_progress)
 	elif _normal_enemy() and NormalInfectedV1.enabled():
 		NormalInfectedV1.pose(_body, direction, motion_state, _walk_clock, _attack_clock, _hit_clock, _defeat_clock)
+	elif is_enemy and enemy_kind == EnemyRules.RUSH:
+		RushInfectedV1.pose(_body, direction, motion_state, _walk_clock, _attack_clock, _hit_clock, _defeat_clock)
+	elif is_enemy and enemy_kind == EnemyRules.HEAVY:
+		HeavyInfectedV1.pose(_body, direction, motion_state, _walk_clock, _attack_clock, _hit_clock, _defeat_clock)
 	else:
 		MotionAtlas.pose(_body, is_enemy, enemy_kind, variant, direction, action)
 

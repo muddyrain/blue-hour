@@ -140,7 +140,6 @@ func _build() -> void:
 	column.add_child(health_bar)
 	scope_label = _label(column, "Scope", 14)
 	scope_label.add_theme_color_override("font_color", Color("f2c37f"))
-	recipe_label = _label(column,"Recipe",14)
 	scroll = ScrollContainer.new()
 	scroll.name = "DetailScroll"
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -155,6 +154,9 @@ func _build() -> void:
 	body.add_theme_constant_override("separation", 10)
 	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	scroll.add_child(body)
+	# Keep trait information in the scrolling body so compact camp windows
+	# retain room to read it alongside weapon and growth details.
+	recipe_label = _label(body, "Recipe", 14)
 	_section(body, "主特长与成长")
 	trait_label = _label(body, "TraitDetail", 16)
 	positive_label = _trait(body, "Positive", POSITIVE_ICON, Color("b5eee0"))

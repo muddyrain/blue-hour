@@ -3,6 +3,7 @@ extends RefCounted
 ## V9 authenticates the new full description, never claims new geometry is old V3.
 static var _checked: Dictionary = {}
 static var _origins: Dictionary = {}
+static var _maps: ActionGenerationMemo = ActionGenerationMemo.new()
 
 static func origin(value: Dictionary) -> Dictionary:
 	if value.has("economy_source"):
@@ -102,6 +103,25 @@ static func upgrade(source: Dictionary, worldgen: bool = false, level: bool = fa
 static func level_map(source: Dictionary, id: String, mission_policy: int, industrial: bool,
 		residential_rescue: bool, rare_policy: int, require_supermarket: bool = false,
 		open_streets: int = 0, trace: Array[String] = []) -> Dictionary:
+	# Full source identity covers rewards, sites and capabilities as well as seed/id.
+	# Rules are fixed for this process; policies explicitly bind geometry and navigation.
+	var input: Dictionary = {"scope":"level-map-v1", "source":source, "id":id,
+		"mission_policy":mission_policy, "industrial":industrial, "residential_rescue":residential_rescue,
+		"rare_policy":rare_policy, "require_supermarket":require_supermarket, "open_streets":open_streets,
+		"worldgen":WorldgenLayout.policy(true, industrial, residential_rescue, open_streets),
+		"exploration":ExplorationLayout.policy(), "navigation":[FieldNavigation.CELL, FieldNavigation.FOOT_RADIUS]}
+	var result: Dictionary = _maps.resolve(input, func() -> Dictionary:
+		var attempts: Array[String] = []
+		var value: Dictionary = _build_level_map(source, id, mission_policy, industrial,
+			residential_rescue, rare_policy, require_supermarket, open_streets, attempts)
+		return {"value":value, "trace":attempts})
+	trace.append_array(result.trace)
+	return result.value
+
+
+static func _build_level_map(source: Dictionary, id: String, mission_policy: int, industrial: bool,
+		residential_rescue: bool, rare_policy: int, require_supermarket: bool,
+		open_streets: int, trace: Array[String]) -> Dictionary:
 	for attempt: int in range(4):
 		var layout: Dictionary = WorldgenLayout._assemble("BH_LEVEL_V1:" + id, source.layout["size"],
 			source.layout.topology, mini(attempt, 2), attempt == 3, source.type, industrial, residential_rescue, open_streets, trace)

@@ -33,6 +33,7 @@ def main():
   assert all(int(n)==0 for n in re.findall(r'"failures"\s*:\s*(\d+)',text)),(label,'structured failures')
   if label=='known-hash-cycle':assert 'MINIMAL_HASH_CYCLE=true' in text and 'EXACT_RECORD_ROUNDTRIP=true' in text
   if label.startswith('startup-'):assert 'BH_READY' in text
+  if label=='action-generation-cache':assert 'BH_ACTION_GENERATION_CACHE ' in text
   rows.append({'case':label,'exit':z.returncode,'expected_exit':expected,'status':'EXPECTED_KNOWN_FAILURE' if expected else 'PASS'});print(label,rows[-1]['status'],flush=True)
  execute('import',['--editor','--import'])
  execute('startup-default',['--quit-after','3'])
@@ -41,6 +42,7 @@ def main():
  execute('smoke-wait',['--script','res://tests/smoke_wait.gd'],[])
  execute('mission-loading',['--script','res://tests/mission_loading.gd'],[])
  execute('navigation-cache',['--script','res://tests/navigation_cache.gd'],[])
+ execute('action-generation-cache',['--script','res://tests/action_generation_cache.gd'],[])
  execute('run-feel',['--script','res://tests/run_feel.gd'],[])
  execute('ground-seams',['--script','res://tests/ground_seams.gd'],[])
  execute('surface-lines',['--script','res://tests/surface_lines.gd'],[])

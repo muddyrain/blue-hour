@@ -43,6 +43,7 @@ def main():
  execute('navigation-cache',['--script','res://tests/navigation_cache.gd'],[])
  execute('run-feel',['--script','res://tests/run_feel.gd'],[])
  execute('ground-seams',['--script','res://tests/ground_seams.gd'],[])
+ execute('surface-lines',['--script','res://tests/surface_lines.gd'],[])
  execute('audio-feedback',['--script','res://tests/audio_feedback.gd'],[])
  for name in ['playable_entry','presentation','squad_recruit','squad_long_run','camp_scene_contracts','weapon_inventory','combat_los','navigation_nearest','night_pressure','campaign_pressure','harbor_warehouse','progression_contracts','progression_save','maps_events','sortie_events','contact_damage','contact_separation','animation/motion','animation/normal_stability','animation/infected_v1','animation/special_infected_v1','animation/survivors_v1','animation/weapon_holding']:
   execute(name.replace('/','-'),['--script','res://tests/'+name+'.gd'])

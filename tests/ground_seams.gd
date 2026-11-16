@@ -57,7 +57,7 @@ func _pixels(width: int) -> void:
 	var sidewalk: Image = IsoAtlas.ground_texture("tiles/sidewalk.png").get_image()
 	expect(road.get_pixel(128,64).r > road.get_pixel(80,64).r + 0.1
 		and sidewalk.get_pixel(128,64) != sidewalk.get_pixel(110,64),
-		"road center paint and authored sidewalk seams keep their interior detail")
+		"road center paint and fine sidewalk grain keep their interior detail")
 	# Replace only texture data with a constant transparent diamond. This removes
 	# authored lines/gradients; any lattice must come from coverage and compositing.
 	var saved: Dictionary = IsoAtlas._textures.duplicate()

@@ -231,23 +231,17 @@ def tile_grass(seed: int = 11) -> Image.Image:
 
 def tile_sidewalk() -> Image.Image:
     img = Image.new("RGBA", (TW, TH), (0, 0, 0, 0))
-    shade_diamond(img, PAL["sidewalk"], PAL["sidewalk_lt"], PAL["sidewalk_dk"], noise=0.04)
-    d = ImageDraw.Draw(img)
-    pts = diamond_pts()
-    # slab seams
-    mid_top = ((pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2)
-    mid_bot = ((pts[2][0] + pts[3][0]) / 2, (pts[2][1] + pts[3][1]) / 2)
-    mid_l = ((pts[0][0] + pts[3][0]) / 2, (pts[0][1] + pts[3][1]) / 2)
-    mid_r = ((pts[1][0] + pts[2][0]) / 2, (pts[1][1] + pts[2][1]) / 2)
-    d.line([mid_top, mid_bot], fill=rgb(PAL["curb"], 90), width=1)
-    d.line([mid_l, mid_r], fill=rgb(PAL["curb"], 70), width=1)
-    d.line(pts + [pts[0]], fill=rgb(PAL["curb"], 120), width=1)
+    # Material grain, without a rim or X that connects into a town-wide grid.
+    fill_cover(img, PAL["sidewalk"], PAL["sidewalk_lt"], PAL["sidewalk_dk"],
+               noise=0.025, contrast=0.0, seed=37)
     return img
 
 
 def tile_road() -> Image.Image:
     img = Image.new("RGBA", (TW, TH), (0, 0, 0, 0))
-    shade_diamond(img, PAL["asphalt"], PAL["asphalt_lt"], PAL["asphalt_dk"], noise=0.05)
+    # A directional gradient restarted every 32 map units reads as diagonal bands.
+    fill_cover(img, PAL["asphalt"], PAL["asphalt_lt"], PAL["asphalt_dk"],
+               noise=0.025, contrast=0.0, seed=43)
     return img
 
 
@@ -313,23 +307,17 @@ def tile_crosswalk(axis: str) -> Image.Image:
 
 def tile_canal() -> Image.Image:
     img = Image.new("RGBA", (TW, TH), (0, 0, 0, 0))
-    shade_diamond(img, PAL["canal"], PAL["canal_lt"], PAL["canal_dk"], noise=0.05)
-    d = ImageDraw.Draw(img)
-    pts = diamond_pts()
-    # ripple lines along the long axis
-    for i, t in enumerate((0.28, 0.5, 0.72)):
-        p1 = (lerp(pts[0][0], pts[1][0], t), lerp(pts[0][1], pts[1][1], t) + 4)
-        p2 = (lerp(pts[3][0], pts[2][0], t), lerp(pts[3][1], pts[2][1], t) - 2)
-        d.line([p1, p2], fill=rgb(PAL["foam"] if i == 1 else PAL["canal_lt"], 80), width=1)
+    # No bright strokes or per-cell lighting resets. Sparse ripples are placed
+    # over the continuous water surface by IsoTiles, independently of cell edges.
+    fill_cover(img, PAL["canal"], PAL["canal_lt"], PAL["canal_dk"],
+               noise=0.018, contrast=0.0, seed=59)
     return img
 
 
 def tile_bank() -> Image.Image:
     img = Image.new("RGBA", (TW, TH), (0, 0, 0, 0))
-    shade_diamond(img, PAL["stone"], (176, 174, 166), PAL["stone_dk"], noise=0.05)
-    d = ImageDraw.Draw(img)
-    pts = diamond_pts()
-    d.line(pts + [pts[0]], fill=rgb(PAL["stone_dk"], 140), width=1)
+    fill_cover(img, PAL["stone"], (176, 174, 166), PAL["stone_dk"],
+               noise=0.025, contrast=0.0, seed=67)
     return img
 
 
@@ -1156,6 +1144,23 @@ def export_path_tiles(root: Path | None = None) -> None:
     export_cover_tiles(root, include_grass=False)
 
 
+def export_street_tiles(root: Path | None = None) -> None:
+    """Rebuild existing street surfaces only; preserve opaque diamond rims."""
+    global ROOT
+    previous = ROOT
+    if root is not None:
+        ROOT = root
+    try:
+        for name, make in (("sidewalk", tile_sidewalk), ("road", tile_road),
+                           ("road_ew", tile_road_dash_ew), ("road_ns", tile_road_dash_ns),
+                           ("crosswalk_ew", lambda: tile_crosswalk("ew")),
+                           ("crosswalk_ns", lambda: tile_crosswalk("ns")),
+                           ("canal", tile_canal), ("bank", tile_bank)):
+            save_tile(name, make(), cover=True)
+    finally:
+        ROOT = previous
+
+
 def export_cover_tiles(root: Path | None = None, include_grass: bool = True) -> None:
     """Rewrite grass/gravel/concrete covers. Does not touch road or sidewalk art."""
     global ROOT
@@ -1209,6 +1214,8 @@ if __name__ == "__main__":
         export_path_tiles()
     elif "--cover-tiles" in sys.argv:
         export_cover_tiles()
+    elif "--street-tiles" in sys.argv:
+        export_street_tiles()
     elif "--street-props" in sys.argv:
         export_street_props()
     else:

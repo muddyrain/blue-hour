@@ -24,13 +24,21 @@ func _verify_tiers() -> void:
 	var legacy: Dictionary = {"version":6, "campaign":{"pressure":CampaignRules.BREAKOUT_INTERVAL}}
 	expect(CampaignPressureV1.spawn_factor(legacy) == CampaignRules.BREAKOUT_INTERVAL,
 		"short campaign retains its own historical breakout pressure")
-	var current: Dictionary = {"version":9, "mission_policy":1, "day":7,
+	var current: Dictionary
+	for settled: int in [0, 1, 2, 3, 4, 5, 6]:
+		current = {"version":9, "mission_policy":1, "day":settled + 2,
+			"campaign":{"pressure":1.0}, "campaign_pressure":CampaignPressureV1.marker(settled)}
+		var director: ThreatDirector = ThreatDirector.new()
+		for row: Array in [[0.0, 0, 10.0], [70.0, 1, 8.0], [105.0, 2, 6.0], [140.0, 3, 4.5]]:
+			director.update(row[0], 105.0, 10.0 * CampaignPressureV1.spawn_factor(current))
+			expect(director.stage == row[1] and near(director.interval,
+				row[2] * CampaignPressureV1.INTERVAL_FACTORS[CampaignPressureV1.tier_for(settled)]),
+				"confirmed returns %d: campaign and day-night factors multiply once" % settled)
+		for stage: int in range(1, 4):
+			expect(ThreatRules.INTERVAL_FACTORS[stage - 1] / ThreatRules.INTERVAL_FACTORS[stage] <= 4.0 / 3.0 + 0.00001,
+				"each phase arrival rate increases by at most one third")
+	current = {"version":9, "mission_policy":1, "day":7,
 		"campaign":{"pressure":1.0}, "campaign_pressure":CampaignPressureV1.marker(5)}
-	var director: ThreatDirector = ThreatDirector.new()
-	for row: Array in [[0.0, 0, 5.6], [70.0, 1, 4.0], [105.0, 2, 2.8], [140.0, 3, 2.0]]:
-		director.update(row[0], 105.0, 7.0 * CampaignPressureV1.spawn_factor(current))
-		expect(director.stage == row[1] and near(director.interval, row[2]),
-			"frozen pressure and original day-night rules multiply once")
 	for bad_marker: Variant in [null, [], {"version":2, "tier":2}, {"version":"1", "tier":2},
 			{"version":1, "tier":true}, {"version":1, "tier":1}, {"version":1, "tier":2, "extra":0}]:
 		current.campaign_pressure = bad_marker

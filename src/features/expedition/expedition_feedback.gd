@@ -5,6 +5,7 @@ extends RefCounted
 var _atmosphere: ExpeditionAtmosphere = ExpeditionAtmosphere.new()
 var _special_infected: SpecialInfectedFeedback
 var _night_audio_seen: bool = false
+var _down_notices: Dictionary[StringName, bool] = {}
 var _warning_audio: Dictionary[String, int] = {}
 var x: Expedition
 
@@ -122,6 +123,14 @@ func _combat_popup(at: Vector2, text: String, colour: Color) -> void:
 	popup.tween_property(label, "position:y", label.position.y - 18.0, 0.5)
 	popup.parallel().tween_property(label, "modulate:a", 0.0, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	popup.tween_callback(label.queue_free)
+
+
+func notify_down(actor: FieldActor) -> void:
+	if _down_notices.has(actor.definition_id):
+		return
+	_down_notices[actor.definition_id] = true
+	_show_notice("%02d %s %s" % [actor.member_id, actor.call_sign,
+		"已阵亡 · 战斗死亡已持久确认" if actor.permanent_death else "已倒下 · 请让存活者集合撤离"])
 
 
 func _show_notice(message: String) -> void:

@@ -4,5 +4,5 @@
 
 [resource]
 script = ExtResource("1")
-initial_food = 2
+initial_food = 4
 ration_per_member = 1

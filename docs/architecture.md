@@ -95,6 +95,12 @@
 
 `CampaignPressureV1.blockade_night()` 在启用跨日压力的普通第 4、7、10…天出击预告“封锁夜”（调查、稀有、事件、终局除外）。入夜后普通敌种抽签按 actor ID 模 3，把其中两类普通槽分别升级为重压、疾奔，其余槽与特殊种优先级沿用原规则；`CombatEnemyRules.pick_for()` 同供刷怪与回放证明使用。任务卡、顶部时钟、黄昏和入夜均有提示，结算从原收据的任务日期及经过时间还原是否经历封锁夜。上限、间隔、出入口、安全距离和 `ExpeditionAtmosphere` 曲线不变；策略参数进入快照哈希。`tests/maps_events.gd` 覆盖车站正式选卡、导航/屋外作业/登车/恢复与封锁夜来源校验；`tests/sortie_events.gd` 覆盖事件两分支、冷库断电与结算事实，两者均纳入 `check`。
 
+场内普通增援以 `ExpeditionTuning.spawn_seconds = 10` 为基准，`ThreatRules` 按原 70/105/140 秒边界给出 10/8/6/4.5 秒间隔（PROJECT_TEMP）；`CampaignPressureV1` 的 1.0/0.9/0.8 倍率仍只乘一次，封锁夜敌种替换不变。白昼保持 105 秒，`LevelSummary` 和任务卡证据不受此调整影响。开局 4 粮只增加一餐两人缓冲，不改任务、设施或训练收入。
+
+`ExpeditionUi` 在短通知结束后投影当前撤离阶段、等待名单和口粮预估；B 保留先发动、后集合的接线，搜集者仍完成作业后归队。`ReturnFeedback.forecast()` 复用 `FieldJoinRules.meal_members()`、`CampFacilities.offered_food()` 和 `CampEconomy.post_battle_food()`：只读出发前设施、当前存活者、携带食物和库存上限，新同行首餐豁免，不发放收益。`ReturnFeedback` 同供冻结结算展示归航人数、场内阵亡、未登车及餐后饥饿死亡；终局标题按实际原因区分。
+
+`C1ExpeditionHud.place_status_hint()` 先确定可用文本宽度，再按字体行高、行距和面板内边距计算最多两行的最小高度。裁切 Label 的固有最小尺寸可能仍为 1×1，布局使用显式计算的组合最小尺寸，避免反过来用这个固有值把底板锁在 28px。常驻提示第一行为撤离操作，第二行为口粮；过长的名单省略显示，完整文本与事件上下文保留在 tooltip。`tests/run_feel.gd` 在正式 Expedition 布局验证两种分辨率；原生渲染执行还对每行文字像素及无文字对照取样，无头 Dummy 执行会明确跳过像素取样。
+
 ### 存档说明
 
 - 不再兼容旧存档：v1–v5 `RunSave` 升级、v5 迁移导入、旧位置 `user://saves/run.json` 保护都已删除。读到不认识的存档会被拒绝，需要开新旅程。

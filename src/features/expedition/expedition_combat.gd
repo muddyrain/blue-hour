@@ -70,7 +70,7 @@ func _update_combat() -> void:
 					expedition.toggle_pause()
 				return
 			if expedition.battle_survival and target.health == 0:
-				expedition._show_notice("%02d %s 已阵亡 · 战斗死亡已持久确认" % [target.member_id,target.call_sign])
+				expedition._feedback.notify_down(target)
 			expedition._clear_dead_worker()
 			enemy.cooldown = behavior.attack_interval(expedition.tuning.enemy_interval) if hound else expedition.tuning.enemy_interval
 			if timed_attack:

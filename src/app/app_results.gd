@@ -28,7 +28,8 @@ func _show_battle_result(snapshot: Dictionary, durable: bool) -> void:
 	app._set_pump_victory_visible(false)
 	if app._pump_details_back != null:
 		app._pump_details_back.hide()
-	app.get_node("Interface/Screen/Result/Heading").text = ("旅程胜利" if durable else "胜利预览 · 待确认保存") if victory else "旅程结束 · 全员阵亡" if ended else "幸存者归航"
+	var battle: Dictionary = app.progress_session.inspect().get("receipt", {}).get("envelope", {}).get("result", {}).get("battle", {})
+	app.get_node("Interface/Screen/Result/Heading").text = ("旅程胜利" if durable else "胜利预览 · 待确认保存") if victory else ReturnFeedback.result_heading(snapshot, battle)
 	var text: String = app._playable_result_text(snapshot,durable)
 	app.get_node("Interface/Screen/Result/Scroll/Body").text = text
 	app.get_node("Interface/Screen/Result/Scroll").scroll_vertical = 0
@@ -124,6 +125,8 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	var meal: Dictionary = frozen.get("food",snapshot.last_day)
 	var battle: Dictionary = frozen.get("battle",{})
 	var text: String = "归航结果 · 已入账\n" if durable else "归航预览 · 确认保存后入账\n"
+	text += ReturnFeedback.return_text(battle, snapshot.crew, snapshot.journey.deaths,
+		String(snapshot.last_settlement_id)) + "\n"
 	var catalog_notice: String = app._catalog_result_notice(snapshot) if durable else ""
 	if not catalog_notice.is_empty():
 		text += catalog_notice + "\n"

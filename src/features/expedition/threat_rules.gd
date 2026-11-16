@@ -4,7 +4,7 @@ extends Resource
 
 const LATE_FRACTION: float = 2.0 / 3.0
 const DEEP_FRACTION: float = 4.0 / 3.0
-const INTERVAL_FACTORS: Array[float] = [1.0, 5.0 / 7.0, 0.5, 2.5 / 7.0]
+const INTERVAL_FACTORS: Array[float] = [1.0, 0.8, 0.6, 0.45]
 const ENEMY_CAP: int = 24
 const SCREEN_MARGIN: float = 32.0
 const PARTY_DISTANCE: float = 280.0

@@ -98,11 +98,12 @@ func refresh(state: Dictionary) -> void:
 		"time":{"label":time_label,
 			"text":("+" if night else "") + "%02d:%02d" % [display_seconds / 60, display_seconds % 60],
 			"compact_hint":compact_hint,
+			"explanation":"当前普通增援间隔 %.2f 秒（含跨日压力）。\n天黑不会强制发车；存活者全登车才归航。\nB 先发动，发动后再按 B 集合；搜集者完成后归队，再点原搜集点可取消。" % float(threat.get("interval", 10.0)),
 			"hint":night_hint if not night_hint.is_empty() else threat.get("hint", "") if threat.get("enabled", false) else ""},
 		"bus_status_text":"巴士就绪" if enabled else bus_text,
 		"bus_waiting_text":"\n".join(bus_waiting), "bus_count_visible":gathering,
 		"bus_action_label":action, "bus_action_enabled":enabled or gathering,
-		"status_hint":state["notice"] if state["notice_visible"] else state.get("event_hint", ""),
+		"status_hint":state["notice"] if state["notice_visible"] else state.get("status_hint", state.get("event_hint", "")),
 	})
 	_burst_warning.text = state.get("burst_warning", "")
 	_burst_warning.visible = not _burst_warning.text.is_empty()
@@ -119,9 +120,9 @@ func refresh(state: Dictionary) -> void:
 	help.text = _base_help
 	help.text += "\n敌种候选：疾奔者近处加速；重压者预警0.5秒后重击，移出脚底圆环可避。"
 	help.text += "\n" + String(state.get("route_hint", ""))
-	help.text += "\n先发动，等待时点「集合至巴士」；搜集完成后归队。"
+	help.text += "\nB 先发动，不自动召回；发动后再按 B 集合。搜集者完成后归队，再点原搜集点可取消。"
 	help.text += "\nEsc：暂停菜单、定位巴士与退出风险提示。"
-	help.text += "\n威胁随时间上升；归零仍可撤离，原作夜间参数待校准。"
+	help.text += "\n当前增援间隔 %.2f 秒；天黑不会强制发车，存活者全登车才归航。" % float(threat.get("interval", 10.0))
 	view._time_box.tooltip_text = "威胁随时间增加；暂停会冻结计时。巴士就绪后须发动并集合队员。"
 	help.text = help.text.replace("敌种候选：", "敌种：").replace("；归零仍可撤离，原作夜间参数待校准。", "；计时归零仍可撤离。")
 

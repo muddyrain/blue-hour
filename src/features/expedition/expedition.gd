@@ -70,7 +70,7 @@ var search_actor: FieldActor:
 		return search_member(int(jobs[0].member_id)) if not jobs.is_empty() else null
 var goal: Vector2 = Vector2.ZERO
 var initial_cash: int = 53
-var initial_food: int = 2
+var initial_food: int = 4
 var camp_rules: CampRules = preload("res://src/features/camp/camp_rules.tres")
 var supply: MissionSupply = preload("res://src/features/camp/supermarket.tres")
 var day: int = 2

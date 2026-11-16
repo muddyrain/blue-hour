@@ -27,6 +27,7 @@ var _time_box: VBoxContainer
 var _pause_state: Label
 var _bus_status: Label
 var _bus_waiting: Label
+var _hint_source: String = ""
 var _hint: Label
 var _hint_panel: PanelContainer
 var _actions_panel: PanelContainer
@@ -66,6 +67,7 @@ func _ready() -> void:
 	# No initial focus: Space continues to mean pause in the world.
 	visibility_changed.connect(_on_visibility_changed)
 	get_viewport().size_changed.connect(_fit_persona_members)
+	resized.connect(place_status_hint)
 	refresh({})
 	ExpeditionHudTheme.skin(self)
 	_mission.add_theme_color_override("font_color", ExpeditionHudTheme.AMBER)
@@ -139,7 +141,8 @@ func refresh(state: Dictionary) -> void:
 	_bus_waiting.visible = not _bus_waiting.text.is_empty()
 	_bus_button.text = _text(state, "bus_action_label", "发动巴士")
 	_bus_button.disabled = state.get("bus_action_enabled", false) != true
-	_hint.text = _text(state, "status_hint")
+	_hint_source = _text(state, "status_hint")
+	_hint.text = _hint_source
 	_hint.visible = not _hint.text.is_empty()
 	_hint.tooltip_text = _hint.text
 	if _hint_panel != null:
@@ -446,9 +449,37 @@ func place_status_hint() -> void:
 			strip_top = strip.offset_bottom - strip.size.y
 		cluster_top = minf(cluster_top, strip_top)
 	_hint_panel.offset_bottom = cluster_top - 6.0
-	var text_height: float = maxf(28.0, _hint.get_minimum_size().y + 8.0)
-	_hint_panel.offset_top = _hint_panel.offset_bottom - text_height
+	# Clipped, autowrapped Labels report a 1x1 intrinsic minimum. Give shaping
+	# a usable width first, then reserve actual font line heights (at most two).
+	var width: float = minf(640.0, maxf(360.0, size.x - 448.0))
+	_hint_panel.offset_left = -width / 2.0
+	_hint_panel.offset_right = width / 2.0
+	var surface: StyleBox = _hint_panel.get_theme_stylebox("panel")
+	var padding: Vector2 = surface.get_minimum_size()
+	var text_width: float = width - padding.x
+	# Explicit paragraphs are the action and food estimate. Keep both visible;
+	# long headcounts/events remain available in the unabridged tooltip.
+	if _hint_source.contains("\n"):
+		var paragraphs: PackedStringArray = _hint_source.split("\n")
+		_hint.text = _fit_hint_line(paragraphs[0], text_width - 6.0) + "\n" + _fit_hint_line(paragraphs[1], text_width - 6.0)
+	_hint.custom_minimum_size.x = text_width
+	_hint.size.x = text_width
+	var lines: int = clampi(_hint.get_line_count(), 1, 2)
+	var text_height: float = float(_hint.get_line_height()) * lines
+	text_height += float(_hint.get_theme_constant("line_spacing")) * (lines - 1)
+	_hint.custom_minimum_size.y = text_height
+	_hint_panel.offset_top = _hint_panel.offset_bottom - text_height - padding.y
 	_hint_panel.visible = _hint.visible and not _hint.text.is_empty()
+
+
+func _fit_hint_line(text: String, width: float) -> String:
+	var font: Font = _hint.get_theme_font("font")
+	var font_size: int = _hint.get_theme_font_size("font_size")
+	if font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x <= width:
+		return text
+	while not text.is_empty() and font.get_string_size(text + "…", HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > width:
+		text = text.left(-1)
+	return text + "…"
 
 
 func hud_exclusion_rects() -> Array[Rect2]:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Original 2:1 isometric building and prop refinement for Blue Hour.
 
-Hand-authored procedural sprites: tiled hip/gable roofs, eaves, shop fascias,
+Hand-authored procedural sprites: closed hip/gable roofs, eaves, shop fascias,
 window frames and signs. Not AI-generated and not a third-party art pack.
 """
 from __future__ import annotations
@@ -162,7 +162,7 @@ def noisy_fill(img, pts, color, amount=0.05, seed=1):
     img.alpha_composite(layer)
 
 
-def draw_tiled_quad(img, pts, base, light, dark, courses=8, divisions=10):
+def draw_tiled_quad(img, pts, base, light, dark, courses=8, divisions=10, *, roof=False):
     if len(pts) < 3:
         return
     if len(pts) == 3:
@@ -176,20 +176,23 @@ def draw_tiled_quad(img, pts, base, light, dark, courses=8, divisions=10):
     layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
     ImageDraw.Draw(layer).polygon(pts, fill=rgb(base))
     gdr = ImageDraw.Draw(layer)
-    steps = max(courses * 2, 8)
+    steps = 64 if roof else max(courses * 2, 8)
     for i in range(steps):
         t0 = i / steps
         t1 = (i + 1) / steps
         col = mix(light, dark, t0 * 0.55 + 0.15)
         gdr.polygon([lerp_pt(a, d, t0), lerp_pt(b, c, t0), lerp_pt(b, c, t1), lerp_pt(a, d, t1)], fill=rgb(col))
     ldr = ImageDraw.Draw(layer)
+    # Roof planes keep directional light, hips, eaves and parapets. Their old
+    # intersecting strokes alias into dotted diamonds at the gameplay zoom.
+    # Masonry (bridges/walls) still uses the authored, bounded block joints.
     n = max(3, courses)
-    for i in range(n + 1):
+    for i in range(0 if roof else n + 1):
         t = i / n
         col = rgb(mix(dark, (20, 16, 14), 0.25), 140 if i not in (0, n) else 200)
         ldr.line([lerp_pt(a, d, t), lerp_pt(b, c, t)], fill=col, width=1 if i not in (0, n) else 2)
     m = max(3, divisions)
-    for i in range(m + 1):
+    for i in range(0 if roof else m + 1):
         t = i / m
         ldr.line([lerp_pt(a, b, t), lerp_pt(d, c, t)], fill=rgb(mix(dark, (0, 0, 0), 0.15), 90), width=1)
     layer.putalpha(ImageChops.multiply(layer.split()[3], mask))
@@ -329,19 +332,19 @@ def draw_hip_roof(img, vx, w, d, wall_h, rise, roof, over=8, courses=None):
         e_div = max(4, int((d + over * 2) / 16))
         c_long = courses or max(5, int((d / 2 + rise) / 8))
         c_short = courses or max(4, int((w / 4 + rise) / 8))
-        draw_tiled_quad(img, [nw, ne, re, rw], shade(roof, -0.05), mid, dark, c_long, n_div)
-        draw_tiled_quad(img, [sw, nw, rw], mid, light, shade(roof, -0.1), c_short, e_div)
-        draw_tiled_quad(img, [se, ne, re], dark, shade(roof, -0.08), very_dark, c_short, e_div)
-        draw_tiled_quad(img, [sw, se, re, rw], mid, light, dark, c_long, n_div)
+        draw_tiled_quad(img, [nw, ne, re, rw], shade(roof, -0.05), mid, dark, c_long, n_div, roof=True)
+        draw_tiled_quad(img, [sw, nw, rw], mid, light, shade(roof, -0.1), c_short, e_div, roof=True)
+        draw_tiled_quad(img, [se, ne, re], dark, shade(roof, -0.08), very_dark, c_short, e_div, roof=True)
+        draw_tiled_quad(img, [sw, se, re, rw], mid, light, dark, c_long, n_div, roof=True)
     else:
         n_div = max(4, int((w + over * 2) / 16))
         e_div = max(6, int((d + over * 2) / 16))
         c_long = courses or max(5, int((w / 2 + rise) / 8))
         c_short = courses or max(4, int((d / 4 + rise) / 8))
-        draw_tiled_quad(img, [nw, ne, re], shade(roof, -0.05), mid, dark, c_short, n_div)
-        draw_tiled_quad(img, [sw, nw, rw], mid, light, shade(roof, -0.1), c_long, e_div)
-        draw_tiled_quad(img, [se, ne, re, rw], dark, shade(roof, -0.08), very_dark, c_long, e_div)
-        draw_tiled_quad(img, [sw, se, rw], mid, light, dark, c_short, n_div)
+        draw_tiled_quad(img, [nw, ne, re], shade(roof, -0.05), mid, dark, c_short, n_div, roof=True)
+        draw_tiled_quad(img, [sw, nw, rw], mid, light, shade(roof, -0.1), c_long, e_div, roof=True)
+        draw_tiled_quad(img, [se, ne, re, rw], dark, shade(roof, -0.08), very_dark, c_long, e_div, roof=True)
+        draw_tiled_quad(img, [sw, se, rw], mid, light, dark, c_short, n_div, roof=True)
     ImageDraw.Draw(img).line([rw, re], fill=rgb(shade(roof, -0.3)), width=max(3, int(2.5 * SCALE)))
     ImageDraw.Draw(img).line([rw, re], fill=rgb(shade(roof, 0.15), 220), width=max(1, SCALE))
     draw_scalloped_eave(img, sw, se, shade(roof, -0.05), very_dark, drop=2)
@@ -365,16 +368,16 @@ def draw_gable_roof(img, vx, w, d, wall_h, rise, roof, over=8, axis="x"):
         fill_masked(img, g_e, (200, 186, 168))
         edge(img, g_w, (140, 128, 112), 1)
         edge(img, g_e, (120, 108, 94), 1)
-        draw_tiled_quad(img, [nw, ne, re, rw], shade(roof, -0.05), shade(roof, 0.15), shade(roof, -0.25), 7, 10)
-        draw_tiled_quad(img, [sw, se, re, rw], shade(roof, 0.06), shade(roof, 0.28), shade(roof, -0.18), 7, 10)
+        draw_tiled_quad(img, [nw, ne, re, rw], shade(roof, -0.05), shade(roof, 0.15), shade(roof, -0.25), 7, 10, roof=True)
+        draw_tiled_quad(img, [sw, se, re, rw], shade(roof, 0.06), shade(roof, 0.28), shade(roof, -0.18), 7, 10, roof=True)
     else:
         rw = vx(0, over, wall_h + rise)
         re = vx(0, -d - over, wall_h + rise)
         g_s = [vx(-w / 2, 0, wall_h), vx(w / 2, 0, wall_h), vx(0, 0, wall_h + rise)]
         fill_masked(img, g_s, (236, 226, 210))
         edge(img, g_s, (140, 128, 112), 1)
-        draw_tiled_quad(img, [sw, nw, re, rw], shade(roof, 0.1), shade(roof, 0.28), shade(roof, -0.15), 7, 8)
-        draw_tiled_quad(img, [se, ne, re, rw], shade(roof, -0.12), shade(roof, 0.0), shade(roof, -0.35), 7, 8)
+        draw_tiled_quad(img, [sw, nw, re, rw], shade(roof, 0.1), shade(roof, 0.28), shade(roof, -0.15), 7, 8, roof=True)
+        draw_tiled_quad(img, [se, ne, re, rw], shade(roof, -0.12), shade(roof, 0.0), shade(roof, -0.35), 7, 8, roof=True)
     ImageDraw.Draw(img).line([rw, re], fill=rgb(shade(roof, -0.3)), width=max(3, int(2.5 * SCALE)))
     ImageDraw.Draw(img).line([rw, re], fill=rgb(shade(roof, 0.18), 220), width=max(1, SCALE))
     draw_scalloped_eave(img, sw, se, shade(roof, -0.05), shade(roof, -0.4), drop=2)
@@ -389,7 +392,7 @@ def draw_flat_roof(img, vx, w, d, wall_h, roof, over=6, parapet=6):
     ne = vx(w / 2 + over, -d - over, wall_h + 3)
     fill_masked(img, [vx(-w / 2, 0, wall_h - 1), vx(w / 2, 0, wall_h - 1), se, sw], shade(roof, -0.4))
     fill_masked(img, [vx(w / 2, 0, wall_h - 1), vx(w / 2, -d, wall_h - 1), ne, se], shade(roof, -0.5))
-    draw_tiled_quad(img, [sw, se, ne, nw], shade(roof, 0.05), shade(roof, 0.18), shade(roof, -0.18), 6, 8)
+    draw_tiled_quad(img, [sw, se, ne, nw], shade(roof, 0.05), shade(roof, 0.18), shade(roof, -0.18), 6, 8, roof=True)
     if parapet:
         bands = [
             (-w / 2 - over, over, w / 2 + over, over, shade(roof, 0.05)),

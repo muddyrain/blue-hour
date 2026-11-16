@@ -4,6 +4,14 @@ extends VBoxContainer
 
 signal selected(member_id: int)
 
+class HoverButton extends C1HudButton:
+	func _make_custom_tooltip(for_text: String) -> Object:
+		return PersonaCard.make_hover_tooltip(for_text, get_viewport_rect().size)
+
+class HoverLabel extends Label:
+	func _make_custom_tooltip(for_text: String) -> Object:
+		return PersonaCard.make_hover_tooltip(for_text, get_viewport_rect().size)
+
 var portrait: PersonaPortrait
 var portrait_button: Button
 var info_button: Button
@@ -51,7 +59,7 @@ func present(model: Dictionary, compact: bool = false) -> void:
 	negative_label.tooltip_text = trait_detail(model.get("negative", ""))
 	var picture: Texture2D = model.get("portrait") as Texture2D
 	portrait.present(picture, alive, primary)
-	portrait_button.tooltip_text = name_label.text + "\n" + health_label.text + "\n" + ammo_label.text + "\n" + primary + "\n" + positive_label.text + "\n" + negative_label.text
+	portrait_button.tooltip_text = hover_text(model)
 	info_button.tooltip_text = "查看" + text(model, "name", "该成员") + "的特长、属性与计算来源"
 	_apply_size(compact)
 	var colour: Color = Color("80ddd8") if alive else Color("a7b5bd")
@@ -142,7 +150,7 @@ func _select() -> void:
 
 
 func _button(node_name: String, caption: String, action: Callable) -> Button:
-	var button: Button = C1HudButton.new()
+	var button: Button = HoverButton.new() if node_name == "Portrait" else C1HudButton.new()
 	button.name = node_name
 	button.text = caption
 	button.add_theme_font_size_override("font_size", 12)
@@ -174,6 +182,50 @@ func _label(parent: Control, node_name: String, font_size: int) -> Label:
 static func text(model: Dictionary, key: String, fallback: String = "") -> String:
 	var value: Variant = model.get(key)
 	return value if value is String and not value.is_empty() else fallback
+
+
+static func hover_text(model: Dictionary) -> String:
+	var name: String = text(model, "name", "姓名未提供")
+	var identity: String = text(model, "identity_name", name)
+	if identity != name:
+		name = identity + " · 呼号：" + name
+	var rows: PackedStringArray = [name, "HP %d/%d · Lv%d" % [ceili(float(model.get("hp", 0.0))),
+		ceili(float(model.get("max_hp", 0.0))), int(model.get("level", 1))]]
+	for key: String in ["weapon_name", "ammo", "status", "primary", "trait_detail"]:
+		var value: String = text(model, key)
+		if not value.is_empty(): rows.append(value)
+	for key: String in ["positive", "negative"]:
+		if model.has(key):
+			rows.append(("＋" if key == "positive" else "－") + trait_name(model[key]) + "：" + trait_detail(model[key]))
+	return "\n".join(rows)
+
+
+static func make_hover_tooltip(value: String, viewport: Vector2) -> Control:
+	var panel: PanelContainer = PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", CampStyle.box(Color("101b22"), Color("59665e"), 10))
+	var label: Label = Label.new()
+	label.text = value
+	label.theme_type_variation = &"TooltipLabel"
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.custom_minimum_size.x = minf(520.0, viewport.x - 32.0)
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", CampStyle.TEXT)
+	panel.add_child(label)
+	return panel
+
+
+static func camp_hover(base: Dictionary, id: int) -> String:
+	var model: Dictionary = PersonaViewModel.camp(base, id)
+	if model.is_empty():
+		var member: Dictionary = SurvivorRoster.member(base.crew, id)
+		var item: Dictionary = WeaponInventory.for_member(base, id)
+		model = {"name":member.call_sign, "identity_name":SurvivorRoster.definition_for(member).default_display_name,
+			"hp":member.health, "max_hp":SurvivorGrowth.maximum(base, member),
+			"level":member.get("growth", {}).get("level", 1),
+			"weapon_name":"未装备" if item.is_empty() else WeaponInventory.definition(item.weapon_id).display_name}
+		if TraitState.is_family(base):
+			model.trait_detail = TraitRules.description(member).replace(" · PROJECT_TEMP", "")
+	return hover_text(model)
 
 
 static func trait_name(value: Variant) -> String:

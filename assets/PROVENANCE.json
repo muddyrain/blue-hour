@@ -767,183 +767,273 @@
     },
     {
       "path": "assets/iso/buildings/apartment_a.png",
-      "sha256": "83109db733842867cb31449ca69495899def507bd5d52619363e76ffcef2d04e",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "1113851422b0c04460f03937548f97971cf44c8674ef7e6f426b14c1d8463d76",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/apartment_b.png",
-      "sha256": "e355b04f0239048db26b0ab3d28aecce15b65c625b3af198b70e0d1e786c5a49",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "d2cf3e4d08ce1c60b33b55b34cc669c840afea2ae5601d4b354ec0320ff55f8f",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/convenience.png",
-      "sha256": "c58e7121c089749b9df0f81206e937e0c0c7912a9cd22fbf594333eab00063d5",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "0b7bd7aac2a7fc229154305e8e351f1b1dd5a4c792ad440b2ec45a7f6e51a893",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/convenience_b.png",
-      "sha256": "7415b2bc2269487ec752543fcdf44c0f5bcd515741cff2b6be1da7547bda6c36",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "934c779996c39cf4e9141fd795a51b2287dc0b865ca92cd210d5d23873b0a3d4",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/convenience_wide.png",
-      "sha256": "7a19b8d953ce213adc6363859bd9fa3d6aebd5ef50d06c86c3b6494486922876",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "7f076894803f309d6adb00604107b570a662a52dd5367e33b85c888ddeb74cac",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/eatery.png",
-      "sha256": "20c32f3501a24585ccfe58b7bab617e996050744ea58c43f982bbb4d94a73729",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "a8511339a1f6d0e47798ea5d74d11e9adfea1cd2bf50d0e8b5164f68d97ea948",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/eatery_b.png",
-      "sha256": "400aa718617e7d8e8c1e9c3c1c3118efc6659cec79a4a59274e3cfcd3223c43e",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "c72899c08eb9bfe00a272b1cf220e5ea5c2d2803524d8a917292d1946b0d684b",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/garage.png",
-      "sha256": "a9abbc3703b1020664570cd73a2598d4eb51ae7f6548d91872553657a1c49e59",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "e5c5f4abd0d2ca80ab13f2da8984306dc2fd7e7ee6c4480c5cb86605e8250d77",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/garage_b.png",
-      "sha256": "e263ce77a1d88c4770b2305082365fdab30d18c6ce906b3b4170cc165ba6c289",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "c6d8d381368d3464f392b4b559844c7575ac11de540799edf5ce8b1e5c041dfe",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/grocery.png",
-      "sha256": "cc30be20e0d4281aa0d55a7c0efafa1577b631e212e432ea12a8fef7be6ff00b",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "7ad67e52f0a303ec1e937ea9479c5c4a0f5b3eeb61ae78da306bf0300a4ff1e2",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/grocery_b.png",
-      "sha256": "de4ee4c3a80ddfa2b311a9787101dbeb758191d97796d58eadfbd4ed4bbed267",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "005848ea9f5865f4c10a6fc024a9bd6f5c6d6c1216789444af38452ccd3e8c23",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/house_a.png",
-      "sha256": "b011dcd364ed41bbff8db0a84ccab81da769f7c8c5a2d4d02933b0f1d55ebcc1",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "0b5225b56756bb01c0a05e91f9854bc8e7ae3c53508fdc8a17cfc0f1d999410d",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/house_b.png",
-      "sha256": "1d5f810e7a50563f49f9b982a537a302f844ae5993375c8ccca275eef60f94f4",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "1b2b9132ea916064b50a80fdcb6fc1857a6973424f230f156eabd7b857bacee5",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/house_c.png",
-      "sha256": "e09523ece6f4cbe5dcfb2a28074ba3fed5b2860327832552e61400745be0d7c8",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "86a0ccd400e6581fe6f9bdf33097d3065c095ab4de1c5cffa284d513383f08f1",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/house_d.png",
-      "sha256": "d947bacc346683e41e24adb4119c4c159711eb0102ece6b51d185afd281672a7",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "2b7a6b391a810c1dace75a64f5e7a3e99a2682151ff44338226fb50636947479",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/house_e.png",
-      "sha256": "944024901450f47c3165ba85854af74c9ff3c19a2960e6f869b47543e73a1d70",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "806be94437f92f6d61552b4ce701ff251576546742085eb5bcc8d2cb5c4cf3f8",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/house_f.png",
-      "sha256": "33fd870c4e42acbaeb0394220035858bebe8fe12a95afb8ea072fcdefc77f6a6",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "fb2ec9de5d41290e795fe8810753e55f6a5be5c1bb948671c42462e60867df67",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/house_g.png",
-      "sha256": "739ca977211863386b10697f89c8257d17aa5fd2319e90c90f5a6a2c612d820f",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "4a59d2a56bf47eb1a34018536461756140721eebd69cde1160001859f0f97137",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/house_wide_a.png",
-      "sha256": "a81171a9c7c0c4827f9b8e928836c68d02a79f79ca593ff08757a9030f26420f",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "22757b846fbd6f768e7f85ec308f37daa2b0b56ea94922545e029ec3adcfed5d",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/house_wide_b.png",
-      "sha256": "4da86f1fa30cf895dd3ec8b3803b3c4cf60a4dd5f344c1a38a90e4d747324748",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "f24c5d5838003eddaa66cde3716c70e7e3d3ff38a4f4573d8501a1c2bab2f007",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/house_wide_c.png",
-      "sha256": "f56233e006f09a510d330bdb8de97519c2a8db0c34caeefb8981a900925394c8",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "4fac8d73a4a84d833063f2ad1db8ea8abba3036b272259f3a5e60ed9e18254f0",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/row_a.png",
-      "sha256": "b43dfd23987c68abc7754ae51edfec4e15f3b45ab02d0077a4ac4bf685d8e2e4",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "9422d4bb1131ab3ef4992697031f0d03bef6e6751ef03a87eb97aedd70dc0e21",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/row_b.png",
-      "sha256": "f82907e8cbac5d0d1d33638d7195144d7b8dd658312634cd303660b8007b31c1",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "a9b9eefdbfe5541338f1d575be516d57137f1a87328d1ad2b17f4156e7aa613f",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/shrine.png",
-      "sha256": "ae4780c273ea32bc73057cb6b5c79b98255d893510471e3627ad6ada3fffc39c",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "5db5d38273f9b624f894dc99993a2e8575ba7a0f6ead7864fbd315110617fa4c",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/supermarket.png",
-      "sha256": "ab3a170cee1849c88d775b6cca4b76cd7c015a7a264e9e30f7f35bd85a62ce24",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "8dcd853bd5b528e9df054c0f3f321e473a03d32b97839c655f9f87def49a6b8a",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/supermarket_b.png",
-      "sha256": "0e478651d618bde319ad7f585659001706f6fd4436d610c2f83c6cc14e31a240",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "e451774c1bbc2ff4c9e1b193d0d0f31cd2ec09f87d30f46068c63848b9e7948c",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/warehouse.png",
-      "sha256": "d04c8d057958ef9fc70a477418952e55a6dc3fa5b318a9574a567d6d71f956c2",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "68b2e5b95b1c917fa8f526d95d62cac50350923d47280655d7a77e0cac128499",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/warehouse_b.png",
-      "sha256": "690b25675f69b915c5d68e1595681566d2a17a44eb4ba449eaeaebbca434d722",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "4746f55c6f3e7c74d3e3ce421073e9f65d5c27b52a09dd40a5a4b65542c69884",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/warehouse_wide.png",
-      "sha256": "69bcc072d619de4a68e65c1425c2305bc452c3c3daa0ed9a02acfc6e5dc1afc7",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "1d5bb9ec4a848721692d8305939bf4a5d742c44665fbd2406e5476afda504d41",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/buildings/warehouse_wide_b.png",
-      "sha256": "f7f2da263ee92c3ff0a5d48829600ebdda73df59410cadd4fb05c29d7f178666",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "33e80aa23f63742298cfdcf514f6ee5f24e6b144e7a16785ad0bec639715c454",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/props/bike.png",
@@ -953,9 +1043,12 @@
     },
     {
       "path": "assets/iso/props/bike_shelter.png",
-      "sha256": "f7d31d5e09ed1462a2ff596be586dd1547f907d8546dfaf2e0a515ed133bdef2",
-      "origin": "Original project isometric art, hand-authored with Pillow in tools/make_iso_art.py (2:1 everyday city bicycles with filled rubber tires, rims, spokes, shaded colored frames, saddles, handlebars and optional baskets; the existing timber bike shelter reuses the same bicycle geometry). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "ca0ac5541bf5e543a0d141d5b42442a5664f7733fd6c15c8c421ab8967134f00",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_art.py; tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/props/canal_rail_ew.png",
@@ -995,9 +1088,12 @@
     },
     {
       "path": "assets/iso/props/tram_stop.png",
-      "sha256": "1d8dbe964a151046d2477e461332749aff56679182f42c282397e76df0e76325",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "5e009566796d9eaa6b9c4d5a284646764bfb8c569b662a16a3fe6acdb0212b81",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_buildings.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/props/tree.png",
@@ -1121,15 +1217,21 @@
     },
     {
       "path": "assets/iso/tiles/bank.png",
-      "sha256": "68d1ed0c5c94752eb84be29f65ddc8cd87b2c27aad742fd2b2b120084026efca",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "270e8d50d8a7df6469de67da9c3700f7dbc5d61b474ed0a35c308ab27eff07e2",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_art.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/tiles/canal.png",
-      "sha256": "c83061cf57f24f5a8ada57bb7eb98c71843901c1482cc22408f6177d19671fcf",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "e8229996ed4ebc4f62aa1c98baf5828592bf15ddff1ff73d1892bf7aedc9e816",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_art.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/tiles/concrete.png",
@@ -1145,15 +1247,21 @@
     },
     {
       "path": "assets/iso/tiles/crosswalk_ew.png",
-      "sha256": "b5bc215ff6b19b56f936a6420a88486a753132cb0a8dafbab3273131ee9e73a4",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "59787a0b0533d9ea08c8c2caaad27b56133e29acea4ea105f8ccd7e4615e257c",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_art.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/tiles/crosswalk_ns.png",
-      "sha256": "329110557df634081aeb367489898a07a852ce9cf7113133931b9ef1cb4870b3",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "90912654b70086a238ef756a1c9ba2e693474313da1803354c450f2d8ad77ac5",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_art.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/tiles/grass.png",
@@ -1199,27 +1307,39 @@
     },
     {
       "path": "assets/iso/tiles/road.png",
-      "sha256": "63443f183077710c2757c5270b443f332a8fbefd34cc0455ac03c8cb8e0b8c5e",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "a37b70b6ccf7d6eba0984c6e113bbe6fc70663da34f33d0c2384a8badfdbc5d5",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_art.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/tiles/road_ew.png",
-      "sha256": "f8b4f49ea92a362caa2c6e436d4f54e8b54b69b5c29b94608edb46c1f8fee2d9",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "01542436df1b6c7087c6ee11ebad4dbac8f39e9c11499a68471e9ec8167c5aae",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_art.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/tiles/road_ns.png",
-      "sha256": "e2b400cc9f0d166c936100f8e5d071c36678efe4c45c2af0b28b42be120600c7",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "688e6baa29ac58fdfd964c0022c8becad74dcb7c0d763cf45fc3927742e3e0b1",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_art.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/tiles/sidewalk.png",
-      "sha256": "95f16c1a6646fdfc60fa5a2b791cb4a4dd0ab787746e72c4fa57ed7634d5518f",
-      "origin": "Original project isometric art, hand-authored in tools/make_iso_buildings.py (2:1 closed-roof Japanese seaside-town buildings and props with tiled roofs, eaves, shop fascias, window frames and signs). Not AI-generated and not a third-party pack.",
-      "license": "No additional license granted"
+      "sha256": "88dfbc5feb10853f413b681e84165dbd376fbb532219d323a9a281cdd11f6968",
+      "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
+      "license": "No additional license granted",
+      "tool": "tools/make_iso_art.py",
+      "ai_generated_image": false,
+      "ai_assisted_code": true
     },
     {
       "path": "assets/iso/props/parked_car.png",

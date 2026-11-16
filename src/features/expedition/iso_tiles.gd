@@ -236,11 +236,30 @@ func _draw() -> void:
 		var tile_name: String = _art_name(cell, String(cells[cell]))
 		var extension: String = "svg" if tile_name.begins_with("harbor_") else "png"
 		IsoAtlas.stamp_cell(self, "tiles/%s.%s" % [tile_name, extension], cell, TILE)
+	_draw_canal_ripples()
 	for road: Rect2 in _road_edges:
 		var poly: PackedVector2Array = IsoSpace.polygon(road)
 		draw_polyline(PackedVector2Array([poly[0], poly[1], poly[2], poly[3], poly[0]]), Color(0.62, 0.65, 0.68, 0.9), 1.25, true)
 	for mark: Dictionary in _crosswalks:
 		_draw_crosswalk(mark.rect, String(mark.axis))
+
+
+func _draw_canal_ripples() -> void:
+	# Occasional short, bent strokes; never three bright lines per 32-unit tile.
+	# Stable local hashing does not consume the simulation's random sequence.
+	for cell: Vector2i in cells:
+		if cells[cell] != "canal":
+			continue
+		var salt: int = absi((cell.x * 73856093) ^ (cell.y * 19349663))
+		if salt % 13 != 0:
+			continue
+		var at: Vector2 = (Vector2(cell) + Vector2(0.25 + (salt % 17) * 0.025, 0.2)) * TILE
+		var length: float = 8.0 + salt % 11
+		var points: PackedVector2Array = PackedVector2Array([
+			IsoSpace.to_view(at), IsoSpace.to_view(at + Vector2(0.8, length * 0.5)),
+			IsoSpace.to_view(at + Vector2(0.0, length)),
+		])
+		draw_polyline(points, Color(0.65, 0.82, 0.84, 0.065), 0.7, true)
 
 
 func _draw_crosswalk(area: Rect2, axis: String) -> void:

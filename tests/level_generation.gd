@@ -242,8 +242,8 @@ func _action_choices() -> void:
 	var next: Array[Dictionary] = DailyActions.offers(later)
 	expect(next.size() == 3 and next[1].type == "airdrop", "same seed on a different date can offer original equipment recovery")
 	var full: Dictionary = current.duplicate(true)
-	RescuePoolState.grant(full, 3)
-	RescuePoolState.grant(full, 4)
+	for id: int in range(3, RosterState.MAX_LIVING + 1): RescuePoolState.grant(full, id)
+	expect(RosterState.living_count(full) == RosterState.MAX_LIVING, "rescue fallback fixture fills all eight living slots")
 	var fallback: Array[Dictionary] = DailyActions.offers(full)
 	expect(RescuePoolState.available(full).is_empty() and fallback.size() == 3 and fallback[1].type == "airdrop"
 		and DailyActions.matches(full, fallback[1]), "rescue preference with no eligible recruit falls back to legal gear")

@@ -32,6 +32,7 @@ var _asset_root: String
 var _streams: Dictionary[StringName, AudioStream] = {}
 var _ui_players: Array[AudioStreamPlayer] = []
 var _world_players: Array[AudioStreamPlayer] = []
+var _world_stream_ids: Dictionary[AudioStreamPlayer, int] = {}
 var _last_played: Dictionary[StringName, int] = {}
 var _warned: Dictionary[StringName, bool] = {}
 var _world_paused: bool = false
@@ -79,12 +80,20 @@ func play_world(cue: StringName) -> bool:
 func set_world_paused(value: bool) -> void:
 	_world_paused = value
 	for player: AudioStreamPlayer in _world_players:
+		# A stopped AudioStreamPlayer has no playback to pause and reports false.
+		# Keep an empty, silent transport for idle slots too, so pause survives
+		# recycling without manufacturing a cue that could replay on resume.
+		if value and not player.has_stream_playback():
+			player.play()
 		player.stream_paused = value
 
 
 func stop_world() -> void:
 	for player: AudioStreamPlayer in _world_players:
 		player.stop()
+	_world_stream_ids.clear()
+	if not _closed:
+		set_world_paused(_world_paused)
 	# Stopping is not resuming. The caller sets the next sortie's pause state.
 	for cue: StringName in CUES:
 		if CUES[cue]["channel"] == &"world":
@@ -115,6 +124,10 @@ func _make_players(players: Array[AudioStreamPlayer], count: int, prefix: String
 		player.name = prefix + str(index)
 		player.process_mode = Node.PROCESS_MODE_ALWAYS
 		player.max_polyphony = 1
+		if prefix == "World":
+			var transport: AudioStreamPolyphonic = AudioStreamPolyphonic.new()
+			transport.polyphony = 1
+			player.stream = transport
 		add_child(player)
 		players.append(player)
 
@@ -126,6 +139,8 @@ func _apply_preferences() -> void:
 		player.volume_linear = master * float(state["sfx_volume"]) * VOICE_GAIN
 		if player.volume_linear <= 0.0:
 			player.stop()
+			_world_stream_ids.erase(player)
+	set_world_paused(_world_paused)
 	for player: AudioStreamPlayer in _ui_players:
 		player.volume_linear = master * float(state["ui_volume"]) * VOICE_GAIN
 		if player.volume_linear <= 0.0:
@@ -152,10 +167,24 @@ func _play(cue: StringName, channel: StringName, players: Array[AudioStreamPlaye
 	var player: AudioStreamPlayer = _voice(players, channel, priority)
 	if player == null:
 		return false
-	player.stream = _streams[cue]
-	player.stream_paused = false
+	if channel == &"world":
+		# Polyphonic stop_stream retires on the audio thread. Restart this fixed
+		# transport when replacing a cue, so its one slot is available immediately.
+		if _world_stream_ids.has(player):
+			player.stop()
+		if not player.has_stream_playback():
+			player.play()
+		var playback: AudioStreamPlaybackPolyphonic = player.get_stream_playback() as AudioStreamPlaybackPolyphonic
+		var stream_id: int = playback.play_stream(_streams[cue])
+		if stream_id == AudioStreamPlaybackPolyphonic.INVALID_ID:
+			_world_stream_ids.erase(player)
+			return false
+		_world_stream_ids[player] = stream_id
+	else:
+		player.stream = _streams[cue]
+		player.stream_paused = false
+		player.play()
 	player.set_meta(&"priority", priority)
-	player.play()
 	_last_played[cue] = now
 	return true
 
@@ -164,11 +193,11 @@ func _voice(players: Array[AudioStreamPlayer], channel: StringName, priority: in
 	# Two world slots stay free of routine combat. Alerts can also use spare combat slots.
 	if channel == &"world" and priority > 0:
 		for index: int in range(COMBAT_VOICES, players.size()):
-			if not players[index].playing:
+			if not _voice_active(players[index], channel):
 				return players[index]
 	var limit: int = COMBAT_VOICES if channel == &"world" and priority == 0 else players.size()
 	for index: int in range(limit):
-		if not players[index].playing:
+		if not _voice_active(players[index], channel):
 			return players[index]
 	if priority > 0:
 		for player: AudioStreamPlayer in players:
@@ -176,6 +205,15 @@ func _voice(players: Array[AudioStreamPlayer], channel: StringName, priority: in
 				return player
 	# No queue or new nodes. A full set of equal-priority alerts coalesces by dropping newest.
 	return null
+
+
+func _voice_active(player: AudioStreamPlayer, channel: StringName) -> bool:
+	if channel != &"world":
+		return player.playing
+	if not player.has_stream_playback() or not _world_stream_ids.has(player):
+		return false
+	var playback: AudioStreamPlaybackPolyphonic = player.get_stream_playback() as AudioStreamPlaybackPolyphonic
+	return playback.is_stream_playing(_world_stream_ids[player])
 
 
 func _warn_once(key: StringName, message: String) -> void:

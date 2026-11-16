@@ -65,6 +65,10 @@
 | `audio_settings/` | 音量设置与合成音效服务。 |
 | `run_save/` | 存档：`ProductionProgress`（会话）+ `RunTransaction` + `ReceiptJournal`（带哈希的收据日志）+ `*State` 校验链。 |
 
+`IsoAtlas.stamp_cell()` 只用于地面：共享不透明菱形多边形边界，缓存去 alpha 的地面纹理，UV 向内避开源图的透明平滑边缘。建筑和人物仍使用原贴图路径。`tools/make_iso_art.py` 的 `export_street_tiles()` 生成无逐格定向渐变、十字缝和亮水纹的现有街道贴图；道路中线保留，`IsoTiles` 用局部哈希放置稀疏低对比短水纹，不消耗模拟随机数。`tools/make_iso_buildings.py` 的屋顶面保留明暗和外轮廓，不画交叉瓦格；石桥、墙体仍可使用有限砖缝。
+
+`tests/ground_seams.gd` 在原生渲染中取样 1024 与 1600 两种宽度，并以原透明包围盒绘制作为反例，防止地面覆盖接缝回归。`tests/surface_lines.gd` 另检查源图，并在正式海边町的 1024×576 / 1600×900 画面中检查绿屋顶、坡屋顶、运河、路面、人行道的局部高对比线像素，以及草地沿 32 单位周期的相位均值，避免把自然草叶斑驳误判成网格。反例在同一正式画面上重加菱形线，验证检测灵敏度。无头模式明确跳过像素检查，需用原生 `gl_compatibility` 运行这两个测试；不改正式裁切、镜头缩放或图层透明度来通过测试。
+
 营地玩家入口直接显示 `CampSceneWorld` 的旧渔协院落，不再隐藏世界后展示静态背景。`CampSceneLayout` 只定义营地表现坐标；`IsoSpace` / `IsoTiles` / `IsoBuildingArt` / `IsoAtlas` 与出征场共用，世界和设施标签共同等比缩放。三个设施位读取 `EconomyBuildV1.level()`（已有营地数据仍经 `CampFacilities` 读取）：未建为空地与材料，一级为小屋，二级换闭合屋顶建筑并补齐门前摆件。场景只发原有建设、补给、工坊、特长训练、名册和任务选择意图，不拥有交易或存档规则。装备台继续打开已有配装页，其中保留支援与构筑入口。
 
 `CampSceneResident` 仅给当前存活名册成员播放 `SurvivorVisualV1` 的正式八向待机/行走；沿院内固定环线散步，在补给、工坊、规划室和篝火旁停留，不实例化战斗角色、不写入存档。`CampSceneScenery` 绘制原创围栏、篝火和家具，所有立体物按脚点 Y 排序；暖暮复用 `ExpeditionAtmosphere.tint_for()` 及径向暖色点光，色调与灯光限制在世界层。`CampSceneStyle` 将营地与既有面板调整为暖炭灰，保留原面板布局参数。
@@ -112,6 +116,8 @@
 
 任务卡与援救目标展示冻结候选姓名；未接纳者不开放队员详情。救援标记、进度与标签使用 `IsoSpace` 投影，规则坐标和任务收据不变。`SquadDeployment` 共用原额外出生点搜索，供运行时、侦察证据与广告牌作业证据重建使用，不扩写源地图的 arrivals。原五人 `SurvivorPersona` 事实与 policy 保持原字节结构，以保留既有 offers 指纹；第 6–10 人按同一种子排序继续生成，按种子缓存、按身份读取，不增加存档字段或迁移分支。容量校验同步覆盖训练、特性、配装、治疗、能力、敌人目标、Boss 命中名单与快照；现行 EnemyState schema 111 无需改变。
 
+正式头像、名册与出发复核共用 `PersonaCard.hover_text()` / `camp_hover()`，读取既有 `PersonaViewModel` 的姓名、生命、等级、实际武器与特性；复核 Label 显式接收鼠标悬停；四处悬停共用有实底、自动换行的信息卡，避免长说明溢出或被底层 HUD 干扰。`tests/squad_recruit.gd` 按稳定成员 ID 检查全部八人，并在原生渲染时检查第八张头像的真实 tooltip；救援覆盖满编拒绝、减员后的后备路径、接纳与冻结归航结果。`tests/squad_long_run.gd` 使用通过现有存档校验的定向八人夹具，运行第 8/10 天正式车站关的自然时钟、AI、寻路、夜间登车与冻结结算；其中第 10 天另加一例明确的定向阵亡输入，不代表人工通关或自然伤亡。夜间暂停同时校验完整 `SortieSnapshot` 并拒绝篡改的增援间隔；快照威胁重建读取 `ExpeditionTuning`，与现场使用同一白昼长度和增援基准。
+
 ## 资源
 
 - 场内八套幸存者外观：`SurvivorVisualV1` 读取 `assets/survivors_v1/{gu,xia,lin,shen,lu,ruan,ye,he}.png`，每表 2048×2048 / 8×8 格。行按屏幕方向 E、SE、S、SW、W、NW、N、NE；列为待机 1 帧、走路 4 帧、攻击 3 帧。所有朝向直接绘制，不翻转。固定脚点 (128,224)，`ActorVisual.BODY_SCALE = 0.22`。`IsoSpace.attach_actor()` 标记画面投影，幸存者用投影后的朝向选择整帧；有瞄准意图时走路整帧随瞄准方向，避免身体与握持使用不同朝向。来源与生成规格见该目录 `generation.json`，原五套切片注册由 `tools/build_survivor_atlas.py` 完成；新人由 `tools/build_recruit_atlas.py` 归一化并裁切头像，提示词见 `recruit_generation.json`；敌人各自的方向与动作模块不变。
@@ -129,6 +135,8 @@
 - 不使用 Deadly Days 的任何图像、声音或录屏。
 
 音效沿用应用持有的 `B1AudioService`，没有 Autoload 或全局 AudioServer 总线写入。`ExpeditionFeedback` 通过 `audio_cue_requested` 上报开火（含霰弹）、近战提交、统一命中、特殊种蓄势和入夜；`AppSortie` 把意图接回已有服务，搜刮/发动与营地、任务选择、声音设置的 UI 确认仍走原回调。毒气和夜犬读取现有蓄势边沿，重复刷新不重播；暂停恢复快照只记录已存在的提示状态。巴士演出单独发登车/驶离提示，在结算冻结、战斗事件断开后继续接入同一服务。
+
+世界声部每个固定播放器持有单槽 `AudioStreamPolyphonic`，以实际 cue 的 stream ID 判断占用；空闲 transport 不发声，也可以保持 `stream_paused`。停止/静音清除 cue，暂停时空闲槽仍保持冻结，恢复不会补播；高优先级替换重启该槽 transport，避免音频线程尚未回收的槽导致假接受。`BusJourney` 在配置与阶段推进前校验门点/路线，正式世界搭建也提前报告缺失门点。
 
 音量默认仍为主音量 0.8、世界 0.75、UI 0.7、非静音。静音/分类归零立即停止对应尾音并拒绝新声音；世界暂停冻结现有声流、拒绝新请求，UI 保持可用，恢复不补播。服务固定 6 个世界与 2 个 UI 声部，其中世界的 2 个优先留给搜刮、巴士和预警；重要提示可替换较低优先级声音，满载不排队。15 个 WAV 为纯 Python 标准库数学合成（Codex 辅助代码、没有 AI 音频模型或采样素材），每个峰值 0.55，`VOICE_GAIN = 0.20`（PROJECT_TEMP 表现参数，原 0.16）；8 声部满滑杆的离散峰值和不超过 0.88。`tests/audio_feedback.gd` 已纳入 `check`；`python tests/test_audio_assets.py` 可脱离引擎校验生成可复现性、注册、来源与混音余量。
 

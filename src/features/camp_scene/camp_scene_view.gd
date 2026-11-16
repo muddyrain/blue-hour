@@ -222,7 +222,7 @@ func _build_blue_hour_team() -> void:
 	roster.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_team_scroll.add_child(roster)
 	for id: int in range(1, RosterState.MAX_HISTORY + 1):
-		var button: Button = _blue_hour_button(roster, StringName("member%d" % id), "")
+		var button: Button = _blue_hour_button(roster, StringName("member%d" % id), "", true)
 		button.set_meta("member_id", id)
 		button.custom_minimum_size.y = 94
 		member_buttons[id] = button
@@ -292,8 +292,8 @@ func _blue_hour_panel(node_name: String, rect: Rect2, _colour: Color) -> PanelCo
 	return panel
 
 
-func _blue_hour_button(parent: Container, action: StringName, caption: String) -> Button:
-	var button: Button = Button.new()
+func _blue_hour_button(parent: Container, action: StringName, caption: String, member_hover: bool = false) -> Button:
+	var button: Button = PersonaCard.HoverButton.new() if member_hover else Button.new()
 	button.name = String(action)
 	button.text = caption
 	button.add_theme_font_size_override("font_size", 17)
@@ -449,10 +449,7 @@ func _refresh_blue_hour_member(button: Button, data: Dictionary, id: int) -> voi
 	var weapon: Label = button.find_child("Weapon", true, false) as Label
 	var equipped: Dictionary = WeaponInventory.for_member(data, id)
 	weapon.text = WeaponInventory.definition(equipped.weapon_id).display_name if not equipped.is_empty() else "未装备"
-	button.tooltip_text = "%s · %s\n%s · %s\n查看队员档案" % [specialty.text, call_sign.text, health.text, weapon.text]
-	button.tooltip_text += "\n" + GrowthRules.description(member)
-	if TraitState.is_family(data):
-		button.tooltip_text += "\n" + TraitRules.description(member).replace(" · PROJECT_TEMP", "")
+	button.tooltip_text = PersonaCard.camp_hover(data, id) + "\n查看队员档案"
 
 
 func clear() -> void:

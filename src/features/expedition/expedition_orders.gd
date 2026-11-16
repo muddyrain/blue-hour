@@ -162,6 +162,9 @@ func candidate_id() -> int:
 
 
 func join_target(at_ms: int) -> bool:
+	if RescuePoolState.is_family(expedition.field_departure) and RescuePoolState.available(expedition.field_departure).is_empty():
+		expedition._show_notice(RosterState.unavailable_reason(expedition.field_departure))
+		return false
 	if not expedition.field_join_gate.is_valid():
 		return false
 	var confirmed: Dictionary = expedition.field_join_gate.call(at_ms)

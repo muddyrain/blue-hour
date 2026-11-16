@@ -221,7 +221,7 @@ func refresh(data: Dictionary, feedback: String = "") -> void:
 		if entry.is_empty(): continue
 		var list_name: String = entry.call_sign if entry.call_sign.length() <= 5 else entry.call_sign.left(4) + "…"
 		var definition: SurvivorDefinition = SurvivorRoster.definition(member_id)
-		button.tooltip_text = "%s · %s\n呼号：%s" % [definition.default_display_name, definition.gender_text(), entry.call_sign]
+		button.tooltip_text = PersonaCard.camp_hover(_data, member_id) + "\n" + definition.gender_text()
 		button.text = "%02d  %s\n%s · %.0f / %.0f" % [member_id, list_name,
 			"存活" if entry.condition == "active" else ("已阵亡" if entry.condition == "dead" else "倒地"), float(entry.health),SurvivorGrowth.maximum(_data,entry)]
 		if PersonaState.enabled(_data):
@@ -275,7 +275,7 @@ func _sync_members() -> void:
 	for entry: Dictionary in _data.crew:
 		var member_id: int = int(entry.id)
 		if buttons_by_id.has(member_id): continue
-		var button: Button = Button.new()
+		var button: Button = PersonaCard.HoverButton.new()
 		button.icon = SurvivorRoster.definition(member_id).portrait
 		button.add_theme_constant_override("icon_max_width", 72)
 		button.expand_icon = true

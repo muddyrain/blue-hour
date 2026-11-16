@@ -20,11 +20,13 @@ func configure(blockers: Array[Rect2], world_bounds: Rect2 = BOUNDS) -> void:
 	bounds = world_bounds
 	obstacles = blockers.duplicate()
 	_prepare_grid()
+	# Rasterize the same inflated rectangles instead of testing every obstacle at
+	# every cell. The final solid mask (and therefore AStar tie breaks) is unchanged.
+	for obstacle: Rect2 in obstacles:
+		_paint_blocker(self, obstacle, true)
 	if _grid.jumping_enabled:
 		# Paint each footprint once. The outer cell centers are 8 units from
 		# the edge and fail the same 10-unit actor bounds test as legacy maps.
-		for obstacle: Rect2 in obstacles:
-			_paint_blocker(self, obstacle, true)
 		var size: Vector2i = _grid.region.size
 		for x: int in range(size.x):
 			_grid.set_point_solid(Vector2i(x, 0), true)
@@ -33,11 +35,21 @@ func configure(blockers: Array[Rect2], world_bounds: Rect2 = BOUNDS) -> void:
 			_grid.set_point_solid(Vector2i(0, y), true)
 			_grid.set_point_solid(Vector2i(size.x - 1, y), true)
 		return
-	for x: int in range(_grid.region.size.x):
-		for y: int in range(_grid.region.size.y):
+	# Only the perimeter can fail the actor-bounds test: CELL/2 < FOOT_RADIUS
+	# < 3*CELL/2. Test actual centers to retain fractional/offset bounds behavior.
+	var size: Vector2i = _grid.region.size
+	if size.x == 0 or size.y == 0:
+		return
+	var interior: Rect2 = bounds.grow(-FOOT_RADIUS)
+	for x: int in range(size.x):
+		for y: int in [0, size.y - 1]:
 			var id: Vector2i = Vector2i(x, y)
-			var point: Vector2 = _grid.get_point_position(id)
-			if not is_clear(point):
+			if not interior.has_point(_grid.get_point_position(id)):
+				_grid.set_point_solid(id, true)
+	for y: int in range(1, size.y - 1):
+		for x: int in [0, size.x - 1]:
+			var id: Vector2i = Vector2i(x, y)
+			if not interior.has_point(_grid.get_point_position(id)):
 				_grid.set_point_solid(id, true)
 
 

@@ -12,6 +12,7 @@ const SIZES: Dictionary = {
 const MAX_CACHE: int = 48
 static var _built: Dictionary = {}
 static var _certificates: Dictionary = {}
+static var _navigation: Dictionary = {}
 static var _open_certificates: Dictionary[String, String] = {}
 static var _cache_mutex: Mutex = Mutex.new()
 
@@ -43,6 +44,7 @@ static func complete(data: Dictionary, trace: Array[String] = []) -> Dictionary:
 	var prior: Dictionary = _cached_layout(origin_key)
 	if not prior.is_empty():
 		return prior.duplicate(true)
+	FreezeProfile.count("geometry_certificate_builds")
 	var issue: String = _geometry_problem(data)
 	if not issue.is_empty():
 		trace.append(issue)
@@ -141,27 +143,42 @@ static func _cached_layout(origin_key: String) -> Dictionary:
 
 static func _cached_certificate(signature: String) -> Dictionary:
 	_cache_mutex.lock()
-	var certificate: Dictionary = _certificates.get(signature, {})
+	var certificate: Dictionary = _certificates.get(signature, {}).duplicate(false)
+	if _navigation.has(signature):
+		certificate.nav = _navigation[signature]
 	_cache_mutex.unlock()
 	return certificate
 
 
 static func _store_certificate(origin_key: String, signature: String, data: Dictionary, certificate: Dictionary) -> void:
+	var compact: Dictionary = certificate.duplicate(false)
+	var nav: FieldNavigation = compact.nav
+	compact.erase("nav")
 	_cache_mutex.lock()
-	if _certificates.size() >= MAX_CACHE:
-		_certificates.clear()
-		_built.clear()
-		_open_certificates.clear()
-	if data.has("open_streets"):
+	if not _certificates.has(signature) and _certificates.size() >= MAX_CACHE:
+		var oldest: String = _certificates.keys()[0]
+		_certificates.erase(oldest)
+		_navigation.erase(oldest)
+		_open_certificates.erase(oldest)
+		for key: String in _built.keys():
+			if _built[key].signature == oldest:
+				_built.erase(key)
+	_certificates[signature] = compact
+	_built[origin_key] = {"layout":data, "signature":signature}
+	_store_navigation_locked(signature, nav, data.has("open_streets"))
+	_cache_mutex.unlock()
+
+
+static func _store_navigation_locked(signature: String, nav: FieldNavigation, open: bool) -> void:
+	# Large native AStar graphs remain capped at four. Evicting one must not
+	# discard the compact geometry proof and force full procedural regeneration.
+	if open:
 		if not _open_certificates.has(signature) and _open_certificates.size() >= 4:
 			var oldest: String = _open_certificates.keys()[0]
-			_certificates.erase(oldest)
-			_built.erase(_open_certificates[oldest])
+			_navigation.erase(oldest)
 			_open_certificates.erase(oldest)
-		_open_certificates[signature] = origin_key
-	_certificates[signature] = certificate
-	_built[origin_key] = {"layout":data, "signature":signature}
-	_cache_mutex.unlock()
+		_open_certificates[signature] = ""
+	_navigation[signature] = nav
 
 
 static func _geometry_problem(data: Dictionary) -> String:
@@ -353,4 +370,16 @@ static func _routing(data: Dictionary) -> Dictionary:
 		value = _cached_certificate(signature)
 		if value.is_empty() and not validate(data, false).is_empty():
 			return {}
+	if not value.has("nav"):
+		# The held proof authenticates this complete geometry even if a parallel
+		# eviction removes its cache entry. Rebuild only its identical native grid.
+		var street: StreetLayout = NeighborhoodLayout.resource(data)
+		var nav: FieldNavigation = FieldNavigation.new()
+		nav.configure(street.blockers(), street.world_bounds)
+		FreezeProfile.count("geometry_nav_rebuilds")
+		_cache_mutex.lock()
+		if _certificates.has(signature):
+			_store_navigation_locked(signature, nav, data.has("open_streets"))
+		_cache_mutex.unlock()
+		value.nav = nav
 	return {"nav":value.nav, "dmax":value.dmax, "doors":value.doors.duplicate(true)}

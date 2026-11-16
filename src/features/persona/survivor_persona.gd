@@ -90,11 +90,11 @@ static func member(bundle: Dictionary, id: int, definition_id: String = "") -> D
 	if id < 1 or id > RosterState.MAX_HISTORY or (not definition_id.is_empty() and definition_id != "crew_%d" % id) or not _shape_problem(bundle).is_empty():
 		return {}
 	if id > bundle.members.size():
-		if not _extended.has(bundle.seed):
-			if _extended.size() >= 16:
-				_extended.clear()
-			_extended[bundle.seed] = _generate(String(bundle.seed), RosterState.MAX_HISTORY).members
-		return _extended[bundle.seed][id - 1].duplicate(true)
+		var members: Variant = ActionMemo.lookup(_extended, bundle.seed)
+		if members == null:
+			members = _generate(String(bundle.seed), RosterState.MAX_HISTORY).members
+			ActionMemo.store(_extended, bundle.seed, members, 16)
+		return members[id - 1].duplicate(true)
 	return bundle.members[id - 1].duplicate(true)
 
 

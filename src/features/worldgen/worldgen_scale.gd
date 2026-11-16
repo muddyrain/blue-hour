@@ -33,6 +33,7 @@ static func visible_height(type: String, variant: int = 0, art: String = "") -> 
 	return (608.0-top)*float(WIDTH[type])/448.0
 
 static func visible_rect(entity: Dictionary) -> Rect2:
+	FreezeProfile.count("worldgen_visible_rects")
 	var rect: Rect2=Rect2(float(entity.rect[0]),float(entity.rect[1]),float(entity.rect[2]),float(entity.rect[3]))
 	var height: float=visible_height(entity.archetype,int(entity.variant),entity.get("art",""))
 	return Rect2(rect.position.x,rect.end.y-height,rect.size.x,height)

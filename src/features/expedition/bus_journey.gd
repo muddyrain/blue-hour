@@ -13,7 +13,8 @@ const OPEN_ARRIVAL_SPEED: float = 650.0
 const OPEN_DEPARTURE_SPEED: float = 780.0
 const BOARDING_SPEED: float = 185.0
 const ARRIVAL_STAGGER: float = 0.14
-var stage: String = "arriving"
+var stage: String = "unconfigured"
+var configuration_problem: String = "BUS_ROUTE_UNCONFIGURED"
 var clock: float = 0.0
 var world: Expedition
 var sprite: Sprite2D
@@ -33,7 +34,12 @@ var _boarding_actors: Array[FieldActor] = []
 var _boarding_index: int = 0
 
 func configure(owner_world: Expedition, bus: Sprite2D, data: Dictionary) -> void:
+	configuration_problem = route_problem(data)
+	if not configuration_problem.is_empty():
+		stage = "unconfigured"
+		return
 	world=owner_world; sprite=bus; route=data.duplicate(true); stop=world.layout.bus_foot()
+	stage = "arriving"
 	for actor: FieldActor in world.survivors:
 		starts.append(actor.position)
 		actor.hide()
@@ -78,6 +84,10 @@ func running() -> bool:
 
 func advance(delta: float) -> void:
 	if not running(): return
+	configuration_problem = route_problem(route)
+	if not configuration_problem.is_empty():
+		stage = "unconfigured"
+		return
 	if world.rescue_target!=null: world.rescue_target.refresh()
 	if _open_body != null:
 		if world.rescue_target != null and not world.rescue_target.npc.visible:
@@ -125,13 +135,15 @@ func skip() -> void:
 		for actor: FieldActor in world.survivors:
 			if actor.health>0: actor.hide()
 		stage="done"
-		_boarding_panel.hide()
+		if _boarding_panel != null: _boarding_panel.hide()
 		departed.emit()
 	if skip_button!=null: skip_button.hide()
 	if world.rescue_target!=null: world.rescue_target.refresh()
 
 func departure() -> void:
-	if stage!="exploring" or world.phase!=Expedition.Phase.FINISHED: return
+	if stage!="exploring" or world == null or world.phase!=Expedition.Phase.FINISHED: return
+	configuration_problem = route_problem(route)
+	if not configuration_problem.is_empty(): return
 	audio_cue_requested.emit(&"bus_board")
 	if _open_body != null:
 		_begin_open_boarding()
@@ -139,6 +151,24 @@ func departure() -> void:
 	for actor: FieldActor in world.survivors: boarding_starts.append(actor.position)
 	stage="embarking"; clock=0; skip_button.text="队员登车 · 跳过演出"; skip_button.show()
 	_show_boarding("正在登车")
+
+
+static func route_problem(data: Dictionary) -> String:
+	var required: Array[String] = ["entry", "exit", "passenger_door"]
+	if data.has("in_path"):
+		required.append_array(["door", "stop"])
+		for key: String in ["in_path", "out_path"]:
+			if not data.get(key) is Array or data[key].size() < 2:
+				return "BUS_ROUTE_PATH"
+			for point: Variant in data[key]:
+				if not _route_point_valid(point): return "BUS_ROUTE_POINT"
+	for key: String in required:
+		if not _route_point_valid(data.get(key)): return "BUS_ROUTE_" + key.to_upper()
+	return ""
+
+
+static func _route_point_valid(value: Variant) -> bool:
+	return value is Array and value.size() == 2 and SurvivalContracts.number(value[0]) and SurvivalContracts.number(value[1])
 
 
 func _show_boarding(status: String) -> void:

@@ -55,9 +55,11 @@ func run() -> void:
 				bad=offer.duplicate(true); bad.extra=true
 				check(not TaskActions.problem(bad).is_empty(),"unknown field rejected")
 	# Synthetic full roster fixture only tests eligibility, never drives gameplay completion.
-	var full: Dictionary = base.duplicate(true); RescuePoolState.grant(full,3); RescuePoolState.grant(full,4)
+	var full: Dictionary = base.duplicate(true)
+	for id: int in range(3, RosterState.MAX_LIVING + 1): RescuePoolState.grant(full, id)
+	check(RosterState.living_count(full) == RosterState.MAX_LIVING, "full-pool fixture actually fills all eight living slots")
 	var full_offers: Array[Dictionary] = TaskActions.offers(full)
-	check(full_offers.all(func(o: Dictionary) -> bool:return o.type!="rescue") and full_offers[0].type!=full_offers[1].type and full_offers[1].type!=full_offers[2].type and full_offers[0].type!=full_offers[2].type,"full pool has three distinct legal tasks")
+	check(full_offers.size()==3 and full_offers.all(func(o: Dictionary) -> bool:return o.type!="rescue") and full_offers[0].type!=full_offers[1].type and full_offers[1].type!=full_offers[2].type and full_offers[0].type!=full_offers[2].type,"full pool has three distinct legal tasks")
 	print("TASK_DATA checks=",checks," failures=",failures," seed_examples=",JSON.stringify(examples))
 	main.audio.shutdown(); main.queue_free(); await process_frame
 	quit(1 if failures else 0)

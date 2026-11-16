@@ -18,7 +18,7 @@ static func camp(base: Dictionary, id: int, scope: String = "camp") -> Dictionar
 	var negative: Dictionary=SurvivorPersona.NEGATIVE[recipe.negative_id]
 	var model: Dictionary={"id":id,"definition_id":member.definition_id,"portrait":definition.portrait,
 		"primary":TraitRules.NAMES[TraitRules.role(member)-1],"primary_short":TraitRules.NAMES[TraitRules.role(member)-1],
-		"name":member.call_sign,"hp":member.health,"max_hp":GrowthRules.maximum(member),"level":member.growth.level,
+		"name":member.call_sign,"identity_name":definition.default_display_name,"hp":member.health,"max_hp":GrowthRules.maximum(member),"level":member.growth.level,
 		"alive":member.health>0,"status":"存活" if member.health>0 else "阵亡 · 只读历史","ammo":"",
 		"positive":{"name":positive.name,"detail":positive.description},"negative":{"name":negative.name,"detail":negative.description},
 		"trait_detail":TraitRules.description(member).replace("Trait ","").replace(" · PROJECT_TEMP",""),
@@ -72,6 +72,7 @@ static func field(world: Expedition, actor: FieldActor, status: String) -> Dicti
 			model.trait_detail = "生还归航并登记后，下次出击可用。\n" + String(model.trait_detail)
 	model.ammo=world._ammo_text(actor)
 	var gun: WeaponDefinition=actor.weapon_definition
+	model.weapon_name=gun.display_name
 	model.weapon_detail=_weapon_text(gun,actor.trait_shot_factor)
 	if actor.magazine!=null:
 		model.reload_detail="%s\n实际换弹 %.3f 秒%s"%[model.ammo,actor.magazine.seconds(),"（工作期间暂停换弹）" if world.has_search_job(actor.member_id) else ""]
@@ -93,10 +94,12 @@ static func _show_first_aid(model: Dictionary) -> void:
 
 static func _weapon(model: Dictionary, item: Dictionary, personal: Dictionary, passive: Dictionary, shot_factor: float, mod: String, workshop_reload: float) -> void:
 	if item.is_empty():
+		model.weapon_name="未装备"
 		model.weapon_detail="无当前装备 · 历史武器以归航档案为准"
 		model.reload_detail="无弹匣"
 		return
 	var gun: WeaponDefinition=WeaponModifiers.combat_definition(item)
+	model.weapon_name=gun.display_name
 	var melee: bool=CombatEquipment.melee(String(gun.id))
 	if (melee and model.positive.name=="枪械专长") or (not melee and model.positive.name=="近战好手"):
 		model.positive.detail+=" 当前武器不适用。"

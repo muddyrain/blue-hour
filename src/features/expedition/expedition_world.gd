@@ -38,6 +38,12 @@ func setup() -> void:
 	if SurvivalContracts.integer(expedition.supply.generated.get("version"), 6, 9):
 		expedition.tuning.spawn_seconds *= CampaignPressureV1.spawn_factor(expedition.supply.generated)
 	expedition.layout = expedition.supply.layout
+	if not expedition.layout.world_data.is_empty():
+		expedition.setup_problem = BusJourney.route_problem(expedition.layout.world_data.get("bus", {}))
+		if not expedition.setup_problem.is_empty():
+			expedition.set_physics_process(false)
+			expedition.set_process_unhandled_input(false)
+			return
 	if HarborWarehouse.is_layout(expedition.layout) or CapeStation.is_layout(expedition.layout):
 		expedition.mission_title = expedition.layout.display_name
 	expedition._supply_entrances = expedition._world._street_supply_entrances()
@@ -179,9 +185,12 @@ func setup() -> void:
 	readout_layer.layer = 5
 	expedition.add_child(readout_layer)
 	if expedition.supply.id == &"rescue" and not expedition.rescue_completed:
-		expedition.rescue_target = RescueTarget.new()
-		expedition.rescue_target.world = expedition
-		expedition.add_child(expedition.rescue_target)
+		if RescuePoolState.is_family(expedition.field_departure) and RescuePoolState.available(expedition.field_departure).is_empty():
+			expedition._show_notice(RosterState.unavailable_reason(expedition.field_departure))
+		else:
+			expedition.rescue_target = RescueTarget.new()
+			expedition.rescue_target.world = expedition
+			expedition.add_child(expedition.rescue_target)
 	if not expedition.field_joins.is_empty() and expedition.rescue_target != null:
 		expedition.promote_target(expedition.field_joins[0],true)
 	expedition._readouts = SquadReadouts.new()

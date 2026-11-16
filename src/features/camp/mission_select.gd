@@ -391,11 +391,21 @@ func _refresh_departure_team(base: Dictionary, rations: Dictionary) -> void:
 			var mod: String = WorkshopV1.mod_for(base, item.instance_id)
 			if not mod.is_empty():
 				weapon += " · " + WorkshopV1.name_for(mod)
-		var crew_label: Label = CampStyle.label("%s · 生命 %d/%.0f" % [SurvivorRoster.display_label(member), ceili(member.health), GrowthRules.maximum(member)], 18)
-		crew_label.tooltip_text = GrowthRules.description(member) + "\n" + TraitRules.description(member).replace(" · PROJECT_TEMP", "")
+		var crew_label: Label = PersonaCard.HoverLabel.new()
+		crew_label.text = "%s · 生命 %d/%.0f" % [SurvivorRoster.display_label(member), ceili(member.health), GrowthRules.maximum(member)]
+		crew_label.add_theme_font_size_override("font_size", 18)
+		crew_label.add_theme_color_override("font_color", CampStyle.TEXT)
+		crew_label.tooltip_text = PersonaCard.camp_hover(base, int(member.id))
+		crew_label.mouse_filter = Control.MOUSE_FILTER_PASS
 		_review_details.add_child(crew_label)
 		weapon += " · 等级 %d" % int(item.get("weapon_level", 1))
-		_review_details.add_child(CampStyle.label(weapon, 15, CampStyle.MUTED))
+		var weapon_label: Label = PersonaCard.HoverLabel.new()
+		weapon_label.text = weapon
+		weapon_label.add_theme_font_size_override("font_size", 15)
+		weapon_label.add_theme_color_override("font_color", CampStyle.MUTED)
+		weapon_label.tooltip_text = crew_label.tooltip_text
+		weapon_label.mouse_filter = Control.MOUSE_FILTER_PASS
+		_review_details.add_child(weapon_label)
 		_review_details.add_child(HSeparator.new())
 	if EconomyActions.camp_enabled(base):
 		var levels: PackedStringArray = []

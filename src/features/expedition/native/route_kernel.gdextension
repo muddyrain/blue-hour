@@ -1,0 +1,7 @@
+[configuration]
+entry_symbol = "bh_route_init"
+compatibility_minimum = "4.7.2"
+reloadable = false
+
+[libraries]
+linux.x86_64 = "res://.local/navigation-native/route_kernel.so"

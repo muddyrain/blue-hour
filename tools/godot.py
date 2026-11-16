@@ -10,6 +10,8 @@ def main():
  exe=a.godot or os.environ.get('GODOT_BIN') or shutil.which('godot') or shutil.which('godot4')
  if not exe:raise RuntimeError('Specify --godot or GODOT_BIN with the pinned engine')
  version=subprocess.check_output([exe,'--version'],text=True,timeout=15).strip();assert version==LOCK,(version,LOCK)
+ from build_navigation import build
+ build(exe)
  if a.action=='run':
   env=dict(os.environ);flags=[]
   profile=a.profile or (ROOT/'.local/developer-enemy' if a.enemy_trial else None)
@@ -42,6 +44,7 @@ def main():
  execute('smoke-wait',['--script','res://tests/smoke_wait.gd'],[])
  execute('mission-loading',['--script','res://tests/mission_loading.gd'],[])
  execute('navigation-cache',['--script','res://tests/navigation_cache.gd'],[])
+ execute('navigation-routes',['--script','res://tests/navigation_routes.gd'],[])
  execute('action-generation-cache',['--script','res://tests/action_generation_cache.gd'],[])
  execute('run-feel',['--script','res://tests/run_feel.gd'],[])
  execute('ground-seams',['--script','res://tests/ground_seams.gd'],[])

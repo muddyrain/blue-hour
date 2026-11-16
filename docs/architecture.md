@@ -85,6 +85,8 @@
 
 `FieldNavigation` 为每张图缓存最多 2048 组精确起终点的原始 AStar 路径（含不可达结果），供任务证书和卡片摘要复用；不改变择路规则。网格重建或临时路障变更会清空缓存，返回数组独立复制，私有路障图不共享路径状态。
 
+大图跳点搜索由 `FieldRouteSearch` 显式调用 `native/route_kernel.c` 的 `RefCounted` 实例。碰撞矩形仍按同一半开栅格覆盖与外圈构成 solid mask；原生 helper 在线性预处理内建立四向直线强制后继、四向对角静态终点和行/列连通段。每次查询将目标与这些段相交，得到与 Godot 4.7.2 `_jump` 完全相同的后继；邻居顺序、float32 octile 评分、相等评分时的堆操作及起点后处理保持原样，返回完整原始路径，不以距离场替代路径。小图继续使用原生非跳点 AStarGrid2D。索引随地图或私有路障变更销毁，查询仍持有原互斥锁；没有增加路线缓存容量或工作线程。`tests/support/navigation_oracle.gd` 保留 c65fa3a 的完整实现，仅供 `navigation_routes` 对照完整点序列与精确累计距离。构建入口 `tools/build_navigation.py` 使用引擎自己导出的 ABI 头与系统 `cc`，开启严格单精度运算、禁止 FMA 收缩/fast-math，输出仅在 `.local/navigation-native/`；当前绑定限 Godot 4.7.2 官方单精度 Linux x86_64，尚无其他平台或导出打包支持。
+
 导航网格构建按膨胀后的障碍矩形覆盖栅格，仅在边缘逐格核对角色的世界边界，不再对每格遍历全部障碍；AStar 参数、障碍膨胀尺寸及最终 solid mask 保持一致。`tests/navigation_cache.gd` 将每格及完整路径与原逐格判定比较，覆盖重叠、退化、偏移和非整格边界，并用查询次数限制重复工作，不依赖机器耗时阈值。
 
 `WorldgenDensity` 在每次补房调用内只投影一次既有建筑外形、门点和围栏；新增建筑立即追加到本次局部投影，变体计算在补房序号变化时失效。预计算不跨调用保存，不改变碰撞判断顺序、随机种子或生成结果。`tests/worldgen_contracts.gd` 用原实现的完整生成指纹及外形投影次数上界检查等价性与复杂度。

@@ -13,6 +13,8 @@ Godot 4.7（GDScript）2D 斜俯视小队生存原型：营地整备 → 选择�
 python tools/godot.py run --godot <Godot 可执行文件>
 ```
 
+Linux x86_64 需要 C11 编译器 `cc`。启动/检查入口会用锁定引擎导出 ABI 头文件并构建精确导航 helper，产物仅放 `.local/navigation-native/`；首次打开编辑器前可运行 `python3 tools/build_navigation.py <引擎>`。当前原生 helper 尚未提供其他平台构建。
+
 只有一个入口，无需任何玩法参数。存档位于 `user://playable-v1/run.enemy-v1.json`。
 
 操作：左键地面移动、点建筑派工/再点取消；WASD 移动镜头，滚轮缩放，空格暂停，Esc 暂停菜单。发动巴士后需全员到达才能归航。

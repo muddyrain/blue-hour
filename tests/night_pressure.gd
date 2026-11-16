@@ -12,11 +12,11 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var director: ThreatDirector = ThreatDirector.new()
-	for sample: Array in [[0.0,0,7.0],[69.99,0,7.0],[70.0,1,5.0],[104.99,1,5.0],[105.0,2,3.5],[140.0,3,2.5],[2000.0,3,2.5]]:
-		director.update(sample[0],105.0,7.0)
+	for sample: Array in [[0.0,0,10.0],[69.99,0,10.0],[70.0,1,8.0],[104.99,1,8.0],[105.0,2,6.0],[139.99,2,6.0],[140.0,3,4.5],[2000.0,3,4.5]]:
+		director.update(sample[0],105.0,10.0)
 		_expect(director.stage == sample[1] and is_equal_approx(director.interval,sample[2]), "configured natural stage/interval boundary")
 	var changed: int = director.transitions
-	director.update(150.0,105.0,7.0)
+	director.update(150.0,105.0,10.0)
 	_expect(director.transitions == changed and director.stage == ThreatDirector.Stage.DEEP, "repeated state cannot duplicate transition or rewind")
 	for supply: MissionSupply in [preload("res://src/features/camp/scavenge.tres"),preload("res://src/features/camp/supermarket.tres")]:
 		await _check_sortie(supply)
@@ -43,7 +43,7 @@ func _check_sortie(supply: MissionSupply) -> void:
 	sortie.threat_changed.connect(func(event: Dictionary) -> void: warnings.append(event))
 	_expect(sortie.threat.stage == ThreatDirector.Stage.CALM and sortie._spawn_count == 0, "new sortie starts clean")
 	_expect(sortie._night_lighting.amount == 0.0, "calm retains the original ungraded street")
-	sortie.step(7.0)
+	sortie.step(10.0)
 	_expect(spawns.size() == 1 and spawns[0].reason == "spawned" and sortie.enemies.size() == 1, "ordinary generator creates real enemy from first deadline")
 	var enemy: FieldActor = sortie.enemies[0]
 	var birth: Vector2 = Vector2(spawns[0].point[0],spawns[0].point[1])
@@ -63,7 +63,7 @@ func _check_sortie(supply: MissionSupply) -> void:
 	sortie.step(0.1)
 	_expect(sortie.threat.stage == ThreatDirector.Stage.LATE and warnings.size() == 1 and sortie._spawn_count == 1, "resume advances current simulation only, no frozen-time backlog")
 	sortie.step(0.16)
-	_expect(sortie._spawn_count == 2 and is_equal_approx(sortie._spawn_clock,5.0), "one due spawn resets exact current stage interval")
+	_expect(sortie._spawn_count == 2 and is_equal_approx(sortie._spawn_clock,8.0), "one due spawn resets exact current stage interval")
 	var dusk_grade: float = sortie._night_lighting.amount
 	sortie.toggle_pause()
 	sortie.step(60.0)

@@ -159,18 +159,17 @@ func _loop(path: String) -> void:
 		"first opening plan creates and saves a new camp"):
 		return
 	var before: Dictionary = app.camp_snapshot().duplicate(true)
+	if not _check(before.day == 2 and before.food == 4 and before.crew.size() == 2,
+		"official day-two opening has four food and the original pair"):
+		return
 	var world: Expedition = await _start_sortie()
 	if world == null:
 		return
 	world.search_completed.connect(func(_reward: int) -> void: search_completions += 1)
 	world.combat_feedback.connect(_observe_hit)
-	var site: Expedition.SearchSite
-	for candidate: Expedition.SearchSite in world.sites:
-		if (not candidate.searched and world.site_discovered(candidate) and world.supply.supports(candidate.kind)
-			and not world._is_event_site(candidate)):
-			site = candidate
-			break
-	if not _check(site != null, "available discovered search site exists"):
+	var site: Expedition.SearchSite = world.search_site(&"food")
+	if not _check(SeasideTown.is_layout(world.layout) and site != null
+		and not site.searched and world.site_discovered(site), "day-two seaside food point is available"):
 		return
 	world.command_move(site.door)
 	world.request_search(site.id)
@@ -179,6 +178,10 @@ func _loop(path: String) -> void:
 		return
 	if not await _advance(world, func() -> bool: return site.searched and search_completions > 0,
 		"assigned survivor completes search and emits completion"):
+		return
+	if not _check(world.living_count() == 2 and world.food_loot > 0
+		and world.tuning.daylight_seconds - world.elapsed >= 20.0,
+		"first food search leaves both alive, carried food and at least twenty seconds of daylight"):
 		return
 	# Spawn through the existing director policy if natural search-time combat has not hit yet.
 	# Never manufacture enemies, damage, ammunition, health, rewards, or clock values.
@@ -209,6 +212,12 @@ func _loop(path: String) -> void:
 		and gathered.y == world.living_count() and app._result.is_visible_in_tree()
 		and not app._pending_settlement.is_empty(), "living survivors extracted into visible frozen preview"):
 		return
+	var preview_text: String = app.get_node("Interface/Screen/Result/Scroll/Body").text
+	if not _check(world.elapsed < 105.0 and world.living_count() == 2 and world.food_loot > 0
+		and preview_text.contains("归航 2 人") and preview_text.contains("场内阵亡：无")
+		and preview_text.contains("顾予安") and preview_text.contains("夏之遥"),
+		"daytime frozen preview names the returned pair and reports no field casualties"):
+		return
 	if not _check(TransactionReceipt.same(before, app.camp_snapshot()), "preview leaves camp and day unchanged"):
 		return
 	await app._confirm_result_ui()
@@ -218,6 +227,9 @@ func _loop(path: String) -> void:
 		"result Continue advances day and saves camp"):
 		return
 	var saved: Dictionary = app.camp_snapshot().duplicate(true)
+	if not _check(saved.last_day.food_shortage == 0 and saved.food >= 2
+		and saved.last_day.food_consumed == 2, "confirmed return feeds original pair and retains next meal"):
+		return
 	var durable: Dictionary = app.progress_session.inspect()
 	if not _check(durable.error == OK and durable.state == "CAMP"
 		and TransactionReceipt.same(saved, durable.camp), "durable camp matches settled app state"):

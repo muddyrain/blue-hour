@@ -107,6 +107,9 @@ func _make_ui() -> void:
 
 
 func _update_ui() -> void:
+	for actor: FieldActor in x.survivors:
+		if actor.health <= 0.0:
+			x._feedback.notify_down(actor)
 	x._feedback._refresh_night_lighting()
 	x._present_support()
 	x._present_power()
@@ -203,6 +206,7 @@ func _update_ui() -> void:
 		"weapon_loot":x.weapon_loot.size(),
 		"searched": x.searched, "kills": x.kills, "engine": engine_text,
 		"notice": x._notice_text, "notice_visible": x._notice_clock > 0.0,
+		"status_hint":_persistent_hint(boarding),
 		"event_hint":SortieEvents.field_hint(x),
 		"night_hint":SortieEvents.night_hint(x.supply.generated, x.elapsed, x.tuning.daylight_seconds),
 		"threat":x.threat_status(),
@@ -242,6 +246,44 @@ func _update_ui() -> void:
 			var text: String = SearchWorkView.building_text(worker.member_id, worker.call_sign, work_phase, TaskActions.outdoor_site(x.supply.generated,site.id)) if worker != null else ""
 			site.prop.update_work(worker.actor_id if worker != null else -1,
 				fraction, worker != null and x.work_state_matches(worker,site), worker.call_sign if worker != null else "", text)
+
+
+func _food_forecast() -> Dictionary:
+	var crew: Array = x._setup_crew.duplicate(true)
+	for member: Dictionary in crew:
+		var actor: FieldActor = x.search_member(int(member.id))
+		member.health = actor.health if actor != null else 0.0
+	return ReturnFeedback.forecast(x.day, crew, x.field_departure,
+		x.initial_food, x.food_loot, x.camp_rules.ration_per_member)
+
+
+func _persistent_hint(boarding: Dictionary) -> String:
+	var advice: String
+	var event: String = SortieEvents.field_hint(x)
+	if x.phase == Expedition.Phase.ENGINE:
+		advice = "发动中，不自动召回；发动后再按 B 集合；再点搜集点取消作业。"
+	elif x.phase == Expedition.Phase.BOARDING:
+		var waiting: PackedStringArray = []
+		for member: Dictionary in boarding.get("waiting", []):
+			waiting.append(String(member.call_sign))
+		if boarding.get("rescue_waiting", false):
+			waiting.append("救援对象")
+		advice = "等待%s；%s" % ["、".join(waiting) if not waiting.is_empty() else "全员登车",
+			"搜完才归队，再点搜集点可取消。" if boarding.working > 0 else "存活者全登车才归航。"]
+		if not boarding.ordered:
+			advice = "再按 B 集合；" + advice
+	else:
+		if not event.is_empty():
+			advice = "B 发动后再按 B 集合 · " + event
+		elif x.food_loot > 0 or x._searched_count() > 0:
+			advice = "物资已携带，可按 B 发动，随后再按 B 集合。"
+		else:
+			advice = "点击%s派工；再点同点取消；巴士就绪后按 B 发动。" % ("食品点" if x.supply.supports(&"food") else "标记搜集点")
+	if x.elapsed >= x.tuning.daylight_seconds:
+		advice = "入夜仍可撤离 · " + advice
+	# Keep event/route context in the tooltip while the first two lines remain
+	# the immediate order and meal estimate, even after transient notices expire.
+	return advice + "\n" + ReturnFeedback.forecast_text(_food_forecast()) + ("\n" + event if not event.is_empty() else "")
 
 
 func _update_member_display() -> void:

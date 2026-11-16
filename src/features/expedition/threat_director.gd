@@ -14,7 +14,7 @@ const HINTS: Array[String] = ["威胁 · 平稳", "暮色 · 增援加快", "夜
 
 var rules: ThreatRules = ThreatRules.new()
 var stage: Stage = Stage.CALM
-var interval: float = 7.0
+var interval: float = 10.0
 var transitions: int = 0
 
 

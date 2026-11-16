@@ -37,7 +37,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				expedition.request_search(&"food")
 		elif expedition.layout.bus_block.grow(18.0).has_point(point):
-			expedition.request_extraction()
+			expedition.request_bus_action()
 		elif expedition.layout.world_bounds.has_point(point):
 			expedition.command_move(point)
 		expedition.get_viewport().set_input_as_handled()

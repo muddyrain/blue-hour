@@ -52,6 +52,9 @@ return_to_title={
 "events": [Object(InputEventKey,"keycode":4194305)]
 }
 
+[editor_plugins]
+enabled=PackedStringArray("res://src/features/expedition/native/plugin.cfg")
+
 [rendering]
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"

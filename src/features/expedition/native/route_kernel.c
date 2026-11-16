@@ -199,6 +199,7 @@ static GDExtensionInterfaceClassdbRegisterExtensionClass6 register_class;
 static GDExtensionInterfaceClassdbRegisterExtensionClassMethod register_method;
 static GDExtensionInterfaceClassdbUnregisterExtensionClass unregister_class;
 static GDExtensionInterfaceStringNameNewWithLatin1Chars name_new;
+static GDExtensionInterfaceStringNewWithLatin1Chars string_new;
 static GDExtensionInterfacePackedInt32ArrayOperatorIndex packed_index;
 static GDExtensionInterfacePackedInt32ArrayOperatorIndexConst packed_const_index;
 static GDExtensionInterfaceVariantGetType variant_type;
@@ -206,13 +207,16 @@ static GDExtensionInterfaceVariantNewNil variant_nil;
 static GDExtensionTypeFromVariantConstructorFunc to_packed;
 static GDExtensionVariantFromTypeConstructorFunc from_packed;
 static GDExtensionPtrConstructor packed_new;
-static GDExtensionPtrDestructor packed_destroy, name_destroy;
+static GDExtensionPtrDestructor packed_destroy, name_destroy, string_destroy;
 static GDExtensionPtrBuiltInMethod packed_size, packed_resize;
 static Name class_name, parent_name, method_name, empty_name;
+static uint64_t empty_hint;
 static GDExtensionObjectPtr create_instance(void *unused, GDExtensionBool notify) {
     (void)unused; (void)notify;
     Kernel *k=calloc(1,sizeof(Kernel));
+    if (!k) return NULL;
     GDExtensionObjectPtr object=construct_object(&parent_name);
+    if (!object) { free(k); return NULL; }
     set_instance(object,&class_name,k);
     return object;
 }
@@ -232,7 +236,10 @@ static void route_call(void *unused,GDExtensionClassInstancePtr instance,const G
     const int32_t *data=size?packed_const_index(&input,0):NULL;
     Kernel *k=instance;
     int length=0;
-    if(size>=3 && data[0]>0) configure(k,data,(int)size);
+    if(size>=3 && data[0]>0) {
+        configure(k,data,(int)size);
+        if(k->n) { k->output[0]=1; length=1; }
+    }
     else if(size==5 && data[0]==0) length=search(k,data[1],data[2],data[3],data[4]);
     packed_new(&result,NULL);
     int64_t output_size=length,resize_error=0;
@@ -247,12 +254,13 @@ static void initialize(void *unused,GDExtensionInitializationLevel level) {
     if(level!=GDEXTENSION_INITIALIZATION_SCENE) return;
     name_new(&class_name,"FieldRouteKernel",0); name_new(&parent_name,"RefCounted",0);
     name_new(&method_name,"route",0); name_new(&empty_name,"",0);
+    string_new(&empty_hint,"");
     GDExtensionClassCreationInfo6 creation={0};
     creation.is_exposed=1; creation.create_instance_func=create_instance; creation.free_instance_func=free_instance;
     register_class(library,&class_name,&parent_name,&creation);
     GDExtensionPropertyInfo result={0}; result.type=GDEXTENSION_VARIANT_TYPE_PACKED_INT32_ARRAY;
     result.name=&empty_name; result.class_name=&empty_name;
-    uint64_t empty_string=0; result.hint_string=&empty_string;
+    result.hint_string=&empty_hint;
     GDExtensionClassMethodInfo method={0};
     method.name=&method_name; method.call_func=route_call;
     method.method_flags=GDEXTENSION_METHOD_FLAG_NORMAL|GDEXTENSION_METHOD_FLAG_VARARG;
@@ -264,8 +272,12 @@ static void deinitialize(void *unused,GDExtensionInitializationLevel level) {
     if(level!=GDEXTENSION_INITIALIZATION_SCENE) return;
     unregister_class(library,&class_name);
     name_destroy(&class_name); name_destroy(&parent_name); name_destroy(&method_name); name_destroy(&empty_name);
+    string_destroy(&empty_hint);
 }
-#define LOAD(type,variable,name) variable=(type)get_proc(name)
+#define LOAD(type,variable,name) variable=(type)get_proc(name); if(!variable) return 0
+#ifdef _WIN32
+__declspec(dllexport)
+#endif
 GDExtensionBool bh_route_init(GDExtensionInterfaceGetProcAddress get_proc,GDExtensionClassLibraryPtr lib,GDExtensionInitialization *init) {
     library=lib;
     LOAD(GDExtensionInterfaceClassdbConstructObject3,construct_object,"classdb_construct_object3");
@@ -274,6 +286,7 @@ GDExtensionBool bh_route_init(GDExtensionInterfaceGetProcAddress get_proc,GDExte
     LOAD(GDExtensionInterfaceClassdbRegisterExtensionClassMethod,register_method,"classdb_register_extension_class_method");
     LOAD(GDExtensionInterfaceClassdbUnregisterExtensionClass,unregister_class,"classdb_unregister_extension_class");
     LOAD(GDExtensionInterfaceStringNameNewWithLatin1Chars,name_new,"string_name_new_with_latin1_chars");
+    LOAD(GDExtensionInterfaceStringNewWithLatin1Chars,string_new,"string_new_with_latin1_chars");
     LOAD(GDExtensionInterfacePackedInt32ArrayOperatorIndex,packed_index,"packed_int32_array_operator_index");
     LOAD(GDExtensionInterfacePackedInt32ArrayOperatorIndexConst,packed_const_index,"packed_int32_array_operator_index_const");
     LOAD(GDExtensionInterfaceVariantGetType,variant_type,"variant_get_type");
@@ -283,14 +296,18 @@ GDExtensionBool bh_route_init(GDExtensionInterfaceGetProcAddress get_proc,GDExte
     GDExtensionInterfaceVariantGetPtrConstructor constructor=(GDExtensionInterfaceVariantGetPtrConstructor)get_proc("variant_get_ptr_constructor");
     GDExtensionInterfaceVariantGetPtrDestructor destructor=(GDExtensionInterfaceVariantGetPtrDestructor)get_proc("variant_get_ptr_destructor");
     GDExtensionInterfaceVariantGetPtrBuiltinMethod builtin=(GDExtensionInterfaceVariantGetPtrBuiltinMethod)get_proc("variant_get_ptr_builtin_method");
+    if(!to || !from || !constructor || !destructor || !builtin) return 0;
     to_packed=to(GDEXTENSION_VARIANT_TYPE_PACKED_INT32_ARRAY); from_packed=from(GDEXTENSION_VARIANT_TYPE_PACKED_INT32_ARRAY);
     packed_new=constructor(GDEXTENSION_VARIANT_TYPE_PACKED_INT32_ARRAY,0);
     packed_destroy=destructor(GDEXTENSION_VARIANT_TYPE_PACKED_INT32_ARRAY); name_destroy=destructor(GDEXTENSION_VARIANT_TYPE_STRING_NAME);
+    string_destroy=destructor(GDEXTENSION_VARIANT_TYPE_STRING);
+    if(!to_packed || !from_packed || !packed_new || !packed_destroy || !name_destroy || !string_destroy) return 0;
     Name size_name,resize_name;
     name_new(&size_name,"size",0); name_new(&resize_name,"resize",0);
     packed_size=builtin(GDEXTENSION_VARIANT_TYPE_PACKED_INT32_ARRAY,&size_name,3173160232);
     packed_resize=builtin(GDEXTENSION_VARIANT_TYPE_PACKED_INT32_ARRAY,&resize_name,848867239);
     name_destroy(&size_name); name_destroy(&resize_name);
+    if(!packed_size || !packed_resize) return 0;
     init->minimum_initialization_level=GDEXTENSION_INITIALIZATION_SCENE;
     init->initialize=initialize; init->deinitialize=deinitialize; init->userdata=NULL;
     return 1;

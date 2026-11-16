@@ -85,7 +85,11 @@
 
 `FieldNavigation` 为每张图缓存最多 2048 组精确起终点的原始 AStar 路径（含不可达结果），供任务证书和卡片摘要复用；不改变择路规则。网格重建或临时路障变更会清空缓存，返回数组独立复制，私有路障图不共享路径状态。
 
-大图跳点搜索由 `FieldRouteSearch` 显式调用 `native/route_kernel.c` 的 `RefCounted` 实例。碰撞矩形仍按同一半开栅格覆盖与外圈构成 solid mask；原生 helper 在线性预处理内建立四向直线强制后继、四向对角静态终点和行/列连通段。每次查询将目标与这些段相交，得到与 Godot 4.7.2 `_jump` 完全相同的后继；邻居顺序、float32 octile 评分、相等评分时的堆操作及起点后处理保持原样，返回完整原始路径，不以距离场替代路径。小图继续使用原生非跳点 AStarGrid2D。索引随地图或私有路障变更销毁，查询仍持有原互斥锁；没有增加路线缓存容量或工作线程。`tests/support/navigation_oracle.gd` 保留 c65fa3a 的完整实现，仅供 `navigation_routes` 对照完整点序列与精确累计距离。构建入口 `tools/build_navigation.py` 使用引擎自己导出的 ABI 头与系统 `cc`，开启严格单精度运算、禁止 FMA 收缩/fast-math，输出仅在 `.local/navigation-native/`；当前绑定限 Godot 4.7.2 官方单精度 Linux x86_64，尚无其他平台或导出打包支持。
+大图跳点搜索由 `FieldRouteSearch` 显式调用 `native/route_kernel.c` 的 `RefCounted` 实例。碰撞矩形仍按同一半开栅格覆盖与外圈构成 solid mask；原生 helper 在线性预处理内建立四向直线强制后继、四向对角静态终点和行/列连通段。每次查询将目标与这些段相交，得到与 Godot 4.7.2 `_jump` 完全相同的后继；邻居顺序、float32 octile 评分、相等评分时的堆操作及起点后处理保持原样，返回完整原始路径，不以距离场替代路径。小图继续使用原生非跳点 AStarGrid2D。索引随地图或私有路障变更销毁，查询仍持有原互斥锁；没有增加路线缓存容量或工作线程。`tests/support/navigation_oracle.gd` 保留 c65fa3a 的完整实现，仅供 `navigation_routes` 对照完整点序列与精确累计距离。构建入口 `tools/build_navigation.py` 使用锁定引擎导出的公开 GDExtension 接口头与 API 元数据，校验公开内建类型的 opaque buffer 大小，String/StringName/PackedInt32Array 全部通过公开构造/析构 API 管理，不依赖全零空字符串表示；GCC/Clang 开启严格单精度运算、禁止 FMA 收缩/fast-math。支持 Linux x86_64 与 MinGW/LLVM-MinGW Windows x86_64 交叉或本机构建，输出仅在 `.local/navigation-native/`，不依赖引擎私有对象布局、私有符号或进程扫描。算法顺序绑定 4.7.2；升级引擎必须重建并重跑完整点序列对照。
+
+`FieldRouteKernelLoader` 在主线程启动阶段显式尝试一次可选加载，工作线程开始读档前完成类注册；`FieldRouteSearch` 以互斥锁共享加载状态，网格仍各自持有内核实例。清单存为普通 `.cfg`，避免编辑器自动扫描 `.gdextension` 在缺库时出错；运行时先按官方平台特征匹配、检查文件，再于 `user://navigation-native/` 写入供公开 `GDExtensionManager.load_extension()` 使用的描述文件。缺清单、无匹配平台、缺库、不能写描述文件、加载失败或内核配置失败，都回到同一网格的 `AStarGrid2D.get_point_path()`，沿用原起点后处理、缓存、完整地图/选卡/历史校验，不引入第二套规则。`BH_NAVIGATION` 标记可观察实际后端，`tests/navigation_fallback.gd` 在独立进程覆盖失败场景及完整路径等价；`tools/test_navigation_build.py` 覆盖可选构建、失败清理和平台键。
+
+已启用 `native/export_plugin.gd` 的 `EditorExportPlugin`，通过公开 `add_file` / `add_shared_object` 将清单和已有目标库加入普通导出。导出库位于可执行文件旁，运行时按可执行文件目录定位，支持整体移动；没有目标库时照常导出并明确报告严格回退。`tools/godot.py run/check/export` 不触发编译，玩家无工具链依赖；`export --templates` 将指定版本模板复制到隔离配置。库缺失只影响性能，不能宣称因此满足 Windows 大存档读档耗时要求。
 
 导航网格构建按膨胀后的障碍矩形覆盖栅格，仅在边缘逐格核对角色的世界边界，不再对每格遍历全部障碍；AStar 参数、障碍膨胀尺寸及最终 solid mask 保持一致。`tests/navigation_cache.gd` 将每格及完整路径与原逐格判定比较，覆盖重叠、退化、偏移和非整格边界，并用查询次数限制重复工作，不依赖机器耗时阈值。
 

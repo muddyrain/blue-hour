@@ -75,11 +75,9 @@ func scenario(size: Vector2i, count: int) -> void:
 	var hud: C1ExpeditionHud = adapter.view
 	var support: BasicSupportPanel = BasicSupportPanel.new()
 	hud.add_child(support)
+	support.name = "CommandStrip"
 	support.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	support.offset_left = -220
-	support.offset_right = 220
-	support.offset_top = -76
-	support.offset_bottom = -8
+	hud._layout_field()
 	var members: Array[Dictionary] = []
 	var names: Array[String] = ["顾予安", "夏之遥", "林知秋", "沈听澜"]
 	for index: int in range(count):
@@ -132,7 +130,7 @@ func scenario(size: Vector2i, count: int) -> void:
 	check(skill_controls.all(func(control: Control) -> bool: return control.icon != null) and support.size.x <= 448.0 and support.size.y <= 80.0, label + " command icons stay on compact bottom keycaps")
 	check(support.heal_button.text.contains("无需") and support.special_button.text.contains("空槽"), label + " heal and special captions keep their actual unavailable meaning")
 	var action_rect: Rect2 = (hud.get_node("ActionsPanel") as Control).get_global_rect()
-	check(not action_rect.intersects(support.get_global_rect()), label + " command strip sits below the bus action cluster")
+	check(not action_rect.intersects(support.get_global_rect()), label + " command strip stays beside the bus action cluster")
 	var bus_labels: Array[Dictionary] = [label_metrics(hud._bus_status, bounds), label_metrics(hud._bus_waiting, bounds)]
 	var bus_controls: Array[Control] = [hud._bus_status, hud._bus_waiting, hud._bus_button, hud._hint]
 	check(bus_controls.all(func(control: Control) -> bool: return control.is_visible_in_tree() and bounds.encloses(control.get_global_rect())) and disjoint(bus_controls), label + " collection count, waiting rows, notice and button have separate visible bounds")

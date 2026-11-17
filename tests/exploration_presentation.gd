@@ -77,7 +77,7 @@ func hud_case(size: Vector2i, count: int) -> void:
 	var mission: Control = hud.get_node("MissionPanel") as Control
 	var expanded_height: float = mission.size.y
 	var row_sizes: Array = []
-	var compact: bool = list.size.y <= 76.5 and list.size.x <= 272.5
+	var compact: bool = list.size.y <= 76.5 and list.size.x <= 294.5
 	var text_matches: bool = true
 	for index: int in range(3):
 		var row: Control = list.get_child(index) as Control
@@ -115,9 +115,8 @@ func hud_case(size: Vector2i, count: int) -> void:
 		reachable = reachable and client.encloses(card.get_global_rect())
 		cards.append({"rect":rect_values(card.get_global_rect()), "client":rect_values(client)})
 	check(cards.size() == count and reachable, tag + " every persona card is reachable through the real bounded member scroll")
-	if count == 2:
-		var last: PersonaCard = hud._persona_cards[1]
-		check(panel.get_global_rect().end.y < float(size.y) - 80.0 and panel.get_global_rect().end.y - last.get_global_rect().end.y <= 24.5, tag + " two-person member background contracts to the actual content")
+	var side: Rect2 = panel.get_global_rect()
+	check(side.size.x <= 272.0 and side.position.x >= float(size.x) - 272.0 and side.position.y >= 76.0 and side.end.y <= float(size.y) - 126.0 and not side.intersects(support.get_global_rect()), tag + " member sidebar stays in its bounded right column clear of top and command desk")
 	hud._persona_cards[0].info_button.pressed.emit()
 	await settle()
 	var details: PersonaDetails = hud.persona_details

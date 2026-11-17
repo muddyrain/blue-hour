@@ -158,6 +158,10 @@
 
 音量默认仍为主音量 0.8、世界 0.75、UI 0.7、非静音。静音/分类归零立即停止对应尾音并拒绝新声音；世界暂停冻结现有声流、拒绝新请求，UI 保持可用，恢复不补播。服务固定 6 个世界与 2 个 UI 声部，其中世界的 2 个优先留给搜刮、巴士和预警；重要提示可替换较低优先级声音，满载不排队。15 个 WAV 为纯 Python 标准库数学合成（Codex 辅助代码、没有 AI 音频模型或采样素材），每个峰值 0.55，`VOICE_GAIN = 0.20`（PROJECT_TEMP 表现参数，原 0.16）；8 声部满滑杆的离散峰值和不超过 0.88。`tests/audio_feedback.gd` 已纳入 `check`；`python tests/test_audio_assets.py` 可脱离引擎校验生成可复现性、注册、来源与混音余量。
 
+菜单表现复用 `PixelMenu` 的品牌顶栏、分隔与主操作样式。`OpeningBuildPicker` 只选择原有开局专精，仍由 `AppSession` 的 `ConfirmationDialog` 明确确认新旅程；独立内容容器避免初始换行尺寸挤占确认区。`MissionActionBrief` 承载原行动全文及整备详情，`MissionSelect` 继续持有候选与二次出发确认；缩略图只表达行动类别，不替代生成地图。装备页保留原生库存列表及原配给/维修/交易入口。
+
+场内 HUD 的顶栏、队员栏和底部操作台只读取既有 DTO；独立姓名/HP显示保留原人物详情与身份。`SortiePauseMenu` 只重排原按钮与提示，取消、正常撤离、安全暂存及危险退出仍通过 `AppMenus` 原信号分发。菜单物件和目标图集位于 `assets/menu_pixel/`，完整生成提示和像素尺寸见 `generation.json`，文件 SHA 登记于统一来源清单。
+
 ## 测试与工具
 
 - `tools/godot.py check`：导入、启动（`BH_READY`）与 `tests/` 下的单元/契约测试，任何 `SCRIPT ERROR`/`ERROR` 或 `"failures": N>0` 都判失败。

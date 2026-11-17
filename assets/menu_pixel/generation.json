@@ -1,0 +1,32 @@
+{
+  "assets": [
+    {
+      "path": "assets/menu_pixel/destinations.png",
+      "prompt": "Create a production asset atlas for the existing Godot game Blue Hour, using the attached approved original game concept ONLY as the pixel-art style reference. Output a portrait image approximately 1024 by 1536 with THREE equal-height horizontal panoramic scenes stacked vertically edge-to-edge, no gaps, no borders. Each scene is independently composed at a 2:1 landscape ratio. Top third: a small Japanese seaside neighborhood grocery, white stucco, slate-blue roof, quiet blue canvas awning, crates of food outside and a wide entrance. Middle third: coastal repair workshop, blue metal roof, white walls, open workbench bay, tools and neatly stacked wooden crates, cool gray paving. Bottom third: residential alley in the same seaside town, blue-gray roofs, white boundary walls, leafy trees, lane opening toward the pale turquoise sea. No people, no zombies, no weapons, no UI, no text, no lettering, no labels, no logos. Keep each building entirely readable within its own third, with a calm focal area at the center. Match the reference's hand-placed small crisp pixel clusters, dark navy edge accents, restrained blue-gray palette, fresh green foliage, and daylight turquoise. Real detailed pixel game environment illustration; no smooth vector buildings, no 3D render, no sepia, no decorative frame. Do not reproduce the reference's menu or any HUD. These three environment illustrations will be cropped by the engine into separate real mission cards.",
+      "tool": "OpenAI built-in image_gen",
+      "date": "2026-11-17",
+      "reference": "Approved original project mission-selection proposal; reference is not bundled",
+      "layout": "three equal horizontal scenes stacked vertically: food, workshop, rescue",
+      "transparent": false,
+      "dimensions": [
+        1024,
+        1536
+      ],
+      "pixel_sha256": "24aacdeed96ffc54512fded26ca379b3f08517bcd42b54631874df78988278aa"
+    },
+    {
+      "path": "assets/menu_pixel/specialties.png",
+      "prompt": "Production transparent pixel-art item atlas for the original game Blue Hour. Use the attached original seaside camp reference only for the crisp small-pixel rendering, navy outlines, cool blue-gray materials and restrained colors. Create THREE separate large inventory object illustrations evenly spaced horizontally in ONE row, centered in equal-width cells, with generous fully transparent gutters, no objects crossing a cell. Left: a navy canvas scavenging tool satchel with a compact flashlight and a wooden-handled hand tool resting against it. Center: a small open blue-gray ammunition box displaying a neat group of brass rifle cartridges; no gun, no explosions. Right: a pale blue-gray canvas first-aid bag with a simple white plus sign, a bandage roll and a small sealed dressing. Each object in matching three-quarter front view, same scale, clean silhouette, precise hand-placed pixel clusters, two-step material shading, clear readable details at small sizes. No people, no scene, no ground, no external drop shadows, no words, no UI, no labels, no letters, no red cross emblem. Truly transparent background, not a painted checkerboard. This is an isolated three-item sprite atlas for a real game specialty selection menu.",
+      "tool": "OpenAI built-in image_gen",
+      "date": "2026-11-17",
+      "reference": "Original project seaside camp pixel material reference",
+      "layout": "three equal columns: field tools, pressure cartridges, aid kit",
+      "transparent": true,
+      "dimensions": [
+        2172,
+        724
+      ],
+      "pixel_sha256": "4be317492ad365e5f0d00fbfdf41f1e290e9cde1ec29f0b66f71906662da9f9c"
+    }
+  ]
+}

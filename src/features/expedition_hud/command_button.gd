@@ -1,6 +1,6 @@
 class_name CommandButton
 extends C1HudButton
-## Square command keycap: real shortcut, status and a linear cooldown indicator.
+## Horizontal command keycap: real shortcut, status and a linear cooldown indicator.
 
 const CREAM: Color = CampStyle.TEXT
 const AMBER: Color = CampStyle.TEAL
@@ -21,13 +21,13 @@ func setup(id: String, key: String, title: String) -> void:
 	icon = _icon(id)
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	expand_icon = true
-	add_theme_constant_override("icon_max_width", 22)
-	icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+	add_theme_constant_override("icon_max_width", 20)
+	icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
 	alignment = HORIZONTAL_ALIGNMENT_CENTER
-	custom_minimum_size = Vector2(68, 68)
+	custom_minimum_size = Vector2(106, 66)
 	size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	add_theme_font_size_override("font_size", 12)
+	add_theme_font_size_override("font_size", 17)
 	add_theme_color_override("font_disabled_color", CampStyle.MUTED)
 	add_theme_color_override("icon_disabled_color", CampStyle.MUTED)
 	autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

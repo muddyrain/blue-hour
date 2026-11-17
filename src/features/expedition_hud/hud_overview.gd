@@ -5,13 +5,13 @@ var world: Expedition
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	custom_minimum_size = Vector2(140, 140)
+	custom_minimum_size = Vector2(120, 90)
 
 func _draw() -> void:
 	if world == null: return
 	var bounds: Rect2 = world.layout.world_bounds
 	if bounds.size.x <= 0 or bounds.size.y <= 0: return
-	var factor: float = minf((size.x - 16) / bounds.size.x, (size.y - 16) / bounds.size.y)
+	var factor: float = minf((size.x - 8) / bounds.size.x, (size.y - 8) / bounds.size.y)
 	var origin: Vector2 = (size - bounds.size * factor) * 0.5
 	draw_rect(Rect2(origin, bounds.size * factor), CampStyle.EDGE, false, 1)
 	if HarborWarehouse.is_layout(world.layout):

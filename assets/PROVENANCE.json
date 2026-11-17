@@ -1880,6 +1880,22 @@
       "sha256": "dbc03973fcc972fbc6df82655863f402af50b623d9155aecbd8cb44331c4a896",
       "origin": "Original code-authored flat resource icon for the pixel camp HUD",
       "license": "No additional license granted"
+    },
+    {
+      "path": "assets/menu_pixel/destinations.png",
+      "sha256": "96634cfbdc2b659f1fdbdccdb06b27c3df5ff3771f192703202ce7d19bca87a1",
+      "origin": "Original project pixel menu illustration; exact generation prompt and image properties in assets/menu_pixel/generation.json",
+      "tool": "OpenAI built-in image_gen",
+      "ai_assisted": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/menu_pixel/specialties.png",
+      "sha256": "ee3f843464d28933ca696cd182a48e850fd86f72e25a48ac79053fdaef5c2d6c",
+      "origin": "Original project pixel menu illustration; exact generation prompt and image properties in assets/menu_pixel/generation.json",
+      "tool": "OpenAI built-in image_gen",
+      "ai_assisted": true,
+      "license": "No additional license granted"
     }
   ]
 }

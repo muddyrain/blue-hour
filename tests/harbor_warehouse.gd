@@ -275,14 +275,16 @@ func _night_hint(world: Expedition) -> void:
 	await process_frame
 	var hud: C1ExpeditionHud = world._hud.view
 	expect(hud._hint.max_lines_visible == 2 and hud._hint_panel.size.y <= 56.0, "night route and evacuation notice occupies at most two compact lines")
-	expect(hud._hint.tooltip_text == HarborWarehouse.ROUTE_HINT, "full route notice remains available in its tooltip")
+	expect(hud._hint.tooltip_text.get_slice("\n", 0) == HarborWarehouse.ROUTE_HINT, "full route notice remains available in its tooltip")
 	var style: StyleBoxFlat = hud._hint_panel.get_theme_stylebox("panel") as StyleBoxFlat
-	expect(style.bg_color.a >= 0.85 and style.bg_color.a < 1.0, "compact night notice has a translucent but stable reading surface")
+	var footer: Panel = hud.get_node("BottomChrome") as Panel
+	var footer_style: StyleBoxFlat = footer.get_theme_stylebox("panel") as StyleBoxFlat
+	expect(footer.is_visible_in_tree() and footer.get_global_rect().encloses(hud._hint_panel.get_global_rect()) and footer_style.bg_color.a == 1.0, "compact night notice is covered by the stable opaque control desk")
 	expect(world._hud.layer > world._night_lighting.layer and hud.get_canvas() != world.get_canvas(), "route notice stays above the vignette on a canvas separate from world tint and lamps")
 	var ink: Color = hud._hint.get_theme_color("font_color")
 	expect(ink == ExpeditionHudTheme.CREAM and ink.a == 1.0, "night route text retains fully opaque cream ink")
 	for backdrop: Color in [ExpeditionAtmosphere.NIGHT_TINT, Color("ffa64a"), Color.WHITE]:
-		var surface: Color = backdrop.blend(style.bg_color)
+		var surface: Color = backdrop.blend(footer_style.bg_color).blend(style.bg_color)
 		var contrast: float = (ink.srgb_to_linear().get_luminance() + 0.05) / (surface.srgb_to_linear().get_luminance() + 0.05)
 		expect(contrast >= 7.0, "route notice keeps at least 7:1 contrast over deep night and bright work lights")
 	var strip: Control = hud.get_node("CommandStrip") as Control

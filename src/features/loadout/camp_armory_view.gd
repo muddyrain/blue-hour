@@ -56,7 +56,7 @@ var _support: ScrollContainer
 var _title: Label
 var _meta: Label
 var _texture: TextureRect
-var _comparison: GridContainer
+var _comparison: VBoxContainer
 var _current: Label
 var _proposed: Label
 var _target_row: HBoxContainer
@@ -81,43 +81,53 @@ var _proposed_art: TextureRect
 var _stat_labels: Array[Label] = []
 var _stat_current: Array[Label] = []
 var _stat_proposed: Array[Label] = []
+var _status_buttons: Array[Button] = []
+var _status_tabs: HBoxContainer
+var _feedback: HBoxContainer
+var _display_textures: Dictionary[int, Texture2D] = {}
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	theme = CampStyle.theme(theme)
-	for side: String in ["left", "right"]:
-		add_theme_constant_override("margin_" + side, 24)
-	for side: String in ["top", "bottom"]:
-		add_theme_constant_override("margin_" + side, 14)
+	for side: String in ["left", "right", "top", "bottom"]:
+		add_theme_constant_override("margin_" + side, 0)
+	var backdrop: TextureRect = CampStyle.blue_hour_background(YARD)
+	add_child(backdrop)
 	var page: VBoxContainer = VBoxContainer.new()
-	page.add_theme_constant_override("separation", 8)
+	page.add_theme_constant_override("separation", 0)
 	add_child(page)
-	var masthead: HBoxContainer = HBoxContainer.new()
-	masthead.add_theme_constant_override("separation", 24)
-	page.add_child(masthead)
-	_heading = CampStyle.label("", 30)
-	_heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	masthead.add_child(_heading)
-	_header = CampStyle.label("", 17, CampStyle.MUTED)
-	_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	masthead.add_child(_header)
-	page.add_child(HSeparator.new())
+	_header = CampStyle.label("", 19)
+	_heading = PixelMenu.masthead(page, "装备仓", _header)
+	var inset: MarginContainer = MarginContainer.new()
+	inset.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	for side: String in ["left", "right"]:
+		inset.add_theme_constant_override("margin_" + side, 64)
+	inset.add_theme_constant_override("margin_top", 12)
+	inset.add_theme_constant_override("margin_bottom", 8)
+	page.add_child(inset)
+	var sheet: PanelContainer = PanelContainer.new()
+	sheet.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.INK, Color.TRANSPARENT, 16))
+	inset.add_child(sheet)
+	var content: VBoxContainer = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 6)
+	sheet.add_child(content)
 	_split = HBoxContainer.new()
 	_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_split.add_theme_constant_override("separation", 14)
-	page.add_child(_split)
+	_split.add_theme_constant_override("separation", 18)
+	content.add_child(_split)
 	_build_list(_column(_split, 1.0))
+	var split_rule: ColorRect = PixelMenu.divider(_split, true)
+	split_rule.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_build_detail(_column(_split, 1.0))
-	_build_support(page)
-	var feedback: HBoxContainer = HBoxContainer.new()
-	page.add_child(feedback)
-	message = _wrapped("", 15, CampStyle.TEAL)
+	_build_support(content)
+	_feedback = HBoxContainer.new()
+	content.add_child(_feedback)
+	message = _wrapped("", 13, CampStyle.TEAL)
 	message.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	feedback.add_child(message)
-	_retry_button = _button(feedback, "重试保存本次整备", func() -> void: power_panel.retry_requested.emit())
+	_feedback.add_child(message)
+	_retry_button = _button(_feedback, "重试保存本次整备", func() -> void: power_panel.retry_requested.emit())
 	_retry_button.hide()
-	page.add_child(HSeparator.new())
 	_build_navigation(page)
 	confirmation = _dialog("维修确认", "确认维修", _finish_repair)
 	workshop_confirmation = _dialog("确认工坊改装", "安装并保存", _finish_workshop)
@@ -129,6 +139,7 @@ func refresh(data: Dictionary, feedback: String, pending: bool) -> void:
 	_camp = data
 	_pending = pending
 	message.text = feedback
+	_feedback.visible = pending or not feedback.is_empty()
 	_retry_button.visible = pending
 	_header.text = "第 %02d 天    口粮 %d    货币 %d    工具箱 %d" % [int(data.day), int(data.food), int(data.cash), WorkshopV1.tools(data)]
 	var campaign: Dictionary = data.get("journey", {}).get("campaign", {})
@@ -210,19 +221,16 @@ func focus_retry() -> void:
 
 
 func _column(parent: HBoxContainer, ratio: float) -> VBoxContainer:
-	var panel: PanelContainer = PanelContainer.new()
-	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	panel.size_flags_stretch_ratio = ratio
-	panel.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.PANEL, Color.TRANSPARENT, 14))
-	parent.add_child(panel)
 	var column: VBoxContainer = VBoxContainer.new()
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.size_flags_stretch_ratio = ratio
 	column.add_theme_constant_override("separation", 8)
-	panel.add_child(column)
+	parent.add_child(column)
 	return column
 
 
 func _build_list(column: VBoxContainer) -> void:
-	_list_heading = CampStyle.label("武器库存", 20)
+	_list_heading = CampStyle.label("武器库存", 24)
 	column.add_child(_list_heading)
 	_banner = PanelContainer.new()
 	_banner.custom_minimum_size.y = 82
@@ -238,46 +246,80 @@ func _build_list(column: VBoxContainer) -> void:
 		craft_buttons[weapon_id] = _button(_craft_row, "制作" + WeaponInventory.definition(weapon_id).display_name,
 			_preview_economy.bind("craft", weapon_id, ""))
 	_filters = VBoxContainer.new()
+	_filters.add_theme_constant_override("separation", 10)
 	column.add_child(_filters)
-	var choices: HBoxContainer = HBoxContainer.new()
-	_filters.add_child(choices)
-	status_filter = _options(choices, STATUS, _filter_changed)
+	_status_tabs = HBoxContainer.new()
+	_status_tabs.add_theme_constant_override("separation", 4)
+	_filters.add_child(_status_tabs)
+	for index: int in range(STATUS.size()):
+		var button: Button = _button(_status_tabs, STATUS[index], _choose_status.bind(index))
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.add_theme_font_size_override("font_size", 20)
+		button.custom_minimum_size.y = 42
+		_status_buttons.append(button)
+	PixelMenu.divider(_filters)
+	# Keep the public selection model used by the controller; the four tabs are its visible controls.
+	status_filter = _options(_filters, STATUS, _filter_changed)
 	status_filter.name = "InventoryStatus"
-	type_filter = _options(choices, ["全部类型", "枪械", "近战"], _filter_changed)
-	type_filter.name = "InventoryType"
-	sort_order = _options(choices, ["按名称", "按实例编号"], _filter_changed)
-	sort_order.name = "InventoryOrder"
+	status_filter.hide()
 	var query: HBoxContainer = HBoxContainer.new()
+	query.add_theme_constant_override("separation", 8)
 	_filters.add_child(query)
+	type_filter = _options(query, ["全部类型", "枪械", "近战"], _filter_changed)
+	type_filter.name = "InventoryType"
+	type_filter.size_flags_horizontal = Control.SIZE_FILL
+	type_filter.custom_minimum_size.x = 116
+	CampStyle.text_button(type_filter)
 	search = LineEdit.new()
 	search.name = "InventorySearch"
-	search.placeholder_text = "搜索武器名称 / 实例编号"
+	search.placeholder_text = "搜索名称 / 编号"
 	search.clear_button_enabled = true
+	search.custom_minimum_size.y = 42
+	search.add_theme_font_size_override("font_size", 17)
 	search.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	search.text_changed.connect(func(_query: String) -> void: _filter_changed(0))
 	query.add_child(search)
-	_clear = _button(query, "清空筛选", _clear_filters)
+	_clear = _button(query, "清空", _clear_filters)
+	_clear.add_theme_font_size_override("font_size", 15)
+	_clear.tooltip_text = "清空搜索与类型、状态筛选"
+	CampStyle.text_button(_clear)
 	items = ItemList.new()
 	items.name = "WeaponInventory"
 	items.max_text_lines = 1
-	items.fixed_icon_size = Vector2i(108, 62)
-	items.add_theme_font_size_override("font_size", 17)
-	items.add_theme_constant_override("h_separation", 20)
-	items.add_theme_constant_override("v_separation", 18)
-	items.add_theme_constant_override("line_separation", 5)
+	items.fixed_icon_size = Vector2i(164, 82)
+	items.add_theme_font_size_override("font_size", 18)
+	items.add_theme_font_override("font", CampStyle.BOLD_FONT)
+	items.add_theme_constant_override("h_separation", 22)
+	items.add_theme_constant_override("v_separation", 20)
+	items.add_theme_constant_override("line_separation", 6)
+	items.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.INK, CampStyle.EDGE, 8))
+	items.add_theme_stylebox_override("focus", CampStyle.box(Color.TRANSPARENT, CampStyle.EDGE, 0))
+	items.add_theme_stylebox_override("selected", CampStyle.box(CampStyle.SELECTED.darkened(0.12), Color.TRANSPARENT, 8))
+	items.add_theme_stylebox_override("selected_focus", CampStyle.box(CampStyle.SELECTED.darkened(0.12), CampStyle.TEAL, 8))
 	items.same_column_width = true
 	items.max_columns = 1
 	items.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	items.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	items.item_selected.connect(_select)
 	column.add_child(items)
-	_list_count = _wrapped("", 15, CampStyle.MUTED)
-	column.add_child(_list_count)
+	var list_footer: HBoxContainer = HBoxContainer.new()
+	list_footer.add_theme_constant_override("separation", 8)
+	column.add_child(list_footer)
+	_list_count = _wrapped("", 13, CampStyle.MUTED)
+	_list_count.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list_footer.add_child(_list_count)
+	sort_order = _options(list_footer, ["按名称", "按实例编号"], _filter_changed)
+	sort_order.name = "InventoryOrder"
+	sort_order.size_flags_horizontal = Control.SIZE_SHRINK_END
+	sort_order.add_theme_font_size_override("font_size", 14)
+	CampStyle.text_button(sort_order)
 
 
 func _build_detail(column: VBoxContainer) -> void:
-	_detail_heading = CampStyle.label("配给预览", 22)
+	_detail_heading = CampStyle.label("配给预览", 26)
+	_detail_heading.custom_minimum_size.y = 42
 	column.add_child(_detail_heading)
+	PixelMenu.divider(column)
 	_empty = _wrapped("", 18, CampStyle.MUTED)
 	column.add_child(_empty)
 	var scroll: ScrollContainer = ScrollContainer.new()
@@ -286,70 +328,89 @@ func _build_detail(column: VBoxContainer) -> void:
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(scroll)
 	_detail_body = VBoxContainer.new()
-	_detail_body.add_theme_constant_override("separation", 10)
+	_detail_body.add_theme_constant_override("separation", 8)
 	_detail_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_detail_body)
 	_target_row = HBoxContainer.new()
-	_target_row.add_theme_constant_override("separation", 12)
+	_target_row.add_theme_constant_override("separation", 14)
 	_detail_body.add_child(_target_row)
-	_target_portrait = _equipment_picture(Vector2(58, 58))
+	_target_portrait = _equipment_picture(Vector2(64, 64))
 	_target_portrait.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_target_row.add_child(_target_portrait)
 	var person: VBoxContainer = VBoxContainer.new()
 	person.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	person.add_theme_constant_override("separation", 4)
 	_target_row.add_child(person)
 	var person_top: HBoxContainer = HBoxContainer.new()
 	person.add_child(person_top)
-	person_top.add_child(CampStyle.label("目标队员", 15, CampStyle.MUTED))
 	target = _options(person_top, [], _select_target)
 	target.name = "EquipTarget"
 	target.fit_to_longest_item = false
 	target.clip_text = true
-	_target_health = CampStyle.label("", 15, CampStyle.MUTED)
-	person.add_child(_target_health)
+	target.add_theme_font_size_override("font_size", 22)
+	CampStyle.text_button(target)
+	_target_health = CampStyle.label("", 18)
+	_target_health.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	person_top.add_child(_target_health)
 	_target_bar = ProgressBar.new()
-	_target_bar.custom_minimum_size.y = 7
+	_target_bar.custom_minimum_size.y = 12
 	_target_bar.show_percentage = false
 	person.add_child(_target_bar)
-	_title = CampStyle.label("", 23)
+	_title = CampStyle.label("", 24)
 	_detail_body.add_child(_title)
 	_meta = _wrapped("", 15, CampStyle.MUTED)
 	_detail_body.add_child(_meta)
 	var picture: PanelContainer = PanelContainer.new()
-	picture.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.INK, Color.TRANSPARENT, 8))
+	picture.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.INK, CampStyle.EDGE, 8))
 	_detail_body.add_child(picture)
-	_texture = _equipment_picture(Vector2(0, 66))
+	_texture = _equipment_picture(Vector2(0, 82))
 	picture.add_child(_texture)
-	_comparison = GridContainer.new()
-	_comparison.columns = 3
-	_comparison.add_theme_constant_override("h_separation", 12)
-	_comparison.add_theme_constant_override("v_separation", 9)
+	_comparison = VBoxContainer.new()
+	_comparison.add_theme_constant_override("separation", 10)
 	_detail_body.add_child(_comparison)
-	_comparison.add_child(CampStyle.label("装备", 15, CampStyle.MUTED))
-	_current = _wrapped("", 17, CampStyle.TEXT)
-	_current.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_comparison.add_child(_current)
-	_proposed = _wrapped("", 17, CampStyle.TEAL)
-	_proposed.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_comparison.add_child(_proposed)
-	_comparison.add_child(Control.new())
-	_current_art = _equipment_picture(Vector2(0, 60))
-	_comparison.add_child(_current_art)
-	_proposed_art = _equipment_picture(Vector2(0, 60))
-	_comparison.add_child(_proposed_art)
+	var pair: HBoxContainer = HBoxContainer.new()
+	pair.add_theme_constant_override("separation", 10)
+	_comparison.add_child(pair)
+	var current_box: VBoxContainer = _comparison_box(pair)
+	_current = CampStyle.label("", 18)
+	_current.clip_text = true
+	_current.mouse_filter = Control.MOUSE_FILTER_PASS
+	current_box.add_child(_current)
+	_current_art = _equipment_picture(Vector2(0, 58))
+	current_box.add_child(_current_art)
+	var arrow: Label = CampStyle.label("→", 26)
+	arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	pair.add_child(arrow)
+	var proposed_box: VBoxContainer = _comparison_box(pair)
+	_proposed = CampStyle.label("", 18)
+	_proposed.clip_text = true
+	_proposed.mouse_filter = Control.MOUSE_FILTER_PASS
+	proposed_box.add_child(_proposed)
+	_proposed_art = _equipment_picture(Vector2(0, 58))
+	proposed_box.add_child(_proposed_art)
+	var stats: GridContainer = GridContainer.new()
+	stats.columns = 3
+	stats.add_theme_constant_override("h_separation", 0)
+	stats.add_theme_constant_override("v_separation", 0)
+	_comparison.add_child(stats)
+	for caption: String in ["", "当前", "拟配"]:
+		var heading: Label = CampStyle.label(caption, 17)
+		heading.add_theme_font_override("font", CampStyle.BOLD_FONT)
+		heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_stat_cell(stats, heading, true)
 	for caption: String in ["伤害", "攻击间隔", "射程 / 距离", "弹匣", "换弹"]:
-		var stat: Label = CampStyle.label(caption, 16, CampStyle.MUTED)
+		var stat: Label = CampStyle.label(caption, 17)
 		_stat_labels.append(stat)
-		_comparison.add_child(stat)
-		var current_value: Label = CampStyle.label("", 17)
-		current_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		_stat_cell(stats, stat)
+		var current_value: Label = CampStyle.label("", 19)
+		current_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_stat_current.append(current_value)
-		_comparison.add_child(current_value)
-		var proposed_value: Label = CampStyle.label("", 17)
-		proposed_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		_stat_cell(stats, current_value)
+		var proposed_value: Label = CampStyle.label("", 19)
+		proposed_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_stat_proposed.append(proposed_value)
-		_comparison.add_child(proposed_value)
-	_detail = _wrapped("", 14, CampStyle.MUTED)
+		_stat_cell(stats, proposed_value)
+	_detail = _wrapped("", 13, CampStyle.MUTED)
 	_detail_body.add_child(_detail)
 	_economy_box = VBoxContainer.new()
 	_economy_box.add_theme_constant_override("separation", 6)
@@ -364,7 +425,7 @@ func _build_detail(column: VBoxContainer) -> void:
 		var key: String = String(operation[0]) + ":" + String(operation[1])
 		economy_buttons[key] = _button(_economy_box, operation[2],
 			_preview_economy.bind(operation[0], "", operation[1]))
-	_preview = _wrapped("", 15, CampStyle.TEAL)
+	_preview = _wrapped("", 14, CampStyle.TEAL)
 	column.add_child(_preview)
 	var actions: HBoxContainer = HBoxContainer.new()
 	actions.add_theme_constant_override("separation", 8)
@@ -381,11 +442,63 @@ func _build_detail(column: VBoxContainer) -> void:
 	for mod: String in MODS:
 		workshop_buttons[mod] = _button(actions, WorkshopV1.name_for(mod), _confirm_workshop.bind(mod))
 	repair_button = _button(actions, "确认维修…", _confirm_repair)
-	CampStyle.primary(repair_button)
+	PixelMenu.primary(repair_button)
 	cancel_preview = _button(actions, "取消预览", func() -> void: cancel_swap_preview())
+	cancel_preview.custom_minimum_size.y = 54
+	cancel_preview.add_theme_font_size_override("font_size", 19)
 	confirm_equip = _button(actions, "确认配给", _apply_equip)
 	confirm_equip.name = "ConfirmEquip"
-	CampStyle.primary(confirm_equip)
+	confirm_equip.custom_minimum_size = Vector2(148, 54)
+	confirm_equip.add_theme_font_size_override("font_size", 24)
+	PixelMenu.primary(confirm_equip)
+
+
+func _comparison_box(parent: HBoxContainer) -> VBoxContainer:
+	var panel: PanelContainer = PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_stretch_ratio = 1.0
+	panel.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.PANEL, CampStyle.EDGE, 8))
+	parent.add_child(panel)
+	var body: VBoxContainer = VBoxContainer.new()
+	body.add_theme_constant_override("separation", 3)
+	panel.add_child(body)
+	return body
+
+
+func _stat_cell(parent: GridContainer, label: Label, heading: bool = false) -> void:
+	var panel: PanelContainer = PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var style: StyleBoxFlat = CampStyle.box(CampStyle.PANEL if heading else Color.TRANSPARENT, CampStyle.EDGE, 4)
+	style.set_border_width_all(0)
+	style.border_width_bottom = 1
+	style.content_margin_left = 8
+	style.content_margin_right = 8
+	style.content_margin_top = 1
+	style.content_margin_bottom = 1
+	panel.add_theme_stylebox_override("panel", style)
+	parent.add_child(panel)
+	panel.add_child(label)
+
+
+func _display_art(texture: Texture2D) -> Texture2D:
+	# UI framing removes transparent export margins; shared combat resources stay untouched.
+	var identity: int = texture.get_instance_id()
+	if _display_textures.has(identity):
+		return _display_textures[identity]
+	var source: Image = texture.get_image()
+	if source == null or (source.is_compressed() and source.decompress() != OK):
+		_display_textures[identity] = texture
+		return texture
+	var bounds: Rect2 = Rect2(source.get_used_rect())
+	if not bounds.has_area():
+		_display_textures[identity] = texture
+		return texture
+	var art: AtlasTexture = AtlasTexture.new()
+	art.atlas = texture
+	art.region = bounds.grow(2).intersection(Rect2(Vector2.ZERO, texture.get_size()))
+	art.filter_clip = true
+	_display_textures[identity] = art
+	return art
 
 
 func _equipment_picture(minimum: Vector2) -> TextureRect:
@@ -415,19 +528,31 @@ func _build_support(page: VBoxContainer) -> void:
 
 
 func _build_navigation(page: VBoxContainer) -> void:
+	var panel: PanelContainer = PanelContainer.new()
+	var style: StyleBoxFlat = CampStyle.box(CampStyle.INK, CampStyle.EDGE, 8)
+	style.set_border_width_all(0)
+	style.border_width_top = 1
+	style.content_margin_left = 64
+	style.content_margin_right = 64
+	panel.add_theme_stylebox_override("panel", style)
+	page.add_child(panel)
 	var footer: HBoxContainer = HBoxContainer.new()
 	footer.add_theme_constant_override("separation", 8)
-	page.add_child(footer)
+	panel.add_child(footer)
 	back_button = _button(footer, "营地 / Esc", func() -> void: navigation_requested.emit(&"camp"))
-	_button(footer, "队员", func() -> void: navigation_requested.emit(&"crew"))
+	CampStyle.text_button(back_button)
+	var crew: Button = _button(footer, "队员", func() -> void: navigation_requested.emit(&"crew"))
+	CampStyle.text_button(crew)
 	_nav[&"inventory"] = _button(footer, "装备仓", show_inventory)
 	_nav[&"workshop"] = _button(footer, "工坊", func() -> void: show_workshop())
-	_button(footer, "补给", func() -> void: navigation_requested.emit(&"supplies"))
+	var supplies: Button = _button(footer, "补给", func() -> void: navigation_requested.emit(&"supplies"))
+	CampStyle.text_button(supplies)
 	_nav[&"support"] = _button(footer, "支援与道具", _show_page.bind(&"support"))
 	var gap: Control = Control.new()
 	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	footer.add_child(gap)
 	var depart: Button = _button(footer, "准备出击 →", func() -> void: navigation_requested.emit(&"bus"))
+	depart.add_theme_font_size_override("font_size", 20)
 	CampStyle.text_button(depart)
 
 
@@ -487,8 +612,9 @@ func _update_page() -> void:
 	_filters.visible = _tab == &"inventory"
 	_workshop_tabs.visible = _tab == &"workshop"
 	_banner.visible = _workshop_tabs.visible
+	_list_heading.visible = _tab == &"workshop"
 	for page: StringName in _nav:
-		_nav[page].add_theme_color_override("font_color", CampStyle.TEAL if page == _tab else CampStyle.TEXT)
+		PixelMenu.tab(_nav[page], page == _tab)
 
 
 func _set_workshop_tab(tab: StringName) -> void:
@@ -513,6 +639,11 @@ func _page_key() -> StringName:
 func _save_scroll() -> void:
 	if _tab != &"support":
 		_scroll[_page_key()] = items.get_v_scroll_bar().value
+
+
+func _choose_status(index: int) -> void:
+	status_filter.select(index)
+	_filter_changed(index)
 
 
 func _filter_changed(_index: int) -> void:
@@ -566,6 +697,9 @@ func _rebuild_list() -> void:
 			rows.append(item)
 	for index: int in range(counts.size()):
 		status_filter.set_item_text(index, "%s %d" % [STATUS[index], counts[index]])
+		_status_buttons[index].text = STATUS[index]
+		_status_buttons[index].tooltip_text = "%s · %d 件" % [STATUS[index], counts[index]]
+		PixelMenu.tab(_status_buttons[index], index == status_filter.selected)
 	_workshop_options[&"repair"].text = "维修 · %d" % counts[3]
 	for mode: StringName in _workshop_options:
 		_workshop_options[mode].add_theme_color_override("font_color", CampStyle.TEAL if mode == key else CampStyle.TEXT)
@@ -584,7 +718,10 @@ func _rebuild_list() -> void:
 		var owner: int = WeaponInventory.owner(_camp, item.instance_id)
 		var holder: String = _member_label(owner) if owner > 0 else "仓库"
 		var short_holder: String = String(SurvivorRoster.member(_camp.crew, owner).get("call_sign", "")) if owner > 0 else "仓库"
-		var row: int = items.add_item("%s #%s · %s · %s" % [weapon.display_name, WeaponInventory.short_id(item), STATUS[state], short_holder], weapon.presentation.texture)
+		var caption: String = "%s #%s · %s" % [weapon.display_name, WeaponInventory.short_id(item), STATUS[state]]
+		if owner > 0:
+			caption += " · " + short_holder
+		var row: int = items.add_item(caption, weapon.presentation.texture)
 		items.set_item_metadata(row, item.instance_id)
 		items.set_item_custom_fg_color(row, CampStyle.DANGER if state == 3 else CampStyle.TEXT)
 		items.set_item_tooltip(row, "%s\n实例 %s\n%s · %s\n%s" % [weapon.display_name, item.instance_id, STATUS[state], holder, _item_attributes(item)])
@@ -617,7 +754,7 @@ func _update_targets() -> void:
 	target.clear()
 	for member: Dictionary in _camp.get("crew", []):
 		if float(member.health) > 0.0:
-			target.add_item(SurvivorRoster.display_label(member), int(member.id))
+			target.add_item(String(member.call_sign), int(member.id))
 	var index: int = target.get_item_index(_target_id)
 	if target.item_count == 0:
 		_target_id = 0
@@ -683,7 +820,7 @@ func _refresh_detail() -> void:
 	_title.text = weapon.display_name
 	_meta.text = "#%s · %s · %s\n%s" % [WeaponInventory.short_id(item), STATUS[_status(item)], _member_label(owner) if owner > 0 else "仓库", _item_attributes(item)]
 	_meta.tooltip_text = "完整实例编号：" + _selected
-	_texture.texture = weapon.presentation.texture
+	_texture.texture = _display_art(weapon.presentation.texture)
 	if inventory:
 		_show_comparison(item, owner)
 	elif modification:
@@ -694,10 +831,12 @@ func _refresh_detail() -> void:
 
 func _show_comparison(item: Dictionary, owner: int) -> void:
 	var current: Dictionary = WeaponInventory.for_member(_camp, _target_id)
-	_current.text = "当前 · " + _item_name(current)
-	_proposed.text = "拟配 · " + _item_name(item)
-	_current_art.texture = null if current.is_empty() else WeaponInventory.definition(current.weapon_id).presentation.texture
-	_proposed_art.texture = WeaponInventory.definition(item.weapon_id).presentation.texture
+	_current.text = "当前 · " + ("无装备" if current.is_empty() else WeaponInventory.definition(current.weapon_id).display_name)
+	_proposed.text = "拟配 · " + WeaponInventory.definition(item.weapon_id).display_name
+	_current.tooltip_text = _item_name(current)
+	_proposed.tooltip_text = _item_name(item)
+	_current_art.texture = null if current.is_empty() else _display_art(WeaponInventory.definition(current.weapon_id).presentation.texture)
+	_proposed_art.texture = _display_art(WeaponInventory.definition(item.weapon_id).presentation.texture)
 	_refresh_target_preview()
 	_refresh_stat_table(current, item)
 	_detail.text = "含目标队员的特长、特性、已装道具与工坊加成。\n" + _item_attributes(item)
@@ -730,7 +869,7 @@ func _refresh_target_preview() -> void:
 	var member: Dictionary = SurvivorRoster.member(_camp.get("crew", []), _target_id)
 	var definition: SurvivorDefinition = SurvivorRoster.definition_for(member)
 	_target_portrait.texture = definition.portrait if definition != null else null
-	_target_health.text = "生命 %d / %.0f" % [ceili(float(member.get("health", 0.0))), GrowthRules.maximum(member)] if not member.is_empty() else "没有可配给的存活队员"
+	_target_health.text = "%d / %.0f" % [ceili(float(member.get("health", 0.0))), GrowthRules.maximum(member)] if not member.is_empty() else "没有可配给的存活队员"
 	_target_bar.max_value = GrowthRules.maximum(member) if not member.is_empty() else 1.0
 	_target_bar.value = float(member.get("health", 0.0))
 
@@ -893,6 +1032,7 @@ func _finish_repair() -> void:
 		return
 	var item: Dictionary = WeaponInventory.find(_camp, _selected)
 	if item.get("condition") != "damaged" or request.get("quote") != WeaponInventory.repair_quote(_camp, item) or request.get("cash") != int(_camp.cash):
+		_feedback.show()
 		message.text = "维修报价已变化，请重新确认。"
 		return
 	_workshop_return_id = _selected
@@ -919,6 +1059,7 @@ func _finish_workshop() -> void:
 	var mod: String = request.get("mod", "")
 	if not WorkshopV1.mod_problem(_camp, _selected, mod).is_empty() or request.get("owner") != WeaponInventory.owner(_camp, _selected) \
 			or request.get("cash") != int(_camp.cash) or request.get("tools") != WorkshopV1.tools(_camp):
+		_feedback.show()
 		message.text = "改装条件已变化，请重新确认。"
 		return
 	workshop_requested.emit(_selected, mod)
@@ -952,6 +1093,7 @@ func _preview_economy(op: String, target_id: String, choice: String) -> void:
 		target_id = _selected
 	var offer: Dictionary = EconomyBuildV1.offer(_camp, op, target_id, choice)
 	if not offer.available:
+		_feedback.show()
 		message.text = offer.reason
 		return
 	var identity: String = String(_camp.profile_id) + ":edit:" + RunSave.new_profile_id()

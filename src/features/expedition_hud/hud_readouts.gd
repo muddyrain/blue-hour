@@ -31,47 +31,48 @@ func build(hud: C1ExpeditionHud) -> void:
 	resources.add_child(column)
 	resources.move_child(column, 0)
 	var row: HBoxContainer = HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
+	row.add_theme_constant_override("separation", 16)
 	column.add_child(row)
-	for index: int in range(3):
-		var chip: PanelContainer = PanelContainer.new()
+	var stock_title: Label = hud._label(row, "StockTitle", 14)
+	stock_title.text = "营地库存"
+	stock_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	for index: int in range(2):
+		var chip: HBoxContainer = HBoxContainer.new()
 		chip.name = "ResourceChip%d" % index
+		chip.add_theme_constant_override("separation", 6)
 		row.add_child(chip)
-		var label: Label = hud._label(chip, "Value", 13)
+		var icon: TextureRect = TextureRect.new()
+		icon.texture = load(["res://assets/camp_pixel/food.svg", "res://assets/camp_pixel/cash.svg"][index]) as Texture2D
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size = Vector2(22, 22)
+		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.add_child(icon)
+		var label: Label = hud._label(chip, "Value", 20)
 		_chips.append(label)
-	_cargo = hud._label(column, "CarriedResources", 11)
-	_cargo.add_theme_color_override("font_color", ExpeditionHudTheme.SECONDARY)
-	# Keep resource values compact after the field theme is applied.
-	_style_chips.call_deferred()
+	_cargo = hud._label(column, "CarriedResources", 18)
+	_cargo.add_theme_color_override("font_color", ExpeditionHudTheme.CREAM)
+	_cargo.clip_text = true
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-func _style_chips() -> void:
-	for label: Label in _chips:
-		var style: StyleBoxFlat = CampStyle.box(CampStyle.PANEL, Color.TRANSPARENT, 6)
-		style.content_margin_left = 6
-		style.content_margin_right = 6
-		style.content_margin_top = 3
-		style.content_margin_bottom = 3
-		(label.get_parent() as PanelContainer).add_theme_stylebox_override("panel", style)
-	(_objective_bar.get_theme_stylebox("fill") as StyleBoxFlat).bg_color = ExpeditionHudTheme.AMBER
 
 func refresh(hud: C1ExpeditionHud, rows: Array[Dictionary], _state: Dictionary) -> void:
 	var text: String = hud._currency.text
-	var values: Array[String] = []
-	for key: String in ["货币", "食物", "工具箱"]:
+	var stock: String = text.get_slice("\n", 0)
+	for index: int in range(_chips.size()):
+		var key: String = ["食物", "货币"][index]
 		var expression: RegEx = RegEx.new()
 		expression.compile(key + "\\s*(\\d+)")
-		var found: RegExMatch = expression.search(text)
-		values.append(found.get_string(1) if found != null else "—")
-	for index: int in range(_chips.size()):
-		_chips[index].text = ["货币 ", "食物 ", "工具 "][index] + values[index]
-		_chips[index].tooltip_text = ["货币", "食物", "工具箱"][index]
-		_chips[index].add_theme_color_override("font_color", [ExpeditionHudTheme.AMBER, ExpeditionHudTheme.SAGE, ExpeditionHudTheme.CREAM][index])
-	_cargo.text = text.get_slice("\n", 1)
+		var found: RegExMatch = expression.search(stock)
+		_chips[index].text = key + " " + (found.get_string(1) if found != null else "—")
+		_chips[index].tooltip_text = "营地库存 · " + key
+	_cargo.text = text.get_slice("\n", 1).replace("携带：", "本次携带 · ")
 	_cargo.visible = not _cargo.text.is_empty()
-	# Keep the complete cargo string while fitting the existing top-right width.
-	_cargo.custom_minimum_size.x = 232
-	_cargo.clip_text = true
+	_cargo.add_theme_color_override("font_color", ExpeditionHudTheme.CREAM)
 	_cargo.tooltip_text = text
+
 	var total: float = 0.0
 	var done: float = 0.0
 	for row: Dictionary in rows:

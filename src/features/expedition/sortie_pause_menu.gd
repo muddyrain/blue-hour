@@ -18,6 +18,9 @@ var panel: PanelContainer
 var heading: Label
 var body: Label
 var _body_scroll: ScrollContainer
+var _lead: Label
+var _safe_actions: GridContainer
+var _danger_actions: VBoxContainer
 var buttons: Array[Button] = []
 var confirming: bool = false
 
@@ -31,7 +34,7 @@ func _ready() -> void:
 	root.mouse_force_pass_scroll_events = false
 	add_child(root)
 	var shade: ColorRect = ColorRect.new()
-	shade.color = Color(0.02, 0.08, 0.13, 0.86)
+	shade.color = Color(0.02, 0.08, 0.13, 0.76)
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.add_child(shade)
@@ -40,19 +43,20 @@ func _ready() -> void:
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(center)
 	panel = PanelContainer.new()
-	panel.custom_minimum_size.x = 600
+	panel.custom_minimum_size.x = 780
 	panel.mouse_force_pass_scroll_events = false
-	var style: StyleBoxFlat = CampStyle.box(CampStyle.INK, CampStyle.EDGE, 24)
-	style.content_margin_top = 20
-	style.content_margin_bottom = 20
+	var style: StyleBoxFlat = CampStyle.box(CampStyle.INK, CampStyle.EDGE, 28)
 	panel.add_theme_stylebox_override("panel", style)
 	center.add_child(panel)
 	var column: VBoxContainer = VBoxContainer.new()
-	column.add_theme_constant_override("separation", 8)
+	column.add_theme_constant_override("separation", 16)
 	panel.add_child(column)
-	heading = Label.new()
-	heading.add_theme_font_size_override("font_size", 28)
+	heading = CampStyle.label("", 32)
 	column.add_child(heading)
+	PixelMenu.divider(column)
+	_lead = CampStyle.label("", 20)
+	_lead.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(_lead)
 	_body_scroll = ScrollContainer.new()
 	_body_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_body_scroll.follow_focus = true
@@ -61,17 +65,27 @@ func _ready() -> void:
 	column.add_child(_body_scroll)
 	body = Label.new()
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.custom_minimum_size.x = 536
+	body.custom_minimum_size.x = 700
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.add_theme_font_size_override("font_size", 15)
+	body.add_theme_font_size_override("font_size", 18)
+	body.add_theme_constant_override("line_spacing", 5)
 	body.add_theme_color_override("font_color", CampStyle.MUTED)
 	_body_scroll.add_child(body)
+	_safe_actions = GridContainer.new()
+	_safe_actions.columns = 2
+	_safe_actions.add_theme_constant_override("h_separation", 14)
+	_safe_actions.add_theme_constant_override("v_separation", 12)
+	column.add_child(_safe_actions)
+	PixelMenu.divider(column)
+	_danger_actions = VBoxContainer.new()
+	column.add_child(_danger_actions)
 	for index: int in range(5):
 		var button: C1HudButton = C1HudButton.new()
-		button.custom_minimum_size.y = 40
-		button.add_theme_font_size_override("font_size", 17)
+		button.custom_minimum_size.y = 56
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.add_theme_font_size_override("font_size", 21)
 		button.mouse_force_pass_scroll_events = false
-		column.add_child(button)
+		_safe_actions.add_child(button)
 		buttons.append(button)
 	root.hide()
 	root.resized.connect(_fit_body)
@@ -92,6 +106,7 @@ func show_pause(was_paused: bool) -> void:
 		actions.append(suspend_requested.emit)
 	if not suspend_message.is_empty():
 		body.text += "\n" + suspend_message
+	_split_message()
 	_actions(labels,actions)
 
 
@@ -99,6 +114,7 @@ func show_exit(title: String, message: String, danger: String, offer_suspend: bo
 	confirming = true
 	heading.text = title
 	body.text = message
+	_split_message()
 	var labels: Array = ["取消 / 留在当前页面", danger]
 	var actions: Array = [exit_cancelled.emit, exit_confirmed.emit]
 	if offer_suspend:
@@ -112,6 +128,15 @@ func close() -> void:
 	confirming = false
 
 
+func _split_message() -> void:
+	# Preserve every fact; the first sentence leads while detailed caveats stay readable.
+	var lines: PackedStringArray = body.text.split("\n")
+	_lead.text = lines[0]
+	body.set_meta("full_message", body.text)
+	body.text = "\n".join(lines.slice(1))
+	_body_scroll.visible = not body.text.is_empty()
+
+
 func _actions(labels: Array, actions: Array) -> void:
 	for index: int in range(buttons.size()):
 		var button: Button = buttons[index]
@@ -123,21 +148,34 @@ func _actions(labels: Array, actions: Array) -> void:
 			button.remove_theme_stylebox_override(state)
 		for state: String in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 			button.remove_theme_color_override(state)
-		if index == 0:
-			CampStyle.primary(button)
+		CampStyle.text_button(button)
+		button.custom_minimum_size.y = 56
+		button.add_theme_font_size_override("font_size", 21)
+		if (confirming and index == 2) or (not confirming and index == 0):
+			PixelMenu.primary(button)
 		elif (confirming and index == 1) or (not confirming and index == 2):
 			button.add_theme_color_override("font_color", CampStyle.DANGER)
-			button.add_theme_stylebox_override("normal", CampStyle.box(CampStyle.PANEL, CampStyle.DANGER, 8))
+			button.add_theme_stylebox_override("normal", CampStyle.box(Color.TRANSPARENT, Color.TRANSPARENT, 8))
+			button.custom_minimum_size.y = 40
+			button.add_theme_font_size_override("font_size", 17)
+		else:
+			button.add_theme_stylebox_override("normal", CampStyle.box(CampStyle.PANEL, CampStyle.EDGE, 10))
 		if button.visible:
 			button.text = labels[index]
 			button.pressed.connect(actions[index])
 	# Keep stable signal/test references while placing the safe action before danger.
-	var column: Node = buttons[0].get_parent()
 	var order: Array[int] = [0, 1, 4, 2, 3]
 	if confirming:
 		order.assign([0, 2, 1, 3, 4])
-	for index: int in range(order.size()):
-		column.move_child(buttons[order[index]], 2 + index)
+	for index: int in order:
+		var destination: Node = _danger_actions if (confirming and index == 1) or (not confirming and index == 2) else _safe_actions
+		if buttons[index].get_parent() != destination:
+			buttons[index].reparent(destination)
+		destination.move_child(buttons[index], destination.get_child_count() - 1)
+		if destination == _danger_actions:
+			buttons[index].size_flags_horizontal = Control.SIZE_SHRINK_END
+		else:
+			buttons[index].size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var focusable: Array[Control] = []
 	for index: int in order:
 		var button: Button = buttons[index]
@@ -156,6 +194,8 @@ func _actions(labels: Array, actions: Array) -> void:
 func _fit_body() -> void:
 	if _body_scroll == null or body == null:
 		return
+	panel.custom_minimum_size.x = minf(780.0, maxf(560.0, root.size.x - 64.0))
+	body.custom_minimum_size.x = panel.custom_minimum_size.x - 56.0
 	# Error details can be arbitrarily long; preserve the real message in a
 	# scrollable reading area while all departure and cancel actions stay visible.
 	var line_height: float = float(body.get_line_height())
@@ -163,7 +203,7 @@ func _fit_body() -> void:
 	var lines: int = maxi(1, body.get_line_count())
 	var text_height: float = float(lines) * line_height + float(lines - 1) * spacing
 	text_height = maxf(text_height, body.get_combined_minimum_size().y)
-	var available: float = minf(180.0, maxf(72.0, root.size.y - 370.0))
+	var available: float = minf(190.0, maxf(78.0, root.size.y - 450.0))
 	# Keep the last visible line whole when a long failure message needs scrolling.
 	var visible_lines: int = maxi(1, floori((available + spacing) / maxf(1.0, line_height + spacing)))
 	var reading_height: float = float(visible_lines) * line_height + float(visible_lines - 1) * spacing

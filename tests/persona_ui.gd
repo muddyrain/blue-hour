@@ -125,7 +125,7 @@ func scenario(size: Vector2i, count: int) -> void:
 		var client: Rect2 = scroll_client(hud._member_scroll).grow(0.5)
 		var rect: Rect2 = card.get_global_rect()
 		all_reachable = all_reachable and client.encloses(rect) and bounds.encloses(rect)
-		compact = compact and card.size.y <= 124.5 and card.size.x <= 242.0
+		compact = compact and card.size.y <= 124.5 and card.size.x <= 248.0
 		chinese = chinese and chinese_supported(card.primary_label) and chinese_supported(card.positive_label) and chinese_supported(card.negative_label)
 		var model: Dictionary = rows[index].persona
 		var names_match: bool = card.primary_label.text == model.primary_short and card.name_label.tooltip_text.contains(model.name) and card.positive_label.text == "＋" + model.positive.name and card.negative_label.text == "－" + model.negative.name

@@ -112,10 +112,11 @@ func _capacity(original: Dictionary) -> void:
 	await _shot("02-inventory-24")
 	var detail_y: float = armory._title.global_position.y
 	var wheel_at: Vector2 = armory.items.get_global_rect().get_center()
-	for index: int in range(48):
+	var scrollbar: VScrollBar = armory.items.get_v_scroll_bar()
+	for index: int in range(120):
+		if is_equal_approx(scrollbar.value, scrollbar.max_value - scrollbar.page): break
 		await _mouse(wheel_at, MOUSE_BUTTON_WHEEL_DOWN, true)
 		await _mouse(wheel_at, MOUSE_BUTTON_WHEEL_DOWN, false)
-	var scrollbar: VScrollBar = armory.items.get_v_scroll_bar()
 	_check(scrollbar.value > 0.0 and is_equal_approx(scrollbar.value, scrollbar.max_value - scrollbar.page), "mouse wheel reaches bottom of independent inventory list")
 	_check(is_equal_approx(detail_y, armory._title.global_position.y), "detail stays in place while inventory scrolls")
 	await _shot("02b-inventory-bottom")

@@ -8,7 +8,7 @@ const POLICY_VERSION: int = 1
 const PLANS: Dictionary = {
 	"scavenge": {"title":"搜集型", "item_id":"field_tools_v1", "unlock_id":"stride_harness_v1", "advice":"先拿口粮，或用省下的时间再搜一处。"},
 	"firepower": {"title":"火力型", "item_id":"pressure_rounds_v1", "unlock_id":"guided_mag_v1", "advice":"有装备行动时，先清理来敌，再做露天回收。"},
-	"support": {"title":"支援型", "item_id":"aid_kit_v1", "unlock_id":"aid_broadcast_v1", "advice":"用 Q 支援受伤队员，注意治疗冷却。"},
+	"support": {"title":"支援型", "item_id":"aid_kit_v1", "unlock_id":"aid_broadcast_v1", "advice":"用 E 治疗受伤队员，注意治疗冷却。"},
 }
 
 

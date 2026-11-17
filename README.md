@@ -6,7 +6,7 @@ Godot 4.7（GDScript）2D 斜俯视小队生存原型：营地整备 → 选择�
 
 ## 运行
 
-引擎版本固定为 `.godot-version`（4.7.2）。
+引擎版本固定为 `.godot-version`（4.7.2）。命令行工具需要 Python 3.10+；直接用 Godot 编辑器打开不需要 Python。
 
 ```bash
 # 直接用编辑器打开 project.godot，或：
@@ -15,19 +15,21 @@ python tools/godot.py run --godot <Godot 可执行文件>
 
 导航原生 helper 是**可选加速**。直接打开编辑器、运行或导出都不要求编译器；缺库、平台不匹配或加载失败时，日志 `BH_NAVIGATION fallback:` 表明使用 Godot 4.7.2 的原始 `AStarGrid2D`，仍执行完整校验（大型历史存档会更慢）。`BH_NAVIGATION native:` 表明已启用加速。不要把 Linux 的读档耗时当作 Windows 的性能保证。
 
-macOS arm64 / x86_64 当前使用严格 fallback；仓库尚无 macOS 导出预设或已验证的 Mac helper 构建流程。可用官方 4.7.2 编辑器打开项目，Mac 读档耗时需要在 Mac 上测量。
+macOS 11.0+ 可用已有 Xcode Command Line Tools 构建 arm64 / x86_64 helper。日常运行仍不要求工具链或原生库；缺库严格回退。构建成功只证明生成了对应架构的库，各平台运行与性能须单独验证。
 
-维护者可提前构建 Linux / Windows x86_64 helper（单精度，公开 GDExtension C API）：
+维护者可提前构建 Linux / Windows x86_64、macOS helper（单精度，公开 GDExtension C API）：
 
 ```bash
 python3 tools/build_navigation.py <Godot> --required
+# macOS 通用包：同一源码构建两种架构，再合并为 route_kernel.dylib
+python3 tools/build_navigation.py <Godot> --target macos.universal --required
 # Linux 上交叉构建，或 Windows 上指定 MinGW / LLVM-MinGW 的 GCC/Clang：
 python3 tools/build_navigation.py <Godot> --target windows.x86_64 --compiler <x86_64-w64-mingw32-gcc或clang> --required
 ```
 
-头文件和 API 元数据由锁定引擎导出，所有产物仅在 `.local/navigation-native/`。构建工具默认在失败时报告回退；`--required` 用于必须携带加速库的打包门禁。日常 `run/check` 只检测现有库，**不编译**。Windows 玩家收到已打包的游戏目录，无需 Python 或 C 编译器。其他架构、双精度引擎使用严格回退。
+头文件和 API 元数据由锁定引擎导出，所有产物仅在 `.local/navigation-native/`。构建工具默认在失败时报告回退；`--required` 用于必须携带加速库的打包门禁。日常 `run/check` 只检测现有库，**不编译**。Windows 玩家收到已打包的游戏目录，无需 Python 或 C 编译器。未列出的平台架构、双精度引擎使用严格回退。Mac 构建缓存同时核对 SDK、编译器及产物 SHA；单架构重建或失败会作废旧通用库。
 
-导出仍使用 `export_presets.cfg` 的 `Windows Desktop` 预设；已启用的导航导出插件在编辑器 GUI / CLI 导出时自动将可用的目标库放在可执行文件旁。清单使用官方 `windows.x86_64` / `linux.x86_64` 平台键；没有目标库也能正常导出，日志为 `BH_NAVIGATION_EXPORT fallback:`。分发整个目录（`.exe`、`.pck` 及存在的 `route_kernel.dll`），不要只拷贝 exe。
+Windows 导出使用 `export_presets.cfg` 的 `Windows Desktop` 预设；已启用的导航导出插件在编辑器 GUI / CLI 导出时自动将可用的目标库放在可执行文件旁。清单使用官方 `windows.x86_64` / `linux.x86_64` 平台键；没有目标库也能正常导出，日志为 `BH_NAVIGATION_EXPORT fallback:`。分发整个目录（`.exe`、`.pck` 及存在的 `route_kernel.dll`），不要只拷贝 exe。
 
 ```bash
 # --templates 指向官方 4.7.2 模板目录（包含 version.txt），复制到隔离配置后导出
@@ -35,7 +37,7 @@ python3 tools/godot.py export --godot <Godot> --templates <模板目录> --outpu
 # 已在编辑器安装模板时也可正常从编辑器导出
 ```
 
-Linux 对照导出可使用 `--preset "Linux Desktop"` 与 `.x86_64` 输出路径。
+Linux 对照导出可使用 `--preset "Linux Desktop"` 与 `.x86_64` 输出路径。Mac 使用 `--preset "macOS" --output .local/exports/macos/BlueHour.app`；`--templates` 目录需包含官方 `macos.zip` 和 `version.txt`。通用预设仅打包 `route_kernel.dylib`，不会以单架构库冒充通用库；库位于 `.app/Contents/Frameworks`，可整体移动 `.app`。内置 ad-hoc 签名供本地验证，不等于 Apple 公证或正式发布。
 
 首次编辑器打开不会编译或等待 helper；只在游戏启动时尝试一次加载。加载失败后保持严格回退，本次进程不重试。修复/补齐库后重新启动游戏。原生库只支持可信的本地构建产物；Godot 加载损坏库可能输出引擎诊断，但游戏仍继续完整校验。Windows 构建、Wine 或导出测试均不能替代原生 Windows 实机性能验收。
 
@@ -49,7 +51,7 @@ Linux 对照导出可使用 `--preset "Linux Desktop"` 与 `.x86_64` 输出路�
 python tools/godot.py check --godot <Godot 可执行文件>   # 导入 + 启动 + 单元/契约测试 + 完整一局冒烟（tests/smoke_loop.gd）
 ```
 
-所有输出写在被忽略的 `.local/` 下，不会碰真实玩家存档。
+所有输出写在被忽略的 `.local/` 下，不会碰真实玩家存档。导航路线测试可设置 `BH_NAVIGATION_REQUIRE_NATIVE=1`，要求实际加载并配置原生内核后再比较完整路径；正常 `check` 仍允许无编译器的严格回退。
 
 ## 文档
 

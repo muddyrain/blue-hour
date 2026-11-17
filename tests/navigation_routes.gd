@@ -5,9 +5,13 @@ const Oracle = preload("res://tests/support/navigation_oracle.gd")
 var checks: int = 0
 var failures: int = 0
 var compared: int = 0
+var require_native: bool = OS.get_environment("BH_NAVIGATION_REQUIRE_NATIVE") == "1"
 
 
 func _initialize() -> void:
+	if require_native:
+		FieldRouteSearch.prepare_backend()
+		_expect(FieldRouteSearch._loader.status.begins_with("native:"), "required native backend is loaded")
 	_exhaustive()
 	_seeded_grids()
 	_boundaries()
@@ -40,6 +44,8 @@ func _search_for(grid: AStarGrid2D) -> FieldRouteSearch:
 				solids.append(Rect2i(x, y, 1, 1))
 	var search: FieldRouteSearch = FieldRouteSearch.new()
 	search.configure(grid.region.size, solids)
+	if require_native:
+		_expect(search._kernel != null, "required native kernel configured")
 	return search
 
 

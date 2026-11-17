@@ -58,5 +58,6 @@ enabled=PackedStringArray("res://src/features/expedition/native/plugin.cfg")
 [rendering]
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
 textures/default_filters/use_nearest_mipmap_filter=false
 environment/defaults/default_clear_color=Color(0.035, 0.065, 0.105, 1)

@@ -42,6 +42,7 @@ func _run() -> void:
 	await process_frame
 	app._new_game("scavenge", {"version":CatalogProgress.VERSION, "unlock":""},
 		{"version":OpeningBuild.POLICY_VERSION, "eligible":[]})
+	var audio_playbacks: Array[WeakRef] = _audio_playbacks(app.audio)
 	_stage("ordinary registration returned")
 	var transaction: RunTransaction = app.progress_session._transaction
 	_check(transaction != null and not app._progress_blocked, "ordinary isolated M48 registration completes its real readback")
@@ -74,6 +75,15 @@ func _run() -> void:
 		"all existing record, journal and camp size limits remain unchanged")
 	app.audio.shutdown()
 	app.queue_free()
+	# A timer created after a long synchronous frame can consume that frame's
+	# entire delta immediately. Observe real release within the audio test's 200ms
+	# cleanup budget instead of quitting with a stopped WAV still on the mix thread.
+	var audio_deadline: int = Time.get_ticks_usec() + 200_000
+	while audio_playbacks.any(func(reference: WeakRef) -> bool: return reference.get_ref() != null) \
+			and Time.get_ticks_usec() < audio_deadline:
+		await process_frame
+	_check(audio_playbacks.all(func(reference: WeakRef) -> bool: return reference.get_ref() == null),
+		"stopped audio playback resources retire before the transport fixture exits")
 	await process_frame
 	var report: Dictionary = {"scope":"normal-isolated-registration-and-edits; supplied-records-read-only; negative-transport-fixtures",
 		"record_encoding":M48RecordTransport.VERSION, "checks":rows.size(), "failures":failures,
@@ -81,6 +91,14 @@ func _run() -> void:
 	_write(output.path_join("report.json"), JSON.stringify(report, "\t", true, true))
 	print("M48_RECORD_TRANSPORT ", JSON.stringify(report, "", true, true))
 	quit(0 if failures.is_empty() else 1)
+
+
+func _audio_playbacks(service: B1AudioService) -> Array[WeakRef]:
+	var references: Array[WeakRef] = []
+	for player: AudioStreamPlayer in service._ui_players + service._world_players:
+		if player.has_stream_playback():
+			references.append(weakref(player.get_stream_playback()))
+	return references
 
 
 func _roundtrip(receipt: Dictionary, label: String) -> void:

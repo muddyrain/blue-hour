@@ -34,7 +34,10 @@ func prepare(manifest: String = MANIFEST) -> void:
 	if OS.has_feature("editor"):
 		path = ProjectSettings.globalize_path(path)
 	else:
-		path = OS.get_executable_path().get_base_dir().path_join(path.get_file())
+		var library_dir: String = OS.get_executable_path().get_base_dir()
+		if OS.has_feature("macos"):
+			library_dir = library_dir.path_join("../Frameworks").simplify_path()
+		path = library_dir.path_join(path.get_file())
 	if not FileAccess.file_exists(path):
 		_finish("fallback: library missing (%s)" % selected)
 		return

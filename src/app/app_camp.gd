@@ -494,7 +494,9 @@ func _camp_escape() -> bool:
 		return false
 	if is_instance_valid(app._facility_confirmation) and app._facility_confirmation.visible:
 		return false
-	if is_instance_valid(app.supply_panel) and app.supply_panel.visible:
+	if is_instance_valid(app.sound_settings) and app.sound_settings.visible:
+		app.sound_settings.close_panel()
+	elif is_instance_valid(app.supply_panel) and app.supply_panel.visible:
 		app._leave_supplies_for(&"camp")
 	elif is_instance_valid(app.training_panel) and app.training_panel.visible:
 		if app.training_panel.confirmation.visible:
@@ -517,14 +519,14 @@ func _camp_escape() -> bool:
 			app.close_loadout()
 	elif app.mission_select.visible:
 		app.close_mission_select()
-	elif is_instance_valid(app.sound_settings) and app.sound_settings.visible:
-		app.sound_settings.close_panel()
 	else:
 		return false
 	return true
 
 
 func _camp_input_allowed() -> bool:
+	if is_instance_valid(app.sound_settings) and app.sound_settings.visible:
+		return false
 	return not app._camp_commit_busy and not (is_instance_valid(app.training_panel) and app.training_panel.visible) and app.phase == app.Phase.TITLE and not app._new_game_confirmation.visible and not app._hunger_confirmation.visible and not (is_instance_valid(app.pause_menu) and app.pause_menu.root.visible) and not (is_instance_valid(app._camp_leave_dialog) and app._camp_leave_dialog.visible)
 
 

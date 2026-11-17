@@ -9,7 +9,7 @@ func build(hud: C1ExpeditionHud) -> void:
 	var heading: HBoxContainer = hud._mission.get_parent() as HBoxContainer
 	var accent: ColorRect = ColorRect.new()
 	accent.color = ExpeditionHudTheme.AMBER
-	accent.custom_minimum_size.x = 3
+	accent.custom_minimum_size.x = 1
 	accent.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	heading.add_child(accent)
 	heading.move_child(accent, 0)
@@ -37,16 +37,16 @@ func build(hud: C1ExpeditionHud) -> void:
 		var chip: PanelContainer = PanelContainer.new()
 		chip.name = "ResourceChip%d" % index
 		row.add_child(chip)
-		var label: Label = hud._label(chip, "Value", 12)
+		var label: Label = hud._label(chip, "Value", 13)
 		_chips.append(label)
 	_cargo = hud._label(column, "CarriedResources", 11)
 	_cargo.add_theme_color_override("font_color", ExpeditionHudTheme.SECONDARY)
-	# Style after recursive HUD skinning so capsule radii stay local.
+	# Keep resource values compact after the field theme is applied.
 	_style_chips.call_deferred()
 
 func _style_chips() -> void:
 	for label: Label in _chips:
-		var style: StyleBoxFlat = ExpeditionHudTheme.box(Color("e8dcc4", 0.55), 9)
+		var style: StyleBoxFlat = CampStyle.box(CampStyle.PANEL, Color.TRANSPARENT, 6)
 		style.content_margin_left = 6
 		style.content_margin_right = 6
 		style.content_margin_top = 3
@@ -63,13 +63,13 @@ func refresh(hud: C1ExpeditionHud, rows: Array[Dictionary], _state: Dictionary) 
 		var found: RegExMatch = expression.search(text)
 		values.append(found.get_string(1) if found != null else "—")
 	for index: int in range(_chips.size()):
-		_chips[index].text = ["◆ ", "● ", "▣ "][index] + values[index]
+		_chips[index].text = ["货币 ", "食物 ", "工具 "][index] + values[index]
 		_chips[index].tooltip_text = ["货币", "食物", "工具箱"][index]
 		_chips[index].add_theme_color_override("font_color", [ExpeditionHudTheme.AMBER, ExpeditionHudTheme.SAGE, ExpeditionHudTheme.CREAM][index])
 	_cargo.text = text.get_slice("\n", 1)
 	_cargo.visible = not _cargo.text.is_empty()
 	# Keep the complete cargo string while fitting the existing top-right width.
-	_cargo.custom_minimum_size.x = 170
+	_cargo.custom_minimum_size.x = 232
 	_cargo.clip_text = true
 	_cargo.tooltip_text = text
 	var total: float = 0.0

@@ -44,6 +44,13 @@ func hud_case(size: Vector2i, count: int) -> void:
 	var hud: C1ExpeditionHud = HUD_SCENE.instantiate() as C1ExpeditionHud
 	hud.theme = HUD_THEME
 	layer.add_child(hud)
+	# Use the real Q/W/E/R controls in the bottom strip consumed by the HUD layout.
+	var support: BasicSupportPanel = BasicSupportPanel.new()
+	hud.add_child(support)
+	support.name = "CommandStrip"
+	support.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	hud._layout_field()
+	support.present("8.3s", "空槽", false, false)
 	var objectives: Array[Dictionary] = [
 		{"id":"primary_food", "title":"食品主站点", "optional":false, "done":0, "total":2, "complete":false, "site_ids":["food", "cash"], "hint":"受控主要目标，计数仅来自传入DTO。"},
 		{"id":"optional_vehicles", "title":"搜完车辆", "optional":true, "done":1, "total":3, "complete":false, "site_ids":["vehicle_01", "vehicle_02", "vehicle_03"], "hint":"可选站点本身给收益，不额外发整组奖金。"},
@@ -78,11 +85,14 @@ func hud_case(size: Vector2i, count: int) -> void:
 		compact = compact and row.size.y <= 24.5
 		text_matches = text_matches and list.labels[index].text.contains("%d/%d" % [objectives[index].done, objectives[index].total]) and list.labels[index].tooltip_text.contains(objectives[index].title) and list.labels[index].tooltip_text.contains(objectives[index].hint)
 	check(compact and text_matches and list.labels[0].text.contains("主") and list.labels[1].text.contains("可选") and list.labels[2].text.contains("✓"), tag + " three factual objective rows stay within 24px/76px and retain full explanations")
-	var skills: Array[Rect2] = [Rect2(16, 164, 184, 68), Rect2(16, 240, 184, 68), Rect2(16, 316, 184, 74)]
-	var no_overlap: bool = bounds.encloses(mission.get_global_rect())
-	for rect: Rect2 in skills:
-		no_overlap = no_overlap and not mission.get_global_rect().intersects(rect)
-	check(no_overlap, tag + " expanded MissionPanel clears the existing Q/E/3 rectangles")
+	var skills: Array[CommandButton] = [support.rally_button, support.focus_button, support.heal_button, support.special_button]
+	var command_rects: Array = []
+	var no_overlap: bool = bounds.encloses(mission.get_global_rect()) and bounds.encloses(support.get_global_rect())
+	for button: CommandButton in skills:
+		var rect: Rect2 = button.get_global_rect()
+		command_rects.append(rect_values(rect))
+		no_overlap = no_overlap and button.is_visible_in_tree() and rect.has_area() and bounds.encloses(rect) and not mission.get_global_rect().intersects(rect)
+	check(no_overlap, tag + " expanded MissionPanel clears all four bounded real Q/W/E/R controls")
 	hud._objective_toggle.pressed.emit()
 	await settle()
 	var folded: bool = not list.visible and mission.size.y < expanded_height
@@ -113,7 +123,7 @@ func hud_case(size: Vector2i, count: int) -> void:
 	var details: PersonaDetails = hud.persona_details
 	check(details.visible and details.mouse_filter == Control.MOUSE_FILTER_STOP and not details.mouse_force_pass_scroll_events and details.scroll.mouse_filter == Control.MOUSE_FILTER_STOP and not details.scroll.mouse_force_pass_scroll_events and bounds.encloses(details.get_global_rect()), tag + " original details keep bounded STOP ownership of clicks and scrolling")
 	details.close()
-	var result: Dictionary = {"size":[size.x, size.y], "count":count, "objective_size":[list.size.x, list.size.y], "row_sizes":row_sizes, "mission":rect_values(mission.get_global_rect()), "member_panel":rect_values(panel.get_global_rect()), "cards":cards, "located":located, "scope":"controlled UI only"}
+	var result: Dictionary = {"size":[size.x, size.y], "count":count, "objective_size":[list.size.x, list.size.y], "row_sizes":row_sizes, "mission":rect_values(mission.get_global_rect()), "commands":command_rects, "member_panel":rect_values(panel.get_global_rect()), "cards":cards, "located":located, "scope":"controlled UI only"}
 	viewport.queue_free()
 	await process_frame
 	hud_cases.append(result)

@@ -1,37 +1,22 @@
 class_name CampSceneStyle
 extends RefCounted
-## Camp-local warm charcoal theme; expedition HUD and shared art remain untouched.
+## Camp panels share the approved cool pixel palette; world lighting stays local.
 
-const PANEL: Color = Color(0.1333, 0.1255, 0.1176, 0.92)
-const TEXT: Color = Color("e8dcc4")
-const MUTED: Color = Color("b8ac96")
-const AMBER: Color = Color("d9a24a")
-const EDGE: Color = Color(0.91, 0.86, 0.77, 0.55)
+const PANEL: Color = CampStyle.PANEL
+const TEXT: Color = CampStyle.TEXT
+const MUTED: Color = CampStyle.MUTED
+const AMBER: Color = CampStyle.TEAL # Existing camp accent API; now the mint status colour.
+const EDGE: Color = CampStyle.EDGE
 
 
-static func theme(base: Theme) -> Theme:
-	var result: Theme = base.duplicate() as Theme if base != null else Theme.new()
+static func theme(base: Theme = null) -> Theme:
+	var result: Theme = CampStyle.theme(base)
 	result.default_font_size = 16
-	for type: String in ["Label", "Button", "CheckButton", "LineEdit", "OptionButton"]:
-		result.set_color("font_color", type, TEXT)
-		result.set_color("font_hover_color", type, TEXT)
-		result.set_color("font_focus_color", type, TEXT)
-		result.set_color("font_disabled_color", type, MUTED)
-	for type: String in ["PanelContainer", "PopupPanel", "AcceptDialog"]:
-		result.set_stylebox("panel", type, box())
-	for type: String in ["Button", "OptionButton", "LineEdit"]:
-		result.set_stylebox("normal", type, box())
-		result.set_stylebox("hover", type, CampStyle.box(Color("39342c"), AMBER, 8))
-		result.set_stylebox("pressed", type, CampStyle.box(Color("493c2b"), AMBER, 8))
-		result.set_stylebox("disabled", type, CampStyle.box(Color("26231f"), Color("61594d"), 8))
-		result.set_stylebox("focus", type, CampStyle.box(Color.TRANSPARENT, AMBER, 0))
-	result.set_stylebox("background", "ProgressBar", CampStyle.box(Color("302c27"), EDGE, 0))
-	result.set_stylebox("fill", "ProgressBar", CampStyle.box(AMBER, AMBER, 0))
 	return result
 
 
 static func box() -> StyleBoxFlat:
-	return CampStyle.box(PANEL, EDGE, 10)
+	return CampStyle.box(PANEL, Color.TRANSPARENT, 10)
 
 
 static func apply_to(root: Node) -> void:
@@ -41,8 +26,8 @@ static func apply_to(root: Node) -> void:
 
 
 static func _recolour(root: Node) -> void:
-	# Existing panels author their own overrides. Recolour copies while retaining
-	# all margins/minimum sizes, so a palette change cannot change panel layout.
+	# Retain authored margins and minimum sizes in existing camp editors. Already
+	# migrated controls keep their semantic status and primary-action colours.
 	if root is Control:
 		var control: Control = root as Control
 		if control.theme != null:
@@ -54,21 +39,34 @@ static func _recolour(root: Node) -> void:
 			if previous == null:
 				continue
 			var style: StyleBoxFlat = previous.duplicate() as StyleBoxFlat
-			if style.bg_color.a > 0.0:
-				style.bg_color = PANEL
-			style.border_color = AMBER if key in ["hover", "focus", "pressed"] else EDGE
+			style.set_corner_radius_all(0)
+			style.shadow_size = 0
+			if not _current_colour(style.bg_color):
+				if style.bg_color.a > 0.0:
+					style.bg_color = CampStyle.SELECTED.darkened(0.16) if key == "hover" else CampStyle.SURFACE if key == "pressed" else PANEL
+				style.set_border_width_all(1 if key == "focus" else 0)
+				style.border_color = CampStyle.TEAL if key == "focus" else Color.TRANSPARENT
 			control.add_theme_stylebox_override(key, style)
 		if control is Label:
 			var colour: Color = control.get_theme_color("font_color")
-			if colour.is_equal_approx(CampStyle.TEAL) or colour.is_equal_approx(CampStyle.AMBER):
+			if colour.is_equal_approx(Color("d9a24a")):
 				control.add_theme_color_override("font_color", AMBER)
-			elif colour.is_equal_approx(CampStyle.TEXT):
+			elif colour.is_equal_approx(Color("e8dcc4")):
 				control.add_theme_color_override("font_color", TEXT)
-			elif colour.is_equal_approx(CampStyle.MUTED):
+			elif colour.is_equal_approx(Color("b8ac96")):
 				control.add_theme_color_override("font_color", MUTED)
-		if control is ColorRect:
-			control.color = Color("22201e")
+		if control is ColorRect and control.color.is_equal_approx(Color("22201e")):
+			control.color = CampStyle.INK
 	elif root is Window:
 		root.theme = theme(root.theme)
 	for child: Node in root.get_children():
 		_recolour(child)
+
+
+static func _current_colour(colour: Color) -> bool:
+	for current: Color in [CampStyle.INK, PANEL, CampStyle.SURFACE, CampStyle.SELECTED,
+			CampStyle.SELECTED.darkened(0.16), CampStyle.TEAL, CampStyle.CORAL, CampStyle.CORAL.lightened(0.12),
+			CampStyle.CORAL.darkened(0.08), Color("223b4d")]:
+		if Color(colour, 1.0).is_equal_approx(current):
+			return true
+	return false

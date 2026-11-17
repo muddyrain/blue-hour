@@ -1865,6 +1865,62 @@
       "origin": "Original procedural 2:1 SVG; tools/make_station_art.py using Sprite from make_harbor_art.py; Python standard library; AI-assisted code, no AI-generated imagery; no third-party assets",
       "ai_generated": false,
       "license": "No additional license granted"
+    },
+    {
+      "path": "assets/fonts/SourceHanSansSC-Heavy.otf",
+      "sha256": "6374b11bc4c2cd4bd7be1a1d64cf5047906c8a6a025c64e023c6792e50ba985e",
+      "origin": "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/a4f7cf94edfb9d7ffbdfc4841de276358bd7e0f2/OTF/SimplifiedChinese/SourceHanSansSC-Heavy.otf",
+      "license": "SIL Open Font License 1.1; copyright Adobe; upstream unmodified; see assets/fonts/SourceHanSans-LICENSE.txt",
+      "ai_generated": false
+    },
+    {
+      "path": "assets/fonts/SourceHanSans-LICENSE.txt",
+      "sha256": "fcac737e761ec63dbfbdce11030a1780161920d80315edba9c8beff1c2bac5a2",
+      "origin": "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/a4f7cf94edfb9d7ffbdfc4841de276358bd7e0f2/LICENSE.txt",
+      "license": "SIL Open Font License 1.1; copyright Adobe; upstream unmodified; see assets/fonts/SourceHanSans-LICENSE.txt",
+      "ai_generated": false
+    },
+    {
+      "path": "assets/ui/pixel/title-coast.png",
+      "sha256": "1d26fcc560b29652c631f99d619457e86170a8d4bebd8729c4eb9277cb7b78ce",
+      "origin": "OpenAI image_gen edit of original project user-approved cool-pixel title concept; all UI removed, scenery retained. Prompt: assets/ui/pixel/generation.json",
+      "ai_generated": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/ui/pixel/play.svg",
+      "sha256": "015a9e7932f0979286a3f2284466760c62ed6d3bda0dca7f2ef8a95f61cc71aa",
+      "origin": "Original project geometric interface icon, authored as SVG; AI-assisted code",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/ui/pixel/bus.svg",
+      "sha256": "5fa025538a46f3d703f05dd33e06736447d32719df73f7300e90b53cf1c3d1ad",
+      "origin": "Original project geometric interface icon, authored as SVG; AI-assisted code",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/ui/pixel/settings.svg",
+      "sha256": "0e736223c224d2331cd497b32b959794cf8e380dcc2ac2d3ae5409676047085a",
+      "origin": "Original project geometric interface icon, authored as SVG; AI-assisted code",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/ui/pixel/book.svg",
+      "sha256": "7e6d463a6f56256494cba388e0faecb06c38e1a13266bd2232ac7d9e34ee3f3d",
+      "origin": "Original project geometric interface icon, authored as SVG; AI-assisted code",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/ui/pixel/exit.svg",
+      "sha256": "27abc16e8d7f739d39aaf95c460a9b6d6cc26078c1337b81c99594199f0ac489",
+      "origin": "Original project geometric interface icon, authored as SVG; AI-assisted code",
+      "ai_generated": false,
+      "license": "No additional license granted"
     }
   ]
 }

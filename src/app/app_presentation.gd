@@ -167,9 +167,15 @@ func _setup_blue_hour_title() -> void:
 	app._catalog_button.text = "专精 / 图鉴"
 	app._catalog_button.pressed.connect(func() -> void: app._show_equipment_catalog(app.progress_session.refresh_catalog()))
 	app._title.add_child(app._catalog_button)
-	var title_font: SystemFont = SystemFont.new()
-	title_font.font_names = PackedStringArray(["STZhongsong", "SimSun", "Noto Serif CJK SC", "Microsoft YaHei"])
-	title_font.font_weight = 700
+	app._continue_button.icon = preload("res://assets/ui/pixel/play.svg")
+	app._home_button.icon = preload("res://assets/ui/pixel/bus.svg")
+	app.get_node("Interface/Screen/Title/Reset").icon = preload("res://assets/ui/pixel/bus.svg")
+	app.get_node("Interface/Screen/Title/Sound").icon = preload("res://assets/ui/pixel/settings.svg")
+	app._catalog_button.icon = preload("res://assets/ui/pixel/book.svg")
+	app.get_node("Interface/Screen/Title/Quit").icon = preload("res://assets/ui/pixel/exit.svg")
+	var title_font: FontVariation = FontVariation.new()
+	title_font.base_font = preload("res://assets/fonts/SourceHanSansSC-Heavy.otf")
+	title_font.variation_transform = Transform2D(Vector2(1, 0), Vector2(-0.12, 1), Vector2.ZERO)
 	app.get_node("Interface/Screen/Title/Heading").add_theme_font_override("font", title_font)
 	var english_font: FontVariation = FontVariation.new()
 	english_font.base_font = ThemeDB.fallback_font
@@ -198,12 +204,13 @@ func _refresh_blue_hour_title() -> void:
 	var sound: Button = app.get_node("Interface/Screen/Title/Sound")
 	var exit: Button = app.get_node("Interface/Screen/Title/Quit")
 	heading.text = "蓝时归航"
-	heading.add_theme_font_size_override("font_size", 76)
-	heading.add_theme_color_override("font_color", Color("f3e7d1"))
-	CampStyle.place(heading, Rect2(90, 144, 426, 94))
+	heading.add_theme_font_size_override("font_size", 64)
+	heading.add_theme_color_override("font_color", CampStyle.TEXT)
+	CampStyle.place(heading, Rect2(48, 68, 370, 96))
 	english.text = "BLUE HOUR"
-	english.add_theme_color_override("font_color", Color("f3e7d1"))
-	CampStyle.place(english, Rect2(99, 242, 334, 28))
+	english.add_theme_color_override("font_color", CampStyle.TEXT)
+	english.add_theme_font_size_override("font_size", 18)
+	CampStyle.place(english, Rect2(56, 164, 334, 28))
 	app.get_node("Interface/Screen/Title/Description").hide()
 	var live_camp: bool = app._home_button.visible and app.run_save.has_files()
 	app._continue_button.visible = not live_camp
@@ -215,23 +222,39 @@ func _refresh_blue_hour_title() -> void:
 	reset.visible = not app._home_button.visible or live_camp
 	sound.text = "设置"
 	exit.text = "退出游戏"
-	CampStyle.place(app._continue_button, Rect2(91, 316, 276, 44))
-	CampStyle.place(app._home_button, Rect2(91, 316 if live_camp else 367, 276, 44))
-	CampStyle.place(reset, Rect2(91, 367, 276, 44))
-	CampStyle.place(sound, Rect2(91, 418, 126, 44))
+	CampStyle.place(app._continue_button, Rect2(42, 222, 310, 66))
+	CampStyle.place(app._home_button, Rect2(42, 222 if live_camp else 338, 310, 52 if not live_camp else 66))
+	CampStyle.place(reset, Rect2(42, 338, 310, 52))
+	CampStyle.place(sound, Rect2(42, 396, 310, 52))
+	CampStyle.primary(app._continue_button)
+	if live_camp:
+		CampStyle.primary(app._home_button)
+	else:
+		CampStyle.text_button(app._home_button)
+		app._home_button.add_theme_color_override("font_color", CampStyle.TEXT)
+		app._home_button.add_theme_color_override("font_hover_color", CampStyle.TEXT)
+		app._home_button.add_theme_color_override("font_pressed_color", CampStyle.TEXT)
+		app._home_button.add_theme_color_override("font_focus_color", CampStyle.TEXT)
 	var catalog_ready: bool = app.progress_session.catalog_state().get("error", FAILED) == OK
 	app._catalog_button.text = "专精 / 图鉴" if catalog_ready else "专精待同步"
 	app._catalog_button.tooltip_text = "" if catalog_ready else "打开专精资料，重试读取与同步"
 	app._catalog_button.show()
-	CampStyle.place(app._catalog_button, Rect2(223, 418, 144, 44))
-	CampStyle.place(exit, Rect2(91, 469, 276, 44))
-	CampStyle.place(app._backup_button, Rect2(91, 524, 365, 38))
-	CampStyle.place(app._retry_button, Rect2(91, 569 if app._backup_button.visible else 524, 365, 38))
-	camp.visible = app._requires_continue and not app._pending_save.is_empty() and not app._progress_blocked
-	camp.add_theme_color_override("font_color", Color("cad7d6"))
-	CampStyle.place(camp, Rect2(103, 532, 426, 68))
-	CampStyle.place(app._status, Rect2(103, 633, 490, 74))
-	app._status.add_theme_color_override("font_color", CampStyle.AMBER if app._progress_blocked else Color("c5d3d1"))
+	CampStyle.place(app._catalog_button, Rect2(42, 454, 310, 52))
+	CampStyle.place(exit, Rect2(42, 512, 310, 52))
+	CampStyle.place(app._backup_button, Rect2(42, 576, 390, 38))
+	app._retry_button.visible = app._progress_dirty
+	CampStyle.place(app._retry_button, Rect2(42, 618 if app._backup_button.visible else 576, 390, 38))
+	camp.visible = not app._progress_blocked
+	var shown: Dictionary = app._pending_save if app._requires_continue else app.camp_snapshot()
+	if not shown.is_empty() and (app._requires_continue or live_camp):
+		camp.text = "第 %d 天 · %d 位同伴" % [int(shown.get("day", 1)), shown.get("crew", []).size()]
+	else:
+		camp.text = "从一段新的旅程开始"
+	camp.add_theme_font_size_override("font_size", 16)
+	camp.add_theme_color_override("font_color", CampStyle.MUTED)
+	CampStyle.place(camp, Rect2(54, 294, 340, 30))
+	CampStyle.place(app._status, Rect2(48, 664, 760, 48))
+	app._status.add_theme_color_override("font_color", CampStyle.AMBER if app._progress_blocked else CampStyle.MUTED)
 	var focusable: Array[Button] = []
 	for button: Button in app._blue_hour_title_buttons():
 		if button.visible and not button.disabled:
@@ -249,14 +272,9 @@ func _blue_hour_title_buttons() -> Array[Button]:
 
 func _style_blue_hour_title_button(button: Button) -> void:
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.add_theme_font_size_override("font_size", 22)
-	button.add_theme_stylebox_override("normal", CampStyle.box(Color(0.06, 0.14, 0.2, 0.40), Color.TRANSPARENT, 8))
-	button.add_theme_stylebox_override("hover", CampStyle.box(Color(0.10, 0.24, 0.33, 0.92), CampStyle.TEAL, 8))
-	button.add_theme_stylebox_override("pressed", CampStyle.box(Color(0.10, 0.17, 0.22, 0.96), CampStyle.AMBER, 8))
-	button.add_theme_stylebox_override("disabled", CampStyle.box(Color(0.06, 0.14, 0.2, 0.35), Color.TRANSPARENT, 8))
-	var focus: StyleBoxFlat = CampStyle.box(Color.TRANSPARENT, CampStyle.AMBER, 0)
-	focus.border_width_left = 4
-	button.add_theme_stylebox_override("focus", focus)
+	button.add_theme_font_size_override("font_size", 26)
+	button.add_theme_constant_override("h_separation", 20)
+	CampStyle.text_button(button)
 
 
 func _remember_blue_hour_title_focus(button: Button) -> void:

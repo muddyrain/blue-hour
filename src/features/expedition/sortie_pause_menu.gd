@@ -17,6 +17,7 @@ var root: Control
 var panel: PanelContainer
 var heading: Label
 var body: Label
+var _body_scroll: ScrollContainer
 var buttons: Array[Button] = []
 var confirming: bool = false
 
@@ -24,12 +25,13 @@ var confirming: bool = false
 func _ready() -> void:
 	layer = 30
 	root = Control.new()
+	root.theme = CampStyle.theme()
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
 	root.mouse_force_pass_scroll_events = false
 	add_child(root)
 	var shade: ColorRect = ColorRect.new()
-	shade.color = Color(0.03, 0.07, 0.12, 0.82)
+	shade.color = Color(0.02, 0.08, 0.13, 0.86)
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.add_child(shade)
@@ -38,37 +40,41 @@ func _ready() -> void:
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(center)
 	panel = PanelContainer.new()
-	panel.custom_minimum_size.x = 680
+	panel.custom_minimum_size.x = 600
 	panel.mouse_force_pass_scroll_events = false
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color("162d41")
-	style.border_color = Color("8fb9cd")
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(12)
-	style.content_margin_left = 32
-	style.content_margin_right = 32
-	style.content_margin_top = 24
-	style.content_margin_bottom = 24
+	var style: StyleBoxFlat = CampStyle.box(CampStyle.INK, CampStyle.EDGE, 24)
+	style.content_margin_top = 20
+	style.content_margin_bottom = 20
 	panel.add_theme_stylebox_override("panel", style)
 	center.add_child(panel)
 	var column: VBoxContainer = VBoxContainer.new()
-	column.add_theme_constant_override("separation", 12)
+	column.add_theme_constant_override("separation", 8)
 	panel.add_child(column)
 	heading = Label.new()
-	heading.add_theme_font_size_override("font_size", 30)
+	heading.add_theme_font_size_override("font_size", 28)
 	column.add_child(heading)
+	_body_scroll = ScrollContainer.new()
+	_body_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_body_scroll.follow_focus = true
+	_body_scroll.focus_mode = Control.FOCUS_ALL
+	_body_scroll.mouse_force_pass_scroll_events = false
+	column.add_child(_body_scroll)
 	body = Label.new()
-	body.custom_minimum_size.x = 616
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.custom_minimum_size.x = 536
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.add_theme_font_size_override("font_size", 18)
-	column.add_child(body)
+	body.add_theme_font_size_override("font_size", 15)
+	body.add_theme_color_override("font_color", CampStyle.MUTED)
+	_body_scroll.add_child(body)
 	for index: int in range(5):
 		var button: C1HudButton = C1HudButton.new()
-		button.custom_minimum_size.y = 44
-		button.add_theme_font_size_override("font_size", 18)
+		button.custom_minimum_size.y = 40
+		button.add_theme_font_size_override("font_size", 17)
+		button.mouse_force_pass_scroll_events = false
 		column.add_child(button)
 		buttons.append(button)
 	root.hide()
+	root.resized.connect(_fit_body)
 	get_window().focus_exited.connect(func() -> void:
 		for button: Button in buttons:
 			(button as C1HudButton)._cancel_confirm())
@@ -76,12 +82,12 @@ func _ready() -> void:
 
 func show_pause(was_paused: bool) -> void:
 	confirming = false
-	heading.text = "已暂停"
-	body.text = "如何撤离\n发动巴士后，集合所有存活成员；搜集未完成也可撤离。\n集合不会取消搜集，工人完成后再归队。\n" + ("关闭菜单后仍保持原暂停，可在 HUD 继续。" if was_paused else "关闭菜单后继续出击。")
+	heading.text = "出击已暂停"
+	body.text = "发动巴士后，集合所有存活成员即可撤离。\n集合不会取消搜集，队员完成作业后归队；也可再点原搜集点取消。\n" + ("关闭菜单后仍保持原暂停，可在 HUD 继续。" if was_paused else "关闭菜单后继续出击。")
 	var labels: Array = ["继续出击（保持原暂停）" if was_paused else "继续出击", "定位巴士并正常撤离", "危险退出到首页…", "退出游戏 / 安全选项…"]
 	var actions: Array = [resume_requested.emit, bus_requested.emit, home_requested.emit, quit_requested.emit]
 	if suspend_available:
-		body.text += "\n暂存后可继续原战场，不算回营；每次恢复后须重新暂存。\n再次闪退且无新暂存或完整结果，原旅程仍可能无法继续。"
+		body.text += "\n安全暂存保留当前战场，不算回营；恢复后须重新暂存。\n再次闪退且无新暂存或完整结果，原旅程仍可能无法继续。"
 		labels.append("安全暂存并返回首页")
 		actions.append(suspend_requested.emit)
 	if not suspend_message.is_empty():
@@ -113,6 +119,15 @@ func _actions(labels: Array, actions: Array) -> void:
 			button.pressed.disconnect(connection.callable)
 		button.visible = index < labels.size()
 		button.disabled = index == 4 and not confirming and not suspend_enabled
+		for state: String in ["normal", "hover", "pressed", "disabled", "focus"]:
+			button.remove_theme_stylebox_override(state)
+		for state: String in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+			button.remove_theme_color_override(state)
+		if index == 0:
+			CampStyle.primary(button)
+		elif (confirming and index == 1) or (not confirming and index == 2):
+			button.add_theme_color_override("font_color", CampStyle.DANGER)
+			button.add_theme_stylebox_override("normal", CampStyle.box(CampStyle.PANEL, CampStyle.DANGER, 8))
 		if button.visible:
 			button.text = labels[index]
 			button.pressed.connect(actions[index])
@@ -123,13 +138,34 @@ func _actions(labels: Array, actions: Array) -> void:
 		order.assign([0, 2, 1, 3, 4])
 	for index: int in range(order.size()):
 		column.move_child(buttons[order[index]], 2 + index)
-	var focusable: Array[Button] = []
+	var focusable: Array[Control] = []
 	for index: int in order:
 		var button: Button = buttons[index]
 		if button.visible and not button.disabled:
 			focusable.append(button)
+	focusable.append(_body_scroll)
 	for index: int in range(focusable.size()):
 		focusable[index].focus_next = focusable[index].get_path_to(focusable[(index+1)%focusable.size()])
 		focusable[index].focus_previous = focusable[index].get_path_to(focusable[(index+focusable.size()-1)%focusable.size()])
 	root.show()
+	_body_scroll.scroll_vertical = 0
+	_fit_body.call_deferred()
 	buttons[0].grab_focus.call_deferred()
+
+
+func _fit_body() -> void:
+	if _body_scroll == null or body == null:
+		return
+	# Error details can be arbitrarily long; preserve the real message in a
+	# scrollable reading area while all departure and cancel actions stay visible.
+	var line_height: float = float(body.get_line_height())
+	var spacing: float = float(body.get_theme_constant("line_spacing"))
+	var lines: int = maxi(1, body.get_line_count())
+	var text_height: float = float(lines) * line_height + float(lines - 1) * spacing
+	text_height = maxf(text_height, body.get_combined_minimum_size().y)
+	var available: float = minf(180.0, maxf(72.0, root.size.y - 370.0))
+	# Keep the last visible line whole when a long failure message needs scrolling.
+	var visible_lines: int = maxi(1, floori((available + spacing) / maxf(1.0, line_height + spacing)))
+	var reading_height: float = float(visible_lines) * line_height + float(visible_lines - 1) * spacing
+	_body_scroll.custom_minimum_size.y = minf(text_height, reading_height)
+	panel.reset_size()

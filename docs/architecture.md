@@ -71,7 +71,7 @@
 
 营地玩家入口直接显示 `CampSceneWorld` 的旧渔协院落，不再隐藏世界后展示静态背景。`CampSceneLayout` 只定义营地表现坐标；`IsoSpace` / `IsoTiles` / `IsoBuildingArt` / `IsoAtlas` 与出征场共用，世界和设施标签共同等比缩放。三个设施位读取 `EconomyBuildV1.level()`（已有营地数据仍经 `CampFacilities` 读取）：未建为空地与材料，一级为小屋，二级换闭合屋顶建筑并补齐门前摆件。场景只发原有建设、补给、工坊、特长训练、名册和任务选择意图，不拥有交易或存档规则。装备台继续打开已有配装页，其中保留支援与构筑入口。
 
-`CampSceneResident` 仅给当前存活名册成员播放 `SurvivorVisualV1` 的正式八向待机/行走；沿院内固定环线散步，在补给、工坊、规划室和篝火旁停留，不实例化战斗角色、不写入存档。`CampSceneScenery` 绘制原创围栏、篝火和家具，所有立体物按脚点 Y 排序；暖暮复用 `ExpeditionAtmosphere.tint_for()` 及径向暖色点光，色调与灯光限制在世界层。`CampSceneStyle` 将营地与既有面板调整为暖炭灰，保留原面板布局参数。
+`CampSceneResident` 仅给当前存活名册成员播放 `SurvivorVisualV1` 的正式八向待机/行走；沿院内固定环线散步，在补给、工坊、规划室和篝火旁停留，不实例化战斗角色、不写入存档。`CampSceneScenery` 绘制原创围栏、篝火和家具，所有立体物按脚点 Y 排序；暖暮复用 `ExpeditionAtmosphere.tint_for()` 及径向暖色点光，色调与灯光限制在世界层。`CampSceneStyle` 复用 `CampStyle` 的冷蓝方角主题，保留既有面板布局参数和语义状态色；营地队员栏的 HP 与行动资格仍来自真实快照。场景素材与光照独立于 UI 配色。
 
 成长沿现有 `CampEdit` / `FrozenSettlement` → `RunTransaction` 链路保存。`EconomyBuildV1` 三个设施键 `supply` / `workshop` / `planning` 独立建设、最高二级：补给成功归航应发 2/3 粮；工坊回营自动修复最多 1/2 件出发前损坏的闲置武器，维修减免 4/6 币，下次出击换弹耗时乘 0.95/0.90；规划室成功归航给合格队员中的最低特性等级者增加 1/2 点进度。自动收益读取出发前状态，建设不会追溯补发；补给受库存容量限制，规划室不选择未登记、阵亡或特性满级者。
 

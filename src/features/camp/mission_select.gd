@@ -10,7 +10,6 @@ signal navigation_requested(action: StringName)
 const Supplies: Array[MissionSupply] = [preload("res://src/features/camp/scavenge.tres"), preload("res://src/features/camp/supermarket.tres")]
 const SHOP: Texture2D = preload("res://assets/candidates/shop_02.png")
 const MARKET: Texture2D = preload("res://assets/m401/market.png")
-const YARD: Texture2D = preload("res://assets/ui/m20/camp-blue-hour.png")
 const BUS: Texture2D = preload("res://assets/candidates/bus_02.png")
 var choices: Array[Button] = []
 var daily_offers: Array[Dictionary] = []
@@ -38,46 +37,53 @@ var _review_details: VBoxContainer
 var _review_target: Label
 var _selected_index: int = -1
 var _review_nav: Array[Button] = []
+var _resources: Label
+var _review_summary: Label
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	theme = CampStyle.theme(theme)
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(CampStyle.blue_hour_background(YARD))
 	var background: ColorRect = ColorRect.new()
-	background.color = Color(0.023, 0.061, 0.09, 0.66)
+	background.color = CampStyle.INK
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
 	var margins: MarginContainer = MarginContainer.new()
 	margins.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for side: String in ["left","right"]:
-		margins.add_theme_constant_override("margin_" + side, 48)
-	for side: String in ["top","bottom"]:
-		var inset: int = 42
-		margins.add_theme_constant_override("margin_" + side, inset if side == "top" else (34))
+	for side: String in ["left", "right"]:
+		margins.add_theme_constant_override("margin_" + side, 24)
+	for side: String in ["top", "bottom"]:
+		margins.add_theme_constant_override("margin_" + side, 16)
 	add_child(margins)
 	var column: VBoxContainer = VBoxContainer.new()
-	column.add_theme_constant_override("separation", 12)
+	column.add_theme_constant_override("separation", 10)
 	margins.add_child(column)
-	_heading = CampStyle.label("准备出击" if review_enabled else ("选择行动"), 34)
-	column.add_child(_heading)
-	_subtitle = CampStyle.label("选择此行的补给方向，准备好后出发。", 18, CampStyle.MUTED)
+	var header: HBoxContainer = HBoxContainer.new()
+	header.add_theme_constant_override("separation", 18)
+	column.add_child(header)
+	_heading = CampStyle.label("准备出击" if review_enabled else "选择行动", 30)
+	_heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(_heading)
+	_resources = CampStyle.label("", 16, CampStyle.MUTED)
+	_resources.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	header.add_child(_resources)
+	column.add_child(HSeparator.new())
+	_subtitle = CampStyle.label("比较目标、路线与风险；成功撤离后确认入账。", 17, CampStyle.MUTED)
+	_subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_subtitle)
-	var row: HBoxContainer = HBoxContainer.new()
+	var content: HBoxContainer = HBoxContainer.new()
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 18)
+	column.add_child(content)
+	var row: VBoxContainer = VBoxContainer.new()
 	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 16)
+	row.add_theme_constant_override("separation", 10)
+	content.add_child(row)
 	if review_enabled:
-		var content: HBoxContainer = HBoxContainer.new()
-		content.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		content.add_theme_constant_override("separation", 14)
-		column.add_child(content)
-		content.add_child(row)
 		_build_departure_review(content)
-	else:
-		column.add_child(row)
 	var available: Array[MissionSupply] = Supplies.duplicate()
 	available.append(preload("res://src/features/camp/rescue.tres"))
 	_active.assign(available)
@@ -85,69 +91,79 @@ func _ready() -> void:
 		var supply: MissionSupply = available[index]
 		var panel: PanelContainer = PanelContainer.new()
 		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		panel.add_theme_stylebox_override("panel", _card_style(false))
 		row.add_child(panel)
 		_card_panels.append(panel)
+		var horizontal: HBoxContainer = HBoxContainer.new()
+		horizontal.add_theme_constant_override("separation", 14)
+		panel.add_child(horizontal)
+		var visual: VBoxContainer = VBoxContainer.new()
+		visual.custom_minimum_size.x = 176 if review_enabled else 260
+		visual.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		visual.size_flags_stretch_ratio = 0.75
+		horizontal.add_child(visual)
+		_build_thumbnail(visual, SHOP if index == 0 else MARKET)
 		var card: VBoxContainer = VBoxContainer.new()
-		card.add_theme_constant_override("separation", 10)
-		panel.add_child(card)
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card.size_flags_stretch_ratio = 1.25
+		card.add_theme_constant_override("separation", 6)
+		horizontal.add_child(card)
 		var rescue: bool = supply.id == &"rescue"
-		var title: Label = CampStyle.label("%02d / %s" % [index + 1, RescueTarget.ACTION_TITLE if rescue else supply.layout.display_name], 24)
-		if review_enabled:
-			title.add_theme_font_size_override("font_size", 18)
-			title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var title: Label = CampStyle.label(RescueTarget.ACTION_TITLE if rescue else supply.layout.display_name, 21)
+		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var top: HBoxContainer = HBoxContainer.new()
-		top.add_theme_constant_override("separation", 10)
+		top.add_theme_constant_override("separation", 8)
 		card.add_child(top)
 		var mark: CardMark = CardMark.new()
-		mark.custom_minimum_size = Vector2(34, 34)
+		mark.custom_minimum_size = Vector2(26, 26)
 		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		top.add_child(mark)
 		_role_marks.append(mark)
 		top.add_child(title)
 		_titles.append(title)
-		_build_thumbnail(card, SHOP if index == 0 else MARKET)
-		var pressure: Label = CampStyle.label("", 15, CampStyle.TEAL)
+		var pressure: Label = CampStyle.label("", 14, CampStyle.DANGER)
 		pressure.hide()
 		card.add_child(pressure)
 		_campaign_pressures.append(pressure)
 		var description: String = _rescue_card_text(supply) if rescue else supply.description
-		description += "\n搜完货币点可带回%d币；%s。武器以实际搜获为准。\n夜间敌人增援变密；阵亡不可恢复，归航需留足口粮。" % [supply.cash_reward,"食物点%d份" % supply.food_reward if supply.food_reward>0 else "此行没有食物点"]
-		var text: Label = CampStyle.label(description, 17, CampStyle.MUTED)
+		description += "\n搜完货币点可带回%d币；%s。武器以实际搜获为准。\n夜间敌人增援变密；阵亡不可恢复，归航需留足口粮。" % [supply.cash_reward, "食物点%d份" % supply.food_reward if supply.food_reward > 0 else "此行没有食物点"]
+		var text: Label = CampStyle.label(description, 16, CampStyle.MUTED)
 		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		text.custom_minimum_size.y = 52
+		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var scroll: ScrollContainer = ScrollContainer.new()
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		scroll.custom_minimum_size.y = 124
+		scroll.custom_minimum_size.y = 44
+		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		card.add_child(scroll)
-		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		text.add_theme_color_override("font_color", Color("d4e0dd"))
-		text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		scroll.add_child(text)
 		_description_scrolls.append(scroll)
 		_descriptions.append(text)
 		var button: Button = Button.new()
-		button.text = "前往救援 →" if index == 2 else ("出发搜集 →" if index == 0 else "前往超市 →")
-		button.custom_minimum_size.y = 46
+		button.text = "选择此行动"
+		button.add_theme_font_size_override("font_size", 16)
+		button.custom_minimum_size = Vector2(126, 38)
+		button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		button.pressed.connect(_choose.bind(index))
-		card.add_child(button)
+		horizontal.add_child(button)
 		choices.append(button)
-		button.focus_entered.connect(func() -> void: panel.add_theme_stylebox_override("panel", _card_style(true)))
-		button.focus_exited.connect(func() -> void: panel.add_theme_stylebox_override("panel", _card_style(false)))
+		button.focus_entered.connect(_refresh_card_states)
+		button.focus_exited.connect(_refresh_card_states)
 	cancel_button = Button.new()
 	cancel_button.text = "返回营地 / Esc"
-	cancel_button.custom_minimum_size.y = 44
+	cancel_button.custom_minimum_size = Vector2(174, 42)
 	cancel_button.pressed.connect(func() -> void: cancelled.emit())
-	cancel_button.custom_minimum_size.x = 184
-	cancel_button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var footer: HBoxContainer = HBoxContainer.new()
+	footer.add_theme_constant_override("separation", 8)
+	column.add_child(footer)
 	if review_enabled:
-		var footer: HBoxContainer = HBoxContainer.new()
-		column.add_child(footer)
-		footer.add_child(cancel_button)
 		for action: StringName in [&"crew", &"weapons", &"workshop", &"supplies"]:
 			var nav: Button = Button.new()
 			nav.text = {&"crew":"队员", &"weapons":"装备仓", &"workshop":"工坊", &"supplies":"补给"}[action]
+			nav.custom_minimum_size.y = 42
+			CampStyle.text_button(nav)
 			nav.pressed.connect(navigation_requested.emit.bind(action))
 			footer.add_child(nav)
 			_review_nav.append(nav)
@@ -156,8 +172,10 @@ func _ready() -> void:
 		_retry_button.pressed.connect(retry_requested.emit)
 		footer.add_child(_retry_button)
 		_retry_button.hide()
-	else:
-		column.add_child(cancel_button)
+	var gap: Control = Control.new()
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	footer.add_child(gap)
+	footer.add_child(cancel_button)
 	_link_choices()
 
 
@@ -201,8 +219,8 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}, prepared: Diction
 	for index: int in range(choices.size()):
 		var panel: PanelContainer = _card_panels[index]
 		panel.visible = index < daily_offers.size()
-		panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER if daily_offers.size() == 1 else Control.SIZE_EXPAND_FILL
-		panel.custom_minimum_size.x = 366 if daily_offers.size() == 1 else 0
+		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		panel.custom_minimum_size.x = 0
 		if index>=daily_offers.size(): continue
 		var supply: MissionSupply = DailyActions.supply(daily_offers[index]) if prepared.is_empty() else prepared.supplies[index]
 		_active[index] = supply
@@ -211,7 +229,7 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}, prepared: Diction
 		if pressure.visible:
 			pressure.text = CampaignPressureV1.label(int(supply.generated.campaign_pressure.tier))
 		var rescue: bool = supply.id == &"rescue"
-		_titles[index].text = "%02d / %s" % [index + 1, RescueTarget.ACTION_TITLE if rescue else supply.display_name]
+		_titles[index].text = RescueTarget.ACTION_TITLE if rescue else supply.display_name
 		_descriptions[index].text = _rescue_card_text(supply) if rescue else supply.description
 		_descriptions[index].custom_minimum_size.y = 52
 		if _descriptions[index].has_theme_constant_override("line_spacing"):
@@ -222,17 +240,17 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}, prepared: Diction
 		var rare_card: bool = supply.generated.has("rare_policy")
 		var event_site: String = EventSortieV1.site_id(supply.generated)
 		if EconomyActions.hardware(supply.generated):
-			_titles[index].text = "%02d / %s" % [index + 1, EconomyActions.HARDWARE_TITLE]
+			_titles[index].text = EconomyActions.HARDWARE_TITLE
 			_descriptions[index].text = EconomyActions.card_text(supply.generated)
 			_descriptions[index].custom_minimum_size.y = 100
 			_descriptions[index].add_theme_font_size_override("font_size", 16)
 		elif not event_site.is_empty():
-			_titles[index].text = "%02d / %s" % [index + 1, EventSortieV1.TITLE]
+			_titles[index].text = EventSortieV1.TITLE
 			_descriptions[index].text = _event_card_text(supply.generated)
 			_descriptions[index].custom_minimum_size.y = 100
 			_descriptions[index].add_theme_font_size_override("font_size", 16)
 		elif rare_card:
-			_titles[index].text = "%02d / 稀有行动 · %s" % [index + 1, supply.display_name]
+			_titles[index].text = "稀有行动 · " + supply.display_name
 			_descriptions[index].add_theme_font_size_override("font_size", 16)
 		elif pump_card:
 			_descriptions[index].add_theme_font_size_override("font_size", 16)
@@ -242,7 +260,7 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}, prepared: Diction
 				title = "超市补给"
 			if SortieRiskV1.enabled(supply.generated):
 				title = "装备 · 深入回收" if supply.generated.sortie_risk.tier == SortieRiskV1.DEEP else "装备 · 常规回收"
-			_titles[index].text = "%02d / %s" % [index + 1, title]
+			_titles[index].text = title
 			_descriptions[index].text = _rescue_card_text(supply) if rescue else LevelSummary.mission_card_text(supply.generated, base if action_choices else {}, rations)
 			if ReconActionV1.enabled(supply.generated):
 				var lines: PackedStringArray = _descriptions[index].text.split("\n")
@@ -286,21 +304,22 @@ func refresh_daily(base: Dictionary, rations: Dictionary = {}, prepared: Diction
 		_pictures[index].texture = picture
 		_crates[index].visible=outdoor
 		choices[index].disabled = false
-		choices[index].text = "选择此行动 →"
+		choices[index].text = "选择此行动"
 		choices[index].tooltip_text = "只有真实搜集并成功撤离，确认结算才入账。"
 		_refresh_blue_hour_card(index, supply.generated)
 		if HarborWarehouse.is_layout(supply.layout):
-			_titles[index].text = "%02d / %s" % [index + 1, HarborWarehouse.TITLE]
+			_titles[index].text = HarborWarehouse.TITLE
 			_descriptions[index].text = supply.description
 			_pictures[index].texture = IsoAtlas.texture("harbor/cold_store.svg")
 			_crates[index].hide()
 		elif CapeStation.is_layout(supply.layout):
-			_titles[index].text = "%02d / %s" % [index + 1, CapeStation.TITLE]
+			_titles[index].text = CapeStation.TITLE
 			_descriptions[index].text = supply.description
 			_pictures[index].texture = IsoAtlas.texture("station/station.svg")
 			_crates[index].hide()
 		if CampaignPressureV1.blockade_night(supply.generated):
 			_descriptions[index].text = CampaignPressureV1.BLOCKADE_WARNING + "\n" + _descriptions[index].text
+	_refresh_card_states()
 	_link_choices()
 
 
@@ -317,7 +336,7 @@ func show_waiting(base: Dictionary, rations: Dictionary, failed: bool = false) -
 	for nav: Button in _review_nav:
 		nav.disabled = loading
 	_retry_button.visible = failed
-	_review_target.text = "等待任务卡" if loading else "暂无可用任务卡"
+	_review_target.text = "正在核验今日行动…" if loading else "行动生成失败 · 请重试"
 	_refresh_departure_team(base, rations)
 	_link_choices()
 	cancel_button.grab_focus()
@@ -332,7 +351,8 @@ func _choose(index: int) -> void:
 	_selected_index = index
 	_review_target.text = _titles[index].text
 	for row: int in range(choices.size()):
-		choices[row].text = "当前选择" if row == index else "选择此行动 →"
+		choices[row].text = "当前选择" if row == index else "选择此行动"
+	_refresh_card_states()
 	depart_button.disabled = false
 	_link_choices()
 	depart_button.grab_focus()
@@ -345,29 +365,35 @@ func _confirm_departure() -> void:
 
 func _build_departure_review(parent: Container) -> void:
 	var panel: PanelContainer = PanelContainer.new()
-	panel.custom_minimum_size.x = 292
-	panel.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.PANEL))
+	panel.custom_minimum_size.x = 302
+	panel.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.PANEL, Color.TRANSPARENT, 14))
 	parent.add_child(panel)
 	var body: VBoxContainer = VBoxContainer.new()
 	body.add_theme_constant_override("separation", 10)
 	panel.add_child(body)
-	body.add_child(CampStyle.label("出击小队", 23))
+	body.add_child(CampStyle.label("出发复核", 25))
+	_review_target = CampStyle.label("请选择一项行动", 21, CampStyle.TEXT)
+	_review_target.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_child(_review_target)
+	_review_summary = CampStyle.label("", 16, CampStyle.MUTED)
+	_review_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_child(_review_summary)
+	body.add_child(HSeparator.new())
 	var scroll: ScrollContainer = ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.follow_focus = true
 	body.add_child(scroll)
 	_review_details = VBoxContainer.new()
 	_review_details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_review_details.add_theme_constant_override("separation", 10)
+	_review_details.add_theme_constant_override("separation", 6)
 	scroll.add_child(_review_details)
-	_review_target = CampStyle.label("", 17, CampStyle.TEAL)
-	_review_target.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.add_child(_review_target)
 	depart_button = Button.new()
 	depart_button.text = "确认出击 →"
-	depart_button.custom_minimum_size.y = 46
+	depart_button.custom_minimum_size.y = 50
+	depart_button.add_theme_font_size_override("font_size", 24)
 	depart_button.disabled = true
-	CampStyle.blue_hour_primary(depart_button)
+	CampStyle.primary(depart_button)
 	depart_button.pressed.connect(_confirm_departure)
 	body.add_child(depart_button)
 
@@ -376,11 +402,15 @@ func _refresh_departure_team(base: Dictionary, rations: Dictionary) -> void:
 	for child: Node in _review_details.get_children():
 		_review_details.remove_child(child)
 		child.queue_free()
-	if OpeningBuild.is_m47(base):
-		_review_details.add_child(CampStyle.label("本局专精 · " + OpeningBuild.PLANS[OpeningBuild.plan(base)].title, 18, CampStyle.TEAL))
-		var eligible: Label = CampStyle.label(SpecialtyPresentation.access_text(OpeningBuild.eligible(base)), 15, CampStyle.MUTED)
-		eligible.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		_review_details.add_child(eligible)
+	var living: int = 0
+	var armed: int = 0
+	for member: Dictionary in base.crew:
+		if float(member.health) > 0.0:
+			living += 1
+			if not WeaponInventory.for_member(base, int(member.id)).is_empty():
+				armed += 1
+	_resources.text = "口粮 %d    货币 %d    工具箱 %d" % [int(base.food), int(base.cash), WorkshopV1.tools(base)]
+	_review_summary.text = "同行 %d 人 · 已配装 %d 人\n下餐需 %d 粮 · 现有 %d 粮" % [living, armed, int(rations.get("required", 0)), int(base.food)]
 	for member: Dictionary in base.crew:
 		if float(member.health) <= 0.0:
 			continue
@@ -392,21 +422,45 @@ func _refresh_departure_team(base: Dictionary, rations: Dictionary) -> void:
 			if not mod.is_empty():
 				weapon += " · " + WorkshopV1.name_for(mod)
 		var crew_label: Label = PersonaCard.HoverLabel.new()
-		crew_label.text = "%s · 生命 %d/%.0f" % [SurvivorRoster.display_label(member), ceili(member.health), GrowthRules.maximum(member)]
-		crew_label.add_theme_font_size_override("font_size", 18)
+		crew_label.text = "%s\n生命 %d / %.0f" % [SurvivorRoster.display_label(member), ceili(member.health), GrowthRules.maximum(member)]
+		crew_label.add_theme_font_size_override("font_size", 17)
+		crew_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		var identity_style: StyleBoxFlat = CampStyle.box(Color.TRANSPARENT, Color.TRANSPARENT, 0)
+		identity_style.content_margin_left = 54
+		crew_label.add_theme_stylebox_override("normal", identity_style)
+		crew_label.custom_minimum_size.y = 46
+		var portrait: TextureRect = _texture(null)
+		var definition: SurvivorDefinition = SurvivorRoster.definition_for(member)
+		portrait.texture = definition.portrait if definition != null else null
+		portrait.position = Vector2.ZERO
+		portrait.size = Vector2(46, 46)
+		crew_label.add_child(portrait)
 		crew_label.add_theme_color_override("font_color", CampStyle.TEXT)
 		crew_label.tooltip_text = PersonaCard.camp_hover(base, int(member.id))
 		crew_label.mouse_filter = Control.MOUSE_FILTER_PASS
 		_review_details.add_child(crew_label)
-		weapon += " · 等级 %d" % int(item.get("weapon_level", 1))
+		if not item.is_empty():
+			weapon += " · 等级 %d" % int(item.get("weapon_level", 1))
 		var weapon_label: Label = PersonaCard.HoverLabel.new()
 		weapon_label.text = weapon
+		weapon_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		weapon_label.add_theme_font_size_override("font_size", 15)
 		weapon_label.add_theme_color_override("font_color", CampStyle.MUTED)
 		weapon_label.tooltip_text = crew_label.tooltip_text
 		weapon_label.mouse_filter = Control.MOUSE_FILTER_PASS
 		_review_details.add_child(weapon_label)
+		var health: ProgressBar = ProgressBar.new()
+		health.custom_minimum_size.y = 7
+		health.show_percentage = false
+		health.max_value = GrowthRules.maximum(member)
+		health.value = float(member.health)
+		_review_details.add_child(health)
 		_review_details.add_child(HSeparator.new())
+	if OpeningBuild.is_m47(base):
+		_review_details.add_child(CampStyle.label("本局专精 · " + OpeningBuild.PLANS[OpeningBuild.plan(base)].title, 18, CampStyle.TEAL))
+		var eligible: Label = CampStyle.label(SpecialtyPresentation.access_text(OpeningBuild.eligible(base)), 15, CampStyle.MUTED)
+		eligible.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_review_details.add_child(eligible)
 	if EconomyActions.camp_enabled(base):
 		var levels: PackedStringArray = []
 		for facility: String in ["supply", "workshop", "planning"]:
@@ -480,7 +534,7 @@ func _refresh_blue_hour_card(index: int, generated: Dictionary) -> void:
 		var lines: PackedStringArray = _descriptions[index].text.split("\n")
 		lines.insert(1, "专精装备 · %s · 回收后归航确认" % SpecialtyPresentation.reward_name(specialty))
 		_descriptions[index].text = "\n".join(lines)
-	choices[index].text = "出发 · 突破封锁 →" if role == "finale" else "选择此行动 →"
+	choices[index].text = "选择终局行动" if role == "finale" else "选择此行动"
 
 
 static func _has_extra_weapon(generated: Dictionary) -> bool:
@@ -498,7 +552,7 @@ func _build_thumbnail(card: VBoxContainer, source: Texture2D) -> void:
 	_pictures.append(picture)
 	_crates.append(crate)
 	var well: ThumbnailPlate = ThumbnailPlate.new()
-	well.custom_minimum_size.y = 160
+	well.custom_minimum_size.y = 84
 	well.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	well.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	well.clip_contents = true
@@ -549,16 +603,30 @@ static func _texture(source: Texture2D) -> TextureRect:
 	texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	texture_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	texture_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	texture_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	return texture_rect
 
 
 static func _card_style(focused: bool) -> StyleBoxFlat:
-	var color: Color = Color(0.06, 0.15, 0.19, 0.97) if focused else Color(0.045, 0.10, 0.14, 0.92)
-	var edge: Color = CampStyle.AMBER if focused else Color("496971")
-	var result: StyleBoxFlat = CampStyle.box(color, edge, 13)
-	result.set_corner_radius_all(8)
-	result.set_border_width_all(2 if focused else 1)
-	return result
+	return CampStyle.box(CampStyle.SURFACE if focused else CampStyle.PANEL,
+		CampStyle.TEAL if focused else Color.TRANSPARENT, 10)
+
+
+func _refresh_card_states() -> void:
+	for index: int in range(choices.size()):
+		var selected_card: bool = review_enabled and index == _selected_index
+		var button: Button = choices[index]
+		_card_panels[index].add_theme_stylebox_override("panel", _card_style(selected_card or button.has_focus()))
+		if selected_card:
+			button.add_theme_stylebox_override("normal", CampStyle.box(CampStyle.TEAL, Color.TRANSPARENT, 10))
+			button.add_theme_stylebox_override("hover", CampStyle.box(CampStyle.TEAL.lightened(0.08), Color.TRANSPARENT, 10))
+			button.add_theme_color_override("font_color", CampStyle.INK)
+			button.add_theme_color_override("font_hover_color", CampStyle.INK)
+		else:
+			for style: String in ["normal", "hover"]:
+				button.remove_theme_stylebox_override(style)
+			for color: String in ["font_color", "font_hover_color"]:
+				button.remove_theme_color_override(color)
 
 
 func _link_choices() -> void:
@@ -621,9 +689,9 @@ class ThumbnailPlate extends Control:
 
 	func _draw() -> void:
 		var road_y: float = size.y * 0.76
-		draw_rect(Rect2(Vector2.ZERO, size), Color("294653"))
-		draw_rect(Rect2(0, size.y * 0.57, size.x, road_y - size.y * 0.57), Color("385052"))
-		draw_rect(Rect2(0, road_y, size.x, size.y - road_y), Color("263641"))
+		draw_rect(Rect2(Vector2.ZERO, size), CampStyle.SURFACE)
+		draw_rect(Rect2(0, size.y * 0.57, size.x, road_y - size.y * 0.57), Color("365a66"))
+		draw_rect(Rect2(0, road_y, size.x, size.y - road_y), CampStyle.INK)
 		draw_line(Vector2(0, road_y), Vector2(size.x, road_y), Color("7e9393"), 2.0)
 		draw_dashed_line(Vector2(0, size.y * 0.90), Vector2(size.x, size.y * 0.90), Color("777a67"), 1.0, 13.0)
 
@@ -640,7 +708,7 @@ class CardMark extends Control:
 		if scale_factor <= 0.0:
 			return
 		draw_set_transform(size * 0.5, -0.14 if large else 0.0, Vector2.ONE * scale_factor)
-		var accent: Color = CampStyle.AMBER if role in ["equipment", "finale"] else CampStyle.TEAL
+		var accent: Color = CampStyle.CORAL if role == "finale" else CampStyle.TEAL
 		if not large:
 			draw_rect(Rect2(-16, -16, 32, 32), Color("173643"))
 			draw_rect(Rect2(-16, -16, 32, 32), Color(accent, 0.58), false, 1.0)

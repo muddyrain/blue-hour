@@ -1,10 +1,10 @@
 class_name CommandButton
 extends C1HudButton
-## Rounded command keycap: title, shortcut, status, and an amber cooldown ring.
+## Square command keycap: real shortcut, status and a linear cooldown indicator.
 
-const CREAM := Color("e8dcc4")
-const AMBER := Color("d9a24a")
-const DIM := Color("e8dcc4", 0.28)
+const CREAM: Color = CampStyle.TEXT
+const AMBER: Color = CampStyle.TEAL
+const DIM: Color = CampStyle.SURFACE
 
 var command_id: String = ""
 var command_key: String = ""
@@ -19,6 +19,7 @@ func setup(id: String, key: String, title: String) -> void:
 	command_title = title
 	name = id.capitalize()
 	icon = _icon(id)
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	expand_icon = true
 	add_theme_constant_override("icon_max_width", 22)
 	icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -27,8 +28,8 @@ func setup(id: String, key: String, title: String) -> void:
 	custom_minimum_size = Vector2(68, 68)
 	size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	add_theme_font_size_override("font_size", 12)
-	add_theme_color_override("font_disabled_color", Color("b8ac96"))
-	add_theme_color_override("icon_disabled_color", Color("b8ac96"))
+	add_theme_color_override("font_disabled_color", CampStyle.MUTED)
+	add_theme_color_override("icon_disabled_color", CampStyle.MUTED)
 	autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	mouse_force_pass_scroll_events = false
@@ -51,16 +52,13 @@ func present(status: String, enabled: bool, remaining: float = 0.0, duration: fl
 
 
 func _draw() -> void:
-	var center := size * 0.5
-	var radius := minf(size.x, size.y) * 0.5 - 3.0
-	if radius <= 0.0:
-		return
 	if aiming:
-		draw_arc(center, radius, 0.0, TAU, 48, AMBER, 2.2, true)
+		draw_rect(Rect2(Vector2.ONE, size - Vector2.ONE * 2.0), AMBER, false, 2.0)
 	if cooldown_ratio > 0.0:
-		var ready := TAU * (1.0 - cooldown_ratio)
-		draw_arc(center, radius, -PI * 0.5, -PI * 0.5 + ready, 48, AMBER, 3.0, true)
-		draw_arc(center, radius, -PI * 0.5 + ready, -PI * 0.5 + TAU, 48, DIM, 3.0, true)
+		var track: Rect2 = Rect2(4.0, size.y - 5.0, maxf(0.0, size.x - 8.0), 3.0)
+		draw_rect(track, DIM)
+		track.size.x *= 1.0 - cooldown_ratio
+		draw_rect(track, AMBER)
 
 
 func _short(status: String) -> String:
@@ -90,7 +88,7 @@ func _short(status: String) -> String:
 func _icon(kind: String) -> Texture2D:
 	var image := Image.create(32, 32, false, Image.FORMAT_RGBA8)
 	image.fill(Color(0, 0, 0, 0))
-	var ink := Color("e8dcc4")
+	var ink := CampStyle.TEXT
 	match kind:
 		"rally":
 			_dot(image, 8, 8, ink)
@@ -115,10 +113,10 @@ func _icon(kind: String) -> Texture2D:
 		"special":
 			_bar(image, 15, 4, 2, 24, ink)
 			_bar(image, 4, 15, 24, 2, ink)
-			_bar(image, 8, 8, 16, 2, Color("d9a24a"))
-			_bar(image, 8, 22, 16, 2, Color("d9a24a"))
-			_bar(image, 8, 8, 2, 16, Color("d9a24a"))
-			_bar(image, 22, 8, 2, 16, Color("d9a24a"))
+			_bar(image, 8, 8, 16, 2, CampStyle.TEAL)
+			_bar(image, 8, 22, 16, 2, CampStyle.TEAL)
+			_bar(image, 8, 8, 2, 16, CampStyle.TEAL)
+			_bar(image, 22, 8, 2, 16, CampStyle.TEAL)
 	return ImageTexture.create_from_image(image)
 
 

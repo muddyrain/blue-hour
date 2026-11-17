@@ -29,11 +29,9 @@ func _case(base: Dictionary, size: Vector2i, count: int) -> void:
 	viewport.add_child(hud)
 	var support: BasicSupportPanel=BasicSupportPanel.new()
 	hud.add_child(support)
+	support.name="CommandStrip"
 	support.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	support.offset_left=-220
-	support.offset_right=220
-	support.offset_top=-76
-	support.offset_bottom=-8
+	hud._layout_field()
 	var members: Array[Dictionary]=[]
 	for id: int in range(1,count+1):
 		var model: Dictionary=PersonaViewModel.camp(base,id,"camp" if id<=2 else "candidate")

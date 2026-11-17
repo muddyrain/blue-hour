@@ -11,8 +11,8 @@ signal bus_start_requested
 # Matches the verified P03-2 ActorVisual identities; no dependency on that class.
 const IDENTITY_COLORS: Array[Color] = [Color("80ddd8"), Color("f2c37f")]
 const TONES: Dictionary[String, Color] = {
-	"normal": Color("e8dcc4"), "info": Color("8fbf7a"),
-	"warning": Color("d9a24a"), "danger": Color("c8553d"),
+	"normal": CampStyle.TEXT, "info": CampStyle.TEAL,
+	"warning": CampStyle.AMBER, "danger": CampStyle.DANGER,
 }
 
 var _paused: bool = false
@@ -59,6 +59,8 @@ var _member_scroll: ScrollContainer
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	theme = CampStyle.theme(theme)
+	_build_chrome()
 	_build_top()
 	_readouts.build(self)
 	_build_actions()
@@ -68,6 +70,8 @@ func _ready() -> void:
 	visibility_changed.connect(_on_visibility_changed)
 	get_viewport().size_changed.connect(_fit_persona_members)
 	resized.connect(place_status_hint)
+	resized.connect(_layout_field)
+	_layout_field.call_deferred()
 	refresh({})
 	ExpeditionHudTheme.skin(self)
 	_mission.add_theme_color_override("font_color", ExpeditionHudTheme.AMBER)
@@ -217,18 +221,71 @@ func place_help_above_lane() -> void:
 	pass
 
 
+func _build_chrome() -> void:
+	var top: Panel = Panel.new()
+	top.name = "TopChrome"
+	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	top.offset_bottom = 64
+	top.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.INK, CampStyle.EDGE, 0))
+	_passive(top)
+	add_child(top)
+	var title: Label = _label(top, "FieldTitle", 25)
+	title.text = "蓝时归航"
+	title.position = Vector2(16, 12)
+	var bottom: Panel = Panel.new()
+	bottom.name = "BottomChrome"
+	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	bottom.offset_top = -92
+	bottom.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.INK, CampStyle.EDGE, 0))
+	_passive(bottom)
+	add_child(bottom)
+
+
+func _layout_field() -> void:
+	# These nodes are attached by ExpeditionUi after this HUD enters the tree.
+	# Only presentation rectangles change; callbacks and stable paths stay owned there.
+	var strip: HBoxContainer = get_node_or_null("CommandStrip") as HBoxContainer
+	if strip != null:
+		strip.offset_left = -184
+		strip.offset_right = 184
+		strip.offset_top = -80
+		strip.offset_bottom = -12
+		for child: Control in strip.get_children():
+			child.custom_minimum_size = Vector2(82, 68)
+	var overview: Control = get_node_or_null("OverviewPanel") as Control
+	if overview != null:
+		overview.offset_left = 12
+		overview.offset_right = 168
+		overview.offset_top = -190
+		overview.offset_bottom = -34
+	var location: Label = get_node_or_null("LocationName") as Label
+	if location != null:
+		location.offset_left = 12
+		location.offset_right = 168
+		location.offset_top = -30
+		location.offset_bottom = -10
+	if _help_button != null:
+		_help_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+		_help_button.offset_left = -48
+		_help_button.offset_right = -12
+		_help_button.offset_top = -52
+		_help_button.offset_bottom = -16
+	place_status_hint()
+	_fit_persona_members()
+
+
 func _build_top() -> void:
 	var panel: PanelContainer = _panel(self, "MissionPanel")
-	panel.position = Vector2.ZERO
-	panel.custom_minimum_size.x = 264
-	panel.size.x = 264
+	panel.position = Vector2(12, 76)
+	panel.custom_minimum_size.x = 280
+	panel.size.x = 280
 	var mission_box: VBoxContainer = _column(panel)
 	mission_box.add_theme_constant_override("separation",4)
 	var heading: HBoxContainer = HBoxContainer.new()
 	heading.add_theme_constant_override("separation",8)
 	_passive(heading)
 	mission_box.add_child(heading)
-	_mission = _label(heading, "MissionTitle", 16)
+	_mission = _label(heading, "MissionTitle", 18)
 	_mission.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_mission.clip_text = true
 	_mission.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -245,9 +302,9 @@ func _build_top() -> void:
 	_exploration_objectives.hide()
 	var time_panel: PanelContainer = _panel(self,"TimePanel")
 	time_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	time_panel.offset_left = -152
-	time_panel.offset_right = 152
-	time_panel.offset_top = 16
+	time_panel.offset_left = -172
+	time_panel.offset_right = 156
+	time_panel.offset_top = 6
 	_time_box = _column(time_panel)
 	_time_box.add_theme_constant_override("separation",3)
 	_time_box.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -259,19 +316,24 @@ func _build_top() -> void:
 	_day.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_time_label = _label(_time_box, "TimeLabel", 13)
 	_time_label.hide()
-	_time_text = _label(time_row, "TimeText", 25)
+	_time_text = _label(time_row, "TimeText", 24)
 	_time_text.custom_minimum_size.x = 78
 	_time_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_time_hint = _label(time_row, "TimeHint", 13)
 	_time_hint.custom_minimum_size.x = 58
 	_time_hint.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_time_hint.clip_text = true
+	_time_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var time_space: Control = Control.new()
+	time_space.custom_minimum_size.x = 24
+	_passive(time_space)
+	time_row.add_child(time_space)
 	var explanation: Button = _button(self,"ThreatExplanation","?",_toggle_threat)
 	explanation.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	explanation.offset_left=116
 	explanation.offset_right=144
-	explanation.offset_top=24
-	explanation.offset_bottom=50
+	explanation.offset_top=12
+	explanation.offset_bottom=38
 	explanation.custom_minimum_size=Vector2(28,26)
 	explanation.add_theme_font_size_override("font_size",13)
 	explanation.tooltip_text="查看当前威胁；不暂停行动。"
@@ -279,16 +341,16 @@ func _build_top() -> void:
 	_threat_details.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_threat_details.offset_left=-160
 	_threat_details.offset_right=160
-	_threat_details.offset_top=76
+	_threat_details.offset_top=72
 	_threat_content = _label(_threat_details,"ThreatText",15)
 	_wrap(_threat_content)
 	_threat_details.mouse_filter=Control.MOUSE_FILTER_STOP
 	_threat_details.hide()
 	var resource_panel: PanelContainer = _panel(self,"ResourcesPanel")
 	resource_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	resource_panel.offset_left=-264
-	resource_panel.offset_right=-16
-	resource_panel.offset_top=16
+	resource_panel.offset_left=-326
+	resource_panel.offset_right=-12
+	resource_panel.offset_top=6
 	var resources: HBoxContainer = HBoxContainer.new()
 	resources.add_theme_constant_override("separation",8)
 	_passive(resources)
@@ -305,9 +367,10 @@ func _build_top() -> void:
 	members_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	members_panel.offset_left=-224
 	members_panel.offset_right=-16
-	members_panel.offset_top=88
+	members_panel.offset_top=76
 	var list: VBoxContainer = _column(members_panel)
-	_label(list,"TeamTitle",12).text="行动小队"
+	_label(list,"TeamTitle",13).text="行动小队"
+	list.add_theme_constant_override("separation", 8)
 	_members_parent = VBoxContainer.new()
 	_members_parent.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	_members_parent.add_theme_constant_override("separation",4)
@@ -333,9 +396,9 @@ func _build_top() -> void:
 	persona_details=PersonaDetails.new()
 	add_child(persona_details)
 	persona_details.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	persona_details.offset_left=-620
-	persona_details.offset_right=-200
-	persona_details.offset_top=88
+	persona_details.offset_left=-656
+	persona_details.offset_right=-236
+	persona_details.offset_top=76
 	persona_details.offset_bottom=-72
 	persona_details.anchor_bottom=1.0
 	persona_details.closed.connect(func() -> void: _persona_id=0)
@@ -429,8 +492,8 @@ func _build_actions() -> void:
 	_hint.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_hint.clip_text = true
 	_hint.mouse_filter = Control.MOUSE_FILTER_PASS
-	_hint.add_theme_color_override("font_outline_color", Color("22201e"))
-	_hint.add_theme_constant_override("outline_size", 3)
+	_hint.add_theme_color_override("font_outline_color", CampStyle.INK)
+	_hint.add_theme_constant_override("outline_size", 0)
 	_hint_panel.hide()
 	panel.resized.connect(place_status_hint)
 	place_status_hint.call_deferred()
@@ -487,6 +550,7 @@ func hud_exclusion_rects() -> Array[Rect2]:
 	for path: String in [
 		"OverviewPanel", "LocationName", "HelpButton", "ActionsPanel", "CommandStrip",
 		"MembersPanel", "StatusHintPanel", "MissionPanel", "TimePanel", "ResourcesPanel",
+		"TopChrome", "BottomChrome",
 	]:
 		var node: Control = get_node_or_null(path) as Control
 		if node != null and node.is_visible_in_tree() and node.size.x > 1.0 and node.size.y > 1.0:
@@ -508,7 +572,7 @@ func _build_help() -> void:
 	_help.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	_help.offset_left = 216
 	_help.offset_right = 644
-	_help.offset_top = -266
+	_help.offset_top = -470
 	_help.offset_bottom = -96
 	_help.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_help.mouse_filter=Control.MOUSE_FILTER_STOP
@@ -693,7 +757,7 @@ func _fit_persona_members() -> void:
 			height+=card.get_combined_minimum_size().y
 			count+=1
 	height+=4.0*maxi(0,count-1)
-	var client_height: float=maxf(40.0,get_viewport_rect().size.y-88.0-16.0-40.0)
+	var client_height: float=maxf(40.0,get_viewport_rect().size.y-76.0-104.0-40.0)
 	_member_scroll.custom_minimum_size.y=minf(height,client_height)
 	_members_panel.reset_size()
 
@@ -712,24 +776,41 @@ func _compact_persona_card(card: PersonaCard, first_aid: String) -> void:
 		card.set_meta("field_skin", true)
 	card.primary_label.add_theme_color_override("font_color", ExpeditionHudTheme.CREAM)
 	(card.health_bar.get_theme_stylebox("fill") as StyleBoxFlat).bg_color = ExpeditionHudTheme.SAGE
-	# Keep the original hidden health label for details/tests; expose its HP in the identity row.
-	var identity: Node = card.primary_label.get_parent()
-	var hp: Label = identity.get_node_or_null("FieldHp") as Label
+	# Give HP the full card width, independent of the portrait/name/details row.
+	# The original hidden label remains available to details and callers.
+	var content: Node = card.health_bar.get_parent()
+	var hp: Label = content.get_node_or_null("FieldHp") as Label
 	if hp == null:
 		hp = Label.new()
 		hp.name = "FieldHp"
 		hp.clip_text = true
 		hp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		hp.add_theme_font_size_override("font_size", 11)
-		identity.add_child(hp)
-	hp.text = card.name_label.text.get_slice("  ", 1) + "\n" + card.health_label.text.split(" · ")[0]
+		hp.add_theme_font_size_override("font_size", 12)
+		content.add_child(hp)
+		content.move_child(hp, card.health_bar.get_index())
+	# Keep the shared trait/name labels intact for identity details and consumers.
+	var identity: Node = card.name_label.get_parent()
+	var field_name: Label = identity.get_node_or_null("FieldName") as Label
+	if field_name == null:
+		field_name = Label.new()
+		field_name.name = "FieldName"
+		field_name.clip_text = true
+		field_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		field_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		field_name.add_theme_font_size_override("font_size", 15)
+		field_name.add_theme_color_override("font_color", ExpeditionHudTheme.CREAM)
+		identity.add_child(field_name)
+	var name_start: int = card.name_label.text.find("  ")
+	field_name.text = card.name_label.text.substr(name_start + 2) if name_start >= 0 else card.name_label.text
+	hp.text = card.health_label.text.split(" · ")[0]
+	hp.tooltip_text = card.health_label.text
 	hp.add_theme_color_override("font_color", ExpeditionHudTheme.SECONDARY)
-	card.primary_label.add_theme_font_size_override("font_size",12)
-	card.name_label.visible = not first_aid.is_empty()
+	card.primary_label.hide()
+	card.name_label.hide()
 	card.health_label.hide()
 	card.ammo_label.hide()
 	card.positive_label.get_parent().hide()
-	card.health_bar.custom_minimum_size.y=4
+	card.health_bar.custom_minimum_size.y=5
 	card.health_bar.tooltip_text=card.health_label.text
 	card.status_label.add_theme_font_size_override("font_size",12)
 	card.status_label.text = _short_activity(card.status_label.text) if first_aid.is_empty() else first_aid

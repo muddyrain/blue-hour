@@ -28,7 +28,8 @@ func _child(scenario: String) -> void:
 	var config: ConfigFile = ConfigFile.new()
 	config.set_value("configuration", "entry_symbol", "bh_route_init")
 	config.set_value("configuration", "compatibility_minimum", "4.7.2")
-	var key: String = "windows.x86_64" if OS.has_feature("windows") else "linux.x86_64"
+	var platform: String = "windows" if OS.has_feature("windows") else "macos" if OS.has_feature("macos") else "linux"
+	var key: String = platform + (".arm64" if OS.has_feature("arm64") else ".x86_64")
 	if scenario == "platform":
 		key = "wrong_platform.x86_64"
 	var library: String = "user://missing-navigation-library.so"

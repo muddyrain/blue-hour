@@ -22,6 +22,15 @@ func _run() -> void:
 	_check(RecordEncoding.fingerprint(roundtrip) == original and TransactionReceipt.same(roundtrip, action), "gzip and ExactJSON preserve the full source fingerprint including tiny binary64")
 	var disk_encoded: Dictionary = JSON.parse_string(JSON.stringify({"action":packed}, "", true, true))
 	_check(RecordEncoding.fingerprint(EconomyBuildV1.source_action(disk_encoded)) == original, "ordinary camp JSON numeric conversion preserves compact metadata")
+	# Reproduce the only byte that the pinned zlib changes across desktop writers.
+	# A peer's authenticated OS tag must not require this host's tag.
+	for os_code: int in [3, 10, 19]:
+		var peer: Dictionary = _gzip_byte(packed, 9, os_code, true)
+		_check(RecordEncoding.fingerprint(EconomyBuildV1.source_action({"action":peer})) == original,
+			"desktop gzip OS %d preserves the exact source" % os_code)
+		var unauthenticated: Dictionary = _gzip_byte(packed, 9, 10 if os_code == 3 else 3, false)
+		if unauthenticated.data != packed.data:
+			_check(EconomyBuildV1.source_action({"action":unauthenticated}).is_empty(), "OS tag changes still require the stored compressed digest")
 	_check(RecordEncoding.fingerprint(EconomyBuildV1.source_action({"action":action})) == original, "unpublished raw debug sources remain explicitly readable")
 	var raw_ledger: Dictionary = EconomyBuildV1.initial()
 	raw_ledger.sources = [{"action":action, "sortie":1, "transaction_id":"fixture:1", "completed":[]}]
@@ -67,6 +76,10 @@ func _run() -> void:
 	bad.compressed_sha256 = EconomyBuildV1._source_bytes_hash(compressed)
 	variants["invalid gzip header with matching transport hash"] = bad
 	var original_gzip: PackedByteArray = Marshalls.base64_to_raw(packed.data)
+	for field: Dictionary in [{"label":"unsupported OS", "offset":9, "value":255},
+			{"label":"mtime", "offset":4, "value":1}, {"label":"XFL", "offset":8, "value":1},
+			{"label":"optional header flags", "offset":3, "value":1}]:
+		variants["authenticated changed " + field.label] = _gzip_byte(packed, field.offset, field.value, true)
 	for label: String in ["gzip trailing bytes with plausible ISIZE", "gzip second member"]:
 		bad = packed.duplicate(true)
 		compressed = original_gzip.duplicate()
@@ -89,6 +102,14 @@ func _run() -> void:
 			_real_camp(arg.trim_prefix("--codec-camp="))
 	print("M48_SOURCE_CODEC " + JSON.stringify({"checks":checks, "failures":failures, "samples":samples}))
 	quit(0 if failures.is_empty() else 1)
+
+func _gzip_byte(packed: Dictionary, offset: int, value: int, rehash: bool) -> Dictionary:
+	var changed: Dictionary = packed.duplicate(true)
+	var compressed: PackedByteArray = Marshalls.base64_to_raw(changed.data)
+	compressed[offset] = value
+	changed.data = Marshalls.raw_to_base64(compressed)
+	if rehash: changed.compressed_sha256 = EconomyBuildV1._source_bytes_hash(compressed)
+	return changed
 
 func _text_transport(text: String) -> Dictionary:
 	var raw: PackedByteArray = text.to_utf8_buffer()

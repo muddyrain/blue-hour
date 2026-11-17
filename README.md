@@ -15,6 +15,8 @@ python tools/godot.py run --godot <Godot 可执行文件>
 
 导航原生 helper 是**可选加速**。直接打开编辑器、运行或导出都不要求编译器；缺库、平台不匹配或加载失败时，日志 `BH_NAVIGATION fallback:` 表明使用 Godot 4.7.2 的原始 `AStarGrid2D`，仍执行完整校验（大型历史存档会更慢）。`BH_NAVIGATION native:` 表明已启用加速。不要把 Linux 的读档耗时当作 Windows 的性能保证。
 
+macOS arm64 / x86_64 当前使用严格 fallback；仓库尚无 macOS 导出预设或已验证的 Mac helper 构建流程。可用官方 4.7.2 编辑器打开项目，Mac 读档耗时需要在 Mac 上测量。
+
 维护者可提前构建 Linux / Windows x86_64 helper（单精度，公开 GDExtension C API）：
 
 ```bash

@@ -737,6 +737,7 @@ static func source_action(source: Dictionary) -> Dictionary:
 	# New sources use the engine's fixed GZIP writer (no optional header sections).
 	# Check format and declared output length before invoking the bounded inflater.
 	if compressed[0] != 0x1f or compressed[1] != 0x8b or compressed[2] != 8 or compressed[3] != 0 \
+			or compressed[9] not in [3, 10, 19] \
 			or compressed.decode_u32(compressed.size() - 4) != int(stored.unpacked_bytes): return {}
 	var cache_key: String = RecordEncoding.fingerprint(stored)
 	var cached: Variant = ActionMemo.lookup(_decoded_sources, cache_key)
@@ -744,7 +745,13 @@ static func source_action(source: Dictionary) -> Dictionary:
 	# The verified length bounds allocation; fixed inflate also terminates on suffixes.
 	var raw: PackedByteArray = compressed.decompress(int(stored.unpacked_bytes), FileAccess.COMPRESSION_GZIP)
 	if raw.size() != int(stored.unpacked_bytes): return {}
-	if raw.compress(FileAccess.COMPRESSION_GZIP) != compressed: return {}
+	# Godot's pinned zlib writes OS=3 (Unix), 10 (Windows), 19 (macOS).
+	# Authenticate stored bytes above, then compare the entire canonical stream
+	# using its writer's OS tag. Header, DEFLATE, CRC/ISIZE and suffix checks remain exact.
+	var recompressed: PackedByteArray = raw.compress(FileAccess.COMPRESSION_GZIP)
+	if recompressed.size() != compressed.size(): return {}
+	recompressed[9] = compressed[9]
+	if recompressed != compressed: return {}
 	var exact: String = raw.get_string_from_utf8()
 	if exact.to_utf8_buffer() != raw or exact.sha256_text() != stored.sha256: return {}
 	var parser: JSON = JSON.new()

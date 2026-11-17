@@ -126,6 +126,7 @@
 
 - 不再兼容旧存档：v1–v5 `RunSave` 升级、v5 迁移导入、旧位置 `user://saves/run.json` 保护都已删除。读到不认识的存档会被拒绝，需要开新旅程。
 - 当前存档的校验仍是“新状态投影到旧校验器”的链式结构（`EnemyState → WeaponState → …`），收据日志仍做哈希校验。这一部分与当前存档格式耦合，未在本轮删除；后续可整体替换为简单的单文件 JSON 存档。
+- `EconomyBuildV1.source_action()` 的紧凑来源认证原始压缩字节与 ExactJSON，并通过重压缩核对完整 GZIP 流；比较仅兼容锁定 zlib 的 OS 头标记 3（Unix）、10（Windows）、19（macOS），其余头、DEFLATE、CRC/ISIZE 和尾随内容保持精确比较。写入格式与已有字节不变，避免把写入平台的元数据误当作来源内容差异。
 
 ## 小队与救援
 

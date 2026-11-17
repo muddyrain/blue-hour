@@ -1,0 +1,30 @@
+{
+  "assets": [
+    {
+      "path": "assets/camp_pixel/coast-yard.png",
+      "prompt": "Use case: precise-object-edit. Production background asset for the existing Godot game Blue Hour. The attached approved image is the exact visual target. Extract and clean ONLY the large seaside camp scene, excluding the entire top header/navigation and the entire right sidebar and bottom-left text. Deliver the scene filling the entire output, landscape approximately 1275:804. Preserve the reference scene's framing, building positions, perspective, small crisp pixel clusters, blue-gray roofs, cool stone paving, green trees, turquoise sea, white minibus at bottom left, covered seating shelter at upper left, supply office at upper middle, workshop building at right, map table at lower center, campfire in the central courtyard, coastline and pier at upper right. IMPORTANT remove ALL four human characters from the courtyard and reconstruct the stone floor behind them; actual living characters will be separate interactive sprites. No people, no heads, no character silhouettes. Keep campfire, stools, crates and map table. No text, no UI, no health bars, no logos, no painted labels. Do not redesign or simplify the scene. Match the reference pixel rendering and crisp dark outlines; no watercolor, no vector polygons, no smooth 3D, no sepia tint, no borders, no floating diamond island. Clean full-bleed game environment plate.",
+      "tool": "OpenAI built-in image_gen",
+      "date": "2026-11-17",
+      "reference": "Approved original project camp proposal, A cool pixel direction; reference is not bundled",
+      "dimensions": [
+        1580,
+        995
+      ],
+      "pixel_sha256": "1d2fd49c03dd585aa51ebba901fceba3a1096d918bc48d76f3db559db76debc4",
+      "transparent": false
+    },
+    {
+      "path": "assets/camp_pixel/residents.png",
+      "prompt": "Use case: stylized-concept. Asset type: transparent sprite atlas for Blue Hour Godot camp. Match EXACTLY the chibi pixel character style of the supplied approved game reference. Create EIGHT separate full-body standing character sprites, evenly spaced in a strict 4 columns by 2 rows grid, each centered in its cell with generous transparent gutters and feet aligned. All face slightly to viewer's right in three-quarter front view, unarmed casual camp idle pose, identical head/body proportions and pixel size. Crisp true pixel clusters, dark navy outline, two-step shading, no smooth painterly gradient. Characters in reading order: row1 (1) young adult man silver-white messy short hair, navy-blue field jacket, dark trousers, small backpack, (2) young adult woman auburn high ponytail, dark navy short jacket and skirt with boots, (3) young adult woman long blue-black hair, dark navy jacket and trousers, (4) young adult woman violet shoulder-length hair, navy-blue jacket, short skirt and boots. Row2 (5) adult man short brown hair, olive field jacket and dark trousers, (6) adult woman pale ash-blonde bob hair, blue-gray hooded jacket and dark trousers, (7) young adult man dark slate-blue short hair, light-gray shirt under navy jacket, dark trousers, (8) adult man brown-black short hair, slate-gray outdoor coat, dark trousers. Keep them gender-correct, nonsexual, approachable, same small 2.5-head-tall RPG sprite silhouette. Each sprite completely isolated with transparent pixels around it. No weapons, no text, no labels, no shadows outside sprite, no background, no ground, no scene, no panels, no outlines around cells. The reference is for style and first-four identity continuity only; DO NOT copy any UI or environment.",
+      "tool": "OpenAI built-in image_gen",
+      "date": "2026-11-17",
+      "reference": "Approved original project camp proposal, A cool pixel direction; reference is not bundled",
+      "dimensions": [
+        1774,
+        887
+      ],
+      "pixel_sha256": "2ed43d46946a1645353d17730728cda6d05f2e3fd8cb1a46c4e85fd28e7c754f",
+      "transparent": true
+    }
+  ]
+}

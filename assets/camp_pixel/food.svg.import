@@ -2,15 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-path="res://.godot/imported/ruan_portrait.png-ba37377c735b70b16bf7f4ddec9eb3fb.ctex"
+uid="uid://chd2md8h3peo3"
+path="res://.godot/imported/food.svg-53b87accaa7d0476006f894dec0e2366.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/iso/chars/ruan_portrait.png"
-dest_files=["res://.godot/imported/ruan_portrait.png-ba37377c735b70b16bf7f4ddec9eb3fb.ctex"]
+source_file="res://assets/camp_pixel/food.svg"
+dest_files=["res://.godot/imported/food.svg-53b87accaa7d0476006f894dec0e2366.ctex"]
 
 [params]
 
@@ -37,3 +38,6 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
+svg/scale=1.0
+editor/scale_with_editor_scale=false
+editor/convert_colors_with_editor_theme=false

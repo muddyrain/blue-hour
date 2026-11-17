@@ -204,7 +204,13 @@ func _views(full: Dictionary) -> void:
 	for id: int in [6, 7, 8]:
 		var definition: SurvivorDefinition = SurvivorRoster.definition(id)
 		var resident: CampSceneResident = camp_world.residents[id]
-		_check(resident.visible and resident.body.texture == SurvivorVisualV1.SHEETS[id - 1] and definition.portrait != null, "new resident uses correct body and portrait")
+		var body: AtlasTexture = resident.body.texture as AtlasTexture
+		var portrait: AtlasTexture = definition.portrait as AtlasTexture
+		var region: Rect2 = CampPixelArt.REGIONS[CampPixelArt.variant(String(definition.id))]
+		_check(resident.visible and resident.get_meta("definition_id") == definition.id
+			and body != null and body.atlas == CampPixelArt.SHEET and body.region == region.grow(2)
+			and portrait != null and portrait.atlas == CampPixelArt.SHEET and portrait.region.position == region.position,
+			"new resident uses the correct independent pixel body and portrait identity")
 	camp_world.free()
 	var actual: Dictionary = view_camp(8)
 	var models: Array[Dictionary] = []

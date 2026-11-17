@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dxi8cuwnp4mbx"
-path="res://.godot/imported/lin_portrait.png-c0eef998814ac76400bfcf9388fc85c9.ctex"
+uid="uid://bs7yah3j81kvp"
+path="res://.godot/imported/residents.png-2e708c997047ee377b98a5698862e48d.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/iso/chars/lin_portrait.png"
-dest_files=["res://.godot/imported/lin_portrait.png-c0eef998814ac76400bfcf9388fc85c9.ctex"]
+source_file="res://assets/camp_pixel/residents.png"
+dest_files=["res://.godot/imported/residents.png-2e708c997047ee377b98a5698862e48d.ctex"]
 
 [params]
 

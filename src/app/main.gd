@@ -12,7 +12,7 @@ enum Phase {
 
 const ExpeditionScene: PackedScene = preload("res://src/features/expedition/expedition.tscn")
 const BLUE_HOUR_TITLE_ART: Texture2D = preload("res://assets/ui/pixel/title-coast.png")
-const BLUE_HOUR_CAMP_ART: Texture2D = preload("res://assets/ui/m20/camp-blue-hour.png")
+const BLUE_HOUR_CAMP_ART: Texture2D = preload("res://assets/camp_pixel/coast-yard.png")
 const SLOW_DEPARTURE_MS: int = 120
 
 var phase: Phase = Phase.TITLE

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://di61qwwsmlxlf"
-path="res://.godot/imported/xia_portrait.png-5e0015e18740e06389588ebe249d6128.ctex"
+uid="uid://x8223lorwk3u"
+path="res://.godot/imported/coast-yard.png-916c9657c600aaac3986b22d29d7a09c.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/iso/chars/xia_portrait.png"
-dest_files=["res://.godot/imported/xia_portrait.png-5e0015e18740e06389588ebe249d6128.ctex"]
+source_file="res://assets/camp_pixel/coast-yard.png"
+dest_files=["res://.godot/imported/coast-yard.png-916c9657c600aaac3986b22d29d7a09c.ctex"]
 
 [params]
 

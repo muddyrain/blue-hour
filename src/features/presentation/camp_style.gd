@@ -2,6 +2,8 @@ class_name CampStyle
 extends RefCounted
 ## Local presentation vocabulary. No campaign state or interaction policy.
 
+const BOLD_FONT: Font = preload("res://assets/fonts/SourceHanSansSC-Heavy.otf")
+
 const INK: Color = Color("0a2133")
 const PANEL: Color = Color("163248")
 const SURFACE: Color = Color("315773")
@@ -29,6 +31,8 @@ static func box(colour: Color, edge: Color = Color.TRANSPARENT, padding: int = 1
 static func theme(base: Theme = null) -> Theme:
 	var result: Theme = base.duplicate() as Theme if base != null else Theme.new()
 	result.default_font_size = 18
+	for type: String in ["Button", "OptionButton"]:
+		result.set_font("font", type, BOLD_FONT)
 	for type: String in ["Label", "Button", "OptionButton", "CheckButton", "CheckBox", "LineEdit", "ItemList", "PopupMenu", "RichTextLabel"]:
 		result.set_color("font_color", type, TEXT)
 		result.set_color("font_hover_color", type, TEXT)
@@ -110,6 +114,8 @@ static func blue_hour_background(texture: Texture2D) -> TextureRect:
 static func label(value: String, font_size: int = 18, colour: Color = TEXT) -> Label:
 	var node: Label = Label.new()
 	node.text = value
+	if font_size >= 20:
+		node.add_theme_font_override("font", BOLD_FONT)
 	node.add_theme_font_size_override("font_size", font_size)
 	node.add_theme_color_override("font_color", colour)
 	node.mouse_filter = Control.MOUSE_FILTER_IGNORE

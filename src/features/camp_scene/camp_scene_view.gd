@@ -8,8 +8,8 @@ signal facility_requested(choice: String)
 const FACILITY_NAMES: Dictionary[String, String] = {"supply": "补给设施", "workshop": "工坊", "planning": "规划室"}
 
 var scene_buttons: Dictionary[StringName, Button] = {}
-var _scene_origin: Vector2 = Vector2(405, 118)
-var _scene_scale: float = 0.82
+var _scene_surface: Control
+var _resource_values: Dictionary[String, Label] = {}
 
 var input_allowed: Callable
 var player_mode: bool = false
@@ -29,6 +29,8 @@ var _data: Dictionary = {}
 var _daily: Dictionary = {}
 var _last_focus: String = "bus"
 var _shortage_text: Label
+var _return_close: Button
+var _dismissed_return_id: String = ""
 var _return_summary: PanelContainer
 var _return_goods: Label
 var _return_text: Label
@@ -46,14 +48,20 @@ func _ready() -> void:
 	var backdrop: ColorRect = ColorRect.new()
 	backdrop.name = "CampBackdrop"
 	backdrop.color = CampStyle.INK
-	# IsoTiles owns z = -10. The full-screen backing must stay below that canvas.
+	# Keep the full-screen backing below the scene plate and all controls.
 	backdrop.z_index = -20
 	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(backdrop)
 	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_scene_surface = Control.new()
+	_scene_surface.name = "CampSceneSurface"
+	_scene_surface.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_scene_surface.clip_contents = true
+	add_child(_scene_surface)
+	CampStyle.place(_scene_surface, Rect2(0, 108, 976, 612))
 	world = CampSceneWorld.new()
 	world.name = "TransitYard"
-	add_child(world)
+	_scene_surface.add_child(world)
 	resized.connect(_resize_world)
 	_resize_world()
 	_build_blue_hour_header()
@@ -87,14 +95,15 @@ func _build_scene_actions() -> void:
 func _position_scene_controls() -> void:
 	if world == null:
 		return
-	var fit: float = world.scale.x / _scene_scale
+	var fit: float = minf(size.x / 1280.0, size.y / 720.0)
 	for id: String in facility_buttons:
-		var at: Vector2 = world.position + IsoSpace.to_view(CampSceneLayout.facility_door(id)) * world.scale.x
-		_place_pin(facility_buttons[id], at, Vector2(112, 23) * fit)
+		var at: Vector2 = get_global_transform().affine_inverse() * world.to_global(CampSceneLayout.facility_door(id))
+		_place_pin(facility_buttons[id], at, Vector2(128, 26) * fit)
 	for action: StringName in scene_buttons:
-		var foot: Vector2 = IsoSpace.foot(CampSceneLayout.AREAS[action])
-		var at: Vector2 = world.position + IsoSpace.to_view(foot + Vector2(0, 24)) * world.scale.x
-		_place_pin(scene_buttons[action], at, Vector2(120, 23) * fit)
+		var area: Rect2 = CampSceneLayout.AREAS[action]
+		var point: Vector2 = Vector2(area.get_center().x, area.end.y)
+		var at: Vector2 = get_global_transform().affine_inverse() * world.to_global(point)
+		_place_pin(scene_buttons[action], at, Vector2(128, 26) * fit)
 
 
 func _place_pin(button: Button, at: Vector2, extent: Vector2) -> void:
@@ -104,51 +113,77 @@ func _place_pin(button: Button, at: Vector2, extent: Vector2) -> void:
 
 
 func _style_pin(button: Button) -> void:
-	button.add_theme_font_size_override("font_size", 12)
+	button.add_theme_font_size_override("font_size", 13)
 	button.clip_text = true
 	button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	button.add_theme_color_override("font_color", CampSceneStyle.MUTED)
+	# The scene remains artwork; labels appear only when a player points or tabs here.
+	button.add_theme_color_override("font_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_disabled_color", Color.TRANSPARENT)
 	for state: String in ["font_hover_color", "font_focus_color", "font_pressed_color"]:
 		button.add_theme_color_override(state, CampSceneStyle.AMBER)
-	button.add_theme_stylebox_override("normal", CampStyle.box(Color(CampSceneStyle.PANEL, 0.90), Color.TRANSPARENT, 2))
-	button.add_theme_stylebox_override("hover", CampStyle.box(CampStyle.SURFACE, Color.TRANSPARENT, 2))
-	button.add_theme_stylebox_override("pressed", CampStyle.box(CampStyle.SELECTED, Color.TRANSPARENT, 2))
-	var focus: StyleBoxFlat = CampStyle.box(Color.TRANSPARENT, CampSceneStyle.AMBER, 0)
-	focus.set_border_width_all(2)
-	button.add_theme_stylebox_override("focus", focus)
+	button.add_theme_stylebox_override("normal", CampStyle.box(Color.TRANSPARENT, Color.TRANSPARENT, 2))
+	button.add_theme_stylebox_override("hover", CampStyle.box(CampStyle.INK, CampStyle.EDGE, 2))
+	button.add_theme_stylebox_override("pressed", CampStyle.box(CampStyle.PANEL, CampStyle.TEAL, 2))
+	button.add_theme_stylebox_override("focus", CampStyle.box(CampStyle.INK, CampStyle.TEAL, 2))
 
 
 func _build_blue_hour_header() -> void:
-	var header: PanelContainer = _blue_hour_panel("CampHud", Rect2(0, 0, 1280, 62), CampStyle.INK)
-	var header_style: StyleBoxFlat = CampStyle.box(CampStyle.INK, Color.TRANSPARENT, 16)
-	header_style.content_margin_top = 3
-	header_style.content_margin_bottom = 3
-	header.add_theme_stylebox_override("panel", header_style)
+	var header: PanelContainer = _blue_hour_panel("CampHud", Rect2(0, 0, 1280, 56), CampStyle.INK)
+	var style: StyleBoxFlat = CampStyle.box(CampStyle.INK, CampStyle.EDGE, 14)
+	style.set_border_width_all(0)
+	style.border_width_bottom = 3
+	style.content_margin_top = 1
+	style.content_margin_bottom = 2
+	header.add_theme_stylebox_override("panel", style)
 	var row: HBoxContainer = HBoxContainer.new()
-	row.add_theme_constant_override("separation", 32)
+	row.add_theme_constant_override("separation", 19)
 	header.add_child(row)
-	var title: VBoxContainer = VBoxContainer.new()
-	title.custom_minimum_size.x = 300
-	title.add_theme_constant_override("separation", 0)
-	row.add_child(title)
-	title.add_child(CampStyle.label("蓝时归航 / 蓝时驿站", 24))
-	_atmosphere_caption = CampStyle.label("", 13, CampStyle.MUTED)
+	var logo: Label = CampStyle.label("蓝时归航", 34)
+	var slant: FontVariation = FontVariation.new()
+	slant.base_font = CampStyle.BOLD_FONT
+	slant.variation_transform = Transform2D(Vector2(1, 0), Vector2(-0.16, 1), Vector2.ZERO)
+	logo.add_theme_font_override("font", slant)
+	logo.custom_minimum_size.x = 210
+	row.add_child(logo)
+	var divider: Label = CampStyle.label("│", 30, CampStyle.EDGE)
+	row.add_child(divider)
+	var hub: Label = CampStyle.label("蓝时驿站", 31)
+	hub.custom_minimum_size.x = 220
+	row.add_child(hub)
+	var badge: PanelContainer = PanelContainer.new()
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	badge.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.INK, CampStyle.EDGE, 5))
+	row.add_child(badge)
+	_resource_values["day"] = CampStyle.label("第 2 天", 24)
+	badge.add_child(_resource_values["day"])
+	var spacer: Control = Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(spacer)
+	for key: String in ["food", "cash", "tools", "required"]:
+		var group: HBoxContainer = HBoxContainer.new()
+		group.add_theme_constant_override("separation", 6)
+		row.add_child(group)
+		if key != "required":
+			var icon: TextureRect = TextureRect.new()
+			icon.texture = load("res://assets/camp_pixel/" + key + ".svg") as Texture2D
+			icon.custom_minimum_size = Vector2(24, 28)
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			group.add_child(icon)
+		_resource_values[key] = CampStyle.label("", 25)
+		group.add_child(_resource_values[key])
+	resource_text = CampStyle.label("")
+	resource_text.hide()
+	add_child(resource_text)
+	_atmosphere_caption = CampStyle.label("")
 	_atmosphere_caption.name = "AtmosphereCaption"
-	title.add_child(_atmosphere_caption)
+	_atmosphere_caption.hide()
+	add_child(_atmosphere_caption)
 	_update_atmosphere_caption(world.atmosphere_name())
-	var stores: VBoxContainer = VBoxContainer.new()
-	stores.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	stores.add_theme_constant_override("separation", 1)
-	row.add_child(stores)
-	resource_text = CampStyle.label("", 19, CampSceneStyle.TEXT)
-	resource_text.clip_text = true
-	resource_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	stores.add_child(resource_text)
-	_shortage_text = CampStyle.label("", 13, CampSceneStyle.MUTED)
-	_shortage_text.clip_text = true
-	_shortage_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	stores.add_child(_shortage_text)
-	_return_summary = _blue_hour_panel("ReturnSummary", Rect2(24, 542, 916, 56), CampStyle.PANEL)
+	_shortage_text = CampStyle.label("")
+	_shortage_text.hide()
+	add_child(_shortage_text)
+	_return_summary = _blue_hour_panel("ReturnSummary", Rect2(20, 630, 936, 74), CampStyle.PANEL)
 	var return_row: HBoxContainer = HBoxContainer.new()
 	return_row.add_theme_constant_override("separation", 20)
 	_return_summary.add_child(return_row)
@@ -163,6 +198,14 @@ func _build_blue_hour_header() -> void:
 	return_details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return_details.add_theme_constant_override("separation", 2)
 	return_row.add_child(return_details)
+	_return_close = Button.new()
+	_return_close.text = "×"
+	_return_close.tooltip_text = "收起归航记录"
+	_return_close.custom_minimum_size = Vector2(30, 30)
+	_return_close.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	CampStyle.text_button(_return_close)
+	_return_close.pressed.connect(_dismiss_return_summary)
+	return_row.add_child(_return_close)
 	_return_text = CampStyle.label("", 16)
 	return_details.add_child(_return_text)
 	_return_objective = CampStyle.label("", 14, CampStyle.TEAL)
@@ -201,12 +244,17 @@ func _activate_facility(choice: String) -> void:
 
 
 func _build_blue_hour_team() -> void:
-	var panel: PanelContainer = _blue_hour_panel("TeamPanel", Rect2(972, 118, 308, 602), CampStyle.INK)
+	var panel: PanelContainer = _blue_hour_panel("TeamPanel", Rect2(976, 108, 304, 364), CampStyle.INK)
+	var style: StyleBoxFlat = CampStyle.box(CampStyle.INK, CampStyle.EDGE, 12)
+	style.set_border_width_all(0)
+	style.border_width_left = 1
+	style.border_width_bottom = 2
+	style.content_margin_top = 16
+	panel.add_theme_stylebox_override("panel", style)
 	var column: VBoxContainer = VBoxContainer.new()
-	column.add_theme_constant_override("separation", 8)
 	panel.add_child(column)
-	column.add_child(CampStyle.label("在营同行者", 21, CampSceneStyle.TEXT))
-	_team_count = CampStyle.label("", 13, CampSceneStyle.MUTED)
+	_team_count = CampStyle.label("")
+	_team_count.hide()
 	column.add_child(_team_count)
 	_team_scroll = ScrollContainer.new()
 	_team_scroll.name = "TeamScroll"
@@ -217,12 +265,12 @@ func _build_blue_hour_team() -> void:
 	_team_scroll.get_v_scroll_bar().focus_mode = Control.FOCUS_NONE
 	var roster: VBoxContainer = VBoxContainer.new()
 	roster.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	roster.add_theme_constant_override("separation", 4)
+	roster.add_theme_constant_override("separation", 8)
 	_team_scroll.add_child(roster)
 	for id: int in range(1, RosterState.MAX_HISTORY + 1):
 		var button: Button = _blue_hour_button(roster, StringName("member%d" % id), "", true)
 		button.set_meta("member_id", id)
-		button.custom_minimum_size.y = 76
+		button.custom_minimum_size.y = 74
 		CampStyle.text_button(button)
 		member_buttons[id] = button
 		var row: HBoxContainer = HBoxContainer.new()
@@ -230,63 +278,87 @@ func _build_blue_hour_team() -> void:
 		row.add_theme_constant_override("separation", 10)
 		button.add_child(row)
 		row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		row.offset_left = 4
-		row.offset_top = 8
-		row.offset_right = -4
-		row.offset_bottom = -8
+		row.offset_top = 7
+		row.offset_bottom = -7
 		var portrait: TextureRect = TextureRect.new()
 		portrait.name = "Portrait"
 		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		portrait.custom_minimum_size = Vector2(48, 52)
+		portrait.custom_minimum_size = Vector2(62, 60)
 		row.add_child(portrait)
 		var labels: VBoxContainer = VBoxContainer.new()
 		labels.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		labels.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		labels.alignment = BoxContainer.ALIGNMENT_CENTER
-		labels.add_theme_constant_override("separation", 2)
+		labels.add_theme_constant_override("separation", 7)
 		row.add_child(labels)
-		for field: String in ["Trait", "CallSign", "Health", "Weapon"]:
-			var label: Label = CampStyle.label("", 18 if field == "CallSign" else 15, CampSceneStyle.TEXT if field == "CallSign" else CampSceneStyle.MUTED)
-			label.name = field
-			label.clip_text = true
-			label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-			label.visible = field in ["CallSign", "Health"]
-			labels.add_child(label)
+		var heading: HBoxContainer = HBoxContainer.new()
+		heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		labels.add_child(heading)
+		var call_sign: Label = CampStyle.label("", 22)
+		call_sign.name = "CallSign"
+		call_sign.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		call_sign.clip_text = true
+		call_sign.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		heading.add_child(call_sign)
+		var health: Label = CampStyle.label("", 20)
+		health.name = "Health"
+		heading.add_child(health)
 		var health_bar: ProgressBar = ProgressBar.new()
 		health_bar.name = "HealthBar"
 		health_bar.show_percentage = false
-		health_bar.custom_minimum_size.y = 6
+		health_bar.custom_minimum_size.y = 13
 		health_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		labels.add_child(health_bar)
+		for field: String in ["Trait", "Weapon"]:
+			var label: Label = CampStyle.label("")
+			label.name = field
+			label.hide()
+			labels.add_child(label)
+	var departure: PanelContainer = _blue_hour_panel("DeparturePanel", Rect2(976, 472, 304, 248), CampStyle.INK)
+	var departure_style: StyleBoxFlat = CampStyle.box(CampStyle.INK, Color.TRANSPARENT, 12)
+	departure_style.content_margin_top = 36
+	departure.add_theme_stylebox_override("panel", departure_style)
 	_departure_controls = VBoxContainer.new()
-	_departure_controls.add_theme_constant_override("separation", 12)
-	column.add_child(_departure_controls)
-	_journey_caption = CampStyle.label("旅程进度", 14, CampSceneStyle.MUTED)
-	_journey_caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_departure_controls.add_theme_constant_override("separation", 38)
+	departure.add_child(_departure_controls)
+	_journey_caption = CampStyle.label("")
+	_journey_caption.hide()
 	_departure_controls.add_child(_journey_caption)
-	eligibility_text = CampStyle.label("", 20, CampStyle.TEAL)
+	var progress_panel: PanelContainer = PanelContainer.new()
+	progress_panel.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.PANEL, Color.TRANSPARENT, 4))
+	progress_panel.custom_minimum_size.y = 48
+	_departure_controls.add_child(progress_panel)
+	eligibility_text = CampStyle.label("", 26)
+	eligibility_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	eligibility_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	eligibility_text.custom_minimum_size.y = 42
-	_departure_controls.add_child(eligibility_text)
+	eligibility_text.max_lines_visible = 2
+	eligibility_text.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	progress_panel.add_child(eligibility_text)
 
 
 func _build_blue_hour_footer() -> void:
-	var panel: PanelContainer = _blue_hour_panel("CampActions", Rect2(0, 62, 1280, 56), CampStyle.INK)
-	panel.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.INK, Color.TRANSPARENT, 4))
+	var panel: PanelContainer = _blue_hour_panel("CampActions", Rect2(0, 56, 1280, 52), CampStyle.INK)
+	panel.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.INK, Color.TRANSPARENT, 5))
 	var column: VBoxContainer = VBoxContainer.new()
 	panel.add_child(column)
 	var row: HBoxContainer = HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 	column.add_child(row)
-	var labels: Dictionary[StringName, String] = {&"crew":"队员", &"weapons":"装备仓", &"workshop":"工坊",
-		&"supplies":"补给与设施", &"training":"训练", &"specialties":"专精"}
+	var labels: Dictionary[StringName, String] = {&"crew":"队员", &"weapons":"装备", &"workshop":"工坊",
+		&"supplies":"补给", &"training":"训练", &"specialties":"专精"}
 	for action: StringName in labels:
 		var button: Button = _blue_hour_button(row, action, labels[action])
-		button.custom_minimum_size.x = 106 if action == &"supplies" else 90
+		button.custom_minimum_size.x = 115
+		button.add_theme_font_size_override("font_size", 25)
 		CampStyle.text_button(button)
+		button.add_theme_stylebox_override("normal", CampStyle.box(Color.TRANSPARENT, Color.TRANSPARENT, 4))
+		button.add_theme_stylebox_override("hover", CampStyle.box(CampStyle.PANEL, Color.TRANSPARENT, 4))
+		button.add_theme_stylebox_override("pressed", CampStyle.box(CampStyle.SURFACE, Color.TRANSPARENT, 4))
+		if action == &"crew":
+			button.add_theme_stylebox_override("normal", CampStyle.box(CampStyle.SELECTED, Color.TRANSPARENT, 4))
 		if action == &"specialties":
 			footer_buttons[action] = button
 		else:
@@ -302,16 +374,23 @@ func _build_blue_hour_footer() -> void:
 		CampStyle.text_button(button)
 		footer_buttons[action] = button
 	var depart: Button = _blue_hour_button(_departure_controls, &"bus", "选择行动 →")
-	depart.custom_minimum_size.y = 64
-	depart.add_theme_font_size_override("font_size", 25)
+	depart.custom_minimum_size.y = 80
+	depart.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	depart.add_theme_font_size_override("font_size", 35)
 	CampStyle.primary(depart)
+	depart.add_theme_stylebox_override("normal", CampStyle.box(CampStyle.CORAL.darkened(0.08), Color.TRANSPARENT, 8))
+	for state: String in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		depart.add_theme_color_override(state, Color.WHITE)
+	depart.reparent(self)
+	CampStyle.place(depart, Rect2(988, 594, 280, 80))
 	hotspots[&"bus"] = depart
 	notice = CampStyle.label("", 14, CampSceneStyle.MUTED)
 	notice.name = "CampNotice"
 	notice.clip_text = true
 	notice.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	add_child(notice)
-	CampStyle.place(notice, Rect2(24, 678, 924, 26))
+	CampStyle.place(notice, Rect2(990, 688, 276, 24))
+	notice.add_theme_font_size_override("font_size", 12)
 
 
 func _blue_hour_panel(node_name: String, rect: Rect2, colour: Color) -> PanelContainer:
@@ -356,6 +435,8 @@ func _allows_input() -> bool:
 
 
 func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion and _allows_input():
+		world.highlight(world.to_local(get_global_mouse_position()))
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed and _allows_input():
 		activate_at(world.to_local(get_global_mouse_position()))
 		accept_event()
@@ -383,6 +464,12 @@ func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, r
 	if WorkshopV1.enabled(data):
 		resource_text.text += "     工具箱 %d" % WorkshopV1.tools(data)
 	resource_text.tooltip_text = resource_text.text
+	_resource_values["day"].text = "第%d天" % data.day
+	_resource_values["food"].text = "食物%d" % data.food
+	_resource_values["cash"].text = "货币%d" % data.cash
+	_resource_values["tools"].text = "工具箱%d" % (WorkshopV1.tools(data) if WorkshopV1.enabled(data) else 0)
+	_resource_values["required"].text = "今日需粮%d" % daily.required
+	_resource_values["required"].add_theme_color_override("font_color", CampStyle.DANGER if daily.shortage > 0 else CampStyle.TEXT)
 	var pressure: String = _campaign_pressure(data)
 	_journey_caption.text = "旅程进度" if pressure.is_empty() else pressure
 	_shortage_text.text = "口粮缺口 %d · 可考虑先补给" % daily.shortage if daily.shortage > 0 else "口粮缺口 0 · 库存充足"
@@ -408,14 +495,15 @@ func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, r
 		button.tooltip_text = "点击查看设施与建设" if level == 0 else "点击打开工坊" if choice == "workshop" else "点击打开特长训练" if choice == "planning" else "点击查看补给与升级"
 		if EconomyBuildV1.enabled(data):
 			button.tooltip_text += "\n" + EconomyBuildV1.facility_effect(choice, level)
+		button.tooltip_text = button.text + "\n" + button.tooltip_text
 		button.disabled = false
 		scene_buttons[&"bus"].disabled = not can_depart
-	_return_summary.visible = not last.is_empty()
+	_return_summary.visible = not last.is_empty() and String(data.last_settlement_id) != _dismissed_return_id
 	if not last.is_empty():
 		var facility_meal: bool = int(last.get("facility_food", 0)) > 0
 		var task: Dictionary = last.get("task", {})
 		var extended: bool = facility_meal or not task.is_empty()
-		CampStyle.place(_return_summary, Rect2(24, 516, 916, 82) if extended else Rect2(24, 542, 916, 56))
+		CampStyle.place(_return_summary, Rect2(20, 610, 936, 94) if extended else Rect2(20, 634, 936, 70))
 		var returned_weapons: Array = data.weapons.filter(func(item: Dictionary) -> bool:
 			return item.get("acquired_sortie") == data.last_settlement_id)
 		_return_goods.text = "入库 %d 币 · %d 件武器" % [last.cash_gained, returned_weapons.size()]
@@ -433,6 +521,8 @@ func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, r
 	elif last.has("task"):
 		eligibility_text.text = TaskActions.summary_text(last.task)
 		eligibility_text.tooltip_text = eligibility_text.text
+	eligibility_text.add_theme_font_size_override("font_size", 22 if eligibility_text.text.length() > 18 else 26)
+	_fit_return_summary.call_deferred()
 	notice.text = feedback if not feedback.is_empty() else "点击院内设施或同行者   ·   Tab 切换   ·   Enter 确认   ·   Esc 返回"
 	notice.tooltip_text = notice.text
 	hotspots[&"bus"].disabled = not can_depart
@@ -448,6 +538,20 @@ func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, r
 			_refresh_blue_hour_member(button, data, id)
 	_link_focus()
 	_resize_world()
+
+
+func _fit_return_summary() -> void:
+	if not _return_summary.visible:
+		return
+	var height: float = maxf(70.0, _return_summary.get_combined_minimum_size().y)
+	CampStyle.place(_return_summary, Rect2(20, 704 - height, 936, height))
+
+
+func _dismiss_return_summary() -> void:
+	_dismissed_return_id = String(_data.get("last_settlement_id", ""))
+	_return_summary.hide()
+	_link_focus()
+	restore_focus()
 
 
 func _update_atmosphere_caption(atmosphere: String) -> void:
@@ -478,7 +582,7 @@ func _refresh_blue_hour_member(button: Button, data: Dictionary, id: int) -> voi
 	var call_sign: Label = button.find_child("CallSign", true, false) as Label
 	call_sign.text = member.call_sign
 	var health: Label = button.find_child("Health", true, false) as Label
-	health.text = "HP %.0f / %.0f" % [member.health, GrowthRules.maximum(member)]
+	health.text = "%.0f/%.0f" % [member.health, GrowthRules.maximum(member)]
 	var health_bar: ProgressBar = button.find_child("HealthBar", true, false) as ProgressBar
 	health_bar.max_value = GrowthRules.maximum(member)
 	health_bar.value = float(member.health)
@@ -557,6 +661,8 @@ func _announce(button: Button, text: String) -> void:
 
 func _link_focus() -> void:
 	var sequence: Array[Button] = []
+	if is_instance_valid(_return_close) and _return_close.is_visible_in_tree():
+		sequence.append(_return_close)
 	for action: StringName in [&"bus", &"crew", &"weapons", &"workshop", &"supplies", &"training"]:
 		if hotspots.has(action) and not hotspots[action].disabled:
 			sequence.append(hotspots[action])
@@ -622,17 +728,10 @@ func _shown() -> void:
 
 
 func _resize_world() -> void:
-	# Uniform scale is essential: nonuniform viewport resizing destroys the 2:1 axes.
-	var fit: float = minf(size.x / CampSceneLayout.SIZE.x, size.y / CampSceneLayout.SIZE.y)
-	var offset: Vector2 = (size - CampSceneLayout.SIZE * fit) * 0.5
-	# Centre the playable yard between the bus pin and the rear fence. The outer
-	# ground remains a backdrop; its bounds must not displace the actual entrances.
-	var yard_scale: float = _scene_scale
-	var origin: Vector2 = _scene_origin
-	if is_instance_valid(_return_summary) and _return_summary.visible:
-		# Preserve the existing fence clearance for either return-summary height.
-		yard_scale = 0.70 if _return_summary.anchor_top < 0.74 else 0.74
-		origin.y = 108
-	world.scale = Vector2.ONE * yard_scale * fit
-	world.position = offset + origin * fit
+	if world == null or _scene_surface == null:
+		return
+	var extent: Vector2 = Vector2(size.x * 976.0 / 1280.0, size.y * 612.0 / 720.0)
+	var fit: float = maxf(extent.x / CampSceneLayout.SCENE_SIZE.x, extent.y / CampSceneLayout.SCENE_SIZE.y)
+	world.scale = Vector2.ONE * fit
+	world.position = (extent - CampSceneLayout.SCENE_SIZE * fit) * 0.5
 	_position_scene_controls()

@@ -9,7 +9,7 @@ signal navigation_requested(action: StringName)
 signal selection_changed(instance_id: String)
 signal economy_requested(request: Dictionary)
 
-const YARD: Texture2D = preload("res://assets/ui/m20/camp-blue-hour.png")
+const YARD: Texture2D = preload("res://assets/camp_pixel/coast-yard.png")
 const STATUS: Array[String] = ["全部", "闲置", "已装备", "待维修"]
 const MODS: Array[String] = [WorkshopV1.EXTENDED, WorkshopV1.QUICK]
 

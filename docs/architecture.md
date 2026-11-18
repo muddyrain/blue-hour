@@ -158,14 +158,24 @@
 
 音量默认仍为主音量 0.8、世界 0.75、UI 0.7、非静音。静音/分类归零立即停止对应尾音并拒绝新声音；世界暂停冻结现有声流、拒绝新请求，UI 保持可用，恢复不补播。服务固定 6 个世界与 2 个 UI 声部，其中世界的 2 个优先留给搜刮、巴士和预警；重要提示可替换较低优先级声音，满载不排队。15 个 WAV 为纯 Python 标准库数学合成（Codex 辅助代码、没有 AI 音频模型或采样素材），每个峰值 0.55，`VOICE_GAIN = 0.20`（PROJECT_TEMP 表现参数，原 0.16）；8 声部满滑杆的离散峰值和不超过 0.88。`tests/audio_feedback.gd` 已纳入 `check`；`python tests/test_audio_assets.py` 可脱离引擎校验生成可复现性、注册、来源与混音余量。
 
-菜单表现复用 `PixelMenu` 的品牌顶栏、分隔与主操作样式。`OpeningBuildPicker` 只选择原有开局专精，仍由 `AppSession` 的 `ConfirmationDialog` 明确确认新旅程；独立内容容器避免初始换行尺寸挤占确认区。`MissionActionBrief` 承载原行动全文及整备详情，`MissionSelect` 继续持有候选与二次出发确认；缩略图只表达行动类别，不替代生成地图。装备页保留原生库存列表及原配给/维修/交易入口。
+菜单表现复用 `PixelMenu` 的品牌顶栏、分隔与主操作样式。`OpeningBuildPicker` 只选择原有开局专精，仍由 `AppSession` 的 `ConfirmationDialog` 明确确认新旅程；独立内容容器避免初始换行尺寸挤占确认区。`MissionActionBrief` 承载原行动全文及整备详情，`MissionSelect` 继续持有候选与二次出发确认；缩略图只表达行动类别，不替代生成地图。
 
-场内 HUD 的顶栏、队员栏和底部操作台只读取既有 DTO；独立姓名/HP显示保留原人物详情与身份。`SortiePauseMenu` 只重排原按钮与提示，取消、正常撤离、安全暂存及危险退出仍通过 `AppMenus` 原信号分发。菜单物件和目标图集位于 `assets/menu_pixel/`，完整生成提示和像素尺寸见 `generation.json`，文件 SHA 登记于统一来源清单。
+营地二级菜单由 `PixelSheet` 提供共享画布：逻辑尺寸 `1280×720`，顶栏高 56，中央内容区为 `(88, 64, 1104, 584)`，底栏高 64；按实际可用尺寸等比缩放并居中，`1024×576` 对应 0.8 倍。页面标题、日期、食物、货币和工具箱由原生控件绘制，资源来自传入快照，工具余额共用 `WorkshopV1.tools()`。组件只发返回与导航信号；`AppCamp` 继续负责页面切换、未保存呼号守卫、确认窗口和原事务入口。`CampSceneStyle` 遇到已构建的 `PixelSheet` 时保留其页面样式，不递归覆盖颜色与布局；字号、间距和页面构图见 `docs/design.md`。
+
+`RosterPanel` 使用队员列表、人物展示、事实详情三栏；呼号编辑由“修改呼号”展开，原保存信号和离开检查保留。`RosterPixelDetails` 继承 `PersonaDetails`，复用 `PersonaViewModel` 的身份、生命、武器与特质投影，完整计算来源放在可展开滚动区。阵亡成员保留原身份与历史，只读且不开放改名、配装和训练。`GrowthPanel` 复用同一画布显示真实行动记录，既不回填经验也不重建死亡。列表按快照成员 ID 建行，不因展示区域大小裁掉名册中的成员。
+
+`TrainingPanel` 左侧显示存活队员与营火，右侧显示原 `TrainingRules.preview()` 的前后值和餐耗预估；确认窗口仍属于当前训练页。取消清除确认状态，确认先清空报价再发请求，随后焦点回到返回按钮；pending 状态保留原保存重试，避免再次购买。`CampSupplyPanel` 将三设施报价排为横向图文，并提供完整效果与账目详情；费用、建设与升级资格仍由 `CampFacilities` / `EconomyBuildV1` 提供。
+
+`CampArmoryView` 负责库存、工坊和支援页的展示状态。`CampWeaponList` 继承原生 `ItemList`，原控件继续持有选择、实例 metadata、筛选结果与滚动位置；额外的两行文字按 `get_item_rect()` 和同一滚动值绘制，忽略鼠标，不建立第二套命中区域。工坊仍通过原报价发出维修、制作、强化、组件和弹匣交易意图；基础改装参数与包含持有人加成的有效值分开说明。支援页组合 `BuildItemsPanel` 与 `PowerLoadoutPanel`，显示真实拥有与已开启槽位，保留装配、卸下、投资和失败重试；开槽不会授予物品或能力。
+
+`EquipmentCatalog` 将跨旅程专精与普通装备图鉴分为两种视图：前者显示档案经验与解锁里程碑，后者保留原生滚动列表。读取失败仍可重试同步，营地外不开放营地页面导航；图鉴没有当前库存授予或旅程配装的写入口。上述菜单只重排既有数据和意图，不改 `CampEdit` / `FrozenSettlement` / `RunTransaction` 的规则、保存协议、死亡身份或唯一结算合同。
+
+场内 HUD 的顶栏、队员栏和底部操作台只读取既有 DTO；独立姓名/HP显示保留原人物详情与身份。`SortiePauseMenu` 只重排原按钮与提示，取消、正常撤离、安全暂存及危险退出仍通过 `AppMenus` 原信号分发。菜单物件和目标图集位于 `assets/menu_pixel/`；`facilities.png`、`training-fire.png`、`workshop-objects.png` 分别承载设施、营火和武器/配件插画，`menu-symbols.png` 用于菜单能力与锁槽图标。它们只服务菜单表现，不改变世界、战斗动画或能力身份。完整生成提示和像素尺寸见 `generation.json`，文件 SHA 登记于统一来源清单。
 
 ## 测试与工具
 
 - `tools/godot.py check`：导入、启动（`BH_READY`）与 `tests/` 下的单元/契约测试，任何 `SCRIPT ERROR`/`ERROR` 或 `"failures": N>0` 都判失败。
 - `tests/smoke_loop.gd`（在 `check` 中）：无头跑完整一局：新档 → 出击 → 搜刮 → 战斗 → 巴士撤离 → 结算 → 重启读档 → 第二次出击；任何 SCRIPT ERROR 都会判失败。
 - `python3 tools/check_ten_day.py --godot <引擎> --headless` 是单独运行的长流程回归：`campaign_ten_day.gd` 经正式 App 从第 2 天两人开局逐日选卡、完成主目标、搜集与撤离，结算与营地交易正常落盘；第 6 天退出引擎，新进程从正式进度继续到第 10 天归航，再以第三个游戏进程核对完整状态。测试仅覆写已有 `_pool_initial()` 注入固定种子 `blue-hour-ten-day-20261116`，不修改日期、资源、成员、设施或生产随机机制。过程日志与精确状态比较记录留在 `.local/`；不传 `--headless` 时另捕捉正式画面。档案身份仍由生产 Crypto 创建，并记在初始记录中；依赖该身份的敌种抽签须连同原存档身份复现。`--hunger` 在独立新档中连续三次空手归航，单独验证四份开局粮耗尽后的正式饥饿死亡，不计入十天路线。
-- `PersonaDetails` 的特质摘要与成长、武器说明一起放在详情滚动正文中；`persona_ui` 保证 1024×640 和 1280×720 营地档案的实际内层滚动高度至少 140px，并核对装备、培养与呼号操作的可达性。
+- `PersonaDetails` 提供共用只读投影，营地通过 `RosterPixelDetails` 编排事实与可展开说明；`persona_ui` 检查 1024×640 和 1280×720 营地档案的实际内层滚动高度至少 140px，并展开呼号编辑器核对装备、培养与呼号操作的可达性。它不替代 1024×576 的实际渲染、完整名册/库存容量、失败重试或物理输入验证。
 - 其他 `tools/*_flow.py` 是历史上针对单个系统的流程脚本，未纳入 `check`，部分在 main 上已经失效，后续可继续清理。

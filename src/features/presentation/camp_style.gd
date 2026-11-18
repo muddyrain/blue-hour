@@ -82,21 +82,23 @@ static func blue_hour_primary(button: Button) -> void:
 
 
 static func primary(button: Button) -> void:
-	button.add_theme_stylebox_override("normal", box(CORAL, Color.TRANSPARENT, 12))
-	button.add_theme_stylebox_override("hover", box(CORAL.lightened(0.12), Color.TRANSPARENT, 12))
-	button.add_theme_stylebox_override("pressed", box(CORAL.darkened(0.08), Color.TRANSPARENT, 12))
-	button.add_theme_stylebox_override("disabled", box(SURFACE, Color.TRANSPARENT, 12))
+	button.add_theme_stylebox_override("normal", box(CORAL, Color.TRANSPARENT, 8))
+	button.add_theme_stylebox_override("hover", box(CORAL.lightened(0.12), Color.TRANSPARENT, 8))
+	button.add_theme_stylebox_override("pressed", box(CORAL.darkened(0.08), Color.TRANSPARENT, 8))
+	button.add_theme_stylebox_override("disabled", box(SURFACE, Color.TRANSPARENT, 8))
 	button.add_theme_stylebox_override("focus", box(Color.TRANSPARENT, TEXT, 0))
 	for state: String in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		button.add_theme_color_override(state, INK)
+		button.add_theme_color_override(state, TEXT)
 	button.add_theme_color_override("font_disabled_color", MUTED)
 
 
 static func text_button(button: Button) -> void:
-	button.add_theme_stylebox_override("normal", box(Color.TRANSPARENT, Color.TRANSPARENT, 10))
-	button.add_theme_stylebox_override("hover", box(PANEL, Color.TRANSPARENT, 10))
-	button.add_theme_stylebox_override("pressed", box(SURFACE, Color.TRANSPARENT, 10))
-	button.add_theme_stylebox_override("disabled", box(Color.TRANSPARENT, Color.TRANSPARENT, 10))
+	for state: String in ["normal", "hover", "pressed", "disabled"]:
+		var fill: Color = PANEL if state == "hover" else SURFACE if state == "pressed" else Color.TRANSPARENT
+		var style: StyleBoxFlat = box(fill, Color.TRANSPARENT, 10)
+		style.content_margin_top = 2
+		style.content_margin_bottom = 2
+		button.add_theme_stylebox_override(state, style)
 	button.add_theme_stylebox_override("focus", box(Color.TRANSPARENT, TEAL, 0))
 
 

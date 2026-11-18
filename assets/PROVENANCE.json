@@ -1896,6 +1896,30 @@
       "tool": "OpenAI built-in image_gen",
       "ai_assisted": true,
       "license": "No additional license granted"
+    },
+    {
+      "path": "assets/menu_pixel/facilities.png",
+      "sha256": "472117406392f59fc01034a623ead71b2d734b94169d2dfc1819233a6b576642",
+      "origin": "Original AI-assisted pixel art generated with image_gen from user-approved Blue Hour UI comps, 2026-11-18. Exact prompt embedded in PNG; see assets/menu_pixel/generation.json.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/menu_pixel/training-fire.png",
+      "sha256": "6b5b41e751260bfb662cfe07afd25bfe820957d7e013208962071f7d683bc906",
+      "origin": "Original AI-assisted pixel art generated with image_gen from user-approved Blue Hour UI comps, 2026-11-18. Exact prompt embedded in PNG; see assets/menu_pixel/generation.json.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/menu_pixel/workshop-objects.png",
+      "sha256": "1776eb05d34e6c938213ddc648302ceb588027c4993705e196a57bf64d676dac",
+      "origin": "Original AI-assisted pixel art generated with image_gen from user-approved Blue Hour UI comps, 2026-11-18. Exact prompt embedded in PNG; see assets/menu_pixel/generation.json.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/menu_pixel/menu-symbols.png",
+      "sha256": "63b52a00e2e0c6262a07819a995432b5489dd3b078b107b3a43fe0cc1d478edc",
+      "origin": "Original AI-assisted pixel UI symbol atlas, image_gen2026-11-18; exact cleanup prompt embedded; initial and edit prompts in assets/menu_pixel/generation.json.",
+      "license": "No additional license granted"
     }
   ]
 }

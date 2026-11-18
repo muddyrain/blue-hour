@@ -205,6 +205,8 @@ func camp_scenario(size: Vector2i) -> void:
 	var inner: Rect2 = scroll_client(panel._detail_host).grow(0.5)
 	check(panel.is_visible_in_tree() and details.is_visible_in_tree() and bounds.encloses(panel.get_global_rect()) and inner.encloses(details.get_global_rect()), tag + " actual roster and shared details remain fully reachable")
 	check(details.scroll.size.y >= 140.0, tag + " shared details retain at least 140px of actual inner scroll height")
+	panel.rename_button.pressed.emit()
+	await settle()
 	var rename_reachable: bool = panel.name_edit.is_visible_in_tree() and panel.save_button.is_visible_in_tree() and panel.name_edit.editable and not panel.save_button.disabled and bounds.encloses(panel.name_edit.get_global_rect()) and bounds.encloses(panel.save_button.get_global_rect())
 	panel.name_edit.grab_focus()
 	await process_frame
@@ -213,6 +215,8 @@ func camp_scenario(size: Vector2i) -> void:
 	await process_frame
 	rename_reachable = rename_reachable and viewport.gui_get_focus_owner() == panel.save_button
 	check(rename_reachable, tag + " original rename field and save remain visible, bounded and keyboard-reachable")
+	panel.set_rename_open(false)
+	await settle()
 	var equipment_ids: Array[int] = []
 	var training_ids: Array[int] = []
 	panel.equipment_requested.connect(func(id: int) -> void: equipment_ids.append(id))

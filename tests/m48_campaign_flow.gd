@@ -247,12 +247,18 @@ func _ui_economy(op: String, target_id: String, choice: String) -> bool:
 		app.open_loadout(op != "sell")
 		var armory: CampArmoryView = app.loadout_panel.armory
 		if op == "craft":
+			await _tap(armory._workshop_options[&"craft"])
 			await _tap(armory.craft_buttons[target_id])
 		else:
 			if op == "sell": armory.select_inventory(target_id)
 			else: armory.show_workshop(target_id)
 			await _hold(2)
-			await _tap(armory.economy_buttons[op + ":" + choice])
+			if op == "magazine":
+				await _tap(armory._mod_choices[choice])
+				await _tap(armory._install_button)
+			else:
+				if op != "sell": await _tap(armory._more_mods)
+				await _tap(armory.economy_buttons[op + ":" + choice])
 		await _shot("preview-%02d-%s" % [edits.size(), op])
 		await _tap(armory.confirmation.get_ok_button())
 		await _tap(app.loadout_panel.back_button)

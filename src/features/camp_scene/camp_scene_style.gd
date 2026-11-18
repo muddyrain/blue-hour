@@ -20,9 +20,19 @@ static func box() -> StyleBoxFlat:
 
 
 static func apply_to(root: Node) -> void:
+	if _has_authored_sheet(root):
+		if root is Control: root.theme = CampStyle.theme(root.theme)
+		return
 	if root is Control:
 		root.theme = theme(root.theme)
 	_recolour(root)
+
+
+static func _has_authored_sheet(root: Node) -> bool:
+	if root is PixelSheet: return true
+	for child: Node in root.get_children():
+		if _has_authored_sheet(child): return true
+	return false
 
 
 static func _recolour(root: Node) -> void:

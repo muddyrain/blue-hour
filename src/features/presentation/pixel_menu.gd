@@ -47,12 +47,15 @@ static func divider(parent: Node, vertical: bool = false) -> ColorRect:
 
 static func primary(button: Button) -> void:
 	CampStyle.primary(button)
-	button.add_theme_stylebox_override("normal", CampStyle.box(CampStyle.CORAL.darkened(0.08), Color.TRANSPARENT, 12))
+	button.add_theme_stylebox_override("normal", CampStyle.box(CampStyle.CORAL, Color.TRANSPARENT, 8))
 	for state: String in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		button.add_theme_color_override(state, Color.WHITE)
 
 
 static func tab(button: Button, selected: bool) -> void:
 	CampStyle.text_button(button)
-	button.add_theme_stylebox_override("normal", CampStyle.box(CampStyle.SELECTED if selected else Color.TRANSPARENT, Color.TRANSPARENT, 8))
+	var style: StyleBoxFlat = CampStyle.box(CampStyle.SELECTED if selected else Color.TRANSPARENT, Color.TRANSPARENT, 8)
+	style.content_margin_top = 2
+	style.content_margin_bottom = 2
+	button.add_theme_stylebox_override("normal", style)
 	button.add_theme_color_override("font_color", CampStyle.TEXT)

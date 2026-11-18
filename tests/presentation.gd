@@ -30,9 +30,48 @@ func _run() -> void:
 	_check_readouts()
 	_check_dusk_tint()
 	_check_actor_night_lighting()
+	_check_themed_buildings()
 	await process_frame
 	print("BH_PRESENTATION checks=%d failures=%d" % [_checks, _failures])
 	quit(0 if _failures == 0 else 1)
+
+
+func _check_themed_buildings() -> void:
+	# The real frontage generator uses candidate ordinal + 2, not a palette index.
+	var parcel: Dictionary = {"id":"render-front", "rect":[0, 0, 18000, 1200], "buildings":[], "walks":[]}
+	var entities: Array = []
+	var kinds: Array[String] = ["row_house"]
+	var bus: Dictionary = {"sweep":[-10000, -10000, 100, 100], "door":[-10000, -10000]}
+	ThemedDistrict._fill_front(parcel, entities, [], bus,
+		48.0, 17952.0, 800.0, kinds, 28)
+	_expect(entities.any(func(entity: Dictionary) -> bool: return entity.variant == 16),
+		"real themed frontage includes the variant that interrupted the second sortie")
+	# Also retain explicit original 0/1 colours; generated rows cover 2 through 29.
+	for variant: int in [0, 1]:
+		var entity: Dictionary = entities[0].duplicate(true)
+		entity.id = "legacy-colour-%d" % variant
+		entity.variant = variant
+		entities.append(entity)
+	var data: Dictionary = {"version":5, "size":"large", "entities":entities, "parcels":[parcel], "bus":bus, "gates":[], "objects":[]}
+	var before: String = RecordEncoding.fingerprint(data)
+	var world: Expedition = Expedition.new()
+	world.layout = StreetLayout.new()
+	world.layout.world_data = data
+	world.supply = MissionSupply.new()
+	world.supply.generated = {"sites":[]}
+	world._sort = Node2D.new()
+	world.add_child(world._sort)
+	world._world._make_world_buildings()
+	_expect(world._buildings.size() == entities.size(), "every themed building is created, including later high variants")
+	var colours: Array[Color] = [Color.WHITE, Color(0.92,0.97,1.0), Color(1.0,0.97,0.9), Color.WHITE]
+	for index: int in range(world._buildings.size()):
+		var entity: Dictionary = entities[index]
+		var prop: FieldProp = world._buildings[index]
+		if int(entity.variant) < 4:
+			_expect(prop.modulate == colours[int(entity.variant)], "original 0..3 building colours are unchanged")
+		_expect(prop.iso_art == IsoBuildingArt.pick(entity), "full variant still selects the same building sprite")
+	_expect(RecordEncoding.fingerprint(data) == before, "rendering preserves the complete layout and original variants")
+	world.free()
 
 
 func _check_weapon(view: WeaponPresentation) -> void:

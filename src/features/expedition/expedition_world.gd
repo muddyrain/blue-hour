@@ -347,7 +347,10 @@ func _make_world_buildings() -> void:
 			building.sign_rect=definition.get("sign_rect",Rect2())
 		building.soft_contact=expedition.layout.world_data.get("art_revision")==3
 		if expedition.layout.world_data.get("version")==5:
-			building.modulate=[Color.WHITE,Color(0.92,0.97,1.0),Color(1.0,0.97,0.9),Color.WHITE][int(entity.variant)]
+			# Themed frontage variants retain their candidate ordinal (up to 29).
+			# Repeat only the display palette; never rewrite the frozen entity variant.
+			var tints: Array[Color] = [Color.WHITE,Color(0.92,0.97,1.0),Color(1.0,0.97,0.9),Color.WHITE]
+			building.modulate = tints[posmod(int(entity.variant), tints.size())]
 		if expedition.layout.world_data.has("warehouse_district"):
 			building.roof_tint = [Color.WHITE, Color(0.88, 1.12, 1.08), Color(1.14, 0.98, 0.83)][int(entity.variant)]
 		if not expedition._supply_entrances.is_empty():

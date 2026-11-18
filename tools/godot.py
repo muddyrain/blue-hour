@@ -20,12 +20,14 @@ def main():
    assert (templates/'version.txt').read_text().strip()==version,'Template version mismatch'
    destination=Path(env['XDG_DATA_HOME'])/'godot/export_templates'/version
    if os.name=='nt':destination=Path(env['APPDATA'])/'Godot/export_templates'/version
+   elif sys.platform=='darwin':destination=Path(env['HOME'])/'Library/Application Support/Godot/export_templates'/version
    shutil.copytree(templates,destination,dirs_exist_ok=True)
   z=subprocess.run([exe,'--headless','--path',str(ROOT),'--audio-driver','Dummy','--export-release',a.preset,str(output)],cwd=ROOT,env=env,capture_output=True,text=True,encoding='utf-8')
   log=z.stdout+z.stderr;(output.parent/'export.log').write_text(log,encoding='utf-8')
   for line in log.splitlines():
    if 'BH_NAVIGATION' in line or re.match(r'^(SCRIPT ERROR|ERROR):',line):print(line,flush=True)
-  if z.returncode or re.search(r'(?m)^(SCRIPT ERROR|ERROR):',log) or not output.is_file():return 1
+  artifact_exists=output.is_file() or (output.suffix=='.app' and (output/'Contents/Info.plist').is_file())
+  if z.returncode or re.search(r'(?m)^(SCRIPT ERROR|ERROR):',log) or not artifact_exists:return 1
   print('BH_EXPORT_READY',output,flush=True);return 0
  if a.action=='run':
   env=dict(os.environ);flags=[]
@@ -64,6 +66,8 @@ def main():
  z=subprocess.run([sys.executable,'tools/test_navigation_build.py'],cwd=ROOT,capture_output=True);(job/'navigation-build.txt').write_bytes(z.stdout+z.stderr);assert z.returncode==0,z.stderr
  rows.append({'case':'navigation-build','exit':z.returncode,'expected_exit':0,'status':'PASS'})
  execute('action-generation-cache',['--script','res://tests/action_generation_cache.gd'],[])
+ execute('worldgen-density',['--script','res://tests/worldgen_density.gd'],[])
+ execute('worldgen-dressing',['--script','res://tests/worldgen_dressing.gd'],[])
  execute('run-feel',['--script','res://tests/run_feel.gd'],[])
  execute('ground-seams',['--script','res://tests/ground_seams.gd'],[])
  execute('surface-lines',['--script','res://tests/surface_lines.gd'],[])

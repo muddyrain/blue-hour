@@ -39,6 +39,27 @@ static func _fill_parcel(data: Dictionary, parcel: Dictionary, reserved: Array[R
 	var box: Rect2 = WorldLayout.rect(parcel.rect)
 	if box.size.x < 220.0 or box.size.y < 220.0:
 		return
+	# _fits accepts only a block inset by 24 and a door inset by 16.
+	# Its largest door envelope has radius 52, extending at most 36 beyond
+	# this parcel. Keep a conservative 64-unit broad phase, then run every
+	# original narrow-phase formula in its original order below.
+	var vicinity: Rect2 = box.grow(64.0)
+	var local_reserved: Array[Rect2] = []
+	var local_silhouettes: Array[Rect2] = []
+	var local_doors: Array[Vector2] = []
+	var local_fences: Array[Rect2] = []
+	var local_door_fences: Array[Rect2] = []
+	for zone: Rect2 in reserved:
+		if _could_overlap(vicinity, zone):
+			local_reserved.append(zone)
+	for pair: int in range(silhouettes.size()):
+		if _could_overlap(vicinity, silhouettes[pair]) or vicinity.intersects(Rect2(doors[pair], Vector2.ZERO), true):
+			local_silhouettes.append(silhouettes[pair])
+			local_doors.append(doors[pair])
+	for pair: int in range(fences.size()):
+		if _could_overlap(vicinity, fences[pair]) or _could_overlap(vicinity, door_fences[pair]):
+			local_fences.append(fences[pair])
+			local_door_fences.append(door_fences[pair])
 	var existing: int = int(parcel.get("buildings", []).size())
 	var topology: String = String(data.get("topology", "residential"))
 	var industrial: bool = topology == "industrial" or data.has("warehouse_district") or data.has("loading_yard")
@@ -72,18 +93,25 @@ static func _fill_parcel(data: Dictionary, parcel: Dictionary, reserved: Array[R
 				if not variants.has(typ):
 					variants[typ] = _variant(typ, data.seed, parcel.id, added)
 				var variant: int = variants[typ]
-				if not _fits(parcel, typ, variant, cursor, foot, reserved, silhouettes, doors, fences, door_fences):
+				if not _fits(parcel, typ, variant, cursor, foot, local_reserved, local_silhouettes, local_doors, local_fences, local_door_fences):
 					continue
 				if not WorldgenGeometry._add_building(typ, variant, cursor, foot, parcel, data.entities, data.roads, data.bus):
 					continue
 				var entity: Dictionary = data.entities[-1]
 				entity.service_only = true
-				silhouettes.append(WorldgenScale.visible_rect(entity).grow(8.0))
-				doors.append(WorldLayout.point(entity.door))
+				var silhouette: Rect2 = WorldgenScale.visible_rect(entity).grow(8.0)
+				var doorway: Vector2 = WorldLayout.point(entity.door)
+				silhouettes.append(silhouette)
+				doors.append(doorway)
+				local_silhouettes.append(silhouette)
+				local_doors.append(doorway)
 				WarehouseDistrict._walk(parcel, Vector2(cursor + 8.0, foot + 24.0),
 					Vector2(cursor + width - 8.0, foot + 24.0), 56.0)
-				reserved.append(WorldgenScale.visible_rect(entity).grow(8.0))
-				reserved.append(Rect2(WorldLayout.point(entity.door) - Vector2(24, 24), Vector2(48, 48)))
+				var apron: Rect2 = Rect2(doorway - Vector2(24, 24), Vector2(48, 48))
+				reserved.append(silhouette)
+				reserved.append(apron)
+				local_reserved.append(silhouette)
+				local_reserved.append(apron)
 				cursor += width + 20.0 + 8.0 * float(random.randi_range(0, 1))
 				last = typ
 				added += 1
@@ -96,6 +124,12 @@ static func _fill_parcel(data: Dictionary, parcel: Dictionary, reserved: Array[R
 				cursor += 48.0
 		# Step by a short-shop roof when the row is empty, otherwise leave a narrow service strip.
 		foot -= 200.0 if row_placed else 128.0
+
+
+static func _could_overlap(area: Rect2, obstacle: Rect2) -> bool:
+	# Keep boundaries and degenerate rectangles conservatively. Negative extents
+	# are not generated, but retaining them leaves their old narrow phase intact.
+	return obstacle.size.x < 0.0 or obstacle.size.y < 0.0 or area.intersects(obstacle, true)
 
 
 static func _pool(topology: String, industrial: bool) -> Array[String]:

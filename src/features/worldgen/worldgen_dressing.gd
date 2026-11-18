@@ -3,6 +3,15 @@ extends RefCounted
 ## Solid scenery is frozen before interactive props and the final navigation certificate.
 ## It never supplies loot or a search identity. Rendering cannot invent blockers.
 
+class ParcelFrontage extends RefCounted:
+	var doors: Array[Vector2] = []
+	var buildings: Array[Rect2] = []
+
+	func append(entity: Dictionary) -> void:
+		doors.append(WorldLayout.point(entity.door))
+		buildings.append(WorldgenScale.visible_rect(entity).grow(96.0))
+
+
 static func freeze(data: Dictionary) -> void:
 	var occupied: Array[Rect2]=[]
 	for entity: Dictionary in data.entities: occupied.append(WorldLayout.rect(entity.rect).grow(22))
@@ -101,6 +110,9 @@ static func enrich(data: Dictionary) -> void:
 
 
 static func _scatter(data: Dictionary, occupied: Array[Rect2], reserved: Array[Rect2]) -> void:
+	# Only dressing changes during this pass. Keep each parcel's entity order while
+	# projecting its immutable doors/silhouettes once, not for every candidate point.
+	var frontages: Dictionary = _frontage_index(data)
 	var random: RandomNumberGenerator = RogueLayout.rng("town-props:" + String(data.get("seed", "0")))
 	var ordered: Array = data.parcels.duplicate()
 	var bus: Vector2 = WorldLayout.point(data.bus.door)
@@ -110,29 +122,29 @@ static func _scatter(data: Dictionary, occupied: Array[Rect2], reserved: Array[R
 	var stalls: int = {"small":6, "medium":12, "large":24}[data["size"]]
 	for parcel: Dictionary in ordered:
 		if stalls > 0:
-			stalls -= _street_sets(data, parcel, occupied, reserved, random)
+			stalls -= _street_sets(data, parcel, occupied, reserved, random, frontages[parcel.id])
 	var shelters: int = {"small":2, "medium":4, "large":10}[data["size"]]
 	for parcel: Dictionary in ordered:
 		if shelters <= 0:
 			break
-		for center: Vector2 in _frontage_anchors(data, parcel, Vector2(140, 106), 192.0):
+		for center: Vector2 in _frontage_anchors(data, parcel, Vector2(140, 106), 192.0, frontages[parcel.id]):
 			var point: Vector2 = center + Vector2(0, 33)
-			if not _near_frontage(data, parcel, point):
+			if not _near_frontage(data, parcel, point, frontages[parcel.id]):
 				continue
 			if _place_prop(data, parcel, occupied, reserved, random, "bike_shelter", point, 28.0):
 				shelters -= 1
 				break
 	for parcel: Dictionary in ordered:
-		_edge_furniture(data, parcel, occupied, reserved, random)
-		_fill_open(data, parcel, occupied, reserved, random)
+		_edge_furniture(data, parcel, occupied, reserved, random, frontages[parcel.id])
+		_fill_open(data, parcel, occupied, reserved, random, frontages[parcel.id])
 
 
 static func _edge_furniture(data: Dictionary, parcel: Dictionary, occupied: Array[Rect2],
-		reserved: Array[Rect2], random: RandomNumberGenerator) -> void:
+		reserved: Array[Rect2], random: RandomNumberGenerator, frontage: ParcelFrontage = null) -> void:
 	var kinds: Array[String] = ["planter", "bike", "trash", "sign", "vending", "pole", "lamp"]
 	var budget: int = mini(18, maxi(4, parcel.buildings.size()))
 	var added: int = 0
-	for center: Vector2 in _frontage_anchors(data, parcel, Vector2(60, 32), 112.0):
+	for center: Vector2 in _frontage_anchors(data, parcel, Vector2(60, 32), 112.0, frontage):
 		if added >= budget:
 			break
 		var kind: String = kinds[(added + random.randi_range(0, 2)) % kinds.size()]
@@ -141,11 +153,11 @@ static func _edge_furniture(data: Dictionary, parcel: Dictionary, occupied: Arra
 
 
 static func _fill_open(data: Dictionary, parcel: Dictionary, occupied: Array[Rect2],
-		reserved: Array[Rect2], random: RandomNumberGenerator) -> void:
+		reserved: Array[Rect2], random: RandomNumberGenerator, frontage: ParcelFrontage = null) -> void:
 	# Lawns stay open. A few plants follow path edges; everyday objects never scatter here.
 	var added: int = 0
 	var kinds: Array[String] = ["bush", "planter", "tree_b"]
-	for center: Vector2 in _frontage_anchors(data, parcel, Vector2(40, 40), 224.0):
+	for center: Vector2 in _frontage_anchors(data, parcel, Vector2(40, 40), 224.0, frontage):
 		if added >= 4:
 			break
 		if _place_prop(data, parcel, occupied, reserved, random, kinds[added % kinds.size()], center, 20.0):
@@ -153,12 +165,12 @@ static func _fill_open(data: Dictionary, parcel: Dictionary, occupied: Array[Rec
 
 
 static func _street_sets(data: Dictionary, parcel: Dictionary, occupied: Array[Rect2],
-		reserved: Array[Rect2], random: RandomNumberGenerator) -> int:
+		reserved: Array[Rect2], random: RandomNumberGenerator, frontage: ParcelFrontage = null) -> int:
 	for court: Dictionary in parcel.get("courtyards", []):
 		if court.kind == "parking" and _fill_parking(data, parcel, court, occupied, reserved, random):
 			return 1
 	# Residential courts need not be labelled parking: look beside their real access paths.
-	for center: Vector2 in _frontage_anchors(data, parcel, Vector2(112, 80), 128.0):
+	for center: Vector2 in _frontage_anchors(data, parcel, Vector2(112, 80), 128.0, frontage):
 		if _parking_pad(data, parcel, Rect2(center - Vector2(56, 40), Vector2(112, 80)),
 				occupied, reserved, random):
 			return 1
@@ -217,7 +229,10 @@ static func _parking_visible(data: Dictionary, pad: Rect2) -> bool:
 	return true
 
 
-static func _frontage_anchors(data: Dictionary, parcel: Dictionary, size: Vector2, step: float) -> Array[Vector2]:
+static func _frontage_anchors(data: Dictionary, parcel: Dictionary, size: Vector2, step: float,
+		frontage: ParcelFrontage = null) -> Array[Vector2]:
+	if frontage == null:
+		frontage = _parcel_frontage(data, parcel)
 	var points: Array[Vector2] = []
 	var bounds: Rect2 = WorldLayout.rect(parcel.rect)
 	# Follow both sides of all access paths, including north/south and east/west frontages.
@@ -253,19 +268,40 @@ static func _frontage_anchors(data: Dictionary, parcel: Dictionary, size: Vector
 	# A path through a large empty field is not a reason to line it with vending machines.
 	var anchors: Array[Vector2] = []
 	for point: Vector2 in points:
-		if bounds.encloses(Rect2(point - size * 0.5, size)) and _near_frontage(data, parcel, point):
+		if bounds.encloses(Rect2(point - size * 0.5, size)) and _near_frontage(data, parcel, point, frontage):
 			anchors.append(point)
 	return anchors
 
 
-static func _near_frontage(data: Dictionary, parcel: Dictionary, point: Vector2) -> bool:
-	var near_building: bool = false
+static func _frontage_index(data: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	for parcel: Dictionary in data.parcels:
+		if not result.has(parcel.id):
+			result[parcel.id] = ParcelFrontage.new()
 	for entity: Dictionary in data.entities:
-		if entity.parcel != parcel.id:
-			continue
-		if point.distance_to(WorldLayout.point(entity.door)) <= 176.0:
+		if result.has(entity.parcel):
+			(result[entity.parcel] as ParcelFrontage).append(entity)
+	return result
+
+
+static func _parcel_frontage(data: Dictionary, parcel: Dictionary) -> ParcelFrontage:
+	# Preserve the existing helper entry points without retaining any cross-call cache.
+	var frontage: ParcelFrontage = ParcelFrontage.new()
+	for entity: Dictionary in data.entities:
+		if entity.parcel == parcel.id:
+			frontage.append(entity)
+	return frontage
+
+
+static func _near_frontage(data: Dictionary, parcel: Dictionary, point: Vector2,
+		frontage: ParcelFrontage = null) -> bool:
+	if frontage == null:
+		frontage = _parcel_frontage(data, parcel)
+	var near_building: bool = false
+	for index: int in range(frontage.doors.size()):
+		if point.distance_to(frontage.doors[index]) <= 176.0:
 			return true
-		near_building = near_building or WorldgenScale.visible_rect(entity).grow(96.0).has_point(point)
+		near_building = near_building or frontage.buildings[index].has_point(point)
 	# Unbuilt roadside slivers are still lawns, not destinations for isolated vending or parking.
 	if not near_building:
 		return false

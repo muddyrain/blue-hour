@@ -130,6 +130,12 @@ func _update_ui() -> void:
 		else:
 			_update_member_display()
 			var blocked: Array[Rect2] = x._hud.view.hud_exclusion_rects() if x._hud != null and x._hud.view != null else []
+			# Dense squads need the same readout avoidance around upright bodies as
+			# around HUD panels. These view-space margins never affect actor hitboxes.
+			var canvas: Transform2D = x.get_global_transform_with_canvas()
+			for actor: FieldActor in x.survivors:
+				if actor.visible:
+					blocked.append(canvas * Rect2(IsoSpace.to_view(actor.position) + actor.visual.position + Vector2(-22, -72), Vector2(44, 76)))
 			x._readouts.update_members(x.survivors, x.get_global_transform_with_canvas(), x.get_viewport_rect().size, blocked)
 	if x.bus_view != null and not x.bus_view.has_meta("field_skin"):
 		x.bus_view.skip_button.theme = x._hud.view.theme

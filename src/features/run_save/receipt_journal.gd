@@ -150,8 +150,14 @@ func _profiled_read_all() -> Dictionary:
 	else:
 		FreezeProfile.count("journal_prefix_misses")
 		if not prefix.is_empty() and prefix.directory == directory: FreezeProfile.count("journal_prefix_fallbacks")
+	var decoded: Array[Dictionary] = []
+	if generations.size() - reused >= ReceiptValidation.MIN_RECORDS:
+		var validation_stamp: int = FreezeProfile.enter("journal.validate_receipts")
+		decoded = ReceiptValidation.new(self, observed_raw).decode_from(reused)
+		FreezeProfile.leave("journal.validate_receipts", validation_stamp)
 	for index: int in range(reused, generations.size()):
-		var result: Dictionary = _decode_record(observed_raw[index], false)
+		var result: Dictionary = _decode_record(observed_raw[index], false) \
+			if decoded.is_empty() or decoded[index].error == OK else decoded[index]
 		if result.error != OK:
 			return result
 		var receipt: Dictionary = result.receipt

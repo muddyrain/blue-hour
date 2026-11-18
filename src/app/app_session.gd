@@ -346,6 +346,8 @@ func _open_opening_choice() -> void:
 
 
 func _boot_session() -> void:
+	# Register an available native class on the main thread before save workers.
+	FieldRouteSearch.prepare_backend()
 	app.get_tree().auto_accept_quit = false
 	app.get_window().close_requested.connect(func() -> void: app.request_exit("quit"))
 	var entry: Dictionary = PlayableEntry.resolve(OS.get_cmdline_user_args())

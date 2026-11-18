@@ -60,6 +60,7 @@ func _run() -> void:
 		if authenticated.error == OK:
 			var count: int = int(authenticated.receipt.revision)
 			_working_set(journal, count)
+			_parallel_read_case(journal, authenticated)
 			_shared_prefix_case(journal, count)
 			var first: String = journal.directory.path_join("00000001/record.json")
 			var original: String = FileAccess.get_file_as_string(first)
@@ -84,6 +85,36 @@ func _run() -> void:
 	_write(output.path_join("report.json"), JSON.stringify(report, "\t", true, true))
 	print("M48_RECORD_CACHE ", JSON.stringify(report, "", true, true))
 	quit(0 if failures.is_empty() else 1)
+
+
+func _parallel_read_case(journal: ReceiptJournal, expected: Dictionary) -> void:
+	_reset_cache()
+	ReceiptJournal._prefix_mutex.lock()
+	ReceiptJournal._verified_prefix = {}
+	ReceiptJournal._prefix_mutex.unlock()
+	_start("cold-complete-parallel-validation")
+	var restored: Dictionary = journal.read_all()
+	_finish()
+	var metadata: Dictionary = profiles.back().profile.metadata
+	_check(restored.error == OK and restored.hash == expected.hash
+		and TransactionReceipt.same(restored.receipt, expected.receipt),
+		"parallel complete receipt proofs retain the exact ordered journal result")
+	_check(int(metadata.get("journal_validation_workers", 0)) >= 1
+		and int(metadata.get("journal_validation_workers", 0)) <= ReceiptValidation.MAX_WORKERS
+		and int(metadata.get("journal_validation_records", 0)) == int(expected.receipt.revision),
+		"cold history validates every receipt within the bounded worker count")
+	var source: String = journal.directory.path_join("%08d/record.json" % (int(expected.receipt.revision) / 2))
+	var original: String = FileAccess.get_file_as_string(source)
+	var changed: Dictionary = RecordEncoding.unpack(JSON.parse_string(original)).payload
+	changed.base.cash = -1
+	_write(source, RecordEncoding.stringify(changed))
+	_start("parallel-rehashed-middle-record-negative")
+	var rejected: Dictionary = journal.read_all()
+	_finish()
+	_check(rejected.error != OK and int(profiles.back().profile.metadata.get("journal_validation_records", 0)) == int(expected.receipt.revision),
+		"parallel validation rejects a rehashed invalid middle receipt with an unchanged latest generation")
+	_write(source, original)
+	_check(journal.read_all().error == OK, "restoring the exact original bytes restores the complete parallel-validated chain")
 
 
 func _working_set(journal: ReceiptJournal, count: int) -> void:

@@ -14,17 +14,20 @@ var _grid: AStarGrid2D = AStarGrid2D.new()
 # search scratch data on the grid. Serialize queries on the shared instance.
 var _query_mutex: Mutex = Mutex.new()
 var _routes: Dictionary[Vector4, PackedVector2Array] = {}
+var _search: FieldRouteSearch
 
 
 func configure(blockers: Array[Rect2], world_bounds: Rect2 = BOUNDS) -> void:
 	bounds = world_bounds
 	obstacles = blockers.duplicate()
 	_prepare_grid()
+	# Rasterize the same inflated rectangles instead of testing every obstacle at
+	# every cell. The final solid mask (and therefore AStar tie breaks) is unchanged.
+	for obstacle: Rect2 in obstacles:
+		_paint_blocker(self, obstacle, true)
 	if _grid.jumping_enabled:
 		# Paint each footprint once. The outer cell centers are 8 units from
 		# the edge and fail the same 10-unit actor bounds test as legacy maps.
-		for obstacle: Rect2 in obstacles:
-			_paint_blocker(self, obstacle, true)
 		var size: Vector2i = _grid.region.size
 		for x: int in range(size.x):
 			_grid.set_point_solid(Vector2i(x, 0), true)
@@ -33,15 +36,26 @@ func configure(blockers: Array[Rect2], world_bounds: Rect2 = BOUNDS) -> void:
 			_grid.set_point_solid(Vector2i(0, y), true)
 			_grid.set_point_solid(Vector2i(size.x - 1, y), true)
 		return
-	for x: int in range(_grid.region.size.x):
-		for y: int in range(_grid.region.size.y):
+	# Only the perimeter can fail the actor-bounds test: CELL/2 < FOOT_RADIUS
+	# < 3*CELL/2. Test actual centers to retain fractional/offset bounds behavior.
+	var size: Vector2i = _grid.region.size
+	if size.x == 0 or size.y == 0:
+		return
+	var interior: Rect2 = bounds.grow(-FOOT_RADIUS)
+	for x: int in range(size.x):
+		for y: int in [0, size.y - 1]:
 			var id: Vector2i = Vector2i(x, y)
-			var point: Vector2 = _grid.get_point_position(id)
-			if not is_clear(point):
+			if not interior.has_point(_grid.get_point_position(id)):
+				_grid.set_point_solid(id, true)
+	for y: int in range(1, size.y - 1):
+		for x: int in [0, size.x - 1]:
+			var id: Vector2i = Vector2i(x, y)
+			if not interior.has_point(_grid.get_point_position(id)):
 				_grid.set_point_solid(id, true)
 
 
 func _prepare_grid() -> void:
+	_search = null
 	_routes.clear()
 	_grid.clear()
 	_grid.region = Rect2i(0, 0, int(bounds.size.x / CELL), int(bounds.size.y / CELL))
@@ -72,6 +86,7 @@ func copy_navigation() -> FieldNavigation:
 
 
 func set_private_blocker(base: FieldNavigation, blocker: Rect2) -> void:
+	_search = null
 	_routes.clear()
 	if obstacles.size() > base.obstacles.size():
 		base._query_mutex.lock()
@@ -114,7 +129,14 @@ func path_between(start: Vector2, goal: Vector2) -> PackedVector2Array:
 		return cached.duplicate()
 	var from_id: Vector2i = _nearest_walkable(start)
 	var to_id: Vector2i = _nearest_walkable(goal)
-	var points: PackedVector2Array = _grid.get_point_path(from_id, to_id)
+	var points: PackedVector2Array
+	if _grid.jumping_enabled:
+		if _search == null:
+			_search = FieldRouteSearch.new()
+			_search.configure(_grid.region.size, _route_solids())
+		points = _search.path(_grid, from_id, to_id)
+	else:
+		points = _grid.get_point_path(from_id, to_id)
 	# Replanning must not first pull a moving actor backwards to its cell centre.
 	# Keep the conservative grid entry when the real start cannot reach the next cell safely.
 	if points.size() > 1 and start.distance_to(points[0]) <= CELL * 0.71:
@@ -210,3 +232,30 @@ func _nearest_large_grid(point: Vector2, direct: Vector2i) -> Vector2i:
 		if distance < lower_bound * lower_bound:
 			return closest
 	return closest
+
+
+# The large-grid mask consists of these exact half-open rectangle footprints
+# and its solid outer ring. Build a row/column index without scanning the grid.
+func _route_solids() -> Array[Rect2i]:
+	var size: Vector2i = _grid.region.size
+	var result: Array[Rect2i] = [Rect2i(0, 0, size.x, 1), Rect2i(0, size.y - 1, size.x, 1),
+		Rect2i(0, 0, 1, size.y), Rect2i(size.x - 1, 0, 1, size.y)]
+	for blocker: Rect2 in obstacles:
+		var area: Rect2 = blocker.grow(FOOT_RADIUS + CELL * 0.5)
+		var first: Vector2i = Vector2i(((area.position - _grid.offset) / CELL).floor()).max(Vector2i.ZERO)
+		var end: Vector2i = Vector2i(((area.end - _grid.offset) / CELL).ceil()).min(size)
+		if end.x <= first.x or end.y <= first.y:
+			continue
+		# The painter visits a conservative range, then checks actual cell centers.
+		for axis: int in range(2):
+			while first[axis] < end[axis] and _grid.get_point_position(first)[axis] < area.position[axis]:
+				first[axis] += 1
+			if first[axis] >= end[axis]:
+				break
+			var last: Vector2i = end - Vector2i.ONE
+			while end[axis] > first[axis] and _grid.get_point_position(last)[axis] >= area.end[axis]:
+				end[axis] -= 1
+				last = end - Vector2i.ONE
+		if end.x > first.x and end.y > first.y:
+			result.append(Rect2i(first, end - first))
+	return result

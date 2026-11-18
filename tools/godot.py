@@ -6,20 +6,37 @@ ROOT=Path(__file__).resolve().parents[1]
 LOCK=(ROOT/'.godot-version').read_text(encoding='utf-8').strip()
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('action',choices=['check','run']);p.add_argument('--godot');entry=p.add_mutually_exclusive_group();entry.add_argument('--enemy-trial',action='store_true');p.add_argument('--profile',type=Path);p.add_argument('--output',type=Path);a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('action',choices=['check','run','export']);p.add_argument('--godot');entry=p.add_mutually_exclusive_group();entry.add_argument('--enemy-trial',action='store_true');p.add_argument('--profile',type=Path);p.add_argument('--output',type=Path);p.add_argument('--preset',default='Windows Desktop');p.add_argument('--templates',type=Path,help='Directory containing pinned official export templates');a=p.parse_args()
  exe=a.godot or os.environ.get('GODOT_BIN') or shutil.which('godot') or shutil.which('godot4')
  if not exe:raise RuntimeError('Specify --godot or GODOT_BIN with the pinned engine')
  version=subprocess.check_output([exe,'--version'],text=True,timeout=15).strip();assert version==LOCK,(version,LOCK)
+ from build_navigation import report_available, isolated_env
+ report_available()
+ if a.action=='export':
+  output=(a.output or ROOT/'.local/exports/windows/blue-hour.exe').resolve();assert output.is_relative_to(ROOT/'.local'),'Use a project-local isolated output';output.parent.mkdir(parents=True,exist_ok=True)
+  env=isolated_env(output.parent/'profile')
+  if a.templates:
+   templates=a.templates.resolve();version='.'.join(LOCK.split('.')[:3])+'.stable'
+   assert (templates/'version.txt').read_text().strip()==version,'Template version mismatch'
+   destination=Path(env['XDG_DATA_HOME'])/'godot/export_templates'/version
+   if os.name=='nt':destination=Path(env['APPDATA'])/'Godot/export_templates'/version
+   shutil.copytree(templates,destination,dirs_exist_ok=True)
+  z=subprocess.run([exe,'--headless','--path',str(ROOT),'--audio-driver','Dummy','--export-release',a.preset,str(output)],cwd=ROOT,env=env,capture_output=True,text=True,encoding='utf-8')
+  log=z.stdout+z.stderr;(output.parent/'export.log').write_text(log,encoding='utf-8')
+  for line in log.splitlines():
+   if 'BH_NAVIGATION' in line or re.match(r'^(SCRIPT ERROR|ERROR):',line):print(line,flush=True)
+  if z.returncode or re.search(r'(?m)^(SCRIPT ERROR|ERROR):',log) or not output.is_file():return 1
+  print('BH_EXPORT_READY',output,flush=True);return 0
  if a.action=='run':
   env=dict(os.environ);flags=[]
   profile=a.profile or (ROOT/'.local/developer-enemy' if a.enemy_trial else None)
   if profile is not None:
    profile=profile.resolve();assert profile.is_relative_to(ROOT/'.local'),'Use a project-local isolated profile';profile.mkdir(parents=True,exist_ok=True)
-   env.update(HOME=str(profile/'home'),APPDATA=str(profile/'user'),XDG_DATA_HOME=str(profile/'user'))
+   env=isolated_env(profile)
    flags+=['--bh-progress='+str(profile/'run.enemy-v1.json'),'--bh-audio-settings='+str(profile/'audio.json')]
   return subprocess.call([exe,'--path',str(ROOT),'--rendering-method','gl_compatibility','--',*flags],cwd=ROOT,env=env)
  job=(a.output or ROOT/'.local/public-checks'/(datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'-'+uuid.uuid4().hex[:8])).resolve();assert job.is_relative_to(ROOT/'.local'),'Use a project-local isolated output';job.mkdir(parents=True,exist_ok=False)
- env=dict(os.environ,HOME=str(job/'home'),APPDATA=str(job/'user'),XDG_DATA_HOME=str(job/'user'))
+ env=isolated_env(job)
  rows=[]
  def execute(label,args,flags=None,expected=0):
   folder=job/label;folder.mkdir();cmd=[exe,'--headless','--path',str(ROOT),'--audio-driver','Dummy',*args]
@@ -33,6 +50,7 @@ def main():
   assert all(int(n)==0 for n in re.findall(r'"failures"\s*:\s*(\d+)',text)),(label,'structured failures')
   if label=='known-hash-cycle':assert 'MINIMAL_HASH_CYCLE=true' in text and 'EXACT_RECORD_ROUNDTRIP=true' in text
   if label.startswith('startup-'):assert 'BH_READY' in text
+  if label=='action-generation-cache':assert 'BH_ACTION_GENERATION_CACHE ' in text
   rows.append({'case':label,'exit':z.returncode,'expected_exit':expected,'status':'EXPECTED_KNOWN_FAILURE' if expected else 'PASS'});print(label,rows[-1]['status'],flush=True)
  execute('import',['--editor','--import'])
  execute('startup-default',['--quit-after','3'])
@@ -41,6 +59,11 @@ def main():
  execute('smoke-wait',['--script','res://tests/smoke_wait.gd'],[])
  execute('mission-loading',['--script','res://tests/mission_loading.gd'],[])
  execute('navigation-cache',['--script','res://tests/navigation_cache.gd'],[])
+ execute('navigation-routes',['--script','res://tests/navigation_routes.gd'],[])
+ execute('navigation-fallback',['--script','res://tests/navigation_fallback.gd'],[])
+ z=subprocess.run([sys.executable,'tools/test_navigation_build.py'],cwd=ROOT,capture_output=True);(job/'navigation-build.txt').write_bytes(z.stdout+z.stderr);assert z.returncode==0,z.stderr
+ rows.append({'case':'navigation-build','exit':z.returncode,'expected_exit':0,'status':'PASS'})
+ execute('action-generation-cache',['--script','res://tests/action_generation_cache.gd'],[])
  execute('run-feel',['--script','res://tests/run_feel.gd'],[])
  execute('ground-seams',['--script','res://tests/ground_seams.gd'],[])
  execute('surface-lines',['--script','res://tests/surface_lines.gd'],[])

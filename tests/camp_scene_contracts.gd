@@ -17,6 +17,8 @@ func _run() -> void:
 	var view: CampSceneView = SCENE.instantiate() as CampSceneView
 	view.player_mode = true
 	root.add_child(view)
+	# This fixture owns its extent; production fills its parent with anchors.
+	view.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	view.size = Vector2(1280, 720)
 	view.world.set_process(false)
 	view.action_requested.connect(func(action: StringName, id: int) -> void:
@@ -220,7 +222,9 @@ func _canvas_z(item: CanvasItem) -> int:
 	var depth: int = item.z_index
 	var current: CanvasItem = item
 	while current.z_as_relative:
-		current = current.get_parent_item()
+		# The yard uses direct CanvasItem parents. get_parent_item is not a
+		# script API in the pinned engine; use the actual scene hierarchy.
+		current = current.get_parent() as CanvasItem
 		if current == null:
 			break
 		depth += current.z_index

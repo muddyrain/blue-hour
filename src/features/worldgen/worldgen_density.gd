@@ -17,11 +17,25 @@ static func fill(data: Dictionary) -> void:
 		reserved.append(OpenStreetsV1.boarding_paving(data.bus).grow(24.0))
 	for point: Array in data.get("enemy_points", []):
 		reserved.append(Rect2(WorldLayout.point(point) - Vector2.ONE * 32.0, Vector2.ONE * 64.0))
+	# Existing entities do not move during this fill. Project their
+	# collision silhouettes once, and append each new entity immediately.
+	var silhouettes: Array[Rect2] = []
+	var doors: Array[Vector2] = []
+	var fences: Array[Rect2] = []
+	var door_fences: Array[Rect2] = []
+	for wall: Array in data.get("barriers", []):
+		var fence: Rect2 = WorldLayout.rect(wall)
+		fences.append(fence.grow(16.0))
+		door_fences.append(fence.grow(20.0))
+	for entity: Dictionary in data.entities:
+		silhouettes.append(WorldgenScale.visible_rect(entity).grow(8.0))
+		doors.append(WorldLayout.point(entity.door))
 	for parcel: Dictionary in data.parcels:
-		_fill_parcel(data, parcel, reserved)
+		_fill_parcel(data, parcel, reserved, silhouettes, doors, fences, door_fences)
 
 
-static func _fill_parcel(data: Dictionary, parcel: Dictionary, reserved: Array[Rect2]) -> void:
+static func _fill_parcel(data: Dictionary, parcel: Dictionary, reserved: Array[Rect2],
+		silhouettes: Array[Rect2], doors: Array[Vector2], fences: Array[Rect2], door_fences: Array[Rect2]) -> void:
 	var box: Rect2 = WorldLayout.rect(parcel.rect)
 	if box.size.x < 220.0 or box.size.y < 220.0:
 		return
@@ -37,6 +51,7 @@ static func _fill_parcel(data: Dictionary, parcel: Dictionary, reserved: Array[R
 	var last: String = ""
 	var index: int = parcel.get("buildings", []).size()
 	var random: RandomNumberGenerator = RogueLayout.rng("gen-density-row:" + String(data.get("seed", "0")) + ":" + parcel.id)
+	var variants: Dictionary = {}
 	var south: float = box.end.y - 56.0
 	var north_limit: float = box.position.y + 120.0
 	var foot: float = south
@@ -54,13 +69,17 @@ static func _fill_parcel(data: Dictionary, parcel: Dictionary, reserved: Array[R
 				var width: float = float(WorldgenScale.WIDTH[typ])
 				if cursor + width > box.end.x - 20.0:
 					continue
-				var variant: int = _variant(typ, data.seed, parcel.id, added)
-				if not _fits(data, parcel, typ, variant, cursor, foot, reserved):
+				if not variants.has(typ):
+					variants[typ] = _variant(typ, data.seed, parcel.id, added)
+				var variant: int = variants[typ]
+				if not _fits(parcel, typ, variant, cursor, foot, reserved, silhouettes, doors, fences, door_fences):
 					continue
 				if not WorldgenGeometry._add_building(typ, variant, cursor, foot, parcel, data.entities, data.roads, data.bus):
 					continue
 				var entity: Dictionary = data.entities[-1]
 				entity.service_only = true
+				silhouettes.append(WorldgenScale.visible_rect(entity).grow(8.0))
+				doors.append(WorldLayout.point(entity.door))
 				WarehouseDistrict._walk(parcel, Vector2(cursor + 8.0, foot + 24.0),
 					Vector2(cursor + width - 8.0, foot + 24.0), 56.0)
 				reserved.append(WorldgenScale.visible_rect(entity).grow(8.0))
@@ -68,6 +87,7 @@ static func _fill_parcel(data: Dictionary, parcel: Dictionary, reserved: Array[R
 				cursor += width + 20.0 + 8.0 * float(random.randi_range(0, 1))
 				last = typ
 				added += 1
+				variants.clear() # _variant's added ordinal is part of its seed.
 				index += 1
 				placed = true
 				row_placed = true
@@ -93,8 +113,9 @@ static func _variant(typ: String, seed: String, parcel_id: String, added: int) -
 	return random.randi_range(0, 2)
 
 
-static func _fits(data: Dictionary, parcel: Dictionary, typ: String, variant: int, x: float, foot: float,
-		reserved: Array[Rect2]) -> bool:
+static func _fits(parcel: Dictionary, typ: String, variant: int, x: float, foot: float,
+		reserved: Array[Rect2], silhouettes: Array[Rect2], doors: Array[Vector2],
+		fences: Array[Rect2], door_fences: Array[Rect2]) -> bool:
 	var width: float = float(WorldgenScale.WIDTH[typ])
 	var depth: float = float(WorldgenScale.DEPTH[typ])
 	var block: Rect2 = Rect2(x, foot - depth, width, depth)
@@ -110,12 +131,13 @@ static func _fits(data: Dictionary, parcel: Dictionary, typ: String, variant: in
 		return false
 	if not box.grow(-16.0).has_point(door):
 		return false
-	for wall: Array in data.get("barriers", []):
-		var fence: Rect2 = WorldLayout.rect(wall)
-		if fence.grow(16.0).intersects(block) or fence.grow(20.0).has_point(door):
+	for index: int in range(fences.size()):
+		if fences[index].intersects(block) or door_fences[index].has_point(door):
 			return false
+	var reserved_block: Rect2 = block.grow(16.0)
+	var reserved_apron: Rect2 = apron.grow(14.0)
 	for zone: Rect2 in reserved:
-		if block.grow(16.0).intersects(zone) or apron.grow(14.0).intersects(zone):
+		if reserved_block.intersects(zone) or reserved_apron.intersects(zone):
 			return false
 	for walk: Array in parcel.get("walks", []):
 		# Keep existing lanes open; a new front apron may sit on leftover grass.
@@ -129,9 +151,11 @@ static func _fits(data: Dictionary, parcel: Dictionary, typ: String, variant: in
 			return false
 	if parcel.has("entrance") and apron.grow(12.0).has_point(WorldLayout.point(parcel.entrance)):
 		return false
-	for entity: Dictionary in data.entities:
-		if visible.grow(8.0).intersects(WorldgenScale.visible_rect(entity).grow(8.0)):
+	var silhouette: Rect2 = visible.grow(8.0)
+	var entry: Rect2 = apron.grow(24.0)
+	for index: int in range(silhouettes.size()):
+		if silhouette.intersects(silhouettes[index]):
 			return false
-		if apron.grow(24.0).has_point(WorldLayout.point(entity.door)):
+		if entry.has_point(doors[index]):
 			return false
 	return true

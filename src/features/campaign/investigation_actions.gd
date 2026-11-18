@@ -6,6 +6,8 @@ const INVESTIGATION_SLOT: int = 1
 const SITE_ID: String = "cash"
 const MAX_DAYS_CACHED: int = 8
 static var _days: Dictionary[String, Dictionary] = {}
+# Compact all-slot proofs outlive the eight full UI descriptions.
+static var _fingerprints: Dictionary = {}
 
 
 static func offers(base: Dictionary) -> Array[Dictionary]:
@@ -17,7 +19,13 @@ static func offers(base: Dictionary) -> Array[Dictionary]:
 static func matches(base: Dictionary, value: Variant) -> bool:
 	if not value is Dictionary or not value.get("id") is String:
 		return false
-	var expected: String = _frozen_day(base).get("fingerprints", {}).get(value.id, "")
+	var identity: String = RecordEncoding.fingerprint(base)
+	var proven: Variant = ActionMemo.lookup(_fingerprints, identity)
+	if proven == null:
+		proven = _frozen_day(base).get("fingerprints", {})
+	else:
+		FreezeProfile.count("action_day_proof_hits")
+	var expected: String = proven.get(value.id, "")
 	return not expected.is_empty() and expected == RecordEncoding.fingerprint(value)
 
 
@@ -32,6 +40,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 	var cached: Variant = ActionMemo.lookup(_days, identity)
 	if cached != null:
 		return cached
+	FreezeProfile.count("action_day_builds")
 	# The original task/boss generators consume their original frozen phase format.
 	var projected: Dictionary = base.duplicate(false)
 	projected.journey = base.journey.duplicate(false)
@@ -121,6 +130,7 @@ static func _frozen_day(base: Dictionary) -> Dictionary:
 		fingerprints[candidate.id] = RecordEncoding.fingerprint(candidate)
 	var frozen: Dictionary = {"offers":result, "fingerprints":fingerprints}
 	ActionMemo.store(_days, identity, frozen, MAX_DAYS_CACHED, true)
+	ActionMemo.store(_fingerprints, identity, fingerprints, 128, true)
 	return frozen
 
 

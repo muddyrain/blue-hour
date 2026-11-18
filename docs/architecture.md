@@ -85,6 +85,19 @@
 
 `FieldNavigation` 为每张图缓存最多 2048 组精确起终点的原始 AStar 路径（含不可达结果），供任务证书和卡片摘要复用；不改变择路规则。网格重建或临时路障变更会清空缓存，返回数组独立复制，私有路障图不共享路径状态。
 
+大图跳点搜索由 `FieldRouteSearch` 显式调用 `native/route_kernel.c` 的 `RefCounted` 实例。碰撞矩形仍按同一半开栅格覆盖与外圈构成 solid mask；原生 helper 在线性预处理内建立四向直线强制后继、四向对角静态终点和行/列连通段。每次查询将目标与这些段相交，得到与 Godot 4.7.2 `_jump` 完全相同的后继；邻居顺序、float32 octile 评分、相等评分时的堆操作及起点后处理保持原样，返回完整原始路径，不以距离场替代路径。小图继续使用原生非跳点 AStarGrid2D。索引随地图或私有路障变更销毁，查询仍持有原互斥锁；没有增加路线缓存容量或工作线程。`tests/support/navigation_oracle.gd` 保留 c65fa3a 的完整实现，仅供 `navigation_routes` 对照完整点序列与精确累计距离。构建入口 `tools/build_navigation.py` 使用锁定引擎导出的公开 GDExtension 接口头与 API 元数据，校验公开内建类型的 opaque buffer 大小，String/StringName/PackedInt32Array 全部通过公开构造/析构 API 管理，不依赖全零空字符串表示；GCC/Clang 开启严格单精度运算、禁止 FMA 收缩/fast-math。支持 Linux x86_64 与 MinGW/LLVM-MinGW Windows x86_64 交叉或本机构建，输出仅在 `.local/navigation-native/`，不依赖引擎私有对象布局、私有符号或进程扫描。算法顺序绑定 4.7.2；升级引擎必须重建并重跑完整点序列对照。
+
+`FieldRouteKernelLoader` 在主线程启动阶段显式尝试一次可选加载，工作线程开始读档前完成类注册；`FieldRouteSearch` 以互斥锁共享加载状态，网格仍各自持有内核实例。清单存为普通 `.cfg`，避免编辑器自动扫描 `.gdextension` 在缺库时出错；运行时先按官方平台特征匹配、检查文件，再于 `user://navigation-native/` 写入供公开 `GDExtensionManager.load_extension()` 使用的描述文件。缺清单、无匹配平台、缺库、不能写描述文件、加载失败或内核配置失败，都回到同一网格的 `AStarGrid2D.get_point_path()`，沿用原起点后处理、缓存、完整地图/选卡/历史校验，不引入第二套规则。`BH_NAVIGATION` 标记可观察实际后端，`tests/navigation_fallback.gd` 在独立进程覆盖失败场景及完整路径等价；`tools/test_navigation_build.py` 覆盖可选构建、失败清理和平台键。
+
+已启用 `native/export_plugin.gd` 的 `EditorExportPlugin`，通过公开 `add_file` / `add_shared_object` 将清单和已有目标库加入普通导出。导出库位于可执行文件旁，运行时按可执行文件目录定位，支持整体移动；没有目标库时照常导出并明确报告严格回退。`tools/godot.py run/check/export` 不触发编译，玩家无工具链依赖；`export --templates` 将指定版本模板复制到隔离配置。库缺失只影响性能，不能宣称因此满足 Windows 大存档读档耗时要求。
+
+导航网格构建按膨胀后的障碍矩形覆盖栅格，仅在边缘逐格核对角色的世界边界，不再对每格遍历全部障碍；AStar 参数、障碍膨胀尺寸及最终 solid mask 保持一致。`tests/navigation_cache.gd` 将每格及完整路径与原逐格判定比较，覆盖重叠、退化、偏移和非整格边界，并用查询次数限制重复工作，不依赖机器耗时阈值。
+
+`WorldgenDensity` 在每次补房调用内只投影一次既有建筑外形、门点和围栏；新增建筑立即追加到本次局部投影，变体计算在补房序号变化时失效。预计算不跨调用保存，不改变碰撞判断顺序、随机种子或生成结果。`tests/worldgen_contracts.gd` 用原实现的完整生成指纹及外形投影次数上界检查等价性与复杂度。
+
+`ExplorationLayout` 将最多 48 份完整几何证明与原生导航图分开保存，大地图原生图仍最多保留 4 份。淘汰导航图时保留已认证的完整布局及门点距离；再次查询只从同一布局重建相同网格，不重复生成地图和全量路线证明。两类缓存都由完整布局指纹绑定，并在同一互斥锁下发布；48 份证明按最早入库顺序逐份淘汰，随证明删除对应布局和导航图。`worldgen_contracts` 强制淘汰原生图后核对重建次数、全部门点路径和篡改拒绝。
+
+
 `HarborWarehouse` 是第二个手摆地点“海边町·北港仓库”（地点键 `north_harbor`）。从第 3 天起，普通 `airdrop` 装备回收和定期五金补给通过 `ExplorationActions.supply()` 投影到港口；带独立空间锚点的侦察、路障、稀有/事件、深入回收和终局保留原图。与 `SeasideTown` 一样保留原任务/地图收据 ID 和 `generated`，不改变 `offers()`、奖励或源站点名义时长。港口地形和搜刮绑定集中在 `harbor_warehouse.gd`；`TaskActions.site_point()` 同时供运行时及快照校验使用，避免只有画面搬了位置。`HarborPresentation` 负责闭合建筑与外部门口工位，`HarborGround` 负责码头岸线表现，仍共用 `FieldNavigation`、原刷怪/入夜、派工、登车与结算。港口仅五盏工作灯（暖色/冷白）参与场景光池，货柜不充当光源。
 
 `StreetLayout` 只读取 `world_data.barriers_block_shots`（默认 true），不反向引用地点生成器，避免资源导入经存档校验链回到任务资源。港口将水岸障碍标为不挡弹，并把非导出的完整地形、作业绑定和边界加入快照兼容哈希；捕获仍要求暂停。成组货柜只分配一个工位，其余有碰撞但无标签，额外源站点使用南侧周转箱。`HarborGround` 以 10 Hz 重绘低透明度慢漂水纹，避开栈桥并服从世界夜色。集合属于移动命令，可在 ACTIVE / ENGINE / BOARDING 下达；发动、全员登车与归航条件保持原规则。
@@ -107,8 +120,13 @@
 
 ### 存档说明
 
+- `InvestigationActions` 将完整三槽选卡的紧凑指纹证明（最多 128 份）与 8 份 UI 完整描述分开保留；证明仍绑定整个营地的 `RecordEncoding.fingerprint`，只在三个槽位全部生成成功后发布，不依赖磁盘标记，也不改变选卡指纹。`ExplorationActions.level_map` 使用进程内 `ActionGenerationMemo`（最多 64 份、16 MiB 输入/结果原生序列化体积），按完整来源、显式生成参数、布局/探索策略与导航尺寸的内容哈希索引，并再次比较完整输入。相同来源的并发调用共用一项计算，调用者只拿独立副本；成功和失败尝试的诊断均保留。缓存不包含跨收据授权，哈希链接、事务次序及历史规则仍由日志逐条检查。
+
+- `ReceiptJournal` 在物理读取和目录检查之后，对至少 12 条尚未证明的收据使用 `ReceiptValidation`，将完整解码/来源校验分为最多 3 个连续段并行执行（调用线程也承担一段）。首条先同步拒绝损坏根；全部任务结束后仍按原顺序执行每条哈希链接、跨收据规则和重放，成功前不发布前缀证明。已证明前缀和短增量仍沿原串行路径。工作线程不读写存档文件；共享纯结果经既有互斥锁发布，扩展人物种子缓存也经 `ActionMemo` 访问。`m48_record_cache` 覆盖完整 69 条历史的结果一致性、工作量上界及重哈希中间收据的拒绝。
+
 - 不再兼容旧存档：v1–v5 `RunSave` 升级、v5 迁移导入、旧位置 `user://saves/run.json` 保护都已删除。读到不认识的存档会被拒绝，需要开新旅程。
 - 当前存档的校验仍是“新状态投影到旧校验器”的链式结构（`EnemyState → WeaponState → …`），收据日志仍做哈希校验。这一部分与当前存档格式耦合，未在本轮删除；后续可整体替换为简单的单文件 JSON 存档。
+- `EconomyBuildV1.source_action()` 的紧凑来源认证原始压缩字节与 ExactJSON，并通过重压缩核对完整 GZIP 流；比较仅兼容锁定 zlib 的 OS 头标记 3（Unix）、10（Windows）、19（macOS），其余头、DEFLATE、CRC/ISIZE 和尾随内容保持精确比较。写入格式与已有字节不变，避免把写入平台的元数据误当作来源内容差异。
 
 ## 小队与救援
 
@@ -144,5 +162,6 @@
 
 - `tools/godot.py check`：导入、启动（`BH_READY`）与 `tests/` 下的单元/契约测试，任何 `SCRIPT ERROR`/`ERROR` 或 `"failures": N>0` 都判失败。
 - `tests/smoke_loop.gd`（在 `check` 中）：无头跑完整一局：新档 → 出击 → 搜刮 → 战斗 → 巴士撤离 → 结算 → 重启读档 → 第二次出击；任何 SCRIPT ERROR 都会判失败。
-- `persona_ui` 在 main 上就已失败（1024×640 营地详情滚动高度 <140px），属已知问题。
+- `python3 tools/check_ten_day.py --godot <引擎> --headless` 是单独运行的长流程回归：`campaign_ten_day.gd` 经正式 App 从第 2 天两人开局逐日选卡、完成主目标、搜集与撤离，结算与营地交易正常落盘；第 6 天退出引擎，新进程从正式进度继续到第 10 天归航，再以第三个游戏进程核对完整状态。测试仅覆写已有 `_pool_initial()` 注入固定种子 `blue-hour-ten-day-20261116`，不修改日期、资源、成员、设施或生产随机机制。过程日志与精确状态比较记录留在 `.local/`；不传 `--headless` 时另捕捉正式画面。档案身份仍由生产 Crypto 创建，并记在初始记录中；依赖该身份的敌种抽签须连同原存档身份复现。`--hunger` 在独立新档中连续三次空手归航，单独验证四份开局粮耗尽后的正式饥饿死亡，不计入十天路线。
+- `PersonaDetails` 的特质摘要与成长、武器说明一起放在详情滚动正文中；`persona_ui` 保证 1024×640 和 1280×720 营地档案的实际内层滚动高度至少 140px，并核对装备、培养与呼号操作的可达性。
 - 其他 `tools/*_flow.py` 是历史上针对单个系统的流程脚本，未纳入 `check`，部分在 main 上已经失效，后续可继续清理。

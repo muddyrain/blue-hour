@@ -4,8 +4,16 @@ extends SceneTree
 var checks: int = 0
 var failures: int = 0
 
+class CountingNavigation extends FieldNavigation:
+	var clearance_queries: int = 0
+
+	func is_clear(point: Vector2) -> bool:
+		clearance_queries += 1
+		return super.is_clear(point)
+
 
 func _initialize() -> void:
+	_grid_equivalence()
 	var nav: FieldNavigation = FieldNavigation.new()
 	var bounds: Rect2 = Rect2(0, 0, 320, 240)
 	nav.configure([], bounds)
@@ -34,6 +42,44 @@ func _initialize() -> void:
 	_expect(nav.path_between(start, goal) == original, "reopening geometry invalidates a cached unreachable result")
 	print("BH_NAV_CACHE ", JSON.stringify({"checks":checks, "failures":failures}))
 	quit(0 if failures == 0 else 1)
+
+
+func _grid_equivalence() -> void:
+	# Include half-open rectangle edges, overlapping/degenerate blockers and a
+	# fractional last row/column that must remain clear when its center fits.
+	var blocks: Array[Rect2] = [Rect2(40, 40, 32, 64), Rect2(56, 56, 80, 32),
+		Rect2(-20, -20, 48, 48), Rect2(320, 0, 32, 48), Rect2(168, 104, 0, 0),
+		Rect2(208.25, 80.5, 15.5, 31.25)]
+	for limits: Rect2 in [Rect2(0, 0, 320, 240), Rect2(-37.5, 19.25, 327, 249), Rect2(16, 32, 48, 32)]:
+		_compare_grid(blocks, limits)
+	for layout: StreetLayout in [preload("res://src/features/expedition/repair_lane.tres"),
+		preload("res://src/features/expedition/market_loop.tres")]:
+		_compare_grid(layout.blockers(), layout.world_bounds)
+
+
+func _compare_grid(blocks: Array[Rect2], limits: Rect2) -> void:
+	var nav: CountingNavigation = CountingNavigation.new()
+	nav.configure(blocks, limits)
+	var size: Vector2i = nav._grid.region.size
+	_expect(nav.clearance_queries <= 2 * (size.x + size.y),
+		"grid construction avoids a whole-grid obstacle scan, independent of wallclock speed")
+	var oracle: FieldNavigation = FieldNavigation.new()
+	oracle.bounds = limits
+	oracle.obstacles = blocks.duplicate()
+	oracle._prepare_grid()
+	var identical: bool = true
+	# Original scalar construction is the oracle, not the new rectangle painter.
+	for x: int in range(size.x):
+		for y: int in range(size.y):
+			var id: Vector2i = Vector2i(x, y)
+			var solid: bool = not oracle.is_clear(oracle._grid.get_point_position(id))
+			oracle._grid.set_point_solid(id, solid)
+			identical = identical and nav._grid.is_point_solid(id) == solid
+	_expect(identical, "every grid cell equals the original footprint predicate at " + str(limits))
+	var start: Vector2 = limits.position + Vector2(24, 24)
+	for end: Vector2 in [limits.end - Vector2(24, 24), limits.get_center(), limits.position + Vector2(8, 8)]:
+		_expect(nav.path_between(start, end) == oracle.path_between(start, end),
+			"complete AStar path and endpoint tie breaks equal the original solid mask")
 
 
 func _expect(valid: bool, label: String) -> void:

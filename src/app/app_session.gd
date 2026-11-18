@@ -53,13 +53,26 @@ func _setup_progress(preloaded_state: Dictionary = {}) -> void:
 	app._new_game_confirmation.confirmed.connect(app._confirm_new_journey)
 	app._screen.add_child(app._new_game_confirmation)
 	app._new_game_confirmation.title = "开始新旅程"
+	app._new_game_confirmation.borderless = true
+	app._new_game_confirmation.wrap_controls = false
 	app._new_game_confirmation.ok_button_text = "确认开始旅程"
 	app._new_game_confirmation.theme = CampStyle.blue_hour_theme(app._screen.theme)
-	app._new_game_confirmation.theme.set_stylebox("panel", "AcceptDialog", CampStyle.box(CampStyle.INK, Color("48646d")))
-	app._new_game_confirmation.theme.set_constant("buttons_min_height", "AcceptDialog", 42)
-	CampStyle.blue_hour_primary(app._new_game_confirmation.get_ok_button())
+	app._new_game_confirmation.theme.set_stylebox("panel", "AcceptDialog", CampStyle.box(CampStyle.INK, CampStyle.EDGE, 20))
+	app._new_game_confirmation.theme.set_constant("buttons_min_height", "AcceptDialog", 56)
+	app._new_game_confirmation.theme.set_constant("buttons_min_width", "AcceptDialog", 260)
+	var confirm: Button = app._new_game_confirmation.get_ok_button()
+	confirm.custom_minimum_size.x = 260
+	confirm.add_theme_font_size_override("font_size", 24)
+	PixelMenu.primary(confirm)
+	var cancel: Button = app._new_game_confirmation.get_cancel_button()
+	cancel.add_theme_font_size_override("font_size", 20)
+	CampStyle.text_button(cancel)
 	app._opening_picker = OpeningBuildPicker.new()
-	app._new_game_confirmation.add_child(app._opening_picker)
+	var opening_content: Control = Control.new()
+	opening_content.custom_minimum_size = Vector2(1080, 520)
+	app._new_game_confirmation.add_child(opening_content)
+	opening_content.add_child(app._opening_picker)
+	app._opening_picker.size = Vector2(1080, 520)
 	app._new_game_confirmation.canceled.connect(func() -> void:
 		app._opening_confirm_pending = false
 		if app.phase == app.Phase.RESULT:
@@ -341,7 +354,10 @@ func _open_opening_choice() -> void:
 	app._opening_picker.present(app.progress_session.catalog_state())
 	app._opening_picker.reset_choice()
 	app._opening_confirm_pending = true
-	app._new_game_confirmation.popup_centered(Vector2i(950, 496))
+	# Embedded windows share the project’s 1280×720 logical canvas and stretch.
+	app._new_game_confirmation.popup_centered(Vector2i(1120, 640))
+	# Reset the first-pass wrapped-label minimum after the logical width has settled.
+	app._opening_picker.set_deferred("size", Vector2(1080, 520))
 	app._opening_picker.link_focus.call_deferred(app._new_game_confirmation.get_ok_button(), app._new_game_confirmation.get_cancel_button())
 
 

@@ -198,7 +198,7 @@ func open_sound_settings() -> void:
 		app.sound_settings.closed.connect(app._close_sound_settings)
 		app._screen.add_child(app.sound_settings)
 	app.sound_settings.show()
-	app._title.hide()
+	app.sound_settings.back_button.text = "返回营地 / Esc" if app._camp_open else "返回首页 / Esc"
 	if is_instance_valid(app._blue_hour_title_art):
 		app.sound_settings.back_button.grab_focus()
 	app._request_audio(&"ui_confirm")
@@ -206,6 +206,10 @@ func open_sound_settings() -> void:
 
 func _close_sound_settings() -> void:
 	app._title.show()
+	if app._camp_open and is_instance_valid(app.camp_scene):
+		app.camp_scene.restore_focus()
+	else:
+		app._restore_blue_hour_title_focus.call_deferred()
 	app._request_audio(&"ui_back")
 
 

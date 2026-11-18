@@ -29,7 +29,7 @@ func _run() -> void:
 	_check(camp.journey.state == "ACTIVE" and camp.crew.size() == 2 and not camp.weapons.is_empty(), "opening includes real journey state, roster and equipment")
 	var daily: Dictionary = CampEconomy.rations(camp.day, camp.crew, camp.food, RunSave.DefaultRules)
 	_check_ground_and_dressing(view)
-	var level_one_art: Dictionary[String, String] = {}
+
 	for tier: int in [0, 1, 2]:
 		for id: String in EconomyBuildV1.FACILITIES:
 			camp.journey.campaign.economy.facilities[id].level = tier
@@ -37,14 +37,9 @@ func _run() -> void:
 		view.refresh(camp, daily, true, "可以选择行动")
 		_check(view.world.visible and view.world.stage.y_sort_enabled, "player entry shows depth-sorted world")
 		for id: String in EconomyBuildV1.FACILITIES:
-			var site: CampSceneScenery = view.world.facilities[id]
-			_check(site.tier == tier, "independent facility tier " + id + str(tier))
-			var art: Sprite2D = site.get_node_or_null("IsoSprite") as Sprite2D
-			_check((art == null) if tier == 0 else (art != null and art.texture != null), "empty site or closed-roof art " + id)
-			if tier == 1:
-				level_one_art[id] = String(site.get_meta("iso_art"))
-			if tier == 2:
-				_check(level_one_art[id] != String(site.get_meta("iso_art")), "upgrade changes building silhouette " + id)
+			_check(view.world.facilities[id] == tier, "independent facility tier " + id + str(tier))
+			_check(view.facility_buttons[id].text.contains("待建" if tier == 0 else "%d 级" % tier), "visible on focus and hover: actual facility state " + id)
+			_check(view.facility_buttons[id].tooltip_text.begins_with(view.facility_buttons[id].text), "facility tooltip retains level and effect " + id)
 		if tier == 0:
 			_actions.clear()
 			view.facility_buttons["supply"].pressed.emit()
@@ -56,15 +51,15 @@ func _run() -> void:
 	_check_identity_templates(camp.crew[0])
 	for id: int in view.world.visible_member_ids:
 		var resident: CampSceneResident = view.world.residents[id]
-		_check(resident.body.scale == Vector2.ONE * ActorVisual.BODY_SCALE, "official body scale")
-		_check(resident.body.texture == SurvivorVisualV1.SHEETS[id - 1] and not resident.body.flip_h, "official unmirrored eight-way sheet")
+		_check(is_equal_approx(resident.body.texture.get_height() * resident.body.scale.y, CampSceneResident.HEIGHT), "pixel resident has a stable screen-space height")
+		_check(resident.body.texture is AtlasTexture and resident.body.texture.atlas == CampPixelArt.SHEET, "resident uses the matched pixel family")
 	var initial: Vector2 = view.world.residents[1].map_position
-	for tick: int in range(90):
+	for tick: int in range(140):
 		view.world.advance(0.1)
 	_check(not initial.is_equal_approx(view.world.residents[1].map_position), "resident actually walks between safe yard stops")
 	for id: int in view.world.visible_member_ids:
 		var resident: CampSceneResident = view.world.residents[id]
-		_check(resident.position.is_equal_approx(IsoSpace.to_view(resident.map_position)), "walking stays in shared iso projection")
+		_check(resident.position.is_equal_approx(resident.map_position.round()), "ambient walking stays on pixel-aligned camp coordinates")
 		_check(not CampSceneLayout.FACILITIES.values().any(func(rect: Rect2) -> bool: return rect.has_point(resident.map_position)), "route never enters a closed building")
 		_actions.clear()
 		view.activate_at(resident.position + Vector2(0, -22))
@@ -75,7 +70,7 @@ func _run() -> void:
 	_check(_actions == [{"action":&"supplies", "member_id":0}, {"action":&"workshop", "member_id":0}, {"action":&"planning", "member_id":0}], "built facility pins use original panels")
 	_actions.clear()
 	for id: String in ["supply", "workshop", "planning"]:
-		view.activate_at(IsoSpace.to_view(CampSceneLayout.FACILITIES[id].get_center()))
+		view.activate_at(CampSceneLayout.FACILITIES[id].get_center())
 	_check(_actions == [{"action":&"supplies", "member_id":0}, {"action":&"workshop", "member_id":0}, {"action":&"planning", "member_id":0}], "physical buildings use the same panel routes as their pins")
 	_actions.clear()
 	view.input_allowed = func() -> bool: return false
@@ -87,7 +82,7 @@ func _run() -> void:
 	view.refresh(camp, daily, false, "暂不能出发")
 	view.hotspots[&"bus"].pressed.emit()
 	view.scene_buttons[&"bus"].pressed.emit()
-	view.activate_at(IsoSpace.to_view(IsoSpace.foot(CampSceneLayout.AREAS[&"bus"])))
+	view.activate_at(CampSceneLayout.AREAS[&"bus"].get_center())
 	_check(_actions.is_empty(), "departure eligibility also protects physical bus")
 	view.refresh(camp, daily, true, "可以选择行动")
 	view.hotspots[&"bus"].pressed.emit()
@@ -107,6 +102,7 @@ func _run() -> void:
 	camp.crew[1].health = 0.0
 	view.refresh(camp, daily, true, "可以选择行动")
 	_check(2 not in view.world.visible_member_ids and not view.member_buttons[2].visible, "absent/down members do not wander or receive hit targets")
+	_check_reserve_positions(view.world)
 	view.clear()
 	_check(view.world.visible_member_ids.is_empty(), "leaving camp clears resident hit targets")
 	view.queue_free()
@@ -115,34 +111,52 @@ func _run() -> void:
 	quit(0 if _failures == 0 else 1)
 
 
+func _check_reserve_positions(world: CampSceneWorld) -> void:
+	# Eight living members with both reserves and both of their shared-art identities.
+	var members: Array[Dictionary] = []
+	for id: int in range(3, 11):
+		members.append({"id":id, "health":200.0})
+	_check(SurvivorRoster.initialize(members).is_empty(), "reserve display fixture has official identities")
+	var before: String = JSON.stringify(members)
+	world.refresh(members)
+	for tick: int in range(200):
+		world.advance(0.1)
+		if tick % 20 != 0:
+			continue
+		for id: int in world.visible_member_ids:
+			var resident: CampSceneResident = world.residents[id]
+			_check(world.pick(resident.position + Vector2(0, -30)).get("member_id") == id, "reserve roster retains a distinct clickable body")
+	var positions: Array[Vector2] = []
+	for id: int in world.visible_member_ids:
+		positions.append(world.residents[id].position)
+	world.refresh(members)
+	for index: int in range(world.visible_member_ids.size()):
+		_check(world.residents[world.visible_member_ids[index]].position == positions[index], "unchanged roster refresh does not reset ambient walks")
+	_check(JSON.stringify(members) == before, "reserve layout never edits roster data")
+
+
 func _check_geometry(view: CampSceneView) -> void:
 	for extent: Vector2 in [Vector2(1280, 720), Vector2(1024, 640), Vector2(1600, 900)]:
 		view.size = extent
 		view._resize_world()
-		var origin: Vector2 = view.world.to_global(Vector2.ZERO)
-		var edge: Vector2 = view.world.to_global(IsoSpace.to_view(Vector2(64, 0))) - origin
-		_check(is_equal_approx(absf(edge.x / edge.y), 2.0), "viewport keeps strict 2:1 axes")
+		_check(is_equal_approx(view.world.scale.x, view.world.scale.y), "scene resizing preserves authored perspective")
 		for id: String in view.facility_buttons:
-			var expected: Vector2 = view.world.to_global(IsoSpace.to_view(CampSceneLayout.facility_door(id)))
+			var expected: Vector2 = view.world.to_global(CampSceneLayout.facility_door(id))
 			var button: Button = view.facility_buttons[id]
 			var actual: Vector2 = button.global_position + Vector2(button.size.x * 0.5, 0)
-			_check(actual.distance_to(expected) < 0.1, "facility pin follows uniform projection when resized")
-			_check(button.size.x <= 112 * minf(extent.x / 1280.0, extent.y / 720.0) + 0.1 and button.get_theme_font_size("font_size") == 12, "facility pins stay compact")
-	_check(CampSceneLayout.AREAS[&"bus"].size == Vector2(108, 32), "bus dimensions remain locked")
-	_check(view.world.tiles.cells[Vector2i(10, 15)] == "road" and view.world.tiles.cells[Vector2i(10, 17)] == "road" and view.world.tiles.cells[Vector2i(10, 18)] == "sidewalk", "96-unit asphalt and 32-unit sidewalk")
+			_check(actual.distance_to(expected) < 0.1, "facility control stays attached to the visible door")
+			_check(Rect2(Vector2.ZERO, extent).encloses(button.get_global_rect()), "door controls remain on screen")
 	view.size = Vector2(1280, 720)
-	var summary: PanelContainer = view.get_node("ReturnSummary") as PanelContainer
-	for top: float in [542.0, 516.0]:
-		summary.show()
-		CampStyle.place(summary, Rect2(24, top, 916, 598 - top))
-		view._resize_world()
-		for corner: Vector2 in [Vector2(64, 32), Vector2(704, 32), Vector2(64, 448), Vector2(704, 448)]:
-			var point: Vector2 = view.world.to_global(IsoSpace.to_view(corner))
-			_check(Rect2(24, 104, 932, top - 108).has_point(point), "summary leaves the complete yard fence visible")
-	summary.hide()
 	view._resize_world()
+	var original_position: Vector2 = view.world.position
+	var original_scale: Vector2 = view.world.scale
+	var summary: PanelContainer = view.get_node("ReturnSummary") as PanelContainer
+	summary.show()
+	view._resize_world()
+	_check(view.world.position == original_position and view.world.scale == original_scale, "return receipt does not shrink or displace the scene's click targets")
+	summary.hide()
 	var pin: Button = view.facility_buttons["supply"]
-	_check(pin.get_theme_color("font_color") != pin.get_theme_color("font_focus_color") and pin.get_theme_color("font_hover_color") == CampSceneStyle.AMBER, "quiet labels emphasize hover and keyboard focus")
+	_check(pin.get_theme_color("font_color").a == 0.0 and pin.get_theme_color("font_hover_color") == CampSceneStyle.AMBER, "scene labels reveal on hover or keyboard focus")
 
 
 func _fixture() -> Dictionary:
@@ -192,43 +206,25 @@ func _check_identity_templates(opening_member: Dictionary) -> void:
 		var resident: CampSceneResident = CampSceneResident.new()
 		root.add_child(resident)
 		resident.configure(member)
-		var index: int = SurvivorVisualV1.variant_for(String(definition.id))
-		_check(resident.body.texture == SurvivorVisualV1.SHEETS[index] and not resident.body.flip_h, "existing identity sheet " + String(definition.id))
+		var atlas: AtlasTexture = resident.body.texture as AtlasTexture
+		_check(atlas != null and atlas.atlas == CampPixelArt.SHEET and atlas.region == CampPixelArt.REGIONS[CampPixelArt.variant(String(definition.id))].grow(2), "correct stable identity region " + String(definition.id))
+		_check(resident.get_meta("definition_id") == definition.id, "art replacement preserves identity " + String(definition.id))
 		resident.free()
 
 
 func _check_ground_and_dressing(view: CampSceneView) -> void:
 	view._resize_world()
-	var backdrop: CanvasItem = view.get_node("CampBackdrop") as CanvasItem
-	_check(_canvas_z(backdrop) < _canvas_z(view.world.tiles) and _canvas_z(view.world.tiles) < _canvas_z(view.world.stage), "full-screen backing cannot cover ground; ground stays below depth-sorted props")
-	_check(view.world.tiles.is_visible_in_tree() and view.world.tiles.cells[Vector2i(7, 6)] == "concrete", "yard has a visible continuous path layer")
-	_check(view.world.scale.x > 0.80, "empty return-summary slot is available to the enlarged yard")
-	for furnishing: Dictionary in CampSceneLayout.DRESSING:
-		var extent: Vector2 = furnishing.size
-		var at: Vector2 = furnishing.at
-		var area: Rect2 = Rect2(at - Vector2(extent.x * 0.5, extent.y), extent)
-		for id: String in CampSceneLayout.FACILITIES:
-			_check(not area.intersects(CampSceneLayout.FACILITIES[id].grow(12)), "dressing clears facility " + id + "/" + String(furnishing.kind))
-			_check(not area.grow(20).has_point(CampSceneLayout.facility_door(id)), "dressing clears door " + id)
-		for index: int in range(CampSceneLayout.LOOP.size()):
-			var closest: Vector2 = Geometry2D.get_closest_point_to_segment(at, CampSceneLayout.LOOP[index], CampSceneLayout.LOOP[(index + 1) % CampSceneLayout.LOOP.size()])
-			_check(not area.grow(16).has_point(closest), "dressing leaves a walking corridor " + String(furnishing.kind))
-		var matches: Array[Node] = view.world.stage.get_children().filter(func(node: Node) -> bool:
-			return node is CampSceneScenery and node.kind == furnishing.kind and IsoSpace.map_of(node) == at)
-		_check(matches.size() == 1, "authored furnishing is on the real depth-sort stage " + String(furnishing.kind))
-
-
-func _canvas_z(item: CanvasItem) -> int:
-	var depth: int = item.z_index
-	var current: CanvasItem = item
-	while current.z_as_relative:
-		# The yard uses direct CanvasItem parents. get_parent_item is not a
-		# script API in the pinned engine; use the actual scene hierarchy.
-		current = current.get_parent() as CanvasItem
-		if current == null:
-			break
-		depth += current.z_index
-	return depth
+	var surface: Control = view.get_node("CampSceneSurface") as Control
+	_check(surface.clip_contents and view.world.plate.texture == CampSceneWorld.PLATE, "real pixel scene plate is clipped to the scene region")
+	_check(view.world.plate.z_index < view.world.stage.z_index and view.world.stage.y_sort_enabled, "independent residents render over the plate in foot-depth order")
+	_check(view.world.plate.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "pixel scene uses nearest texture filtering")
+	for id: int in range(1, RosterState.MAX_HISTORY + 1):
+		var route: Array[Vector2] = CampSceneLayout.resident_route(id)
+		for step: int in range(21):
+			var point: Vector2 = route[0].lerp(route[1], step / 20.0)
+			_check(CampSceneLayout.BOUNDS.has_point(point), "ambient route stays inside the scene")
+			_check(not CampSceneLayout.FACILITIES.values().any(func(rect: Rect2) -> bool: return rect.has_point(point)), "ambient route avoids closed buildings and map table")
+			_check(point.distance_to(CampSceneLayout.FIRE) > 36.0, "ambient route avoids the campfire")
 
 
 func _check(condition: bool, label: String) -> void:

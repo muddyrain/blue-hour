@@ -724,48 +724,6 @@
       "license": "No additional license granted"
     },
     {
-      "path": "assets/ui/m20/title-blue-hour.png",
-      "sha256": "4fdcb13d1fcddbe6e906078288f077e66cf5968780fe8fbb02e7ee6d67b4404c",
-      "origin": "M20 project-authored AI-assisted title art, text-free approved handoff",
-      "license": "No additional license granted"
-    },
-    {
-      "path": "assets/ui/m20/camp-blue-hour.png",
-      "sha256": "f0b0140f705329f2781ff1285495c178e66bc61b8229f501042389d34c41e614",
-      "origin": "M20 project-authored AI-assisted camp art, text-free approved handoff",
-      "license": "No additional license granted"
-    },
-    {
-      "path": "assets/iso/chars/gu_portrait.png",
-      "sha256": "f62ea49012df7b8c3c9f5a34c43c8a705da736246148371af4aaa321bd84c51c",
-      "origin": "Derived face close-up portrait of 顾予安 from official AI-assisted Q-version sprite assets/m5_anim_01/gu_full.png (front idle crop, upscaled); tools/make_iso_portraits.py; no new generation",
-      "license": "No additional license granted"
-    },
-    {
-      "path": "assets/iso/chars/xia_portrait.png",
-      "sha256": "9aa3be34b5d8eba642440ce86abf00bf4471d6167c609a124f0447bf55f0eb28",
-      "origin": "Derived face close-up portrait of 夏之遥 from official AI-assisted Q-version sprite assets/m5_anim_01/xia_full.png (front idle crop, upscaled); tools/make_iso_portraits.py; no new generation",
-      "license": "No additional license granted"
-    },
-    {
-      "path": "assets/iso/chars/lin_portrait.png",
-      "sha256": "71787e21ecf64ae13e4ca2b157718310c19871d79ff526251c6dd4223698fc61",
-      "origin": "Derived face close-up portrait of 林知秋 from official AI-assisted Q-version sprite assets/m5_anim_01/lin_full.png (front idle crop, upscaled); tools/make_iso_portraits.py; no new generation",
-      "license": "No additional license granted"
-    },
-    {
-      "path": "assets/iso/chars/shen_portrait.png",
-      "sha256": "53208d2d5329b8ab7489aae24bd0036ec750dc90e16e672420a843102aa88d81",
-      "origin": "Derived face close-up portrait of 沈听澜 from official AI-assisted Q-version sprite assets/m5_anim_01/shen_full.png (front idle crop, upscaled); tools/make_iso_portraits.py; no new generation",
-      "license": "No additional license granted"
-    },
-    {
-      "path": "assets/iso/chars/lu_portrait.png",
-      "sha256": "64287ffad44fd0edfd8c7faf5dece245e70b035279cac86059775827bbd30ec0",
-      "origin": "Derived face close-up portrait of 陆景川 from official AI-assisted Q-version sprite assets/m5_anim_01/lu_full.png (front idle crop, upscaled); tools/make_iso_portraits.py; no new generation",
-      "license": "No additional license granted"
-    },
-    {
       "path": "assets/iso/buildings/apartment_a.png",
       "sha256": "1113851422b0c04460f03937548f97971cf44c8674ef7e6f426b14c1d8463d76",
       "origin": "Original project procedural isometric art; Codex-assisted Python/Pillow generator; no image model or third-party inputs",
@@ -1657,46 +1615,31 @@
     },
     {
       "path": "src/features/camp_scene/camp_scene_world.gd",
-      "sha256": "cb34b6920581f42ac074cfb03f9f13f186cc68729a84f73fe0c02f82cde7db5b",
-      "origin": "Original project procedural camp illustration and composition, authored with AI assistance in GDScript; Godot CanvasItem / IsoDraw primitives and existing project IsoAtlas art. No new raster generation or third-party asset pack.",
-      "tool": "Godot 4 CanvasItem drawing API; AI-assisted code authoring by Codex",
-      "ai_assisted": true,
-      "license": "No additional license granted"
-    },
-    {
-      "path": "src/features/camp_scene/camp_scene_scenery.gd",
-      "sha256": "84d33f6fa8a72751fd74a3af460ecd2ae667c0a40e423d37cc566942923502f7",
-      "origin": "Original project procedural camp furnishings: fences, fire, clothesline with hanging cloth, metal buckets, braced wooden crates, town bicycle, flowering planters, old chalkboard and slatted benches. AI-assisted GDScript authoring; rendered by Godot CanvasItem / IsoDraw primitives. No image model, third-party asset pack or Deadly Days material.",
-      "tool": "Godot 4 CanvasItem drawing API; AI-assisted code authoring by Codex",
+      "sha256": "b29319990e82247eb31317768221c64acf38344b8b4837ae24ff68851d7922a9",
+      "origin": "Original project runtime composition for the seaside pixel camp: generated scene plate, independent residents and read-only facility hit areas.",
+      "tool": "Godot 4 Sprite2D / AtlasTexture / CanvasItem; AI-assisted code authoring by Codex",
       "ai_assisted": true,
       "license": "No additional license granted"
     },
     {
       "path": "src/features/camp_scene/camp_scene_resident.gd",
-      "sha256": "75a8dbb830d7ed59734eddc321007edcbd18dd925f60f7c2e7e4a595e81c7131",
-      "origin": "Original project procedural camp illustration and composition, authored with AI assistance in GDScript; Godot CanvasItem / IsoDraw primitives and existing project IsoAtlas art. No new raster generation or third-party asset pack.",
-      "tool": "Godot 4 CanvasItem drawing API; AI-assisted code authoring by Codex",
+      "sha256": "dce8fa2a64ed287cb0420131226ee24b69b181259e6d7d9064d95012104fc1fc",
+      "origin": "Original project code composing independent residents from the generated pixel atlas, with local strolls, hover names and drawn foot shadows.",
+      "tool": "Godot 4 Sprite2D / AtlasTexture / CanvasItem; AI-assisted code authoring by Codex",
       "ai_assisted": true,
       "license": "No additional license granted"
     },
     {
       "path": "src/features/camp_scene/camp_scene_layout.gd",
-      "origin": "Original project procedural camp illustration and composition, authored with AI assistance in GDScript; Godot CanvasItem / IsoDraw primitives and existing project IsoAtlas art. Original fishing-cooperative yard paths, clothesline, buckets, braced crates, bicycle, planters, chalkboard and slatted benches. No new raster generation or third-party asset pack.",
-      "tool": "Godot 4 CanvasItem drawing API; AI-assisted code authoring by Codex",
+      "origin": "Original project camp presentation coordinates: clickable facilities, scene areas and local resident stroll routes. No battle navigation or saved state coordinates.",
+      "tool": "Godot 4 Sprite2D / AtlasTexture / CanvasItem; AI-assisted code authoring by Codex",
       "ai_assisted": true,
       "license": "No additional license granted",
-      "sha256": "0e4b9cfddef527eda6127e5da965cfaee4c0a64659034c76a1335c20d49c891d"
+      "sha256": "f7f3cdd36d472f6cb40f406287b6abbcdc16ca4bb72cd7074a7a65551d3a8ec5"
     },
     {
       "path": "assets/survivors_v1/ruan.png",
       "sha256": "172a1d0d24158d68536ab5e2017772cef902259a0bf72f49429bad9ab9caa46e",
-      "origin": "Original AI-assisted OpenAI image_gen character atlas; deterministic Pillow slice, scale and foot registration / portrait crop via tools/build_recruit_atlas.py. Prompts: assets/survivors_v1/recruit_generation.json",
-      "ai_generated": true,
-      "license": "No additional license granted"
-    },
-    {
-      "path": "assets/iso/chars/ruan_portrait.png",
-      "sha256": "28bc0b422cee87bf3c6081b3f0bb344d83ea74e17c1294409920003e0dae0f61",
       "origin": "Original AI-assisted OpenAI image_gen character atlas; deterministic Pillow slice, scale and foot registration / portrait crop via tools/build_recruit_atlas.py. Prompts: assets/survivors_v1/recruit_generation.json",
       "ai_generated": true,
       "license": "No additional license granted"
@@ -1709,22 +1652,8 @@
       "license": "No additional license granted"
     },
     {
-      "path": "assets/iso/chars/ye_portrait.png",
-      "sha256": "58e5db7ad74a196ea616e55da9f66a0c5ef81394fbbec343d15529eaf4a0cc35",
-      "origin": "Original AI-assisted OpenAI image_gen character atlas; deterministic Pillow slice, scale and foot registration / portrait crop via tools/build_recruit_atlas.py. Prompts: assets/survivors_v1/recruit_generation.json",
-      "ai_generated": true,
-      "license": "No additional license granted"
-    },
-    {
       "path": "assets/survivors_v1/he.png",
       "sha256": "b4fedbee7edf6a4929c31d20cd3b70ca221700754a1fe1b9ee2b3d0f3265b728",
-      "origin": "Original AI-assisted OpenAI image_gen character atlas; deterministic Pillow slice, scale and foot registration / portrait crop via tools/build_recruit_atlas.py. Prompts: assets/survivors_v1/recruit_generation.json",
-      "ai_generated": true,
-      "license": "No additional license granted"
-    },
-    {
-      "path": "assets/iso/chars/he_portrait.png",
-      "sha256": "7786eb422eba2ea581060ab1f63f00659a79b447f40523d2a70aa2f7a1dce4a5",
       "origin": "Original AI-assisted OpenAI image_gen character atlas; deterministic Pillow slice, scale and foot registration / portrait crop via tools/build_recruit_atlas.py. Prompts: assets/survivors_v1/recruit_generation.json",
       "ai_generated": true,
       "license": "No additional license granted"
@@ -1864,6 +1793,132 @@
       "sha256": "603de5196bf0ec850ec3d83f165cb26a623597b759902388c1a6c24ae55f4137",
       "origin": "Original procedural 2:1 SVG; tools/make_station_art.py using Sprite from make_harbor_art.py; Python standard library; AI-assisted code, no AI-generated imagery; no third-party assets",
       "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/fonts/SourceHanSansSC-Heavy.otf",
+      "sha256": "6374b11bc4c2cd4bd7be1a1d64cf5047906c8a6a025c64e023c6792e50ba985e",
+      "origin": "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/a4f7cf94edfb9d7ffbdfc4841de276358bd7e0f2/OTF/SimplifiedChinese/SourceHanSansSC-Heavy.otf",
+      "license": "SIL Open Font License 1.1; copyright Adobe; upstream unmodified; see assets/fonts/SourceHanSans-LICENSE.txt",
+      "ai_generated": false
+    },
+    {
+      "path": "assets/fonts/SourceHanSans-LICENSE.txt",
+      "sha256": "fcac737e761ec63dbfbdce11030a1780161920d80315edba9c8beff1c2bac5a2",
+      "origin": "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/a4f7cf94edfb9d7ffbdfc4841de276358bd7e0f2/LICENSE.txt",
+      "license": "SIL Open Font License 1.1; copyright Adobe; upstream unmodified; see assets/fonts/SourceHanSans-LICENSE.txt",
+      "ai_generated": false
+    },
+    {
+      "path": "assets/ui/pixel/title-coast.png",
+      "sha256": "1d26fcc560b29652c631f99d619457e86170a8d4bebd8729c4eb9277cb7b78ce",
+      "origin": "OpenAI image_gen edit of original project user-approved cool-pixel title concept; all UI removed, scenery retained. Prompt: assets/ui/pixel/generation.json",
+      "ai_generated": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/ui/pixel/play.svg",
+      "sha256": "015a9e7932f0979286a3f2284466760c62ed6d3bda0dca7f2ef8a95f61cc71aa",
+      "origin": "Original project geometric interface icon, authored as SVG; AI-assisted code",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/ui/pixel/bus.svg",
+      "sha256": "5fa025538a46f3d703f05dd33e06736447d32719df73f7300e90b53cf1c3d1ad",
+      "origin": "Original project geometric interface icon, authored as SVG; AI-assisted code",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/ui/pixel/settings.svg",
+      "sha256": "0e736223c224d2331cd497b32b959794cf8e380dcc2ac2d3ae5409676047085a",
+      "origin": "Original project geometric interface icon, authored as SVG; AI-assisted code",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/ui/pixel/book.svg",
+      "sha256": "7e6d463a6f56256494cba388e0faecb06c38e1a13266bd2232ac7d9e34ee3f3d",
+      "origin": "Original project geometric interface icon, authored as SVG; AI-assisted code",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/ui/pixel/exit.svg",
+      "sha256": "27abc16e8d7f739d39aaf95c460a9b6d6cc26078c1337b81c99594199f0ac489",
+      "origin": "Original project geometric interface icon, authored as SVG; AI-assisted code",
+      "ai_generated": false,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/camp_pixel/cash.svg",
+      "sha256": "3b09f4ec8a3a01e7ea86722f7eb73cef3a26b2c122e548d54e6a51a683946d2f",
+      "origin": "Original code-authored flat resource icon for the pixel camp HUD",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/camp_pixel/coast-yard.png",
+      "sha256": "6a90b599121bb21ca3ecca263a98cf627fd55305363a98374c85eb34de417dfc",
+      "origin": "Original project pixel asset generated with OpenAI built-in image_gen from the approved project proposal; exact prompt embedded and recorded in assets/camp_pixel/generation.json",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/camp_pixel/food.svg",
+      "sha256": "46a3dfa4643b23e6f68853475437da5714246b6f7722a06503792de20f936649",
+      "origin": "Original code-authored flat resource icon for the pixel camp HUD",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/camp_pixel/residents.png",
+      "sha256": "25d8f175e3170c90de83d4ac0ca4f4adcef434a50dd5a9b052e5bce07756679a",
+      "origin": "Original project pixel asset generated with OpenAI built-in image_gen from the approved project proposal; exact prompt embedded and recorded in assets/camp_pixel/generation.json",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/camp_pixel/tools.svg",
+      "sha256": "dbc03973fcc972fbc6df82655863f402af50b623d9155aecbd8cb44331c4a896",
+      "origin": "Original code-authored flat resource icon for the pixel camp HUD",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/menu_pixel/destinations.png",
+      "sha256": "96634cfbdc2b659f1fdbdccdb06b27c3df5ff3771f192703202ce7d19bca87a1",
+      "origin": "Original project pixel menu illustration; exact generation prompt and image properties in assets/menu_pixel/generation.json",
+      "tool": "OpenAI built-in image_gen",
+      "ai_assisted": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/menu_pixel/specialties.png",
+      "sha256": "ee3f843464d28933ca696cd182a48e850fd86f72e25a48ac79053fdaef5c2d6c",
+      "origin": "Original project pixel menu illustration; exact generation prompt and image properties in assets/menu_pixel/generation.json",
+      "tool": "OpenAI built-in image_gen",
+      "ai_assisted": true,
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/menu_pixel/facilities.png",
+      "sha256": "472117406392f59fc01034a623ead71b2d734b94169d2dfc1819233a6b576642",
+      "origin": "Original AI-assisted pixel art generated with image_gen from user-approved Blue Hour UI comps, 2026-11-18. Exact prompt embedded in PNG; see assets/menu_pixel/generation.json.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/menu_pixel/training-fire.png",
+      "sha256": "6b5b41e751260bfb662cfe07afd25bfe820957d7e013208962071f7d683bc906",
+      "origin": "Original AI-assisted pixel art generated with image_gen from user-approved Blue Hour UI comps, 2026-11-18. Exact prompt embedded in PNG; see assets/menu_pixel/generation.json.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/menu_pixel/workshop-objects.png",
+      "sha256": "1776eb05d34e6c938213ddc648302ceb588027c4993705e196a57bf64d676dac",
+      "origin": "Original AI-assisted pixel art generated with image_gen from user-approved Blue Hour UI comps, 2026-11-18. Exact prompt embedded in PNG; see assets/menu_pixel/generation.json.",
+      "license": "No additional license granted"
+    },
+    {
+      "path": "assets/menu_pixel/menu-symbols.png",
+      "sha256": "63b52a00e2e0c6262a07819a995432b5489dd3b078b107b3a43fe0cc1d478edc",
+      "origin": "Original AI-assisted pixel UI symbol atlas, image_gen2026-11-18; exact cleanup prompt embedded; initial and edit prompts in assets/menu_pixel/generation.json.",
       "license": "No additional license granted"
     }
   ]

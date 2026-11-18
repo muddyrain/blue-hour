@@ -1,0 +1,7 @@
+{
+  "tool": "OpenAI image_gen built-in",
+  "date": "2026-11-17",
+  "asset": "title-coast.png",
+  "reference": "Original project user-approved cool pixel title concept; no third-party game imagery",
+  "prompt": "Use case: precise-object-edit. Asset type: shipping background texture for the Godot game Blue Hour title screen, 16:9.\nInput image is the EDIT TARGET, the user-approved cool pixel title concept. Preserve its exact coastal pixel-art world, same camera, colors, visual density and composition: blue-grey tiled roofs, teal blue sea, white small bus on right, silver-haired young man and brown-haired young woman with luggage near bus stop, foliage, lighthouse, bright sky. Keep the broad dark navy foliage/negative space down the left third for code-rendered game menu.\nREMOVE ALL INTERFACE OVERLAYS, letters, words, Chinese and English title, all buttons, menu icons, coral button rectangle and footer disclaimer. Fill those removed areas cleanly with the existing dark navy background/foliage. No lettering, no logos, no UI icons, no numbers anywhere. Keep environmental objects unaltered. The left third must stay dark and calm (navy #0a2133) and not gain distracting objects. Pixel art with clean consistent stepped edges, no watercolor, no soft bloom, no ornamental frames, no gradients. Output a single polished 16:9 background image."
+}

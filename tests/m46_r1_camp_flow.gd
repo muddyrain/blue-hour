@@ -34,6 +34,7 @@ func _camp_scenario() -> void:
 	await _click_button(camp.hotspots[&"crew"])
 	for id: int in [1, 2]:
 		await _click_button(app.roster_panel.buttons_by_id[id])
+		await _click_button(app.roster_panel.rename_button)
 		app.roster_panel.name_edit.text = SHARED_CALL_SIGN
 		await _click_button(app.roster_panel.save_button)
 	await _click_button(app.roster_panel.back_button)

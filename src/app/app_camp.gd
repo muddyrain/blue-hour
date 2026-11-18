@@ -96,6 +96,10 @@ func open_growth(member_id: int, discard_pending: bool = false) -> void:
 		app._screen.add_child(app.growth_panel)
 		CampSceneStyle.apply_to(app.growth_panel)
 		app.growth_panel.closed.connect(app.close_growth)
+		app.growth_panel.navigation_requested.connect(func(action: StringName) -> void:
+			app.close_growth()
+			if action != &"roster": app._leave_roster_for(action)
+		)
 	app.growth_panel.selected_member_id = member_id
 	app.growth_panel.show()
 	app.growth_panel.refresh(app.camp_snapshot())
@@ -448,7 +452,7 @@ func _camp_action(action: StringName, member_id: int) -> void:
 		return
 	match action:
 		&"bus": app.open_mission_select()
-		&"crew":
+		&"crew", &"roster":
 			if member_id > 0 and is_instance_valid(app.roster_panel) and not SurvivorRoster.member(app.crew, member_id).is_empty():
 				app.roster_panel.selected_member_id = member_id
 			app.open_roster()
@@ -465,7 +469,7 @@ func _camp_action(action: StringName, member_id: int) -> void:
 				app.camp_scene.open_info(action)
 		&"training", &"planning":
 			app.open_training()
-		&"specialties": app._show_equipment_catalog(app.progress_session.refresh_catalog())
+		&"specialties", &"catalog": app._show_equipment_catalog(app.progress_session.refresh_catalog())
 		&"sound": app.open_sound_settings()
 		&"home":
 			app._camp_open = false
@@ -494,7 +498,9 @@ func _camp_escape() -> bool:
 		return false
 	if is_instance_valid(app._facility_confirmation) and app._facility_confirmation.visible:
 		return false
-	if is_instance_valid(app.supply_panel) and app.supply_panel.visible:
+	if is_instance_valid(app.sound_settings) and app.sound_settings.visible:
+		app.sound_settings.close_panel()
+	elif is_instance_valid(app.supply_panel) and app.supply_panel.visible:
 		app._leave_supplies_for(&"camp")
 	elif is_instance_valid(app.training_panel) and app.training_panel.visible:
 		if app.training_panel.confirmation.visible:
@@ -517,14 +523,14 @@ func _camp_escape() -> bool:
 			app.close_loadout()
 	elif app.mission_select.visible:
 		app.close_mission_select()
-	elif is_instance_valid(app.sound_settings) and app.sound_settings.visible:
-		app.sound_settings.close_panel()
 	else:
 		return false
 	return true
 
 
 func _camp_input_allowed() -> bool:
+	if is_instance_valid(app.sound_settings) and app.sound_settings.visible:
+		return false
 	return not app._camp_commit_busy and not (is_instance_valid(app.training_panel) and app.training_panel.visible) and app.phase == app.Phase.TITLE and not app._new_game_confirmation.visible and not app._hunger_confirmation.visible and not (is_instance_valid(app.pause_menu) and app.pause_menu.root.visible) and not (is_instance_valid(app._camp_leave_dialog) and app._camp_leave_dialog.visible)
 
 
@@ -547,6 +553,11 @@ func open_training() -> void:
 		app.training_panel.closed.connect(app.close_training)
 		app.training_panel.confirmed.connect(app.confirm_training)
 		app.training_panel.retry_requested.connect(app.retry_training)
+		app.training_panel.navigation_requested.connect(func(action: StringName) -> void:
+			if app.training_panel.confirmation.visible or app._progress_blocked: return
+			app.close_training()
+			app._camp_action(action, 0)
+		)
 	app._title.hide()
 	app.training_panel.show()
 	app.training_panel.refresh(app.camp_snapshot())
@@ -591,10 +602,16 @@ func _show_equipment_catalog(state: Dictionary) -> void:
 		app._equipment_catalog.closed.connect(app._close_equipment_catalog)
 		app._equipment_catalog.retry_requested.connect(func() -> void:
 			app._equipment_catalog.present(app.progress_session.refresh_catalog()))
+		app._equipment_catalog.navigation_requested.connect(func(action: StringName) -> void:
+			if not app._camp_open or app.phase != app.Phase.TITLE: return
+			app._close_equipment_catalog()
+			app._camp_action(action, 0)
+		)
 	app._title.hide()
 	app._result.hide()
 	app._equipment_catalog.show()
 	app._equipment_catalog.present(state)
+	app._equipment_catalog.set_resources(app.camp_snapshot(), app._camp_open and app.phase == app.Phase.TITLE)
 
 
 func _close_equipment_catalog() -> void:

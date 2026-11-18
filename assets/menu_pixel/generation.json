@@ -1,0 +1,110 @@
+{
+  "assets": [
+    {
+      "path": "assets/menu_pixel/destinations.png",
+      "prompt": "Create a production asset atlas for the existing Godot game Blue Hour, using the attached approved original game concept ONLY as the pixel-art style reference. Output a portrait image approximately 1024 by 1536 with THREE equal-height horizontal panoramic scenes stacked vertically edge-to-edge, no gaps, no borders. Each scene is independently composed at a 2:1 landscape ratio. Top third: a small Japanese seaside neighborhood grocery, white stucco, slate-blue roof, quiet blue canvas awning, crates of food outside and a wide entrance. Middle third: coastal repair workshop, blue metal roof, white walls, open workbench bay, tools and neatly stacked wooden crates, cool gray paving. Bottom third: residential alley in the same seaside town, blue-gray roofs, white boundary walls, leafy trees, lane opening toward the pale turquoise sea. No people, no zombies, no weapons, no UI, no text, no lettering, no labels, no logos. Keep each building entirely readable within its own third, with a calm focal area at the center. Match the reference's hand-placed small crisp pixel clusters, dark navy edge accents, restrained blue-gray palette, fresh green foliage, and daylight turquoise. Real detailed pixel game environment illustration; no smooth vector buildings, no 3D render, no sepia, no decorative frame. Do not reproduce the reference's menu or any HUD. These three environment illustrations will be cropped by the engine into separate real mission cards.",
+      "tool": "OpenAI built-in image_gen",
+      "date": "2026-11-17",
+      "reference": "Approved original project mission-selection proposal; reference is not bundled",
+      "layout": "three equal horizontal scenes stacked vertically: food, workshop, rescue",
+      "transparent": false,
+      "dimensions": [
+        1024,
+        1536
+      ],
+      "pixel_sha256": "24aacdeed96ffc54512fded26ca379b3f08517bcd42b54631874df78988278aa"
+    },
+    {
+      "path": "assets/menu_pixel/specialties.png",
+      "prompt": "Production transparent pixel-art item atlas for the original game Blue Hour. Use the attached original seaside camp reference only for the crisp small-pixel rendering, navy outlines, cool blue-gray materials and restrained colors. Create THREE separate large inventory object illustrations evenly spaced horizontally in ONE row, centered in equal-width cells, with generous fully transparent gutters, no objects crossing a cell. Left: a navy canvas scavenging tool satchel with a compact flashlight and a wooden-handled hand tool resting against it. Center: a small open blue-gray ammunition box displaying a neat group of brass rifle cartridges; no gun, no explosions. Right: a pale blue-gray canvas first-aid bag with a simple white plus sign, a bandage roll and a small sealed dressing. Each object in matching three-quarter front view, same scale, clean silhouette, precise hand-placed pixel clusters, two-step material shading, clear readable details at small sizes. No people, no scene, no ground, no external drop shadows, no words, no UI, no labels, no letters, no red cross emblem. Truly transparent background, not a painted checkerboard. This is an isolated three-item sprite atlas for a real game specialty selection menu.",
+      "tool": "OpenAI built-in image_gen",
+      "date": "2026-11-17",
+      "reference": "Original project seaside camp pixel material reference",
+      "layout": "three equal columns: field tools, pressure cartridges, aid kit",
+      "transparent": true,
+      "dimensions": [
+        2172,
+        724
+      ],
+      "pixel_sha256": "4be317492ad365e5f0d00fbfdf41f1e290e9cde1ec29f0b66f71906662da9f9c"
+    }
+  ],
+  "approved_ui_reconstruction_20261118": [
+    {
+      "path": "assets/menu_pixel/facilities.png",
+      "prompt": "Use case: game-asset extraction/regeneration. Produce ONLY a clean 3-row sprite atlas of the THREE illustrated coastal camp locations in attached UI mockup. No UI, no text, no borders, no icons, no people. Each row exactly one third of output height; full edge-to-edge contiguous rectangular image; all three panels exactly same width and height, zero gutters. TOP: blue metal-roof open supply shed with sacks, crates, tinned food and vegetables. MIDDLE: blue-roof wooden workshop with tools hanging on board, sturdy workbench and blue vise. BOTTOM: planning room with large coastal map on desk, lantern and bookshelves. Preserve composition, cool blue-gray palette, crisp Japanese isometric pixel art, lighting and chunky pixel scale from the respective three vignettes of reference exactly. Wide landscape aspect for each strip, approximately 2.4:1. Output overall atlas approximately 1024 wide by1280 high. NO screenshot, no UI text or readable writing anywhere. Opaque art.",
+      "references": [
+        "09-supplies.png"
+      ],
+      "tool": "image_gen",
+      "approved_style": "A cool pixel; user-approved visual-spec-v2"
+    },
+    {
+      "path": "assets/menu_pixel/training-fire.png",
+      "prompt": "Use case: game-asset extraction/regeneration. Output ONLY the lower-left square training vignette from attached Blue Hour game UI, reconstructing it as standalone crisp pixel art. A single young adult male chibi with silver hair, navy jacket and backpack sits on a wooden stump by small warm campfire at a blue-gray coastal camp; spare stumps, blue-roof workshop on right, sea and stone seawall with blue flag behind. EXACT cool pixel palette, 2.5-head chibi proportions and pixel scale of reference. Fill a square canvas edge-to-edge, no border, no UI, NO TEXT, no labels, no extra characters. Keep character/fire centered lower half, sea above. This will be used in an actual game training panel.",
+      "references": [
+        "08-training.png"
+      ],
+      "tool": "image_gen",
+      "approved_style": "A cool pixel; user-approved visual-spec-v2"
+    },
+    {
+      "path": "assets/menu_pixel/workshop-objects.png",
+      "prompt": "Use case: isolated game sprite atlas. Generate four independent objects from attached approved Blue Hour mockups, no interface. Transparent background. A precise 2x2 atlas, each object contained within its own identical cell with at least10% transparent padding. TOP LEFT: exact short blue-gray CARBINE with tan shoulder stock and tan foregrip in firstreference, side view barrelpointsright. TOP RIGHT: exact long wooden-stock scopedrifle in firstreference, sideviewbarrelright. BOTTOM LEFT: two distinct blue-gray rifle magazines sidebyside, one long curved extendedmagazine and one short quick-releasemagazine. BOTTOM RIGHT: exact navy utility running belt with metalbuckle and smallpouch from secondreference. Crisp pixelart block shading, coherent pixel scale, coolnavy desaturated steel and tan details, no softpainting. No text, noframe, noui, nopeople. Squarecanvas, transparencytrue, generousgap between4cells, nooverlap.",
+      "references": [
+        "10-workshop.png",
+        "12-catalog.png"
+      ],
+      "tool": "image_gen",
+      "approved_style": "A cool pixel; user-approved visual-spec-v2"
+    },
+    {
+      "path": "assets/menu_pixel/menu-symbols.png",
+      "prompt": "Precise cleanup edit of attached sprite atlas. Preserve all six icon shapes, their positions, their sharp pixel edges, colours and cell spacing EXACTLY. Remove ALL blurred glow, haze, halo, bloom, softshadow and background pixels. Outside the six hard-edged icon silhouettes must be 100% transparent alpha, including the gaps inside icon cutouts. No luminous aura anywhere. The finalPNG is six flat solid limited-palette pixel sprites on a fully transparent canvas, with hard alpha edges only. Flatwhite/lightblue/slate interior colours, no luminosity gradient. Do not redesign or add any element, no tile frames, no text, no grid. Actual transparent background, not a black or checkerboard background.",
+      "initial_prompt": "Use case: game UI icon sprite atlas. Recreate ONLY SIX tiny pixel-art symbols from the attached approved Blue Hour UI mockups, without any interface, text, panel or border. Transparent background. EXACTLY six separate icons in a regular 3-column by2-row atlas, equally sized cells, centered in each cell with20% transparentpadding. Top row left-to-right:1 white/bluegray pixel sprinting runner silhouette (疾行号令);2 white/bluegray symmetrical snowflake (全域冻结);3 white/bluegray radio antenna broadcasting waves (抑制脉冲). Bottomrow left-to-right:4 white/bluegray portable radio with a simple white plus on BLUEgray patch (急救广播), NO redcross;5 grayblue padlock with keyhole fromthelockedslots;6 small medium-blue silhouette of a coastal ferry/ship as seen just after 蓝时归航 logo insecondreference. Firstfive symbols match firstreference's squaredretroicons precisely, but remove the surrounding square tile border/background: only symbol shapes on realtransparentalpha. Sixthship matches secondreference logo's pixelship exactly. Hard crisp stair-step edges, limited4-colourwhite/lightblue/slatepalette, 32-bit pixelgame icon language, NO mint/cyan neon lineicons, no roundedrectangleoutlines, no gradients, no softshadows, no lettering. Do not include characters otherthan simple runner symbol. Output1536x1024 ifpossible with equal512x512cells.",
+      "references": [
+        "11-support.png",
+        "07-roster.png"
+      ],
+      "tool": "image_gen",
+      "regions": {
+        "sprint": [
+          95,
+          151,
+          335,
+          262
+        ],
+        "freeze": [
+          629,
+          126,
+          288,
+          308
+        ],
+        "pulse": [
+          1086,
+          157,
+          340,
+          279
+        ],
+        "radio": [
+          116,
+          623,
+          292,
+          280
+        ],
+        "lock": [
+          659,
+          636,
+          212,
+          259
+        ],
+        "ship": [
+          1088,
+          701,
+          365,
+          132
+        ]
+      }
+    }
+  ]
+}

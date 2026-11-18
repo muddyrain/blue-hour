@@ -29,11 +29,9 @@ func _case(base: Dictionary, size: Vector2i, count: int) -> void:
 	viewport.add_child(hud)
 	var support: BasicSupportPanel=BasicSupportPanel.new()
 	hud.add_child(support)
+	support.name="CommandStrip"
 	support.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	support.offset_left=-220
-	support.offset_right=220
-	support.offset_top=-76
-	support.offset_bottom=-8
+	hud._layout_field()
 	var members: Array[Dictionary]=[]
 	for id: int in range(1,count+1):
 		var model: Dictionary=PersonaViewModel.camp(base,id,"camp" if id<=2 else "candidate")
@@ -54,7 +52,7 @@ func _case(base: Dictionary, size: Vector2i, count: int) -> void:
 	support.present("8.3s","空槽",false,false)
 	await _settle()
 	var bounds: Rect2=Rect2(Vector2.ZERO,Vector2(size)).grow(.5)
-	var clear_center: Rect2=Rect2(300,160,size.x-520,size.y-280)
+	var clear_center: Rect2=Rect2(338,238,size.x-624,size.y-378)
 	var panel_metrics: Array[Dictionary]=[]
 	var clear: bool=true
 	for node_name: String in ["MissionPanel","TimePanel","ResourcesPanel","MembersPanel","ActionsPanel"]:
@@ -68,8 +66,16 @@ func _case(base: Dictionary, size: Vector2i, count: int) -> void:
 	for card: PersonaCard in hud._persona_cards:
 		hud._member_scroll.ensure_control_visible(card)
 		await _settle()
-		compact=compact and card.size.x<=160 and card.size.y<=82 and bounds.encloses(card.get_global_rect())
+		compact=compact and card.size.x<=248 and card.size.y<=94 and bounds.encloses(card.get_global_rect())
 		compact=compact and card.portrait.visible and card.health_bar.visible and card.status_label.visible
+		var field_name: Label = card._identity.get_node("FieldHeading/FieldName") as Label
+		var field_hp: Label = card._identity.get_node("FieldHeading/FieldHp") as Label
+		compact=compact and field_name.is_visible_in_tree() and field_hp.is_visible_in_tree()
+		for label: Label in [field_name, field_hp]:
+			var width: float = label.get_theme_font("font").get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, label.get_theme_font_size("font_size")).x
+			compact=compact and width <= label.size.x + 0.5 and card.get_global_rect().encloses(label.get_global_rect())
+		compact=compact and field_name.text == card.name_label.text.substr(card.name_label.text.find("  ") + 2)
+		compact=compact and field_hp.text == card.health_label.text.split(" · ")[0].trim_prefix("HP ")
 		compact=compact and not card.name_label.visible and not card.health_label.visible and not card.ammo_label.visible and not card.positive_label.get_parent().visible
 	_check(compact,tag+" all three/four portraits, health bars and work states fit in compact rows")
 	var keys: Array[Control]=[support.rally_button,support.focus_button,support.heal_button,support.special_button]

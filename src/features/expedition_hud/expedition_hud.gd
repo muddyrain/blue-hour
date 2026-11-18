@@ -11,8 +11,8 @@ signal bus_start_requested
 # Matches the verified P03-2 ActorVisual identities; no dependency on that class.
 const IDENTITY_COLORS: Array[Color] = [Color("80ddd8"), Color("f2c37f")]
 const TONES: Dictionary[String, Color] = {
-	"normal": Color("e8dcc4"), "info": Color("8fbf7a"),
-	"warning": Color("d9a24a"), "danger": Color("c8553d"),
+	"normal": CampStyle.TEXT, "info": CampStyle.TEAL,
+	"warning": CampStyle.AMBER, "danger": CampStyle.DANGER,
 }
 
 var _paused: bool = false
@@ -31,6 +31,7 @@ var _hint_source: String = ""
 var _hint: Label
 var _hint_panel: PanelContainer
 var _actions_panel: PanelContainer
+var _bus_waiting_panel: PanelContainer
 var _pause_button: Button
 var _bus_button: Button
 var _help_button: Button
@@ -59,6 +60,8 @@ var _member_scroll: ScrollContainer
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	theme = CampStyle.theme(theme)
+	_build_chrome()
 	_build_top()
 	_readouts.build(self)
 	_build_actions()
@@ -68,6 +71,8 @@ func _ready() -> void:
 	visibility_changed.connect(_on_visibility_changed)
 	get_viewport().size_changed.connect(_fit_persona_members)
 	resized.connect(place_status_hint)
+	resized.connect(_layout_field)
+	_layout_field.call_deferred()
 	refresh({})
 	ExpeditionHudTheme.skin(self)
 	_mission.add_theme_color_override("font_color", ExpeditionHudTheme.AMBER)
@@ -135,12 +140,16 @@ func refresh(state: Dictionary) -> void:
 	_threat_content.text = _text(time_data,"explanation",_text(time_data,"hint")) + "\n威胁随行动时间推进；不会阻止巴士归航。\n打开此说明不暂停行动。"
 	_bus_status.text = _text(state, "bus_status_text", "巴士状态未提供")
 	var show_count: bool = state.get("bus_count_visible", false)
-	_bus_status.add_theme_font_size_override("font_size", 16 if show_count else 12)
+	_bus_status.add_theme_font_size_override("font_size", 16)
 	_bus_status.add_theme_color_override("font_color", TONES["info"] if show_count else _tone(_dictionary(state.get("bus", {}))))
 	_bus_waiting.text = _text(state, "bus_waiting_text")
 	_bus_waiting.visible = not _bus_waiting.text.is_empty()
+	_bus_waiting_panel.visible = _bus_waiting.visible
 	_bus_button.text = _text(state, "bus_action_label", "发动巴士")
 	_bus_button.disabled = state.get("bus_action_enabled", false) != true
+	# The live preparation/countdown belongs in its status line, not twice.
+	if _bus_button.disabled and _bus_button.text == _bus_status.text:
+		_bus_button.text = "回营巴士"
 	_hint_source = _text(state, "status_hint")
 	_hint.text = _hint_source
 	_hint.visible = not _hint.text.is_empty()
@@ -158,7 +167,7 @@ func refresh(state: Dictionary) -> void:
 	if _bus_button.disabled: _bus_button.release_focus()
 	_bus_button.focus_mode=Control.FOCUS_NONE if _bus_button.disabled else Control.FOCUS_ALL
 	var persona_mode: bool=not members.is_empty() and members[0].has("persona")
-	_members_panel.offset_left=-188 if persona_mode else -224
+	_members_panel.offset_left = -272
 	# Old HUD rows retain their reviewed direct VBox layout. Only new cards
 	# need a bounded scrolling client; otherwise ScrollContainer shrinks labels.
 	if persona_mode and _members_parent.get_parent()!=_member_scroll:
@@ -166,8 +175,8 @@ func refresh(state: Dictionary) -> void:
 	elif not persona_mode and _members_parent.get_parent()==_member_scroll:
 		_members_parent.reparent(_member_scroll.get_parent())
 	_member_scroll.visible=persona_mode
-	_members_panel.anchor_bottom=0.0
-	_members_panel.offset_bottom=0
+	_members_panel.anchor_bottom = 1.0
+	_members_panel.offset_bottom = -126
 	for row: Dictionary in _members: row.box.visible=not persona_mode
 	for card: PersonaCard in _persona_cards: card.visible=persona_mode
 	if persona_mode:
@@ -217,18 +226,87 @@ func place_help_above_lane() -> void:
 	pass
 
 
+func _build_chrome() -> void:
+	var top: Panel = Panel.new()
+	top.name = "TopChrome"
+	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	top.offset_bottom = 76
+	top.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.INK, CampStyle.EDGE, 0))
+	_passive(top)
+	add_child(top)
+	var title: Label = _label(top, "FieldTitle", 30)
+	title.text = "蓝时归航"
+	title.position = Vector2(20, 12)
+	var subtitle: Label = _label(top, "FieldSubtitle", 11)
+	subtitle.text = "B L U E   H O U R"
+	subtitle.position = Vector2(22, 51)
+	var bottom: Panel = Panel.new()
+	bottom.name = "BottomChrome"
+	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	bottom.offset_top = -126
+	bottom.add_theme_stylebox_override("panel", CampStyle.box(CampStyle.INK, CampStyle.EDGE, 0))
+	_passive(bottom)
+	add_child(bottom)
+
+
+func _layout_field() -> void:
+	# A single control desk grounds the map, bus and four commands. All shortcuts
+	# and their callbacks remain owned by ExpeditionUi.
+	var strip: HBoxContainer = get_node_or_null("CommandStrip") as HBoxContainer
+	if strip != null:
+		strip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+		strip.offset_left = 450
+		strip.offset_right = 898
+		strip.offset_top = -78
+		strip.offset_bottom = -12
+		for child: Control in strip.get_children():
+			child.custom_minimum_size = Vector2(106, 66)
+	var overview: Control = get_node_or_null("OverviewPanel") as Control
+	if overview != null:
+		overview.offset_left = 38
+		overview.offset_right = 170
+		overview.offset_top = -122
+		overview.offset_bottom = -20
+		var bus_key: Button = overview.get_node_or_null("MapOverlay/BusShortcut") as Button
+		if bus_key != null:
+			# Keep the B key beside the map, leaving every map footprint visible.
+			bus_key.offset_left = 6
+			bus_key.offset_right = 36
+			bus_key.offset_top = 40
+			bus_key.offset_bottom = 74
+	var location: Label = get_node_or_null("LocationName") as Label
+	if location != null:
+		location.offset_left = 14
+		location.offset_right = 194
+		location.offset_top = -20
+		location.offset_bottom = 0
+		location.add_theme_font_size_override("font_size", 13)
+	var resources: Control = get_node_or_null("ResourcesPanel") as Control
+	if resources != null:
+		resources.offset_left = -minf(600.0, maxf(440.0, size.x - 540.0))
+	if _help_button != null:
+		_help_button.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+		_help_button.offset_left = -60
+		_help_button.offset_right = -16
+		_help_button.offset_top = -65
+		_help_button.offset_bottom = -21
+		_help_button.add_theme_font_size_override("font_size", 20)
+	place_status_hint()
+	_fit_persona_members()
+
+
 func _build_top() -> void:
 	var panel: PanelContainer = _panel(self, "MissionPanel")
-	panel.position = Vector2.ZERO
-	panel.custom_minimum_size.x = 264
-	panel.size.x = 264
+	panel.position = Vector2(14, 90)
+	panel.custom_minimum_size.x = 310
+	panel.size.x = 310
 	var mission_box: VBoxContainer = _column(panel)
 	mission_box.add_theme_constant_override("separation",4)
 	var heading: HBoxContainer = HBoxContainer.new()
 	heading.add_theme_constant_override("separation",8)
 	_passive(heading)
 	mission_box.add_child(heading)
-	_mission = _label(heading, "MissionTitle", 16)
+	_mission = _label(heading, "MissionTitle", 21)
 	_mission.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_mission.clip_text = true
 	_mission.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -236,18 +314,20 @@ func _build_top() -> void:
 	_objective_toggle.custom_minimum_size = Vector2(28,24)
 	_objective_toggle.tooltip_text = "展开 / 收起目标"
 	_objective_toggle.add_theme_font_size_override("font_size",13)
-	_progress = _label(mission_box, "Progress", 14)
-	_objective = _label(mission_box,"Objective",15)
+	_progress = _label(mission_box, "Progress", 16)
+	_objective = _label(mission_box,"Objective",16)
 	_wrap(_objective)
 	_exploration_objectives=ExplorationObjectives.new()
 	mission_box.add_child(_exploration_objectives)
+	for label: Label in _exploration_objectives.labels:
+		label.add_theme_font_size_override("font_size", 15)
 	_exploration_objectives.locate_requested.connect(func(id: String) -> void: objective_locate_requested.emit(id))
 	_exploration_objectives.hide()
 	var time_panel: PanelContainer = _panel(self,"TimePanel")
-	time_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	time_panel.offset_left = -152
-	time_panel.offset_right = 152
-	time_panel.offset_top = 16
+	time_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	time_panel.offset_left = 210
+	time_panel.offset_right = 516
+	time_panel.offset_top = 8
 	_time_box = _column(time_panel)
 	_time_box.add_theme_constant_override("separation",3)
 	_time_box.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -255,23 +335,28 @@ func _build_top() -> void:
 	time_row.add_theme_constant_override("separation",12)
 	_passive(time_row)
 	_time_box.add_child(time_row)
-	_day = _label(time_row,"Day",14)
+	_day = _label(time_row,"Day",18)
 	_day.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_time_label = _label(_time_box, "TimeLabel", 13)
 	_time_label.hide()
-	_time_text = _label(time_row, "TimeText", 25)
-	_time_text.custom_minimum_size.x = 78
+	_time_text = _label(time_row, "TimeText", 30)
+	_time_text.custom_minimum_size.x = 94
 	_time_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_time_hint = _label(time_row, "TimeHint", 13)
+	_time_hint = _label(time_row, "TimeHint", 16)
 	_time_hint.custom_minimum_size.x = 58
 	_time_hint.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_time_hint.clip_text = true
+	_time_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var time_space: Control = Control.new()
+	time_space.custom_minimum_size.x = 24
+	_passive(time_space)
+	time_row.add_child(time_space)
 	var explanation: Button = _button(self,"ThreatExplanation","?",_toggle_threat)
-	explanation.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	explanation.offset_left=116
-	explanation.offset_right=144
-	explanation.offset_top=24
-	explanation.offset_bottom=50
+	explanation.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	explanation.offset_left = 480
+	explanation.offset_right = 508
+	explanation.offset_top = 22
+	explanation.offset_bottom = 50
 	explanation.custom_minimum_size=Vector2(28,26)
 	explanation.add_theme_font_size_override("font_size",13)
 	explanation.tooltip_text="查看当前威胁；不暂停行动。"
@@ -279,16 +364,16 @@ func _build_top() -> void:
 	_threat_details.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_threat_details.offset_left=-160
 	_threat_details.offset_right=160
-	_threat_details.offset_top=76
+	_threat_details.offset_top=72
 	_threat_content = _label(_threat_details,"ThreatText",15)
 	_wrap(_threat_content)
 	_threat_details.mouse_filter=Control.MOUSE_FILTER_STOP
 	_threat_details.hide()
 	var resource_panel: PanelContainer = _panel(self,"ResourcesPanel")
 	resource_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	resource_panel.offset_left=-264
-	resource_panel.offset_right=-16
-	resource_panel.offset_top=16
+	resource_panel.offset_left=-600
+	resource_panel.offset_right=-12
+	resource_panel.offset_top=5
 	var resources: HBoxContainer = HBoxContainer.new()
 	resources.add_theme_constant_override("separation",8)
 	_passive(resources)
@@ -297,20 +382,23 @@ func _build_top() -> void:
 	_wrap(_currency)
 	_currency.mouse_filter=Control.MOUSE_FILTER_PASS
 	_pause_button = _button(resources,"PauseButton","暂停",_request_pause)
-	_pause_button.custom_minimum_size=Vector2(44,32)
+	_pause_button.custom_minimum_size=Vector2(58,44)
 	_pause_button.size_flags_vertical=Control.SIZE_SHRINK_CENTER
-	_pause_button.add_theme_font_size_override("font_size",14)
+	_pause_button.add_theme_font_size_override("font_size",18)
 	var members_panel: PanelContainer = _panel(self,"MembersPanel")
 	_members_panel=members_panel
 	members_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	members_panel.offset_left=-224
-	members_panel.offset_right=-16
-	members_panel.offset_top=88
+	members_panel.offset_left = -272
+	members_panel.offset_right = 0
+	members_panel.offset_top = 76
+	members_panel.anchor_bottom = 1.0
+	members_panel.offset_bottom = -126
 	var list: VBoxContainer = _column(members_panel)
-	_label(list,"TeamTitle",12).text="行动小队"
+	_label(list,"TeamTitle",18).text="行动小队"
+	list.add_theme_constant_override("separation", 8)
 	_members_parent = VBoxContainer.new()
 	_members_parent.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	_members_parent.add_theme_constant_override("separation",4)
+	_members_parent.add_theme_constant_override("separation",8)
 	_passive(_members_parent)
 	_member_scroll=ScrollContainer.new()
 	_member_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
@@ -323,8 +411,8 @@ func _build_top() -> void:
 		_build_member(_members_parent,index)
 	_member_details_panel = _panel(self,"MemberDetails")
 	_member_details_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	_member_details_panel.offset_left=-532
-	_member_details_panel.offset_right=-232
+	_member_details_panel.offset_left=-588
+	_member_details_panel.offset_right=-284
 	_member_details_panel.offset_top=180
 	_member_details_panel.mouse_filter=Control.MOUSE_FILTER_STOP
 	_member_details = _label(_member_details_panel,"MemberText",15)
@@ -333,10 +421,10 @@ func _build_top() -> void:
 	persona_details=PersonaDetails.new()
 	add_child(persona_details)
 	persona_details.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	persona_details.offset_left=-620
-	persona_details.offset_right=-200
-	persona_details.offset_top=88
-	persona_details.offset_bottom=-72
+	persona_details.offset_left=-704
+	persona_details.offset_right=-284
+	persona_details.offset_top=90
+	persona_details.offset_bottom=-134
 	persona_details.anchor_bottom=1.0
 	persona_details.closed.connect(func() -> void: _persona_id=0)
 	persona_details.hide()
@@ -386,89 +474,62 @@ func _build_member(parent: Control, index: int) -> void:
 
 
 func _build_actions() -> void:
-	var panel: PanelContainer = _panel(self, "ActionsPanel")
-	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	panel.offset_left = -168
-	panel.offset_right = 168
-	panel.offset_top = -116
-	panel.offset_bottom = -80
-	var surface: StyleBoxFlat = panel.get_theme_stylebox("panel") as StyleBoxFlat
-	surface.content_margin_top = 2
-	surface.content_margin_bottom = 2
-	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	var column: VBoxContainer = _column(panel)
-	column.add_theme_constant_override("separation",3)
-	var row: HBoxContainer = HBoxContainer.new()
-	row.add_theme_constant_override("separation",10)
-	_passive(row)
-	column.add_child(row)
-	var status: VBoxContainer = _column(row)
-	status.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	_pause_state = _label(status, "PauseState", 12)
+	_actions_panel = _panel(self, "ActionsPanel")
+	_actions_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	_actions_panel.offset_left = 210
+	_actions_panel.offset_right = 430
+	_actions_panel.offset_top = -80
+	_actions_panel.offset_bottom = -10
+	var column: VBoxContainer = _column(_actions_panel)
+	column.add_theme_constant_override("separation", 2)
+	_pause_state = _label(column, "PauseState", 14)
 	_pause_state.hide()
-	_bus_status = _label(status, "BusStatus", 12)
-	_wrap(_bus_status)
-	_bus_waiting = _label(status, "BusWaiting", 13)
+	_bus_button = _button(column, "BusButton", "发动巴士", _request_bus)
+	_bus_button.custom_minimum_size = Vector2(208, 40)
+	_bus_button.add_theme_font_size_override("font_size", 20)
+	_bus_status = _label(column, "BusStatus", 16)
+	_bus_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_bus_waiting_panel = _panel(self, "BusWaitingPanel")
+	_bus_waiting_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	_bus_waiting_panel.offset_left = 14
+	_bus_waiting_panel.offset_right = 324
+	_bus_waiting_panel.offset_top = -196
+	_bus_waiting_panel.offset_bottom = -140
+	_bus_waiting_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_bus_waiting = _label(_bus_waiting_panel, "BusWaiting", 15)
 	_wrap(_bus_waiting)
-	_bus_button = _button(row, "BusButton", "发动巴士", _request_bus)
-	_bus_button.custom_minimum_size=Vector2(124,32)
-	_bus_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_bus_button.add_theme_font_size_override("font_size",14)
-	_bus_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_actions_panel = panel
+	_bus_waiting_panel.hide()
 	_hint_panel = _panel(self, "StatusHintPanel")
 	_hint_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hint_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	_hint_panel.offset_left = -180
-	_hint_panel.offset_right = 180
-	_hint_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_hint = _label(_hint_panel, "StatusHint", 13)
-	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hint_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	_hint = _label(_hint_panel, "StatusHint", 16)
+	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_hint.max_lines_visible = 2
 	_hint.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_hint.clip_text = true
 	_hint.mouse_filter = Control.MOUSE_FILTER_PASS
-	_hint.add_theme_color_override("font_outline_color", Color("22201e"))
-	_hint.add_theme_constant_override("outline_size", 3)
 	_hint_panel.hide()
-	panel.resized.connect(place_status_hint)
 	place_status_hint.call_deferred()
 
 
 func place_status_hint() -> void:
 	if _hint_panel == null or _actions_panel == null:
 		return
-	var cluster_top: float = _actions_panel.offset_top
-	if _actions_panel.size.y > 1.0:
-		cluster_top = _actions_panel.offset_bottom - _actions_panel.size.y
-	var strip: Control = get_node_or_null("CommandStrip") as Control
-	if strip != null and strip.visible:
-		var strip_top: float = strip.offset_top
-		if strip.size.y > 1.0:
-			strip_top = strip.offset_bottom - strip.size.y
-		cluster_top = minf(cluster_top, strip_top)
-	_hint_panel.offset_bottom = cluster_top - 6.0
-	# Clipped, autowrapped Labels report a 1x1 intrinsic minimum. Give shaping
-	# a usable width first, then reserve actual font line heights (at most two).
-	var width: float = minf(640.0, maxf(360.0, size.x - 448.0))
-	_hint_panel.offset_left = -width / 2.0
-	_hint_panel.offset_right = width / 2.0
-	var surface: StyleBox = _hint_panel.get_theme_stylebox("panel")
-	var padding: Vector2 = surface.get_minimum_size()
-	var text_width: float = width - padding.x
-	# Explicit paragraphs are the action and food estimate. Keep both visible;
-	# long headcounts/events remain available in the unabridged tooltip.
+	# Keep action guidance and the meal estimate on the same fixed footer. The
+	# full original message remains available in the tooltip, including all names.
+	_hint_panel.offset_left = 216
+	_hint_panel.offset_right = size.x - 16
+	_hint_panel.offset_top = -126
+	_hint_panel.offset_bottom = -80
+	var width: float = maxf(1.0, size.x - 232.0)
+	var padding: Vector2 = _hint_panel.get_theme_stylebox("panel").get_minimum_size()
+	var text_width: float = maxf(1.0, width - padding.x)
+	_hint.text = _hint_source
 	if _hint_source.contains("\n"):
 		var paragraphs: PackedStringArray = _hint_source.split("\n")
 		_hint.text = _fit_hint_line(paragraphs[0], text_width - 6.0) + "\n" + _fit_hint_line(paragraphs[1], text_width - 6.0)
-	_hint.custom_minimum_size.x = text_width
-	_hint.size.x = text_width
-	var lines: int = clampi(_hint.get_line_count(), 1, 2)
-	var text_height: float = float(_hint.get_line_height()) * lines
-	text_height += float(_hint.get_theme_constant("line_spacing")) * (lines - 1)
-	_hint.custom_minimum_size.y = text_height
-	_hint_panel.offset_top = _hint_panel.offset_bottom - text_height - padding.y
+	_hint.custom_minimum_size = Vector2(text_width, 46)
 	_hint_panel.visible = _hint.visible and not _hint.text.is_empty()
 
 
@@ -487,6 +548,7 @@ func hud_exclusion_rects() -> Array[Rect2]:
 	for path: String in [
 		"OverviewPanel", "LocationName", "HelpButton", "ActionsPanel", "CommandStrip",
 		"MembersPanel", "StatusHintPanel", "MissionPanel", "TimePanel", "ResourcesPanel",
+		"TopChrome", "BottomChrome", "BusWaitingPanel",
 	]:
 		var node: Control = get_node_or_null(path) as Control
 		if node != null and node.is_visible_in_tree() and node.size.x > 1.0 and node.size.y > 1.0:
@@ -508,7 +570,7 @@ func _build_help() -> void:
 	_help.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	_help.offset_left = 216
 	_help.offset_right = 644
-	_help.offset_top = -266
+	_help.offset_top = -470
 	_help.offset_bottom = -96
 	_help.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_help.mouse_filter=Control.MOUSE_FILTER_STOP
@@ -631,6 +693,8 @@ func _label(parent: Control, node_name: String, font_size: int) -> Label:
 	var label: Label = Label.new()
 	label.name = node_name
 	label.add_theme_font_size_override("font_size", font_size)
+	if font_size >= 20:
+		label.add_theme_font_override("font", CampStyle.BOLD_FONT)
 	label.add_theme_color_override("font_color", ExpeditionHudTheme.CREAM)
 	_passive(label)
 	parent.add_child(label)
@@ -685,53 +749,69 @@ func _finite_number(value: Variant) -> bool:
 
 
 func _fit_persona_members() -> void:
-	if not is_inside_tree() or _persona_cards.is_empty() or not _persona_cards[0].visible: return
-	var height: float=0.0
-	var count: int=0
-	for card: PersonaCard in _persona_cards:
-		if card.visible:
-			height+=card.get_combined_minimum_size().y
-			count+=1
-	height+=4.0*maxi(0,count-1)
-	var client_height: float=maxf(40.0,get_viewport_rect().size.y-88.0-16.0-40.0)
-	_member_scroll.custom_minimum_size.y=minf(height,client_height)
-	_members_panel.reset_size()
+	if not is_inside_tree() or _member_scroll == null:
+		return
+	# The panel owns a stable right column; only its client scrolls for a large
+	# squad. Native focus following and the complete eight-member list survive.
+	_member_scroll.custom_minimum_size.y = 0
+	_members_panel.anchor_bottom = 1.0
+	_members_panel.offset_bottom = -126
+	_members_panel.offset_left = -272
 
 
 func _compact_persona_card(card: PersonaCard, first_aid: String) -> void:
-	# Only field presentation changes. The shared card retains its complete model
-	# and the same details for camp, rescue and field selection.
-	card.custom_minimum_size.x=148
-	card.portrait_button.custom_minimum_size=Vector2(40,40)
-	card.info_button.custom_minimum_size=Vector2(22,24)
+	# Recompose this field instance, preserving the shared card's model, actions
+	# and complete hidden identity labels for details and existing consumers.
+	card.custom_minimum_size = Vector2(232, 86)
+	card.portrait_button.custom_minimum_size = Vector2(60, 60)
+	card.portrait_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	card.portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	card.info_button.custom_minimum_size = Vector2(26, 24)
+	card.info_button.add_theme_font_size_override("font_size", 13)
+	card._header.add_theme_constant_override("separation", 10)
+	card._identity.add_theme_constant_override("separation", 4)
 	if not card.has_meta("field_skin"):
 		ExpeditionHudTheme.skin(card)
-		var surface: StyleBoxFlat = (card.get_node("CardSurface") as PanelContainer).get_theme_stylebox("panel") as StyleBoxFlat
-		surface.content_margin_top = 1
-		surface.content_margin_bottom = 1
+		var heading: HBoxContainer = HBoxContainer.new()
+		heading.name = "FieldHeading"
+		heading.add_theme_constant_override("separation", 6)
+		_passive(heading)
+		card._identity.add_child(heading)
+		var field_name: Label = _label(heading, "FieldName", 22)
+		field_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		field_name.clip_text = true
+		field_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		var hp: Label = _label(heading, "FieldHp", 18)
+		hp.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		hp.add_theme_font_override("font", CampStyle.BOLD_FONT)
+		hp.add_theme_color_override("font_color", ExpeditionHudTheme.SECONDARY)
+		card.health_bar.reparent(card._identity)
+		var state_row: HBoxContainer = HBoxContainer.new()
+		state_row.name = "FieldState"
+		state_row.add_theme_constant_override("separation", 4)
+		_passive(state_row)
+		card._identity.add_child(state_row)
+		card.status_label.reparent(state_row)
+		card.status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card.status_label.clip_text = true
+		card.info_button.reparent(state_row)
 		card.set_meta("field_skin", true)
-	card.primary_label.add_theme_color_override("font_color", ExpeditionHudTheme.CREAM)
-	(card.health_bar.get_theme_stylebox("fill") as StyleBoxFlat).bg_color = ExpeditionHudTheme.SAGE
-	# Keep the original hidden health label for details/tests; expose its HP in the identity row.
-	var identity: Node = card.primary_label.get_parent()
-	var hp: Label = identity.get_node_or_null("FieldHp") as Label
-	if hp == null:
-		hp = Label.new()
-		hp.name = "FieldHp"
-		hp.clip_text = true
-		hp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		hp.add_theme_font_size_override("font_size", 11)
-		identity.add_child(hp)
-	hp.text = card.name_label.text.get_slice("  ", 1) + "\n" + card.health_label.text.split(" · ")[0]
-	hp.add_theme_color_override("font_color", ExpeditionHudTheme.SECONDARY)
-	card.primary_label.add_theme_font_size_override("font_size",12)
-	card.name_label.visible = not first_aid.is_empty()
+	var field_name: Label = card._identity.get_node("FieldHeading/FieldName") as Label
+	var hp: Label = card._identity.get_node("FieldHeading/FieldHp") as Label
+	var name_start: int = card.name_label.text.find("  ")
+	field_name.text = card.name_label.text.substr(name_start + 2) if name_start >= 0 else card.name_label.text
+	field_name.tooltip_text = card.name_label.tooltip_text
+	hp.text = card.health_label.text.split(" · ")[0].trim_prefix("HP ")
+	hp.tooltip_text = card.health_label.text
+	card.primary_label.hide()
+	card.name_label.hide()
 	card.health_label.hide()
 	card.ammo_label.hide()
 	card.positive_label.get_parent().hide()
-	card.health_bar.custom_minimum_size.y=4
-	card.health_bar.tooltip_text=card.health_label.text
-	card.status_label.add_theme_font_size_override("font_size",12)
+	card.health_bar.custom_minimum_size.y = 8
+	card.health_bar.tooltip_text = card.health_label.text
+	(card.health_bar.get_theme_stylebox("fill") as StyleBoxFlat).bg_color = ExpeditionHudTheme.SAGE
+	card.status_label.add_theme_font_size_override("font_size", 15)
 	card.status_label.text = _short_activity(card.status_label.text) if first_aid.is_empty() else first_aid
 	card.reset_size()
 

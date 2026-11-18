@@ -188,6 +188,12 @@ func _update_ui() -> void:
 	elif x.encounter != null and not x.encounter.defeat.is_empty() and CampFacilities.enabled(x.field_departure):
 		objective = "破阵者已倒地 · 集合回车"
 	var toolbox: Expedition.SearchSite = x._toolbox_site()
+	var persistent_hint: String = _persistent_hint(boarding)
+	var notice: String = x._notice_text
+	# A transient notice occupies the action line, while the already-derived meal
+	# estimate keeps its fixed second line. Complete context stays in the tooltip.
+	if x._notice_clock > 0.0 and persistent_hint.contains("\n"):
+		notice = notice.replace("\n", " · ") + "\n" + persistent_hint.get_slice("\n", 1) + "\n" + persistent_hint
 	x._hud.refresh({
 		"toolbox":x._carried_tools() if x.supply.generated.has("economy_source") else int(toolbox.searched) if toolbox != null else -1,
 		"exploration_objectives":_exploration_objective_rows() if x.exploration_mode() else [],
@@ -205,8 +211,8 @@ func _update_ui() -> void:
 		"route_hint":"可定位侦察点。走近站点后可搜集，侦察完成可提前标记两处。" if x.recon_site != null else x.layout.route_hint,
 		"weapon_loot":x.weapon_loot.size(),
 		"searched": x.searched, "kills": x.kills, "engine": engine_text,
-		"notice": x._notice_text, "notice_visible": x._notice_clock > 0.0,
-		"status_hint":_persistent_hint(boarding),
+		"notice": notice, "notice_visible": x._notice_clock > 0.0,
+		"status_hint":persistent_hint,
 		"event_hint":SortieEvents.field_hint(x),
 		"night_hint":SortieEvents.night_hint(x.supply.generated, x.elapsed, x.tuning.daylight_seconds),
 		"threat":x.threat_status(),
@@ -482,3 +488,4 @@ func _arrange_field_hud() -> void:
 	bus_shortcut.pressed.connect(x._hud.view._request_bus)
 	ExpeditionHudTheme.skin(x._hud.view)
 	x._hud.view._mission.add_theme_color_override("font_color", ExpeditionHudTheme.AMBER)
+	x._hud.view._layout_field()

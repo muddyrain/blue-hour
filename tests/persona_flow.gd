@@ -96,9 +96,11 @@ func _journey() -> void:
 		_check(app.roster_panel.persona_details.visible,"real roster presents unified detail")
 		var rename_before: Dictionary=app.camp_snapshot().journey.build.persona.duplicate(true)
 		var original_name: String=SurvivorRoster.member(app.crew,1).call_sign
+		await _tap(app.roster_panel.rename_button)
 		app.roster_panel.name_edit.text="夜行者"
 		await _tap(app.roster_panel.save_button)
 		_check(SurvivorRoster.member(app.crew,1).call_sign=="夜行者" and TransactionReceipt.same(rename_before,app.camp_snapshot().journey.build.persona),"original call-sign editor remains reachable without changing identity recipe")
+		await _tap(app.roster_panel.rename_button)
 		app.roster_panel.name_edit.text=original_name
 		await _tap(app.roster_panel.save_button)
 		recording=true

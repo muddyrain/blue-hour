@@ -1,6 +1,7 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://src/app/main.gd" id="1_main"]
+[ext_resource type="Texture2D" path="res://assets/camp_pixel/coast-yard.png" id="2_camp"]
 
 [sub_resource type="SystemFont" id="SystemFont_cjk"]
 font_names = PackedStringArray("Microsoft YaHei", "Noto Sans CJK SC", "Hiragino Sans GB", "Heiti SC", "PingFang SC")
@@ -177,6 +178,19 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 color = Color(0.025, 0.065, 0.09, 0.94)
+
+[node name="MorningCamp" type="TextureRect" parent="Interface/Screen/Result/Backdrop"]
+visible = false
+modulate = Color(0.24, 0.29, 0.32, 1)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture_filter = 1
+mouse_filter = 2
+texture = ExtResource("2_camp")
+expand_mode = 1
+stretch_mode = 6
 
 [node name="Heading" type="Label" parent="Interface/Screen/Result"]
 anchors_preset = 10

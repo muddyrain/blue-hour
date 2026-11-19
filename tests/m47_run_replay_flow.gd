@@ -159,7 +159,7 @@ func _extract(world: Expedition) -> void:
 	var parked: Vector2 = world._bus_sprite.position
 	var occupants: int = bus._boarding_actors.size()
 	var ready: Dictionary = app.progress_session.inspect()
-	var terminal_failure: bool = app._pending_settlement.journey.state == "FAILED"
+	var auto_commit_failure: bool = app._pending_settlement.journey.state == "FAILED" and not ReturnFeedback.has_overnight_shortage(app._pending_settlement)
 	_check(ready.receipt.phase == "RESULT_READY" and app.phase == app.Phase.EXPEDITION,
 		"roadside boarding holds the frozen result behind the visible bus sequence")
 	await _advance(world, func() -> bool: return bus._boarding_index >= 1, 200)
@@ -183,7 +183,7 @@ func _extract(world: Expedition) -> void:
 		if tick % 28 == 0:
 			await _frame()
 	var shown: Dictionary = app.progress_session.inspect()
-	var unchanged: bool = shown.receipt.phase == "COMMITTED" if terminal_failure else shown.hash == ready.hash
+	var unchanged: bool = shown.receipt.phase == "COMMITTED" if auto_commit_failure else shown.hash == ready.hash
 	_check(tail_gate and bus._entire_bus_outside() and app.phase == app.Phase.RESULT and unchanged,
 		"result remains hidden with the tail in bounds and opens after full exit using the same frozen receipt")
 	streets.append(_geometry(world.supply.generated).merged({"boarded":occupants,

@@ -73,7 +73,7 @@ func _supply_route() -> void:
 	await _collect(first, 6)
 	await _finish_outing(first)
 	var ledger: Dictionary = app.camp_snapshot().last_day
-	_check(ledger.get("facility_food") == 2 and ledger.get("facility_stored") == 2, "tier one return credits exactly two real facility rations")
+	_check(ledger.get("facility_food") == 1 and ledger.get("facility_stored") == 1, "tier one processes one bonus ration from the harvest")
 	if not _upgrade(CampFacilities.SUPPLY, "before_camp_write"):
 		return
 	var second: Expedition = await _ordinary_supply()
@@ -84,9 +84,9 @@ func _supply_route() -> void:
 	var camp: Dictionary = app.camp_snapshot()
 	ledger = camp.last_day
 	var counterfactual: Dictionary = CampEconomy.post_battle_food(int(ledger.day), camp.crew, int(ledger.food_before),
-		int(ledger.food_found), int(ledger.ration_per_member), true, CampFacilities.SUPPLY_FOOD)
-	_check(ledger.get("facility_food") == 3 and ledger.get("facility_stored") == 3 and int(ledger.food_after) == int(counterfactual.get("food_after", -999)) + 1,
-		"tier two return credits three rations and one additional real unit over the tier-one counterfactual")
+		int(ledger.food_found), int(ledger.ration_per_member), true, 1)
+	_check(ledger.get("facility_food") == 2 and ledger.get("facility_stored") == 2 and int(ledger.food_after) == int(counterfactual.get("food_after", -999)) + 1,
+		"tier two processes two rations and leaves one more than tier one from the same harvest")
 	_write("supply-ledger.json", {"actual":ledger, "tier_one_counterfactual":counterfactual,
 		"facility_overflow":int(ledger.get("facility_food", 0)) - int(ledger.get("facility_stored", 0))})
 	await _train()

@@ -1,5 +1,5 @@
 extends SceneTree
-## One default-entry loop, using UI business intentions and isolated durable progress.
+## Consecutive food and hardware missions through ordinary controls and isolated durable progress.
 const STEP: float = 1.0 / 30.0
 const WALL_LIMIT_MS: int = 110000
 var app: Node
@@ -73,7 +73,7 @@ func _load_app() -> bool:
 		"default main.tscn reaches title")
 
 
-func _start_sortie() -> Expedition:
+func _start_sortie(type: String) -> Expedition:
 	var loading_started: int = Time.get_ticks_msec()
 	app.open_mission_select()
 	if not await _wait(func() -> bool:
@@ -84,11 +84,11 @@ func _start_sortie() -> Expedition:
 	_mission_timing(loading_started)
 	var menu: MissionSelect = app.mission_select
 	var first: int = -1
-	for index: int in range(menu.choices.size()):
-		if menu.choices[index].is_visible_in_tree() and not menu.choices[index].disabled:
+	for index: int in range(menu.daily_offers.size()):
+		if menu.daily_offers[index].type == type and menu.choices[index].is_visible_in_tree() and not menu.choices[index].disabled:
 			first = index
 			break
-	if not _check(first >= 0, "first available mission exists"):
+	if not _check(first >= 0, "requested mission is offered: " + type):
 		return null
 	var expected: Dictionary = menu.daily_offers[first].duplicate(true)
 	menu._choose(first)
@@ -162,7 +162,7 @@ func _loop(path: String) -> void:
 	if not _check(before.day == 2 and before.food == 4 and before.crew.size() == 2,
 		"official day-two opening has four food and the original pair"):
 		return
-	var world: Expedition = await _start_sortie()
+	var world: Expedition = await _start_sortie("supply")
 	if world == null:
 		return
 	world.search_completed.connect(func(_reward: int) -> void: search_completions += 1)
@@ -190,27 +190,7 @@ func _loop(path: String) -> void:
 	if not await _advance(world, func() -> bool: return survivor_hits > 0,
 		"survivor combat applies positive damage to an enemy"):
 		return
-	world.command_move(world.layout.bus_door)
-	if not await _advance(world, func() -> bool: return world.elapsed >= world.tuning.bus_ready_seconds,
-		"bus becomes ready through simulation"):
-		return
-	world.request_bus_action()
-	if not _check(world.phase == Expedition.Phase.ENGINE, "real bus action starts engine"):
-		return
-	if not await _advance(world, func() -> bool: return world.phase == Expedition.Phase.BOARDING,
-		"engine reaches boarding phase"):
-		return
-	world.request_bus_gather()
-	if not await _advance(world, func() -> bool: return world.phase == Expedition.Phase.FINISHED,
-		"real gather finishes sortie"):
-		return
-	if not await _advance(world, func() -> bool: return (app.phase == app.Phase.RESULT
-		and not world.bus_view.running()), "bus departs and result preview opens", 1500):
-		return
-	var gathered: Vector2i = world.bus_view.final_boarding
-	if not _check(world.living_count() > 0 and gathered.x == gathered.y
-		and gathered.y == world.living_count() and app._result.is_visible_in_tree()
-		and not app._pending_settlement.is_empty(), "living survivors extracted into visible frozen preview"):
+	if not await _return_from(world):
 		return
 	var preview_text: String = app.get_node("Interface/Screen/Result/Scroll/Body").text
 	if not _check(world.elapsed < 105.0 and world.living_count() == 2 and world.food_loot > 0
@@ -248,17 +228,74 @@ func _loop(path: String) -> void:
 		and TransactionReceipt.same(saved, app.camp_snapshot()), "Continue restores exact saved camp"):
 		return
 	app._enter_camp()
-	var second: Expedition = await _start_sortie()
-	_check(second != null and app.phase == app.Phase.EXPEDITION, "saved journey opens a second sortie")
+	var second: Expedition = await _start_sortie("airdrop")
+	if second == null: return
+	var cabinet: Expedition.SearchSite = second.search_site(&"cash")
+	if not _check(EconomyActions.hardware(second.supply.generated) and cabinet != null and second.site_discovered(cabinet),
+		"day-three equipment card offers the real hardware cabinet"): return
+	second.command_move(cabinet.door)
+	second.request_search(cabinet.id)
+	if not await _advance(second, func() -> bool: return cabinet.searched, "second outing recovers the hardware without searching for food"): return
+	if not _check(second.food_loot == 0 and second._carried_tools() == 2, "two tools and no field rations carried"): return
+	if not await _return_from(second): return
+	await app._confirm_result_ui()
+	var returned: Dictionary = app.camp_snapshot()
+	if not _check(returned.settled_sorties == 2 and returned.day == 4 and RosterState.living_count(returned) == 2
+		and returned.last_day.food_before == saved.food and returned.last_day.food_found == 0
+		and returned.last_day.food_consumed == 2 and returned.food == saved.food - 2
+		and EconomyBuildV1.tools(returned) == EconomyBuildV1.tools(saved) + 2,
+		"banked food covers the equipment night and both recovered tools reach camp"): return
+	var identity: String = returned.profile_id + ":edit:" + RunSave.new_profile_id()
+	await app.confirm_economy_edit(EconomyBuildV1.request(returned, "build", "supply", "", identity))
+	var built: Dictionary = app.camp_snapshot()
+	_check(EconomyBuildV1.level(built, "supply") == 1 and built.cash == returned.cash - 12
+		and EconomyBuildV1.tools(built) == EconomyBuildV1.tools(returned) - 1 and built.food == returned.food
+		and TransactionReceipt.same(built.last_day, returned.last_day),
+		"building supply spends the recovered tool and twelve coins without changing last night's meal")
+
+
+func _return_from(world: Expedition) -> bool:
+	world.command_move(world.layout.bus_door)
+	if not await _advance(world, func() -> bool: return world.elapsed >= world.tuning.bus_ready_seconds,
+		"bus becomes ready through simulation"):
+		return false
+	world.request_bus_action()
+	if not _check(world.phase == Expedition.Phase.ENGINE, "real bus action starts engine"):
+		return false
+	if not await _advance(world, func() -> bool: return world.phase == Expedition.Phase.BOARDING,
+		"engine reaches boarding phase"):
+		return false
+	world.request_bus_gather()
+	if not await _advance(world, func() -> bool: return world.phase == Expedition.Phase.FINISHED,
+		"real gather finishes sortie"):
+		return false
+	if not await _advance(world, func() -> bool: return (app.phase == app.Phase.RESULT
+		and not world.bus_view.running()), "bus departs and result preview opens", 1500):
+		return false
+	var gathered: Vector2i = world.bus_view.final_boarding
+	if not _check(world.living_count() > 0 and gathered.x == gathered.y
+		and gathered.y == world.living_count() and app._result.is_visible_in_tree()
+		and not app._pending_settlement.is_empty(), "living survivors extracted into visible frozen preview"):
+		return false
+	return true
 
 
 func _dispose_app() -> void:
 	if is_instance_valid(app):
+		var playbacks: Array[WeakRef] = []
 		if is_instance_valid(app.audio):
+			for player: AudioStreamPlayer in app.audio._ui_players + app.audio._world_players:
+				if player.has_stream_playback():
+					playbacks.append(weakref(player.get_stream_playback()))
 			app.audio.shutdown()
 		app.queue_free()
 		app = null
 		await process_frame
+		# The audio mixer retires stopped streams on its own clock.
+		var deadline: int = Time.get_ticks_usec() + 200_000
+		while playbacks.any(func(ref: WeakRef) -> bool: return ref.get_ref() != null) \
+				and Time.get_ticks_usec() < deadline:
+			await process_frame
 		await process_frame
 
 

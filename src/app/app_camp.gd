@@ -16,9 +16,10 @@ func _update_camp() -> void:
 	ration_text += " · 缺%d，建议选择超市" % daily.shortage if daily.shortage > 0 else " · 库存足够"
 	var change: String = "初始库存为样板值；出击前可选搜集或超市。"
 	if not app.last_day.is_empty():
-		change = "上次归航：食物 %d +%d −%d = %d；货币 +%d；缺口%d" % [app.last_day.food_before, app.last_day.food_stored, app.last_day.food_consumed, app.last_day.food_after, app.last_day.cash_gained, app.last_day.food_shortage]
+		var stored: int = int(app.last_day.food_stored) + int(app.last_day.get("facility_stored", 0))
+		change = "上次归航：库存 %d ＋ 入库 %d − 消耗 %d ＝ 余粮 %d · 货币 +%d · 缺口 %d" % [app.last_day.food_before, stored, app.last_day.food_consumed, app.last_day.food_after, app.last_day.cash_gained, app.last_day.food_shortage]
 	if not app.last_day.is_empty() and app.last_day.food_shortage > 0:
-		change += "；损失候选%d人，未应用" % HungerOutcome.candidate(app.last_day).loss_count
+		change += "\n" + ReturnFeedback.starvation_text(app.crew, app._battle_meta.deaths, app.last_settlement_id)
 	app.get_node("Interface/Screen/Title/Camp").text = "第 %d 天 / 货币 %d / 食物 %d / 队员生命 %d · %d\n%s\n%s" % [app.day,app.cash,app.food,ceili(app.crew_health[0]),ceili(app.crew_health[1]),ration_text,change]
 	var eligible: bool = (app._battle_meta.get("state") == "ACTIVE" and not CampaignState.ended(app.camp_snapshot()))
 	app.get_node("Interface/Screen/Title/Start").disabled = app._requires_continue or app._progress_blocked or not eligible

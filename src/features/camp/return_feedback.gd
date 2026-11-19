@@ -17,7 +17,7 @@ static func forecast(day: int, crew: Array, departure: Dictionary, food: int, fo
 	# The same capped ledger as FrozenSettlement, with today's living departure
 	# members and pre-departure facilities. This is a proposal, never a payout.
 	return CampEconomy.post_battle_food(day, FieldJoinRules.meal_members(crew, departure),
-		food, found, per_member, true, CampFacilities.offered_food(departure, day, true))
+		food, found, per_member, true, CampFacilities.offered_food(departure, day, true, found))
 
 
 static func forecast_text(ledger: Dictionary) -> String:
@@ -25,6 +25,11 @@ static func forecast_text(ledger: Dictionary) -> String:
 		return "若归航：口粮预估暂不可用"
 	return "若归航：本餐需 %d 粮 · 缺 %d 粮 · 餐后余 %d 粮" % [
 		ledger.food_required, ledger.food_shortage, ledger.food_after]
+
+
+static func has_overnight_shortage(camp: Dictionary) -> bool:
+	var meal: Dictionary = camp.get("last_day", {})
+	return meal.get("evacuated", false) and int(meal.get("food_shortage", 0)) > 0
 
 
 static func return_text(battle: Dictionary, crew: Array, deaths: Array,
@@ -46,14 +51,19 @@ static func return_text(battle: Dictionary, crew: Array, deaths: Array,
 		"、".join(fallen) if not fallen.is_empty() else "无"]
 	if not waiting.is_empty():
 		text += "\n未登车：" + "、".join(waiting)
+	var morning: String = starvation_text(crew, deaths, transaction_id)
+	if not morning.is_empty():
+		text += "\n" + morning
+	return text
+
+
+static func starvation_text(crew: Array, deaths: Array, transaction_id: String) -> String:
 	var starved: PackedStringArray = []
 	for death: Dictionary in deaths:
 		if death.transaction_id == transaction_id and death.cause in ["STARVATION", "HUNGER"]:
 			var member: Dictionary = SurvivorRoster.member(crew, int(death.member_id))
 			starved.append(String(member.get("call_sign", "队员%d" % int(death.member_id))))
-	if not starved.is_empty():
-		text += "\n餐后饥饿死亡：" + "、".join(starved)
-	return text
+	return "" if starved.is_empty() else "餐后饥饿死亡：" + "、".join(starved)
 
 
 static func result_heading(snapshot: Dictionary, battle: Dictionary) -> String:

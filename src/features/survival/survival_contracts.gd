@@ -144,9 +144,10 @@ static func food_problem(ledger: Dictionary, expected_facility_food: int = -1) -
 	var stored: int = mini(int(ledger.food_found),CampRules.FOOD_LIMIT-int(ledger.food_before))
 	var available: int = int(ledger.food_before)+stored
 	if CampFacilities.has_food_fields(ledger):
-		# Legacy callers still accept only the original two rations when a facility ledger exists.
-		var facility: int = CampFacilities.SUPPLY_FOOD if expected_facility_food < 0 else expected_facility_food
-		if facility <= 0 or not integer(ledger.get("facility_food"), facility, facility) or not integer(ledger.get("facility_stored"), 0, facility):
+		var found: int = int(ledger.food_found)
+		var facility: int = CampFacilities.processed_food(1, found) if expected_facility_food < 0 else expected_facility_food
+		if facility <= 0 or facility > CampFacilities.processed_food(CampFacilities.MAX_SUPPLY_TIER, found) \
+				or not integer(ledger.get("facility_food"), facility, facility) or not integer(ledger.get("facility_stored"), 0, facility):
 			return "设施口粮账本数字无效"
 		var facility_stored: int = mini(facility, CampRules.FOOD_LIMIT - available)
 		if ledger.facility_stored != facility_stored:

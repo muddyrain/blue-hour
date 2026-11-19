@@ -11,6 +11,10 @@ func _init(owner: AppMain) -> void:
 func return_to_title() -> void:
 	if app.phase != app.Phase.RESULT:
 		return
+	if app.get_node("Interface/Screen/Result/Backdrop/MorningCamp").visible and app._battle_meta.get("campaign", {}).get("outcome") == "VICTORY" and CampaignRules.pump_station_enabled(app._battle_meta.campaign):
+		app.get_node("Interface/Screen/Result/Backdrop/MorningCamp").hide()
+		app._show_pump_victory(app.camp_snapshot())
+		return
 	if not app._pending_settlement.is_empty() and (app._pending_settlement.journey.state=="FAILED" or CampaignState.ended(app._pending_settlement)):
 		var terminal: Dictionary=app._pending_settlement.duplicate(true)
 		if not app._accept_transaction(app.progress_session.commit_result(),true):
@@ -22,7 +26,10 @@ func return_to_title() -> void:
 	app.audio.stop_world()
 	app._disconnect_sortie_events()
 	if app.phase == app.Phase.RESULT and not app._pending_settlement.is_empty():
-		if not app._accept_transaction(app.progress_session.commit_result(),true): return
+		if not app._accept_transaction(app.progress_session.commit_result(),true):
+			if ReturnFeedback.has_overnight_shortage(app._pending_settlement):
+				app._show_battle_result(app._pending_settlement, false)
+			return
 		app._pending_settlement = {}
 	app._damage_gates.clear()
 	if app._progress_blocked:

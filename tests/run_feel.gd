@@ -132,15 +132,30 @@ func _food_forecasts(base: Dictionary) -> void:
 	ledger = ReturnFeedback.forecast(2, crew, base, 4, 0, 1)
 	expect(ledger.food_required == 1 and ledger.food_after == 3,
 		"new field recruit remains exempt from the first meal")
+	crew[1].health = base.crew[1].health
+	ledger = ReturnFeedback.forecast(2, crew, base, 0, 2, 1)
+	expect(ledger.ration_member_ids == [1, 2] and ledger.food_shortage == 0 and ledger.food_after == 0,
+		"two returning rations feed the original pair on the rescue night")
+	var recruited: Dictionary = base.duplicate(true)
+	recruited.crew.append(joined)
+	ledger = ReturnFeedback.forecast(3, crew, recruited, ledger.food_after, 2, 1)
+	expect(ledger.ration_member_ids == [1, 2, 3] and ledger.food_shortage == 1,
+		"the same three survivors need a third ration on their next return")
 	var facility: Dictionary = base.duplicate(true)
 	facility.journey.campaign.economy = EconomyBuildV1.initial()
 	EconomyBuildV1.state(facility).edits.append({"sortie":1,"target":"supply","op":"build"})
 	ledger = ReturnFeedback.forecast(3, base.crew, facility, 0, 0, 1)
-	expect(ledger.get("facility_food", 0) == 2 and ledger.food_shortage == 0,
-		"already-built supply contributes through the existing facility policy")
-	ledger = ReturnFeedback.forecast(2, base.crew, facility, 0, 0, 1)
 	expect(ledger.get("facility_food", 0) == 0 and ledger.food_shortage == 2,
-		"same-sortie construction cannot retroactively supply a meal")
+		"empty returns earn no processing bonus even with a supply facility")
+	ledger = ReturnFeedback.forecast(3, base.crew, facility, 0, 1, 1)
+	expect(ledger.get("facility_food", 0) == 0 and ledger.food_shortage == 1,
+		"one field ration leaves the pair one short")
+	ledger = ReturnFeedback.forecast(3, base.crew, facility, 0, 2, 1)
+	expect(ledger.facility_food == 1 and ledger.food_shortage == 0 and ledger.food_after == 1,
+		"two field rations feed the pair and leave one processed ration")
+	ledger = ReturnFeedback.forecast(2, base.crew, facility, 0, 2, 1)
+	expect(ledger.get("facility_food", 0) == 0 and ledger.food_after == 0,
+		"same-sortie construction cannot process a prior day's harvest")
 	ledger = ReturnFeedback.forecast(3, base.crew, facility, CampRules.FOOD_LIMIT - 1, 3, 1)
 	expect(ledger.food_stored == 1 and ledger.food_overflow == 2 and ledger.facility_stored == 0
 		and ledger.food_after == CampRules.FOOD_LIMIT - 2, "forecast respects shared inventory capacity and deposit order")

@@ -221,10 +221,10 @@ func _facility_returns(base: Dictionary) -> void:
 		var after: Dictionary = source.duplicate(true)
 		for member: Dictionary in after.crew:
 			member.growth.trait = {"id":TraitRules.IDS[TraitRules.role(member) - 1], "level":1, "progress":0}
-		var report: Dictionary = {"sortie_id":"directed-return", "evacuated":true, "site_facts":{}}
+		var report: Dictionary = {"sortie_id":"directed-return", "evacuated":true, "food":4, "site_facts":{}}
 		EconomyBuildV1.settled(source, after, report, {})
 		var returned: Dictionary = EconomyBuildV1.state(after).returns.back()
-		expect(returned.food == (0 if tier == 0 else tier + 1), "supply tier controls next-return food")
+		expect(returned.field_food == 4 and returned.food == tier, "supply tier caps the processed rations from this harvest")
 		expect(returned.planning.is_empty() if tier == 0 else returned.planning.points == tier, "planning tier controls next-return trait award")
 		var failed: Dictionary = source.duplicate(true)
 		report.evacuated = false

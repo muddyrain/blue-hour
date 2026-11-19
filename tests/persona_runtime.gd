@@ -386,7 +386,7 @@ func _trait_bounds() -> void:
 		"field_joins":[], "searched":true, "food_searched":false,
 		"site_facts":{"cash":{"searched":true, "progress":30.0}, "food":{"searched":false, "progress":0.0}}}
 	var minimum: int = floori(30.0 * 0.70 * 0.85 * 0.75 * 1000.0)
-	var event: Dictionary = {"member_id":2, "kind":"search_complete", "site":"cash", "at_ms":minimum}
+	var event: Dictionary = {"member_id":2, "kind":"search_complete", "site_id":"cash", "at_ms":minimum}
 	var facts: Dictionary = {"ruleset_id":TraitRules.RULESET, "binding":BINDING.duplicate(true), "diagnostic":false, "events":[event]}
 	expect(TraitRules.inputs_problem(facts, BINDING, report, context, task).is_empty(), "fastest real participant defines the new permitted integer-millisecond lower bound")
 	event.at_ms = minimum - 1
@@ -405,17 +405,17 @@ func _trait_bounds() -> void:
 	event.at_ms = 21000
 	expect(TraitRules.inputs_problem(facts, BINDING, report, context, legacy).is_empty(), "legacy 21-second completion remains accepted")
 	event.at_ms = 20000
-	var food: Dictionary = {"member_id":1, "kind":"search_complete", "site":"food", "at_ms":25000}
+	var food: Dictionary = {"member_id":1, "kind":"search_complete", "site_id":"food", "at_ms":25000}
 	facts.events.append(food)
 	report.food_searched = true
 	report.site_facts.food = {"searched":true, "progress":30.0}
-	expect(TraitRules.inputs_problem(facts, BINDING, report, context, task).is_empty(), "original cash and food category events both remain available")
-	facts.events.append({"member_id":2, "kind":"search_complete", "site":"cash", "at_ms":30000})
-	expect(not TraitRules.inputs_problem(facts, BINDING, report, context, task).is_empty(), "persona does not expand the original two-category event limit")
+	expect(TraitRules.inputs_problem(facts, BINDING, report, context, task).is_empty(), "different completed locations retain their respective workers")
+	facts.events.append({"member_id":2, "kind":"search_complete", "site_id":"cash", "at_ms":30000})
+	expect(not TraitRules.inputs_problem(facts, BINDING, report, context, task).is_empty(), "another worker cannot claim a completed location twice")
 	facts.events.pop_back()
-	food.site = "cash"
-	expect(not TraitRules.inputs_problem(facts, BINDING, report, context, task).is_empty(), "the same original category cannot be awarded twice")
-	food.site = "food"
+	food.site_id = "cash"
+	expect(not TraitRules.inputs_problem(facts, BINDING, report, context, task).is_empty(), "one location cannot stand in for another completed location")
+	food.site_id = "food"
 	var airdrop: Dictionary = task.duplicate(true)
 	airdrop.type = "airdrop"
 	airdrop.sites[0].seconds = 12.0
@@ -432,6 +432,7 @@ func _trait_bounds() -> void:
 	airdrop.sites.append({"id":"cash_2", "kind":"cash", "building":"controlled-indoor", "amount":1, "weapon":false, "seconds":30.0})
 	report.site_facts.cash = {"searched":false, "progress":0.0}
 	report.site_facts.cash_2 = {"searched":true, "progress":30.0}
+	event.site_id = "cash_2"
 	event.at_ms = floori(12.0 * 0.70 * 0.85 * 0.75 * 1000.0)
 	expect(not TraitRules.inputs_problem(facts, BINDING, report, context, airdrop).is_empty(), "unfinished main air-drop cannot lend its twelve-second floor to a completed thirty-second indoor cash site")
 	event.at_ms = floori(30.0 * 0.70 * 0.85 * 0.75 * 1000.0)
@@ -441,7 +442,7 @@ func _trait_bounds() -> void:
 	expect(not TraitRules.inputs_problem(facts, BINDING, missing_proof, context, airdrop).is_empty(), "new persona work facts require actual completed-site proof")
 	missing_proof = report.duplicate(true)
 	missing_proof.site_facts.cash_2 = {"searched":false, "progress":0.0}
-	expect(not TraitRules.inputs_problem(facts, BINDING, missing_proof, context, airdrop).is_empty(), "an uncompleted category cannot claim a work-completion trait event")
+	expect(not TraitRules.inputs_problem(facts, BINDING, missing_proof, context, airdrop).is_empty(), "an uncompleted location cannot claim a work-completion trait event")
 
 
 func run() -> void:

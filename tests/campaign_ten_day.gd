@@ -63,7 +63,7 @@ func _run() -> void:
 	mode = OS.get_environment("BH_TEN_DAY_MODE")
 	output = OS.get_environment("BH_TEN_DAY_OUTPUT").simplify_path()
 	var local: String = ProjectSettings.globalize_path("res://.local/")
-	if not output.begins_with(local) or mode not in ["new", "resume", "verify", "hunger"]:
+	if not output.begins_with(local) or mode not in ["new", "resume", "verify", "hunger", "hunger-partial", "hunger-retry", "hunger-reload"]:
 		printerr("BH_TEN_DAY_ARGUMENTS isolated output and explicit process mode required")
 		quit(2)
 		return
@@ -80,7 +80,7 @@ func _run() -> void:
 	if not await _wait(func() -> bool: return app.is_node_ready() and not app._startup_pending, "formal main startup completes"):
 		_finish()
 		return
-	if mode in ["new", "hunger"]:
+	if mode in ["new", "hunger", "hunger-partial", "hunger-retry"]:
 		if not _ok(not FileAccess.file_exists(entry.progress) and not app._requires_continue, "fresh formal entry without a save"):
 			_finish()
 			return
@@ -107,6 +107,12 @@ func _run() -> void:
 		if app._hunger_confirmation.visible:
 			app._hunger_confirmation.hide()
 			app._hunger_confirmation.confirmed.emit()
+		if mode == "hunger-reload":
+			var saved: Dictionary = app.camp_snapshot()
+			_check_partial_morning(saved.last_settlement_id, saved.journey.deaths)
+			await _check_morning_card_layout()
+			_finish()
+			return
 		var expected: Dictionary = _read_state("midpoint" if mode == "resume" else "final")
 		var restored: Dictionary = app.camp_snapshot()
 		_event("reload", {"day":restored.day, "state_hash":RecordEncoding.fingerprint(restored), "expected_hash":RecordEncoding.fingerprint(expected), "state":_stats(restored)})
@@ -116,8 +122,10 @@ func _run() -> void:
 			_finish()
 			return
 		app._enter_camp()
-	if mode == "hunger":
-		await _hunger_route()
+	if mode.begins_with("hunger"):
+		if mode == "hunger": await _hunger_route()
+		elif mode == "hunger-partial": await _partial_hunger_return()
+		else: await _retry_hunger_return()
 		_finish()
 		return
 	if mode != "verify":
@@ -260,6 +268,18 @@ func _day() -> bool:
 	if not await _advance(world, func() -> bool: return app.phase == AppMain.Phase.RESULT and not world.bus_view.running(), "formal departure animation and frozen return UI"): return false
 	var pending: Dictionary = app._pending_settlement.duplicate(true)
 	if not _ok(not pending.is_empty() and TransactionReceipt.same(before, app.camp_snapshot()), "frozen result precedes camp mutation"): return false
+	var diners: Array[int] = []
+	for survivor: FieldActor in world.survivors:
+		if survivor.health > 0 and not SurvivorRoster.member(before.crew, survivor.member_id).is_empty():
+			diners.append(survivor.member_id)
+	diners.sort()
+	var meal: Dictionary = pending.last_day
+	var facility_cap: int = EconomyBuildV1.level(before, "supply")
+	var expected_bonus: int = mini(facility_cap, floori(world.food_loot / 2.0))
+	if not _ok(meal.ration_member_ids == diners and meal.food_required == diners.size()
+			and meal.food_before == before.food and meal.food_found == world.food_loot
+			and meal.get("facility_food", 0) == expected_bonus,
+			"each night uses this outing's food, its departure facility and surviving pre-existing diners"): return false
 	if blockade:
 		if not _ok(app.get_node("Interface/Screen/Result/Scroll/Body").text.contains("经历入夜"), "frozen result reports the scheduled blockade night actually experienced"): return false
 	if world.day == 10: await _capture("04-day10-return")
@@ -309,53 +329,145 @@ func _invest() -> void:
 			app.close_training()
 			_event("camp_edit", {"op":"train_trait","state":_stats(app.camp_snapshot())})
 
+func _empty_return() -> Expedition:
+	app.open_mission_select()
+	if not await _wait(func() -> bool: return app.mission_select.visible and not app.mission_select.loading and not app.mission_select.daily_offers.is_empty(), "hunger control loads formal cards"): return null
+	var chosen: int = -1
+	for index: int in range(app.mission_select.daily_offers.size()):
+		if app.mission_select.daily_offers[index].type == "supply" and not app.mission_select.choices[index].disabled:
+			chosen = index
+			break
+	if not _ok(chosen >= 0, "hunger control has a normal food mission"): return null
+	app.mission_select._choose(chosen)
+	app.mission_select._confirm_departure()
+	if not _ok(app.phase == AppMain.Phase.EXPEDITION and not app._progress_blocked, "hunger control departs formally"): return null
+	var world: Expedition = app.expedition
+	world.set_physics_process(false)
+	world.set_process(false)
+	if not await _advance(world, func() -> bool: return not world.bus_view.running(), "hunger control arrival"): return null
+	world.command_move(world.layout.bus_door)
+	if not await _advance(world, func() -> bool: return world.elapsed >= world.tuning.bus_ready_seconds, "hunger control waits for ready bus"): return null
+	world.request_bus_action()
+	world.request_bus_gather()
+	if not await _advance(world, func() -> bool: return world.phase == Expedition.Phase.FINISHED, "hunger control extracts living pair"): return null
+	if not await _advance(world, func() -> bool: return app.phase == AppMain.Phase.RESULT and not world.bus_view.running(), "hunger control frozen return UI"): return null
+	return world
+
+
+func _pay_for_training(times: int) -> bool:
+	for index: int in range(times):
+		var preview: Dictionary = TrainingRules.preview(app.camp_snapshot(), 1)
+		if not _ok(preview.error.is_empty(), "one ration can fund training"): return false
+		app.open_training()
+		app.confirm_training(preview.request)
+		app.close_training()
+	return _ok(app.food == 4 - times and not app._progress_blocked, "training spends exactly the selected rations")
+
+
+func _partial_hunger_return() -> void:
+	if not _pay_for_training(3): return
+	var world: Expedition = await _empty_return()
+	if not is_instance_valid(world): return
+	var evening: String = app.get_node("Interface/Screen/Result/Scroll/Body").text
+	if not _ok(evening.contains("本次口粮缺口 1 粮") and not evening.contains("饥饿死亡")
+		and not evening.contains("生命0/") and not evening.contains("营地：第")
+		and app._pending_settlement.journey.active_member_ids.size() == 1
+		and RosterState.living_count(app.camp_snapshot()) == 2, "evening shows two returning survivors and one missing ration only"): return
+	var id: String = app._pending_settlement.last_settlement_id
+	var expected: Array = app._pending_settlement.journey.deaths.duplicate(true)
+	await app._confirm_result_ui()
+	_check_partial_morning(id, expected)
+
+
+func _check_partial_morning(id: String, expected: Array) -> void:
+	var morning: String = ReturnFeedback.starvation_text(app.crew, expected, id)
+	_ok(app.camp_scene.is_visible_in_tree(), "nonterminal morning enters the actual camp scene")
+	_ok(app.camp_scene._return_text.is_visible_in_tree(), "camp return summary is visible")
+	_ok(not morning.is_empty() and app.camp_scene._return_text.text.contains("第 3 天清晨 · " + morning), "camp summary names the morning victim")
+	_ok(RosterState.living_count(app.camp_snapshot()) == 1, "one resident survives this meal")
+	_ok(TransactionReceipt.same({"deaths":expected}, {"deaths":app.camp_snapshot().journey.deaths}), "committed death matches the frozen identity")
+	_event("partial_morning", {"day":app.day, "meal":app.last_day, "notice":morning, "display":app.camp_scene._return_text.text})
+
+
+func _check_morning_card_layout() -> void:
+	var scene: CampSceneView = app.camp_scene
+	var ledger: Dictionary = app.last_day.duplicate(true)
+	var names: String = "顾予安、夏之遥、陆望舒、韩知秋、许行舟、林雨桐、宋明远"
+	for extended: bool in [false, true]:
+		if extended:
+			ledger.facility_food = 2
+			ledger.facility_stored = 1
+		scene._return_text.text = "第 10 天清晨 · 餐后饥饿死亡：%s\n%s" % [names, ReturnFeedback.food_text(ledger)]
+		scene._return_objective.text = "补给 · 提前撤离未完成（0/3）"
+		scene._return_objective.visible = extended
+		scene._return_advice.visible = extended
+		for frame: int in range(4): await process_frame
+		var card: Rect2 = scene._return_summary.get_global_rect()
+		var food: Rect2 = scene._return_text.get_global_rect()
+		var tag: String = "extended" if extended else "compact"
+		_ok(scene.get_global_rect().encloses(card) and card.encloses(food)
+			and scene._return_text.get_visible_line_count() == scene._return_text.get_line_count(),
+			"all seven names and every meal line fit the " + tag + " morning card")
+		if extended:
+			var objective: Rect2 = scene._return_objective.get_global_rect()
+			var advice: Rect2 = scene._return_advice.get_global_rect()
+			_ok(card.encloses(advice) and objective.position.y >= food.end.y and advice.position.y >= objective.end.y,
+				"morning meal, objective and repair notice occupy separate visible rows")
+		_event("morning_layout", {"case":tag, "card":str(card), "meal":str(food), "lines":scene._return_text.get_line_count()})
+
+
+func _retry_hunger_return() -> void:
+	if not _pay_for_training(4): return
+	app.progress_session.fault_hook = func(point: String) -> Error:
+		if point == "before_record_write" and is_instance_valid(app.expedition) and app.expedition.phase == Expedition.Phase.FINISHED:
+			return ERR_CANT_CREATE
+		return OK
+	var world: Expedition = await _empty_return()
+	app.progress_session.fault_hook = Callable()
+	if not is_instance_valid(world): return
+	if not _ok(app._progress_dirty and app._progress_blocked and app._pending_settlement.is_empty()
+		and app.get_node("Interface/Screen/Result/Heading").text == "结算未应用"
+		and not app.get_node("Interface/Screen/Result/Scroll/Body").text.contains("饥饿死亡"),
+		"failed result preparation keeps morning losses hidden and offers retry"): return
+	await app._confirm_result_ui()
+	var saved: Dictionary = app.progress_session.inspect()
+	_ok(saved.get("state") == "ENDED" and app.day == 3 and app.phase == AppMain.Phase.RESULT
+		and app.get_node("Interface/Screen/Result/Backdrop/MorningCamp").is_visible_in_tree()
+		and app.get_node("Interface/Screen/Result/Scroll/Body").text.contains("餐后饥饿死亡：顾予安、夏之遥"),
+		"retry of frozen packet commits a single night and reveals both names in the morning")
+
+
 func _hunger_route() -> void:
 	# Separate directed consequence check: deliberately return without searching.
 	# Three real meals spend the opening four food, then invoke the original
 	# FrozenSettlement starvation policy. Never counted as the ten-day route.
 	for outing: int in range(3):
 		var before: Dictionary = app.camp_snapshot()
-		app.open_mission_select()
-		if not await _wait(func() -> bool: return app.mission_select.visible and not app.mission_select.loading and not app.mission_select.daily_offers.is_empty(), "hunger control loads formal cards"): return
-		var chosen: int = -1
-		for index: int in range(app.mission_select.daily_offers.size()):
-			if app.mission_select.daily_offers[index].type == "supply" and not app.mission_select.choices[index].disabled:
-				chosen = index
-				break
-		if not _ok(chosen >= 0, "hunger control has a normal food mission"): return
-		app.mission_select._choose(chosen)
-		app.mission_select._confirm_departure()
-		if not _ok(app.phase == AppMain.Phase.EXPEDITION and not app._progress_blocked, "hunger control departs formally"): return
-		var world: Expedition = app.expedition
-		world.set_physics_process(false)
-		world.set_process(false)
-		if not await _advance(world, func() -> bool: return not world.bus_view.running(), "hunger control arrival"): return
-		world.command_move(world.layout.bus_door)
-		if not await _advance(world, func() -> bool: return world.elapsed >= world.tuning.bus_ready_seconds, "hunger control waits for ready bus"): return
-		world.request_bus_action()
-		world.request_bus_gather()
-		if not await _advance(world, func() -> bool: return world.phase == Expedition.Phase.FINISHED, "hunger control extracts living pair"): return
-		if not await _advance(world, func() -> bool: return app.phase == AppMain.Phase.RESULT and not world.bus_view.running(), "hunger control frozen return UI"): return
+		var world: Expedition = await _empty_return()
+		if not is_instance_valid(world): return
 		var pending: Dictionary = app._pending_settlement
-		if outing < 2:
-			if not _ok(not pending.is_empty() and app.day == int(before.day), "ordinary hunger-control return remains an uncommitted frozen preview"): return
-		else:
-			# AppResults commits FAILED outcomes before presenting the terminal UI.
-			var terminal: Dictionary = app.progress_session.inspect()
-			if not _ok(pending.is_empty() and terminal.error == OK and terminal.state == "ENDED"
-				and terminal.receipt.phase == "COMMITTED" and app.day == int(before.day) + 1,
-				"starvation terminal is automatically committed by the production result controller"): return
-			pending = terminal.camp
-			_ok(terminal.receipt.envelope.result.hunger.victim_ids.size() == 2
-				and app.get_node("Interface/Screen/Result/Heading").text == "旅程结束 · 口粮耗尽",
-				"frozen starvation victims and actual terminal UI agree")
+		if not _ok(not pending.is_empty() and app.day == int(before.day), "return remains a frozen preview until confirming camp"): return
+		if outing == 2:
+			var preview: String = app.get_node("Interface/Screen/Result/Scroll/Body").text
+			_ok(app.get_node("Interface/Screen/Result/Heading").text == "巴士归航"
+				and preview.contains("本次口粮缺口 2 粮") and not preview.contains("饥饿死亡")
+				and not preview.contains("生命0/") and not preview.contains("旅程已结束")
+				and not app._battle_new_button.visible, "evening shows the shortfall without revealing overnight fates")
 		_ok(world.food_loot == 0 and world.living_count() == 2 and pending.last_day.food_consumed == (2 if outing < 2 else 0)
 			and pending.last_day.food_shortage == (0 if outing < 2 else 2) and pending.food == (2 if outing == 0 else 0), "three real returns exhaust four initial food without resource edits")
-		if outing < 2: await app._confirm_result_ui()
+		await app._confirm_result_ui()
 		var after: Dictionary = app.camp_snapshot()
 		_event("hunger_return", {"outing":outing + 1, "day":before.day, "ledger":after.last_day, "state":_stats(after), "deaths":after.journey.deaths})
 		var saved: Dictionary = app.progress_session.inspect()
 		if not _ok(saved.error == OK and TransactionReceipt.same(saved.camp, after), "hunger consequence is durably saved"): return
+		if outing == 2:
+			var morning: String = app.get_node("Interface/Screen/Result/Scroll/Body").text
+			_ok(saved.state == "ENDED" and saved.receipt.phase == "COMMITTED"
+				and saved.receipt.envelope.result.hunger.victim_ids.size() == 2
+				and app.get_node("Interface/Screen/Result/Heading").text == "第 %d 天清晨 · 营地" % int(after.day)
+				and app.get_node("Interface/Screen/Result/Backdrop/MorningCamp").is_visible_in_tree()
+				and morning.contains("旅程结束 · 口粮耗尽") and morning.contains("餐后饥饿死亡：顾予安、夏之遥"),
+				"committed next morning reveals both overnight losses at camp and ends journey")
 	var final: Dictionary = app.camp_snapshot()
 	_ok(final.journey.state == "FAILED" and RosterState.living_count(final) == 0 and final.journey.deaths.size() == 2
 		and final.journey.deaths.all(func(death: Dictionary) -> bool: return death.cause == "STARVATION")

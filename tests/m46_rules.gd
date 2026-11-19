@@ -46,21 +46,21 @@ func _facility_cases(fresh: Dictionary) -> void:
 	_check(CampFacilities.upgraded(after) and after.cash == before.cash - 10 and after.camp_spending == before.camp_spending + 10
 		and TransactionReceipt.same(after.last_day, before.last_day) and CampEdit.propose(after, request).is_empty(),
 		"exact debit, previous ledger retained, and duplicate denied")
-	_check(CampFacilities.offered_food(after, int(before.last_day.day), true) == 2
-		and CampFacilities.offered_food(after, int(after.day), false) == 0, "upgrade only applies to future successful returns")
-	var settled: Dictionary = _returned(after, 0)
-	var result: Dictionary = {"food": CampEconomy.post_battle_food(int(after.day), after.crew, int(after.food), 0, 1, true, 3),
-		"battle": {"food": 0, "evacuated": true}}
-	_check(settled.last_day.facility_food == 3 and TransactionReceipt.camp_problem(settled).is_empty()
-		and CampFacilities.result_problem(after, settled, result).is_empty(), "later ledger credits exactly three and validates from departure")
-	var overflow: Dictionary = CampEconomy.post_battle_food(int(after.day), after.crew, CampRules.FOOD_LIMIT - 2, 1, 1, true, 3)
-	_check(overflow.facility_stored == 1 and overflow.facility_food - overflow.facility_stored == 2
-		and not SurvivalContracts.food_problem(overflow).is_empty(), "capacity tracks facility overflow and legacy validation rejects tier-two ledger")
+	_check(CampFacilities.offered_food(after, int(before.last_day.day), true, 4) == 1
+		and CampFacilities.offered_food(after, int(after.day), false, 4) == 0, "upgrade only applies to future successful returns")
+	var settled: Dictionary = _returned(after, 4)
+	var result: Dictionary = {"food": CampEconomy.post_battle_food(int(after.day), after.crew, int(after.food), 4, 1, true, 2),
+		"battle": {"food": 4, "evacuated": true}}
+	_check(settled.last_day.facility_food == 2 and TransactionReceipt.camp_problem(settled).is_empty()
+		and CampFacilities.result_problem(after, settled, result).is_empty(), "tier two processes four field rations into two bonus rations")
+	var overflow: Dictionary = CampEconomy.post_battle_food(int(after.day), after.crew, CampRules.FOOD_LIMIT - 5, 4, 1, true, 2)
+	_check(overflow.facility_stored == 1 and overflow.facility_food - overflow.facility_stored == 1
+		and not SurvivalContracts.food_problem(overflow, 1).is_empty(), "capacity tracks bonus overflow and a different grant fails validation")
 	var old: Dictionary = before.duplicate(true)
 	old.journey.campaign.midgame.version = CampFacilities.VERSION
 	old.journey.campaign.midgame.erase("upgraded_day")
 	_check(TransactionReceipt.camp_problem(old).is_empty() and CampEdit.propose(old, request).is_empty()
-		and CampFacilities.offered_food(old, int(old.day), true) == 2, "legacy camp keeps the original ledger and cannot opt into tier two")
+		and CampFacilities.offered_food(old, int(old.day), true, 4) == 1, "single-level facility applies its cap and cannot opt into tier two")
 
 
 func _workshop_cases(fresh: Dictionary) -> void:
@@ -117,7 +117,7 @@ func _returned(before: Dictionary, field_food: int) -> Dictionary:
 	after.day = int(before.day) + 1
 	after.settled_sorties = int(before.settled_sorties) + 1
 	after.last_settlement_id = "%s:%d" % [before.profile_id, after.settled_sorties]
-	var facility_food: int = CampFacilities.offered_food(before, int(before.day), true)
+	var facility_food: int = CampFacilities.offered_food(before, int(before.day), true, field_food)
 	after.last_day = CampEconomy.post_battle_food(int(before.day), before.crew, int(before.food), field_food, 1, true, facility_food)
 	after.food = after.last_day.food_after
 	after.camp_spending = 0

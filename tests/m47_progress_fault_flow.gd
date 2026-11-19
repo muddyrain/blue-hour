@@ -128,6 +128,8 @@ func _starvation() -> void:
 		final.step(STEP)
 		if tick % 28 == 0:
 			await _frame()
+	if not app._pending_settlement.is_empty() and ReturnFeedback.has_overnight_shortage(app._pending_settlement):
+		await app._confirm_result_ui()
 	var state: Dictionary = app.progress_session.inspect()
 	var result: Dictionary = state.get("receipt", {}).get("envelope", {}).get("result", {})
 	var projection: Dictionary = app.progress_session.catalog_state()

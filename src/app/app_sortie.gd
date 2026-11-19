@@ -237,7 +237,7 @@ func _on_expedition_finished(report: Dictionary, sortie_id: String) -> void:
 		else:
 			var failed: bool = app._pending_settlement.journey.state == "FAILED"
 			app._present_finished_battle()
-			if report.evacuated and not failed and app.expedition.bus_view != null:
+			if report.evacuated and (not failed or ReturnFeedback.has_overnight_shortage(app._pending_settlement)) and app.expedition.bus_view != null:
 				app._screen.hide()
 				app.expedition.bus_view.departed.connect(func() -> void: app._screen.show(),app.CONNECT_ONE_SHOT)
 				app.expedition.bus_view.departure()
@@ -246,7 +246,7 @@ func _on_expedition_finished(report: Dictionary, sortie_id: String) -> void:
 		app._status.text = "结算数据无效，营地与旧档未改变。"
 		app.get_node("Interface/Screen/Result/Heading").text = "结算未应用"
 		app.get_node("Interface/Screen/Result/Scroll/Body").text = app._progress_message+"\n本次行动仍保留在事务记录中，不能退回旧档绕过。"
-		app.get_node("Interface/Screen/Result/Continue").text = "返回首页 / 保留阻塞"
+		app.get_node("Interface/Screen/Result/Continue").text = "重试归航保存 →" if prepared.get("retry_packet", false) else "返回首页 / 保留阻塞"
 		return
 	var ledger: Dictionary = app._pending_settlement.last_day
 	app._status.text = "完整结果已冻结；返回营地确认提交。重启后继续使用同一结果。"

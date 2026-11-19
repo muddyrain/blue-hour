@@ -183,7 +183,8 @@ func _build_blue_hour_header() -> void:
 	_shortage_text = CampStyle.label("")
 	_shortage_text.hide()
 	add_child(_shortage_text)
-	_return_summary = _blue_hour_panel("ReturnSummary", Rect2(20, 630, 936, 74), CampStyle.PANEL)
+	_return_summary = _blue_hour_panel("ReturnSummary", Rect2(20, 634, 936, 70), CampStyle.PANEL)
+	_return_summary.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	var return_row: HBoxContainer = HBoxContainer.new()
 	return_row.add_theme_constant_override("separation", 20)
 	_return_summary.add_child(return_row)
@@ -207,6 +208,7 @@ func _build_blue_hour_header() -> void:
 	_return_close.pressed.connect(_dismiss_return_summary)
 	return_row.add_child(_return_close)
 	_return_text = CampStyle.label("", 16)
+	_return_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return_details.add_child(_return_text)
 	_return_objective = CampStyle.label("", 14, CampStyle.TEAL)
 	return_details.add_child(_return_objective)
@@ -500,14 +502,14 @@ func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, r
 		scene_buttons[&"bus"].disabled = not can_depart
 	_return_summary.visible = not last.is_empty() and String(data.last_settlement_id) != _dismissed_return_id
 	if not last.is_empty():
-		var facility_meal: bool = int(last.get("facility_food", 0)) > 0
 		var task: Dictionary = last.get("task", {})
-		var extended: bool = facility_meal or not task.is_empty()
-		CampStyle.place(_return_summary, Rect2(20, 610, 936, 94) if extended else Rect2(20, 634, 936, 70))
 		var returned_weapons: Array = data.weapons.filter(func(item: Dictionary) -> bool:
 			return item.get("acquired_sortie") == data.last_settlement_id)
 		_return_goods.text = "入库 %d 币 · %d 件武器" % [last.cash_gained, returned_weapons.size()]
 		_return_text.text = ReturnFeedback.food_text(last)
+		var morning: String = ReturnFeedback.starvation_text(data.crew, data.journey.deaths, data.last_settlement_id)
+		if not morning.is_empty():
+			_return_text.text = "第 %d 天清晨 · %s\n%s" % [int(data.day), morning, _return_text.text]
 		_return_objective.visible = not task.is_empty()
 		_return_objective.text = TaskActions.summary_text(task) if not task.is_empty() else ""
 		_return_advice.text = "损坏武器可先在武器整备中维修，再配装。"
@@ -522,7 +524,6 @@ func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, r
 		eligibility_text.text = TaskActions.summary_text(last.task)
 		eligibility_text.tooltip_text = eligibility_text.text
 	eligibility_text.add_theme_font_size_override("font_size", 22 if eligibility_text.text.length() > 18 else 26)
-	_fit_return_summary.call_deferred()
 	notice.text = feedback if not feedback.is_empty() else "点击院内设施或同行者   ·   Tab 切换   ·   Enter 确认   ·   Esc 返回"
 	notice.tooltip_text = notice.text
 	hotspots[&"bus"].disabled = not can_depart
@@ -538,13 +539,6 @@ func _refresh_blue_hour(data: Dictionary, daily: Dictionary, can_depart: bool, r
 			_refresh_blue_hour_member(button, data, id)
 	_link_focus()
 	_resize_world()
-
-
-func _fit_return_summary() -> void:
-	if not _return_summary.visible:
-		return
-	var height: float = maxf(70.0, _return_summary.get_combined_minimum_size().y)
-	CampStyle.place(_return_summary, Rect2(20, 704 - height, 936, height))
 
 
 func _dismiss_return_summary() -> void:

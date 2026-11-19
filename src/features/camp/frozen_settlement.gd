@@ -63,7 +63,7 @@ static func _profiled_compute(input: Dictionary) -> Dictionary:
 			if BuildAuthority.ability(event) and BuildState.enabled(before): continue
 			if event.instance_id != participant.weapon_instance_id or event.weapon_id != equipped.weapon_id:
 				return _reject("GROWTH_EQUIPMENT_OWNER")
-	var facility_food: int = CampFacilities.offered_food(input.before, int(before.day), report.evacuated)
+	var facility_food: int = CampFacilities.offered_food(input.before, int(before.day), report.evacuated, int(report.food))
 	var food: Dictionary = CampEconomy.post_battle_food(int(before.day), FieldJoinRules.meal_members(after.crew,input.before),
 		int(before.food), int(report.food), int(input.rules.ration_per_member), growth, facility_food)
 	if food.is_empty():

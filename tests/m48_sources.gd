@@ -175,7 +175,7 @@ func _facility_fixture(fresh: Dictionary, tier: int = 2) -> Dictionary:
 
 func _facility_settle(before: Dictionary, after: Dictionary, evacuated: bool = true) -> Dictionary:
 	var report: Dictionary = {"sortie_id":"%s:%d" % [before.profile_id, int(before.settled_sorties) + 1],
-		"evacuated":evacuated, "site_facts":{}}
+		"evacuated":evacuated, "food":6, "site_facts":{}}
 	EconomyBuildV1.settled(before, after, report, {"sites":[]})
 	return after
 
@@ -206,8 +206,8 @@ func _facility_cases(fresh: Dictionary) -> void:
 			"T4 new loot and candidates beyond the exact repair limit stay damaged")
 		_check(WeaponInventory.for_member(after, 1).condition == "ready" and WeaponInventory.for_member(after, 2).condition == "ready",
 			"T4 equipped ready instances retain their existing state")
-		_check(row.food == tier + 1 and row.planning.points == tier,
-			"T4 frozen facility levels determine supply and planning amounts")
+		_check(row.field_food == 6 and row.food == tier and row.planning.points == tier,
+			"T4 tracks the field harvest and caps processed rations at the departure facility level")
 		_check(row.planning.member_id == 1 and row.planning_candidates[0].member_id == 1,
 			"T4 equal trait level and progress break ties by stable member identity")
 		_check(after.crew.map(func(member: Dictionary) -> float: return float(member.health)) == health_before,
@@ -269,12 +269,12 @@ func _facility_cases(fresh: Dictionary) -> void:
 	var recent_build: Dictionary = _facility_fixture(fresh, 0)
 	recent_build.journey.campaign.economy.facilities.supply = {"level":1, "built_sortie":3, "upgraded_sortie":0}
 	recent_build.journey.campaign.economy.edits = [{"op":"build", "target":"supply", "sortie":3}]
-	_check(CampFacilities.offered_food(recent_build, 4, true) == 0 and CampFacilities.offered_food(recent_build, 5, true) == 2,
+	_check(CampFacilities.offered_food(recent_build, 4, true, 4) == 0 and CampFacilities.offered_food(recent_build, 5, true, 4) == 1,
 		"T4 newly constructed supply never repays the already confirmed return")
 	recent_build.journey.campaign.economy.facilities.supply = {"level":2, "built_sortie":1, "upgraded_sortie":3}
 	recent_build.journey.campaign.economy.edits = [{"op":"build", "target":"supply", "sortie":1}, {"op":"upgrade_facility", "target":"supply", "sortie":3}]
-	_check(CampFacilities.offered_food(recent_build, 4, true) == 2 and CampFacilities.offered_food(recent_build, 5, true) == 3
-		and CampFacilities.offered_food(recent_build, 5, false) == 0,
+	_check(CampFacilities.offered_food(recent_build, 4, true, 4) == 1 and CampFacilities.offered_food(recent_build, 5, true, 4) == 2
+		and CampFacilities.offered_food(recent_build, 5, true, 3) == 1 and CampFacilities.offered_food(recent_build, 5, false, 4) == 0,
 		"T4 upgrade preserves the old confirmed amount and only improves the next successful return")
 
 

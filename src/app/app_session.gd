@@ -23,6 +23,9 @@ func _setup_progress(preloaded_state: Dictionary = {}) -> void:
 		app._progress_message = "已有未完成的出击暂存。继续将恢复原战场并消费本次快照，不返回旧营地。"
 	elif state.error == OK and state.state in ["CAMP","RECOVERY_READY","ENDED"]:
 		app._pending_save = state.camp.duplicate(true)
+		if state.receipt.phase == "RESULT_READY" and ReturnFeedback.has_overnight_shortage(state.camp):
+			# The title shows the last confirmed camp until Continue commits the frozen night.
+			app._pending_save = state.receipt.base.duplicate(true)
 		app._requires_continue = true
 		app._progress_message = "事务隔离接线：继续将核对并完成已冻结记录。死亡与缺粮规则未开放。"
 		app._progress_message = "隔离生存测试版：继续核对死亡、装备与旅程；已结束旅程只可查看记录。"
@@ -99,7 +102,7 @@ func _setup_progress(preloaded_state: Dictionary = {}) -> void:
 	var description: Label = app.get_node("Interface/Screen/Title/Description")
 	description.offset_top = 300.0
 	description.offset_bottom = 352.0
-	description.text = "搜集补给和武器后回营，维修、配装再出击；装备与营地进度一同保存。\n原作缺粮可能减员；本版损失候选尚未应用，触发与选人仍待校准。"
+	description.text = "搜集补给和武器后回营，维修、配装再出击。回营过夜后，次日清晨会公布缺粮造成的队员损失。"
 
 
 func _create_progress_session() -> ProductionProgress:
@@ -214,8 +217,9 @@ func use_backup() -> void:
 func save_camp() -> void:
 	if app.phase != app.Phase.TITLE or not app._progress_dirty:
 		return
-	app._accept_transaction(app.progress_session.retry(),true)
-	return
+	var retried: Dictionary = app.progress_session.retry()
+	if app._accept_transaction(retried, true) and retried.state == "ENDED" and ReturnFeedback.has_overnight_shortage(retried.camp):
+		app._show_battle_result(retried.camp, true)
 
 
 func camp_snapshot() -> Dictionary:

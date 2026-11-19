@@ -17,7 +17,7 @@ static func rations(day: int, crew: Array, food: int, rules: CampRules) -> Dicti
 static func post_battle_food(day: int, crew: Array, food: int, found: int, per_member: int, growth: bool = false,
 		facility_food: int = 0) -> Dictionary:
 	if not SurvivalContracts.identity_problem(crew,growth).is_empty() or food < 0 or food > CampRules.FOOD_LIMIT or found < 0 or found > RunSave.MAX_COUNTER or per_member < 1 or per_member > 100 \
-			or facility_food not in [0, CampFacilities.SUPPLY_FOOD, CampFacilities.UPGRADED_SUPPLY_FOOD]:
+			or facility_food < 0 or facility_food > CampFacilities.processed_food(CampFacilities.MAX_SUPPLY_TIER, found):
 		return {}
 	var rules: CampRules = CampRules.new()
 	rules.ration_per_member = per_member

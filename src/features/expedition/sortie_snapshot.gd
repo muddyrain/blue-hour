@@ -343,7 +343,8 @@ static func problem(value: Variant, receipt: Dictionary) -> String:
 				return "XP_ENEMY_STILL_ACTIVE"
 	if TraitState.is_family(receipt.base):
 		var report: Dictionary = {"participants":FieldJoinRules.participants(receipt),"growth_inputs":value.growth,"xp_inputs":value.xp_inputs,"field_joins":receipt.joins,"searched":WorldSites.completed(value.generated.sites,value.sites,"cash")>0 if (value.version==WORLD_VERSION or value.version==NEIGHBORHOOD_VERSION or task_version(value.version)) else value.sites.cash.searched,"food_searched":WorldSites.completed(value.generated.sites,value.sites,"food")>0 if (value.version==WORLD_VERSION or value.version==NEIGHBORHOOD_VERSION or task_version(value.version)) else value.sites.food.searched}
-		if value.version==PERSONA_VERSION or value.version==EXPLORATION_VERSION: report.site_facts=value.sites
+		if value.get("generated", {}).has("sites"):
+			report.site_facts = value.sites
 		var trait_issue: String = TraitRules.inputs_problem(value.get("trait_inputs"),RunTransaction.token_for(receipt),report,FieldJoinRules.context(receipt),value.get("generated",{}))
 		if not trait_issue.is_empty():
 			return trait_issue

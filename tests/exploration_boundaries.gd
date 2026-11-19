@@ -173,7 +173,7 @@ func _work(context: Dictionary, task: Dictionary, tools: bool) -> void:
 	expect(completed.size() == 2 and car.searched and tree.searched and car.progress == 8.0 and tree.progress == 6.0
 		and near(float(completed.get("vehicle_01", {}).get("at", -1)), car_duration, 0.011)
 		and near(float(completed.get("tree_01", {}).get("at", -1)), tree_duration, 0.011), "both real completion clocks match their different eight/six-second bases")
-	expect(world.loot == 1 and world.food_loot == 1 and world.weapon_loot.is_empty() and world.trait_inputs.events.size() == 2, "original completion owner grants each object once with only original category Trait events")
+	expect(world.loot == 1 and world.food_loot == 1 and world.weapon_loot.is_empty() and world.trait_inputs.events.size() == 2, "each completion grants one object reward and records one search event")
 	var before: Dictionary = {"loot":world.loot, "food":world.food_loot, "events":world.trait_inputs.events.size(), "completions":world.completions.size()}
 	expect(not world._complete_search(fast, car) and not world._complete_search(slow, tree), "duplicate completed objects fail before any reward or event")
 	world.request_search(car.id)
@@ -186,7 +186,58 @@ func _work(context: Dictionary, task: Dictionary, tools: bool) -> void:
 	expect(WorldSites.problem(definitions, facts, true).is_empty()
 		and WorldSites.carry(definitions, facts, BINDING.transaction_id, true, task) == {"loot":1, "food":1, "weapons":[]}, "original carry derives bounded rewards from exact completed object facts")
 	observations["work_tools" if tools else "work_without_tools"] = completed
+	if tools:
+		_check_scavenger_return(world, fast, context)
 	world.free()
+
+
+func _check_scavenger_return(world: ClockWorld, scavenger: FieldActor, context: Dictionary) -> void:
+	var task: Dictionary = world.supply.generated
+	var saved: Dictionary = world.trait_inputs.snapshot(world)
+	world.trait_inputs = TraitInputs.new()
+	world.trait_inputs.restore(saved)
+	var optional_id: String = ""
+	for definition: Dictionary in task.sites:
+		if definition.id not in ["tree_01", "vehicle_01"]:
+			_install(world, definition)
+		if optional_id.is_empty() and definition.source == "optional_building":
+			optional_id = definition.id
+	expect(not optional_id.is_empty(), "the generated map offers a fourth material location")
+	if optional_id.is_empty():
+		return
+	for id: StringName in [&"food", StringName(optional_id)]:
+		var site: Expedition.SearchSite = world.search_site(id)
+		scavenger.position = site.door
+		world.request_search(id)
+		world.elapsed += site.seconds
+		world._update_search(site.seconds)
+		expect(site.searched, "another location of the same kind still completes: " + String(id))
+	var trait_input: Dictionary = world.trait_inputs.snapshot(world)
+	var finishers: Dictionary = {}
+	for event: Dictionary in trait_input.events:
+		finishers[event.site_id] = event.member_id
+	expect(finishers.size() == 4 and finishers.get("tree_01") == 1 and finishers.get("vehicle_01") == 2
+		and finishers.get("food") == 2 and finishers.get(optional_id) == 2,
+		"restored and new searches keep the worker who finished each separate location")
+	var before: Dictionary = context.duplicate(true)
+	var fast: Dictionary = SurvivorRoster.member(before.crew, scavenger.member_id)
+	fast.growth.trait.level = 5
+	fast.growth.trait.progress = 10
+	var report: Dictionary = {"xp_inputs":{"diagnostic":false, "events":[]}, "growth_inputs":{"duration_ms":ceili(world.elapsed * 1000.0)},
+		"participants":SurvivalContracts.participants(before.crew, WeaponInventory.snapshot(before), true, true),
+		"trait_inputs":trait_input, "site_facts":WorldSites.facts(world), "field_joins":[], "evacuated":true, "searched":true, "food_searched":true}
+	var after: Dictionary = before.duplicate(true)
+	var result: Dictionary = TraitRules.bank(after, before, report, BINDING, task)
+	expect(result.error.is_empty(), "separate completed sites can settle on one return: " + String(result.error))
+	if result.error.is_empty():
+		var award: Dictionary = GrowthRules.member_row(result.ledger.members, scavenger.member_id)
+		expect(award.source_events == 3 and award.gained == 2 and SurvivorRoster.member(after.crew, 2).growth.trait.progress == 12,
+			"all three searches earn loot and only two points of personal scavenger progress")
+		expect(SurvivorRoster.member(after.crew, 1).growth.trait.progress == 0,
+			"the cover member's earlier food search does not award a shooting trait point")
+	report.trait_inputs.events.pop_back()
+	expect(not TraitRules.inputs_problem(report.trait_inputs, BINDING, report, before, task).is_empty(),
+		"a third completed location remains required in the return even when the worker reached the point cap")
 
 
 func _cancel_and_death(context: Dictionary, task: Dictionary) -> void:
@@ -278,7 +329,7 @@ func _trait_bounds(context: Dictionary, task: Dictionary) -> void:
 		"field_joins":[], "searched":true, "food_searched":false, "site_facts":{}}
 	for site: Dictionary in task.sites:
 		report.site_facts[site.id] = {"searched":false, "progress":0.0}
-	var event: Dictionary = {"member_id":2, "kind":"search_complete", "site":"cash", "at_ms":0}
+	var event: Dictionary = {"member_id":2, "kind":"search_complete", "site_id":"cash", "at_ms":0}
 	var facts: Dictionary = {"ruleset_id":TraitRules.RULESET, "binding":BINDING.duplicate(true), "diagnostic":false, "events":[event]}
 	for fixture: Dictionary in [{"id":"vehicle_01", "kind":"cash", "seconds":8.0}, {"id":"tree_01", "kind":"food", "seconds":6.0}]:
 		for site: Dictionary in task.sites:
@@ -286,7 +337,7 @@ func _trait_bounds(context: Dictionary, task: Dictionary) -> void:
 		report.site_facts[fixture.id] = {"searched":true, "progress":fixture.seconds}
 		report.searched = fixture.kind == "cash"
 		report.food_searched = fixture.kind == "food"
-		event.site = fixture.kind
+		event.site_id = fixture.id
 		event.member_id = 2
 		event.at_ms = floori(float(fixture.seconds) * 0.70 * 0.85 * 0.75 * 1000.0)
 		expect(TraitRules.inputs_problem(facts, BINDING, report, controlled, source).is_empty(), "actual completed %s owns its causal base and fastest real participant" % fixture.id)
@@ -309,7 +360,7 @@ func _trait_bounds(context: Dictionary, task: Dictionary) -> void:
 		report.searched = fixture.kind == "cash"
 		report.food_searched = fixture.kind == "food"
 		event.member_id = 2
-		event.site = fixture.kind
+		event.site_id = fixture.id
 		event.at_ms = floori(float(fixture.fast_seconds) * 0.70 * 0.85 * 0.75 * 1000.0)
 		expect(not TraitRules.inputs_problem(facts, BINDING, report, controlled, source).is_empty(), "unfinished %s cannot lend its shorter base to completed %s" % [fixture.fast, fixture.id])
 		event.at_ms = floori(float(actual.seconds) * 0.70 * 0.85 * 0.75 * 1000.0)

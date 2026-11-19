@@ -154,7 +154,7 @@ static func facility_effect(id: String, tier: int) -> String:
 		return "未建设，尚无出击收益"
 	match id:
 		"supply":
-			return "下次出击成功归航补给 %d 粮，受库存容量限制。" % (tier + 1)
+			return "每带回 2 粮加工出 1 粮，每趟最多加 %d 粮。带回的食物优先入库，加工所得按剩余容量入库。" % tier
 		"workshop":
 			return "下次出击全队换弹耗时减少 %d%%；维修减免 %d 币（最低 1 币）；成功归航自动修复最多 %d 件出发前损坏的闲置武器。开放%s。" % [tier * 5, 4 if tier == 1 else 6, tier, "三种自制枪、枪械二至三级强化、卡宾弹匣" if tier == 1 else "枪械四至五级强化、长管与霰弹弹匣"]
 		"planning":
@@ -306,7 +306,10 @@ static func settled(before: Dictionary, after: Dictionary, report: Dictionary, a
 			target.growth.trait.progress += planning_level
 			target.growth.trait.level = TraitRules.level_for(int(target.growth.trait.progress))
 			planning.after = target.growth.trait.duplicate(true)
-	ledger.returns.append({"sortie":sortie, "transaction_id":transaction, "facilities":state(before).facilities.duplicate(true), "repairs":repairs, "planning":planning, "planning_candidates":candidates, "food":CampFacilities.offered_food(before, int(before.day), true)})
+	var field_food: int = int(report.food)
+	ledger.returns.append({"sortie":sortie, "transaction_id":transaction, "facilities":state(before).facilities.duplicate(true),
+		"repairs":repairs, "planning":planning, "planning_candidates":candidates, "field_food":field_food,
+		"food":CampFacilities.offered_food(before, int(before.day), true, field_food)})
 
 
 static func marker_problem(value: Variant) -> String:
@@ -399,13 +402,16 @@ static func problem(camp: Dictionary) -> String:
 		if unit.spent != spent.get(unit.id, ""): return "ECONOMY_TOOL_CONSUMPTION"
 	previous = 0
 	for row: Variant in ledger.returns:
-		if not row is Dictionary or row.size() != 7 or not row.has_all(["sortie", "transaction_id", "facilities", "repairs", "planning", "planning_candidates", "food"]) or not SurvivalContracts.integer(row.sortie, previous + 1, int(camp.settled_sorties)) or row.transaction_id != "%s:%d" % [camp.profile_id, int(row.sortie)] or not row.facilities is Dictionary or not row.repairs is Array or not row.planning is Dictionary or not row.planning_candidates is Array: return "ECONOMY_RETURN_FIELDS"
+		if not row is Dictionary or row.size() != 8 or not row.has_all(["sortie", "transaction_id", "facilities", "repairs", "planning", "planning_candidates", "food", "field_food"]) or not SurvivalContracts.integer(row.sortie, previous + 1, int(camp.settled_sorties)) or row.transaction_id != "%s:%d" % [camp.profile_id, int(row.sortie)] or not row.facilities is Dictionary or not row.repairs is Array or not row.planning is Dictionary or not row.planning_candidates is Array: return "ECONOMY_RETURN_FIELDS"
+		if not SurvivalContracts.integer(row.field_food, 0, RunSave.MAX_COUNTER): return "ECONOMY_RETURN_FIELD_FOOD"
+		if row.sortie == camp.settled_sorties and (not camp.get("last_day") is Dictionary or row.field_food != camp.last_day.get("food_found")): return "ECONOMY_RETURN_FIELD_FOOD"
 		var supply: int = level_at(camp, "supply", int(row.sortie))
 		var workshop: int = level_at(camp, "workshop", int(row.sortie))
 		var planning: int = level_at(camp, "planning", int(row.sortie))
 		for id: String in FACILITIES:
 			if row.facilities.get(id, {}).get("level") != level_at(camp, id, int(row.sortie)): return "ECONOMY_RETURN_FACILITY"
-		if row.food != (supply + 1 if supply > 0 else 0) or row.repairs.size() > workshop: return "ECONOMY_UNEARNED_AUTO_EFFECT"
+		var expected_food: int = CampFacilities.processed_food(supply, int(row.field_food))
+		if not SurvivalContracts.integer(row.food, expected_food, expected_food) or row.repairs.size() > workshop: return "ECONOMY_UNEARNED_AUTO_EFFECT"
 		var ids: Array[String] = []
 		for identity: Variant in row.repairs:
 			if not identity is String or identity in ids: return "ECONOMY_AUTO_REPAIR_ID"

@@ -8,8 +8,8 @@ const SUPPLY: String = "supply"
 const WORKSHOP: String = "workshop"
 const BUILD_COST: int = 12
 const UPGRADE_COST: int = 10
-const SUPPLY_FOOD: int = 2
-const UPGRADED_SUPPLY_FOOD: int = 3
+const FOOD_PER_BONUS: int = 2
+const MAX_SUPPLY_TIER: int = 2
 const REPAIR_DISCOUNT: int = 4
 
 
@@ -123,14 +123,20 @@ static func upgrade(before: Dictionary, choice: String) -> Dictionary:
 	return after
 
 
-static func offered_food(camp: Dictionary, day: int, evacuated: bool) -> int:
+static func processed_food(tier: int, field_food: int) -> int:
+	@warning_ignore("integer_division")
+	return mini(tier, maxi(0, field_food) / FOOD_PER_BONUS)
+
+
+static func offered_food(camp: Dictionary, day: int, evacuated: bool, field_food: int) -> int:
+	if not evacuated:
+		return 0
 	if EconomyBuildV1.enabled(camp):
 		var tier: int = EconomyBuildV1.level_at(camp, SUPPLY, day - 1)
-		return tier + 1 if evacuated and tier > 0 else 0
-	if evacuated and selected(camp) == SUPPLY and day >= int(camp.journey.campaign.midgame.built_day):
-		if upgraded(camp) and day >= int(camp.journey.campaign.midgame.upgraded_day):
-			return UPGRADED_SUPPLY_FOOD
-		return SUPPLY_FOOD
+		return processed_food(tier, field_food)
+	if selected(camp) == SUPPLY and day >= int(camp.journey.campaign.midgame.built_day):
+		var tier: int = 2 if upgraded(camp) and day >= int(camp.journey.campaign.midgame.upgraded_day) else 1
+		return processed_food(tier, field_food)
 	return 0
 
 
@@ -144,7 +150,9 @@ static func camp_problem(camp: Dictionary) -> String:
 		if not issue.is_empty(): return issue
 		var current_ledger: Dictionary = camp.get("last_day", {})
 		if current_ledger.is_empty(): return ""
-		var expected_food: int = offered_food(camp, int(current_ledger.get("day", 0)), current_ledger.get("evacuated") == true)
+		if not SurvivalContracts.integer(current_ledger.get("food_found"), 0, RunSave.MAX_COUNTER):
+			return "ECONOMY_RETURN_FIELD_FOOD"
+		var expected_food: int = offered_food(camp, int(current_ledger.get("day", 0)), current_ledger.get("evacuated") == true, int(current_ledger.food_found))
 		return SurvivalContracts.food_problem(current_ledger, expected_food) if expected_food > 0 else "ECONOMY_UNEARNED_FOOD" if has_food_fields(current_ledger) else ""
 	var day: Variant = camp.get("day")
 	var ledger: Variant = camp.get("last_day")
@@ -168,7 +176,9 @@ static func camp_problem(camp: Dictionary) -> String:
 		return ""
 	if not SurvivalContracts.integer(ledger.get("day"), 2, RunSave.MAX_COUNTER):
 		return "MIDGAME_LEDGER_DAY" if has_food_fields(ledger) else ""
-	var expected: int = offered_food(camp, int(ledger.day), ledger.get("evacuated") == true)
+	if not SurvivalContracts.integer(ledger.get("food_found"), 0, RunSave.MAX_COUNTER):
+		return "MIDGAME_RETURN_FIELD_FOOD"
+	var expected: int = offered_food(camp, int(ledger.day), ledger.get("evacuated") == true, int(ledger.food_found))
 	if expected == 0:
 		return "MIDGAME_UNEARNED_FOOD" if has_food_fields(ledger) else ""
 	if not SurvivalContracts.food_problem(ledger, expected).is_empty():
@@ -198,12 +208,12 @@ static func result_problem(before: Dictionary, after: Dictionary, result: Dictio
 	var battle: Variant = result.get("battle")
 	if not food is Dictionary or not battle is Dictionary or not battle.get("evacuated") is bool:
 		return "MIDGAME_RESULT_LEDGER"
-	if food.get("food_before") != before.food or food.get("food_found") != battle.get("food"):
+	if not SurvivalContracts.integer(battle.get("food"), 0, RunSave.MAX_COUNTER) or food.get("food_before") != before.food or food.get("food_found") != battle.food:
 		return "MIDGAME_RESULT_FIELD_FOOD"
 	var ledger: Dictionary = after.last_day
 	if ledger.get("evacuated") != battle.evacuated or ledger.get("food_before") != before.food:
 		return "MIDGAME_RESULT_LEDGER"
-	var expected: int = offered_food(before, int(before.day), battle.evacuated)
+	var expected: int = offered_food(before, int(before.day), battle.evacuated, int(battle.food))
 	if expected == 0 and has_food_fields(food):
 		return "MIDGAME_UNEARNED_FOOD"
 	if expected > 0 and food.get("facility_food") != expected:

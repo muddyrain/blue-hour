@@ -9,12 +9,12 @@ signal navigation_requested(action: StringName)
 const NAMES: Dictionary[String, String] = {"supply": "补给设施", "workshop": "工坊", "planning": "规划室"}
 const UPGRADES: Dictionary[String, String] = {"supply": "扩建补给架", "workshop": "校准台", "planning": "二级规划室"}
 const EFFECTS: Dictionary[String, String] = {
-	"supply": "成功归航应发 2 粮，按营地剩余容量入库。",
+	"supply": "每带回 2 粮加工出 1 粮，每趟最多加 1 粮。",
 	"workshop": "每次维修减免 4 币，最低 1 币。可随出击回收工具箱并改装卡宾枪。",
 	"planning": "成功归航后，向最终存活且特长未满的一名队员发放 1 点特长进度。",
 }
 const UPGRADE_EFFECTS: Dictionary[String, String] = {
-	"supply": "升级后出发且成功归航，设施应发从 2 粮增至 3 粮，按营地剩余容量入库。",
+	"supply": "每带回 2 粮加工出 1 粮，每趟最多加 2 粮。加工所得按剩余容量入库。",
 	"workshop": "开放普通长管步枪的扩容与快拆方案。每件仅可改装一次，消耗 1 工具箱与 8 币。",
 	"planning": "下一次出发后成功归航，向合格队员发放 2 点特长进度。",
 }
@@ -248,7 +248,7 @@ func _request_detail() -> void:
 func _short_effect(choice: String, level: int) -> String:
 	match choice:
 		"supply":
-			return "成功归航补给 %d 粮。" % (level + 1)
+			return "每带回 2 粮加工 1 粮\n每趟最多加 %d 粮" % level
 		"workshop":
 			return "全队换弹耗时 −%d%%。\n每次维修减免 %d 币。" % [level * 5, 4 if level == 1 else 6]
 		"planning":

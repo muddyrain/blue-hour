@@ -91,8 +91,8 @@ func _complete_search(actor: FieldActor, site: Expedition.SearchSite) -> bool:
 		expedition._show_notice("侦察完成 · 已标记 2 处")
 		expedition.refresh_recon_view()
 		return true
-	if expedition.exploration_mode() and site.searched: return false
-	if not expedition.trait_inputs.events.any(func(e: Dictionary) -> bool: return e.site == String(site.kind)) and not expedition.trait_inputs.accept_search(expedition,actor,site.kind,site.id):
+	if site.searched: return false
+	if not expedition.trait_inputs.accept_search(expedition,actor,site.kind,site.id):
 		expedition._show_notice("特性搜集来源未确认，已暂停；不会重复发放收益。")
 		expedition.toggle_pause()
 		return false

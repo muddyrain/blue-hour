@@ -11,7 +11,7 @@ func _init(owner: AppMain) -> void:
 func _present_finished_battle() -> void:
 	var frozen: Dictionary = app._pending_settlement
 	var durable: bool = false
-	if frozen.journey.state == "FAILED":
+	if frozen.journey.state == "FAILED" and not ReturnFeedback.has_overnight_shortage(frozen):
 		durable = app._accept_transaction(app.progress_session.commit_result(), true)
 		if durable:
 			app._pending_settlement = {}
@@ -25,11 +25,26 @@ func _show_battle_result(snapshot: Dictionary, durable: bool) -> void:
 	app._result.show()
 	var ended: bool = snapshot.journey.state == "FAILED" or CampaignState.ended(snapshot)
 	var victory: bool = snapshot.journey.get("campaign",{}).get("outcome")=="VICTORY"
+	var shortage: bool = ReturnFeedback.has_overnight_shortage(snapshot)
+	app.get_node("Interface/Screen/Result/Backdrop/MorningCamp").visible = durable and shortage
 	app._set_pump_victory_visible(false)
 	if app._pump_details_back != null:
 		app._pump_details_back.hide()
+	if shortage and not durable:
+		app.get_node("Interface/Screen/Result/Heading").text = "巴士归航"
+		app.get_node("Interface/Screen/Result/Scroll/Body").text = app._playable_result_text(snapshot, false)
+		if app._progress_blocked:
+			app.get_node("Interface/Screen/Result/Scroll/Body").text += "\n" + app._progress_message
+		app.get_node("Interface/Screen/Result/Scroll").scroll_vertical = 0
+		app.get_node("Interface/Screen/Result/Continue").text = "重试回营过夜 →" if app._progress_blocked else "回营过夜 →"
+		app._battle_new_button.hide()
+		app._battle_new_button.disabled = true
+		app._status.text = app._progress_message if app._progress_blocked else ""
+		return
 	var battle: Dictionary = app.progress_session.inspect().get("receipt", {}).get("envelope", {}).get("result", {}).get("battle", {})
 	app.get_node("Interface/Screen/Result/Heading").text = ("旅程胜利" if durable else "胜利预览 · 待确认保存") if victory else ReturnFeedback.result_heading(snapshot, battle)
+	if durable and shortage:
+		app.get_node("Interface/Screen/Result/Heading").text = "第 %d 天清晨 · 营地" % int(snapshot.day)
 	var text: String = app._playable_result_text(snapshot,durable)
 	app.get_node("Interface/Screen/Result/Scroll/Body").text = text
 	app.get_node("Interface/Screen/Result/Scroll").scroll_vertical = 0
@@ -43,7 +58,9 @@ func _show_battle_result(snapshot: Dictionary, durable: bool) -> void:
 	if victory and not durable and CampFacilities.enabled(snapshot):
 		app.get_node("Interface/Screen/Result/Heading").text = "归航待确认 · 破阵者已倒地"
 		app.get_node("Interface/Screen/Result/Continue").text = "确认归航并保存胜利 →" if not app._progress_blocked else "重试保存终局 →"
-	if victory and durable and CampaignRules.pump_station_enabled(snapshot.journey.campaign):
+	if victory and durable and shortage and CampaignRules.pump_station_enabled(snapshot.journey.campaign):
+		app.get_node("Interface/Screen/Result/Continue").text = "查看胜利画面 →"
+	if victory and durable and not shortage and CampaignRules.pump_station_enabled(snapshot.journey.campaign):
 		app._show_pump_victory(snapshot)
 
 
@@ -99,7 +116,7 @@ func _set_pump_victory_visible(enabled: bool) -> void:
 
 
 func _hunger_policy_text() -> String:
-	return "开发试玩版：战斗阵亡不可恢复；归航时每名原出发存活者消耗1粮。每缺1粮会失去1名队员，最多至全灭。\n新救援同伴本餐不参食，下一次按实际存活者计粮；死者的原武器保留库存。\n搜刮后须发动巴士并集合存活者，确认结算才入账。中途请使用安全暂存；未保存的中断可能无法继续。\n试玩进度独立，旧档不会自动转换。"
+	return "战斗阵亡不可恢复。巴士回营后，带回的食物和库存一起供应当晚的口粮。每名原出发存活者吃 1 粮，每缺 1 粮随机失去一名用餐队员，次日清晨揭晓。\n新救回的同伴首餐豁免，从下次归航开始用餐。死者的原武器保留在库存。\n搜刮后须发动巴士并集合存活者，确认回营后入账。中途可在暂停菜单中安全暂存。"
 
 
 func _member_fate(snapshot: Dictionary, id: int) -> String:
@@ -124,8 +141,12 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	var frozen: Dictionary = state.get("receipt",{}).get("envelope",{}).get("result",{})
 	var meal: Dictionary = frozen.get("food",snapshot.last_day)
 	var battle: Dictionary = frozen.get("battle",{})
+	var shortage: bool = ReturnFeedback.has_overnight_shortage(snapshot)
+	var awaiting_morning: bool = shortage and not durable
 	var text: String = "归航结果 · 已入账\n" if durable else "归航预览 · 确认保存后入账\n"
-	text += ReturnFeedback.return_text(battle, snapshot.crew, snapshot.journey.deaths,
+	if durable and shortage:
+		text = ("旅程胜利" if snapshot.journey.get("campaign", {}).get("outcome") == "VICTORY" else ReturnFeedback.result_heading(snapshot, battle)) + "\n"
+	text += ReturnFeedback.return_text(battle, snapshot.crew, [] if awaiting_morning else snapshot.journey.deaths,
 		String(snapshot.last_settlement_id)) + "\n"
 	var catalog_notice: String = app._catalog_result_notice(snapshot) if durable else ""
 	if not catalog_notice.is_empty():
@@ -175,7 +196,7 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 		var gained: int = int(WorkshopV1.recovered(generated, battle))
 		text += "本次工具箱 ×%d · %s %d\n" % [gained, "营地库存" if durable else "确认后库存", WorkshopV1.tools(snapshot)]
 	var ended: bool = snapshot.journey.state == "FAILED" or CampaignState.ended(snapshot)
-	if not ended:
+	if not ended and not awaiting_morning:
 		var next_rations: Dictionary = CampEconomy.rations(snapshot.day, snapshot.crew, snapshot.food, app.camp_rules)
 		if next_rations.shortage > 0:
 			text += "下一趟口粮缺口 %d 粮，可优先选择补给。\n" % next_rations.shortage
@@ -195,17 +216,19 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	if CampaignState.is_short(snapshot):
 		var campaign: Dictionary = snapshot.journey.campaign
 		var recorded: Dictionary = campaign
+		if not durable and (awaiting_morning or CampaignRules.is_investigation(campaign)):
+			recorded = app.camp_snapshot().journey.campaign
 		if CampaignRules.is_investigation(campaign):
-			if not durable:
-				recorded = app.camp_snapshot().journey.campaign
 			if not campaign.clues.is_empty():
 				var clue: Dictionary = campaign.clues.back()
 				if clue.transaction_id == snapshot.last_settlement_id:
 					text += "调查线索：%s（%s）\n" % [CampaignRules.CLUE_NAMES[clue.id], "已登记" if durable else "确认后登记"]
 		var display: Dictionary = CampaignRules.display(recorded)
 		text += display.title + " · " + display.progress + "\n"
-		if campaign.outcome == "VICTORY":
+		if campaign.outcome == "VICTORY" and not awaiting_morning:
 			text += "首领真实击败、存活者巴士撤离；" + ("旅程胜利已保存。" if durable else "胜利仅为预览，确认保存成功才结束旅程。") + "\n"
+	if awaiting_morning:
+		return text + "\n回营过夜后，在次日清晨清点队员。"
 	for member: Dictionary in snapshot.crew:
 		var awarded: Dictionary = GrowthRules.member_row(frozen.get("xp",{}).get("members",[]),int(member.id))
 		var fate: String = app._member_fate(snapshot,int(member.id)).replace(" / STARVATION", "").replace(" / BATTLE", "")
@@ -218,7 +241,7 @@ func _playable_result_text(snapshot: Dictionary, durable: bool) -> String:
 	if EconomyBuildV1.enabled(snapshot) and not EconomyBuildV1.state(snapshot).returns.is_empty():
 		var facilities: Dictionary = EconomyBuildV1.state(snapshot).returns.back()
 		if facilities.transaction_id == snapshot.last_settlement_id:
-			text += "\n设施回营收益：补给 %d 粮 · 自动维修 %d 件\n" % [facilities.food, facilities.repairs.size()]
+			text += "\n设施回营收益：加工 %d 粮 · 入库 %d 粮 · 自动维修 %d 件\n" % [facilities.food, int(meal.get("facility_stored", 0)), facilities.repairs.size()]
 			if not facilities.planning.is_empty():
 				var target: Dictionary = SurvivorRoster.member(snapshot.crew, int(facilities.planning.member_id))
 				text += "规划室：%s 特性进度 +%d，等级 %d → %d\n" % [target.call_sign, facilities.planning.points, facilities.planning.before.level, facilities.planning.after.level]

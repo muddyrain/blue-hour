@@ -21,7 +21,7 @@ def main():
     parser.add_argument('--godot', required=True)
     parser.add_argument('--output', type=Path)
     parser.add_argument('--headless', action='store_true', help='Skip native screenshots explicitly')
-    parser.add_argument('--hunger', action='store_true', help='Separate directed three-return starvation control; never part of the ten-day path')
+    parser.add_argument('--hunger', action='store_true', help='Check overnight starvation after empty returns, including partial and total losses')
     args = parser.parse_args()
     output = (args.output or ROOT / '.local' / ('ten-day-' + datetime.datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:8])).resolve()
     if not output.is_relative_to(ROOT / '.local'):
@@ -41,10 +41,15 @@ def main():
     command = [args.godot, '--path', str(ROOT), '--rendering-method', 'gl_compatibility', '--audio-driver', 'Dummy']
     if args.headless:
         command += ['--headless']
-    flags = ['--', '--bh-progress=' + str(output / 'run.enemy-v1.json'), '--bh-audio-settings=' + str(output / 'audio.json')]
     rows = []
-    for mode in (['import', 'hunger'] if args.hunger else ['import', 'new', 'resume', 'verify']):
+    for mode in (['import', 'hunger', 'hunger-partial', 'hunger-reload', 'hunger-retry'] if args.hunger else ['import', 'new', 'resume', 'verify']):
+        case_output = output / mode if mode.startswith('hunger-') else output
+        if mode == 'hunger-reload':
+            case_output = output / 'hunger-partial'
+        case_output.mkdir(exist_ok=True)
+        env['BH_TEN_DAY_OUTPUT'] = str(case_output)
         env['BH_TEN_DAY_MODE'] = mode
+        flags = ['--', '--bh-progress=' + str(case_output / 'run.enemy-v1.json'), '--bh-audio-settings=' + str(case_output / 'audio.json')]
         invocation = command + (['--headless', '--editor', '--import', '--quit'] if mode == 'import' else ['--script', 'res://tests/campaign_ten_day.gd']) + flags
         started = time.monotonic()
         with (output / (mode + '-console.txt')).open('w', encoding='utf8') as log:
